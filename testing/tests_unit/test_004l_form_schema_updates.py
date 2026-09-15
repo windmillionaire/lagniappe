@@ -9,6 +9,7 @@ from google.cloud import datastore
 import pytest
 
 from lagniappe.core.definitions import DeferredJobType
+from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.tools import (
@@ -625,6 +626,8 @@ def test_report_conversion_schema_rejects_flattened_items(external):
 def test_organize_repairs_prepared_conversions_before_returning_plan(
     scope, monkeypatch, invalid_kind, repair_succeeds
 ):
+    from google.genai import types as genai_types
+
     notes = "- [ ] Buy tea\n- [x] Pack mugs"
     scope.tasks[0].db["submission"] = json.dumps({"notes": notes, "count": "000"})
     scope.tasks[-1].db["submission"] = json.dumps(
@@ -668,42 +671,44 @@ def test_organize_repairs_prepared_conversions_before_returning_plan(
     snapshot = {key: deepcopy(entity.db) for key, entity in scope.rows.items()}
     calls, summaries = [], []
 
-    def provider_response(prompt, *, model):
-        calls.append(prompt)
+    def provider_response(*, model, contents, config):
+        calls.append(list(contents))
         assert model == "primary-test"
-        return deepcopy(valid if len(calls) > 1 and repair_succeeds else invalid)
+        proposal = valid if len(calls) > 1 and repair_succeeds else invalid
+        return genai_types.GenerateContentResponse(candidates=[genai_types.Candidate(
+            content=genai_types.Content(role="model", parts=[genai_types.Part.from_text(text=json.dumps(proposal))])
+        )])
 
     monkeypatch.setattr(ai_core.CONFIG, "AI_ENABLED", True)
     monkeypatch.setattr(observability.CONFIG, "AI_OBSERVABILITY", True)
     monkeypatch.setattr(ai_core, "runtime_ai_settings", lambda: {
         "AI_MODEL": "primary-test", "AI_UTILITY_MODEL": "utility-test",
     })
-    monkeypatch.setattr(organize.ai_model, "_generate_content_once", provider_response)
+    monkeypatch.setattr(organize.ai_model, "_client", SimpleNamespace(
+        models=SimpleNamespace(generate_content=provider_response)
+    ))
     monkeypatch.setattr(observability, "_write_summary", lambda summary: summaries.append(summary.payload()))
     monkeypatch.setattr(observability, "prune_old_records", lambda: None)
     prompt = Prompt("Prepare a schema migration.", user=scope.actor, type="organize report")
     prompt.set_allowed_actions(("update_form_schema", "needs_review"))
     prompt.set_response_schema(organize.report_proposal_response_schema(prompt.allowed_actions))
     prompt.add_output_contract("JSON", "Return a complete proposal.")
-    result = organize.generate_organize_plan(prompt)
-
-    assert len(calls) == 2
-    assert all(call.model_tier == "primary" for call in calls)
-    assert "update_form_schema" in json.dumps(calls[-1].context_blocks)
-    assert len(summaries) == 2
-    assert summaries[-1]["success"] is True
-    assert summaries[-1]["outcome"] == (
-        "model_repair" if repair_succeeds else "review_fallback"
-    )
+    if repair_succeeds:
+        result = organize.generate_organize_plan(prompt)
+    else:
+        with pytest.raises(exceptions.AIException):
+            organize.generate_organize_plan(prompt)
+    assert len(calls) == (2 if repair_succeeds else 3)
+    assert "Response validation failed" in calls[-1][-1].parts[0].text
+    assert len(summaries) == 1
+    assert summaries[-1]["success"] is repair_succeeds
+    assert summaries[-1]["structured_final_used"] is False
     if repair_succeeds:
         action = result["actions"][0]
         assert action["type"] == "update_form_schema"
         assert action["data"]["conversions"] == candidates
         assert action["_schema_change"]["migration"] is True
         schema_updates.prepare_schema_updates(result, scope.actor, verify=True)
-    else:
-        assert [action["type"] for action in result["actions"]] == ["needs_review"]
-        assert "_schema_change" not in result["actions"][0]
     assert {key: entity.db for key, entity in scope.rows.items()} == snapshot
 
 

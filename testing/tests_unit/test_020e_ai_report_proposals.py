@@ -1,6 +1,12 @@
-"""Focused AI-report characterization coverage."""
+"""Proposal validation and legacy separate-prompt repair characterization.
+
+Native Organize conversation repair is covered with the real GenAI loop below.
+"""
 
 import copy
+import json
+
+from google.genai import types as genai_types
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -14,6 +20,7 @@ from testing.utility.ai_report_fakes import (
     _prompt_context,
     _with_validator,
     _test_user,
+    _fetch_one_from,
 )
 from testing.utility.test_entities import TestEntities
 
@@ -163,7 +170,7 @@ def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][0]["type"] == "attach_file"
     assert len(calls) == 2
@@ -246,7 +253,7 @@ def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
         ],
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert [action["data"]["file"] for action in result["actions"][2:]] == [
         "file-log-id",
@@ -308,7 +315,7 @@ def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch
         ],
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert len(calls) == 2
     assert result["actions"][0]["type"] == "needs_review"
@@ -376,7 +383,7 @@ def test_generate_organize_report_repairs_invalid_action_references_once(monkeyp
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][1]["data"]["page_action"] == "create_sousa_doors_page"
     assert len(calls) == 2
@@ -541,7 +548,7 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert len(calls) == 2
     assert result["actions"][0]["data"]["category"] == "category-id"
@@ -557,53 +564,107 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
 
 
 # @matrix ai-report : repair validation
+# @matrix ai : tool-loop tool-dispatch
 # @source lagniappe/core/tools/ai/organize.py::generate_organize_plan
+# @source lagniappe/core/tools/ai/core.py::GenAI.generate_content
+# @source lagniappe/core/tools/ai/core.py::GenAI._tool_loop
 # @source lagniappe/core/tools/ai/reporting/proposals/repair.py::validate_or_repair_proposal
 @pytest.mark.unit
-def test_generate_remote_organize_repairs_malformed_table_patch(monkeypatch):
+@pytest.mark.parametrize("mode", ["valid", "repair", "invalid_json", "exhausted", "empty_exhausted"])
+def test_organize_conversation_validation_preserves_complete_proposal(monkeypatch, mode):
+    from lagniappe.core.tools.ai import core, functions, observability, settings
+
     user = _test_user("email-travel-owner")
     report = TestEntities.get("REPORT", {
         "name": "Travel details", "parent": user, "user": user,
         "origin": "email", "tool": "organize",
-        "instructions": "Add the three flight reservations and complete the booking task.",
+        "instructions": "Update both bookings, complete both tasks, and append the tour link.",
     })
-    report.origin = "email"
-    report.tool = "organize"
-    invalid = {
-        "summary": "Update flight reservations and complete booking.",
-        "confidence": 1,
-        "actions": [{
-            "id": "flights", "type": "update_form_values",
-            "data": {"updates": [{
-                "task": "flight-task-id", "schema_id": "table-flights",
-                "new_value": {"rows": ["Airline & Flight #", "Confirmation #"]},
-            }]},
-        }, {
-            "id": "done", "type": "complete_task", "depends_on": ["flights"],
-            "data": {"task": "flight-task-id"},
-        }],
-    }
-    repaired = copy.deepcopy(invalid)
+    report.origin, report.tool = "email", "organize"
+    page = TestEntities.get("PAGE", {"name": "College trip"})
+    task = TestEntities.get("TASK", {"name": "Book Plane Tickets"}, page=page)
+    form = TestEntities.get("FORM", {"name": "Flights"})
+    form.form_type = "task"
+    form.schema = [{"id": "table-flights", "type": "table", "title": "Flights", "columns": [
+        {"id": "row-flight", "type": "input", "input": "text", "title": "Flight"},
+        {"id": "row-confirmation", "type": "input", "input": "text", "title": "Confirmation"},
+    ]}]
+    task.form = form
     flights = {"rows": [
-        {"input-flight": "UA1458", "input-confirmation": "PR2FYB"},
-        {"input-flight": "B61680", "input-confirmation": "PSDSX9"},
-        {"input-flight": "UA1434", "input-confirmation": "PSJLBB"},
+        {"row-flight": "UA1458", "row-confirmation": "PR2FYB"},
+        {"row-flight": "B61680", "row-confirmation": "PSDSX9"},
+        {"row-flight": "UA1434", "row-confirmation": "PSJLBB"},
     ]}
-    repaired["actions"][0]["data"]["updates"][0]["new_value"] = flights
-    calls = []
-    def generate(prompt):
-        calls.append(prompt)
-        return copy.deepcopy(invalid if len(calls) == 1 else repaired)
-    monkeypatch.setattr(organize.ai_model, "generate_content", _with_validator(generate))
-
+    proposal = {"summary": "Update both bookings, complete both tasks, and append the tour link.",
+        "confidence": 1, "issues": [], "actions": [
+        {"id": "flights", "type": "update_form_values", "data": {"updates": [{
+            "task": task.urlsafe_key, "schema_id": "table-flights", "new_value": flights,
+        }]}},
+        {"id": "hotels", "type": "update_form_values", "data": {"updates": [{
+            "task": "hotel-task-id", "schema_id": "textarea-booking", "new_value": "Confirmed hotel",
+        }]}},
+        {"id": "flight-done", "type": "complete_task", "depends_on": ["flights"], "data": {"task": task.urlsafe_key}},
+        {"id": "hotel-done", "type": "complete_task", "depends_on": ["hotels"], "data": {"task": "hotel-task-id"}},
+        {"id": "tour", "type": "append_page_document", "data": {"page": page.urlsafe_key, "document_markdown": "[Tour](https://example.com/tour)"}},
+    ]}
+    invalid = copy.deepcopy(proposal)
+    invalid["actions"][0]["data"]["updates"][0]["new_value"] = {"rows": ["Flight", "Confirmation"]}
+    reads, requests, summaries = [], [], []
+    def get_schema(args, actor):
+        reads.append(args)
+        return {"schema": form.schema, "evidence": "All three confirmed flights"}
+    def response(value=None, tool=False):
+        part = (genai_types.Part.from_function_call(name="get_schema", args={"id": task.urlsafe_key})
+                if tool else genai_types.Part.from_text(text=value if isinstance(value, str) else json.dumps(value)))
+        return genai_types.GenerateContentResponse(candidates=[genai_types.Candidate(
+            content=genai_types.Content(role="model", parts=[part])
+        )])
+    if mode == "valid":
+        responses = [response(tool=True), response(proposal)]
+    elif mode in {"exhausted", "empty_exhausted"}:
+        failed = "" if mode == "empty_exhausted" else invalid
+        responses = [response(tool=True), response(failed), response(failed), response(failed)]
+    else:
+        responses = [response(tool=True), response("{broken JSON" if mode == "invalid_json" else invalid),
+                     response(tool=True), response(proposal)]
+    def generate_content(**kwargs):
+        requests.append({**kwargs, "contents": list(kwargs["contents"])})
+        return responses[len(requests) - 1]
+    monkeypatch.setitem(functions.HANDLERS, "get_schema", get_schema)
+    monkeypatch.setattr(core.ai_model, "_client", SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)))
+    monkeypatch.setattr(settings.site_database, "ai", lambda: None)
+    monkeypatch.setattr(observability, "prune_old_records", lambda: None)
+    monkeypatch.setattr(observability, "_write_summary", lambda summary: summaries.append(summary.payload()))
+    monkeypatch.setattr(organize.Entities, "fetch_one", _fetch_one_from({task.urlsafe_key: task}))
     prompt = organize.organize_prompt(report, user)
-    assert prompt._organize_update_only
-    result = organize.generate_organize_report(prompt, report, user)
-
-    assert len(calls) == 2
-    assert "must be an object keyed by column ids" in _prompt_context(calls[1], "Validation Error")
-    assert result["actions"][0]["data"]["updates"][0]["new_value"] == flights
-    assert result["actions"][1]["depends_on"] == ["flights"]
+    prompt.set_max_tool_iterations(2)
+    if mode in {"exhausted", "empty_exhausted"}:
+        expected_error = "no text content" if mode == "empty_exhausted" else "must be an object keyed by column ids"
+        with pytest.raises(exceptions.AIException, match=expected_error):
+            organize.generate_organize_report(prompt, report, user)
+        assert len(requests) == 4
+    else:
+        result = organize.generate_organize_report(prompt, report, user)
+        assert len(result["actions"]) == 5
+        assert result["actions"][0]["data"]["updates"][0]["new_value"] == flights
+        assert result["actions"][2]["depends_on"] == ["flights"]
+        assert result["actions"][3]["depends_on"] == ["hotels"]
+        assert "https://example.com/tour" in result["actions"][4]["data"]["document"]
+        assert len(requests) == (2 if mode == "valid" else 4)
+    assert len(reads) == 1  # The correction's repeated schema read uses the same cache.
+    assert len({request["model"] for request in requests}) == 1
+    assert all(request["config"].response_schema is None for request in requests)
+    assert len(summaries) == 1
+    assert summaries[0]["structured_final_used"] is False
+    assert summaries[0]["provider_requests"] == len(requests)
+    assert summaries[0]["success"] is (mode not in {"exhausted", "empty_exhausted"})
+    if mode != "valid":
+        history = requests[-1]["contents"]
+        text = "\n".join(part.text or "" for content in history if not isinstance(content, str) for part in content.parts)
+        assert "Response validation failed" in text
+        assert "complete corrected JSON response" in text
+        assert any(part.function_response for content in history if not isinstance(content, str) for part in content.parts)
+        assert len(history) > len(requests[1]["contents"])
 
 
 # @matrix ai-report : repair required-data
@@ -678,7 +739,7 @@ def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch)
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][0]["data"]["name"] == "Family Records"
     assert result["actions"][1]["data"]["from_page"] == "richardson-source-page-id"
@@ -756,7 +817,7 @@ def test_generate_organize_report_repairs_missing_add_page_category_target(monke
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][0]["type"] == "needs_review"
     assert len(calls) == 2
@@ -771,7 +832,7 @@ def test_generate_organize_report_repairs_missing_add_page_category_target(monke
 
 # @matrix ai-report : submission validate
 @pytest.mark.unit
-def test_generate_organize_plan_leaves_form_submission_for_completion(monkeypatch):
+def test_legacy_organize_validation_accepts_pending_submission(monkeypatch):
     invalid = {
         "summary": "Create a pharmacy page.",
         "confidence": 0.7,
@@ -826,10 +887,12 @@ def test_generate_organize_plan_leaves_form_submission_for_completion(monkeypatc
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.validate_or_repair_proposal(
+        prompt, invalid, allow_pending_submissions=True
+    )
 
     assert "submission" not in result["actions"][0]["data"]
-    assert len(calls) == 1
+    assert len(calls) == 0
 
 
 
@@ -893,7 +956,7 @@ def test_generate_organize_report_repairs_empty_form_schema_without_capture(monk
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][0]["type"] == "needs_review"
     assert len(calls) == 2
@@ -960,7 +1023,7 @@ def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypat
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     fields = result["actions"][0]["data"]["schema"]
     assert [field["id"] for field in fields] == [
@@ -1022,7 +1085,7 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     field = result["actions"][0]["data"]["operations"][0]["field"]
     assert field == {
@@ -1088,7 +1151,7 @@ def test_generate_organize_report_infers_create_form_type_from_usage(monkeypatch
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][0]["data"]["form_type"] == "page"
     assert len(calls) == 1
@@ -1161,7 +1224,7 @@ def test_generate_organize_report_infers_unambiguous_add_form_reference(monkeypa
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["actions"][2]["data"] == {
         "page": "toft-property-tax-page",
@@ -1258,7 +1321,7 @@ def test_generate_organize_report_reviews_ambiguous_missing_add_form_reference(
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert [action["type"] for action in result["actions"]] == [
         "create_form",
@@ -1334,7 +1397,7 @@ def test_generate_organize_report_reviews_unresolved_references_after_failed_rep
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert [action["type"] for action in result["actions"]] == [
         "skip",
@@ -1395,7 +1458,7 @@ def test_generate_organize_report_downgrades_malformed_action_after_failed_repai
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert result["summary"] == "Create a divorce form."
     assert result["confidence"] == 0.5
@@ -1473,7 +1536,7 @@ def test_generate_organize_report_downgrades_missing_category_without_sentry_cap
         user=None,
     )
 
-    result = organize.generate_organize_plan(prompt)
+    result = organize.generate_validated_proposal(prompt)
 
     assert [action["type"] for action in result["actions"]] == [
         "create_page",

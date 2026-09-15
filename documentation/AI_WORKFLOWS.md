@@ -72,20 +72,30 @@ Organize evaluates an upload batch as a whole:
 1. finalize direct uploads one at a time and checkpoint `upload_manifest`;
 2. generate and save a summary plus at most two search terms for each File;
 3. query up to five Category/Page/Form candidates per term from Redis;
-4. plan workspace structure with the primary model and read tools;
-5. validate file coverage, references, action shapes, and ordering;
-6. repair locally or through one model pass when needed; and
-7. run a focused form-completion generation only for form-backed targets.
+4. inspect targets and schemas, then author the complete proposal including final
+   form values and all requested updates/completions/document additions;
+5. validate file coverage, references, action shapes, schema conversions and ordering;
+6. apply safe mechanical corrections, or return the precise validation error to
+   the same model conversation for at most two correction attempts.
+
+A valid candidate is accepted directly, without another model rewriting its JSON.
+Correction turns retain prior tool results and the exact-call cache; they share
+one pinned model and the existing tool-round budget. Technical validation failure
+raises a generation error if corrections are exhausted. It does not become a
+generic question with a stale success summary. Models may still propose
+`needs_review` for genuinely ambiguous intent or conflicting evidence.
 
 Planning preflight compares each requested outcome with its executable target
 actions; summaries must describe only those actions and omissions belong in
-review issues. Form completion cannot add missing tasks or document actions.
-Table submissions validate their rows and exact column ids before the proposal
-is accepted, with one corrective generation on malformed output. Execution
-validates all patches on detached fields before changing a submission. Invalid
-values fail the action and block dependent completions; they are not successful
-skips. Older reports with skipped submission errors display those errors instead
-of an unconditional “Work done.”
+review issues. Existing-target table patches are checked against current schemas
+(and preceding schema updates), including internal-link resolution, before
+acceptance. References to newly created action targets or newly assigned forms are checked
+at execution.
+Execution validates all patches on detached fields before changing a submission.
+Table cells propagate validation errors to their table; a missing internal-link
+record cannot silently disappear while its task is marked complete. Failed
+updates block dependent completions. Older reports with skipped submission errors
+display those errors instead of an unconditional “Work done.”
 
 Finalized uploads remain report-only evidence before browser execution. They
 are addressable through the owning report and its exact file references, but
@@ -96,7 +106,10 @@ and on-site Organize uploads.
 
 The stages `uploads_finalized`, `summaries_ready`, `plan_ready`, and
 `ready_to_apply` are durable. A retry resumes without repeating completed
-uploads, summaries, or planning.
+uploads, summaries, or planning. New `plan_ready` checkpoints include
+`proposal_complete: true` and proceed directly to `ready_to_apply`. Older upload
+checkpoints without that marker retain the legacy completion path so a deployment
+update can resume an already-prepared structural plan safely.
 
 Planning clusters Files by stable subject and chooses specific existing or new
 Pages. It does not create one Page per document by default or use a broad
@@ -104,8 +117,8 @@ overview Page as a catch-all. A Category default Page form is proposed only
 when nearly every Page is an instance of one small repeated schema.
 
 Every uploaded File must appear in an executable attachment action with an
-exact target. If repair cannot produce complete safe coverage, the result is a
-review-only proposal. Large or unreadable Files remain represented by metadata
+exact target. If corrections cannot produce complete safe coverage, generation
+fails with its validation error. Large or unreadable Files remain represented by metadata
 and visible issues so the proposal does not silently drop evidence.
 
 Website, API/MCP, and email Organize support the same fileless existing-record
@@ -120,7 +133,7 @@ No additional toolbar option or top-level completion command is introduced.
 The update profile omits upload summaries, retrieval prepasses, and secondary
 form completion. Its planner authors final field patches directly, including
 on revision or validation repair. Once uploads are supplied, normal file
-coverage and completion obligations apply. External starters return a compact
+coverage and final-value obligations apply. External starters return a compact
 action contract; `start_organize(actions=[...])` can include selected schemas in
 that first response. Clients request additional schemas and guidance on demand.
 Table-shaped patches are checked during proposal validation, so malformed row
@@ -135,6 +148,15 @@ Autofill is a direct mutation for one Page or Task form. Its prompt includes:
 - compact parent Page and Category context for Tasks;
 - the target document where applicable; and
 - readable Files attached directly to the target.
+
+Existing answers use the same exact field-ID projection as `get_schema`, including
+typed table cells. Labels are context, never submission keys. Autofill validates
+the response against the target's effective schema using the same detached field
+validator as Organize. Unknown IDs and invalid values enter the shared conversation
+correction loop (at most two corrections); generation is marked validated only
+after this check succeeds. Existing nonempty answers, including false and zero,
+remain authoritative. Guarded apply validates all new values before mutation and
+preserves existing stored answers without converting them through AI text again.
 
 It excludes Task history, sibling Tasks, completed Page Tasks, parent-Page Files,
 and general workspace lookup. Google Search may supply focused public facts.
@@ -180,6 +202,9 @@ Ask, and reveals a newly created report's category.
 
 List snippets flatten Markdown to plain text and show at most five lines at
 the current screen width. Full summaries remain available in each report.
+Document creation and append details show plain-text previews limited to ten
+lines, with a control to expand the full text. The stored proposal retains the
+complete executable HTML; only its review display is shortened.
 
 On-site and external schema plans carry exact converted values or explicit
 unresolved reasons in `conversions`. The planning model prepares these from the
@@ -275,10 +300,9 @@ changes to saved values. The shared preparation layer records complete affected
 identities and source preconditions for review, and the Form-change adapter
 handles deterministic and AI conversions in the same guarded mutation workflow.
 Both report origins supply strict candidates before approval and execute without
-a provider. Native Organize binds and validates candidates inside its existing
-one-pass proposal repair boundary, before the planning result is checkpointed.
-Malformed candidates can be corrected before review; unsuccessful repair yields
-a non-executable review result. Publication and execution still recheck current
+a provider. Native Organize binds and validates candidates inside its conversation
+validation loop, before the complete result is checkpointed. Malformed candidates
+can be corrected before review; exhausted corrections fail generation. Publication and execution still recheck current
 preconditions. Missing, invalid or stale candidates prevent proposal publication
 or execution; execution never fills in missing conversions. Builder AI conversion
 uses the same adapter without a report and retains its utility-model instructions

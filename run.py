@@ -638,16 +638,24 @@ def run_version_command(command_args: list[str]) -> int:
     return 1
 
 
-def run_upgrade_command(command_args: list[str]) -> int:
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_upgrade_dependencies_runs_dependency_upgrade
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_upgrade_dependencies_rejects_software_upgrade_branch
+# @matrix dependencies : cli-routing upgrade
+def run_dependency_upgrade_command(command_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
-        prog="run.py upgrade",
-        description="Run the maintainer dependency-upgrade workflow.",
+        prog="run.py upgrade-dependencies",
+        description="Upgrade maintainer dependencies to their latest releases, including major versions.",
     )
-    parser.parse_args(command_args)
+    parser.add_argument(
+        "--only", choices=("node", "npm", "python"),
+        help="Run only one ecosystem (useful when resuming after a failed step).",
+    )
+    args = parser.parse_args(command_args)
 
     from runner.upgrade import upgrade_all
 
-    return upgrade_all()
+    return upgrade_all(only=args.only)
 
 
 def _run_release_git(
@@ -1138,8 +1146,8 @@ if __name__ == "__main__":
         sys.exit(mutation_contracts.main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "version":
         sys.exit(run_version_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "upgrade":
-        sys.exit(run_upgrade_command(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "upgrade-dependencies":
+        sys.exit(run_dependency_upgrade_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "release-check":
         sys.exit(run_release_check_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "hosted-e2e":
@@ -1164,7 +1172,7 @@ if __name__ == "__main__":
             "test-server",
             "traceability",
             "template-contracts",
-            "upgrade",
+            "upgrade-dependencies",
             "version",
         ],
     )

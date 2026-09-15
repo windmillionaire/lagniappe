@@ -403,6 +403,7 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
 
 # @matrix agent-api : bearer-only bootstrap contract create-revision organize-revision discovery error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
 # @pairs agent-api:create-revision agent-api:organize-revision agent-api:plan-capability
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -1065,7 +1066,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     assert guidance.status_code == 200, guidance.get_data(as_text=True)
     assert (
-        "author the final summaries and form submissions or updates yourself"
+        "final form submissions and updates in the same proposal"
         in (guidance.json["result"]["guidelines"])
     )
     assert (

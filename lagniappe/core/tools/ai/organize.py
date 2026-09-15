@@ -8,12 +8,8 @@ from .core import ai_model
 from .debug import ai_debug
 from .guidelines import (
     LAGNIAPPE_WORKSPACE_CONCEPTS,
-    ORGANIZE_PLANNING_ACTIONS,
-    ORGANIZE_PLANNING_CONCEPTS,
-    ORGANIZE_PLANNING_OUTPUT,
-    ORGANIZE_PLANNING_POLICY,
-    ORGANIZE_PLANNING_PREFLIGHT,
-    ORGANIZE_PLANNING_TOOLS,
+    ORGANIZE_WORKFLOW,
+    REPORT_PREFLIGHT_CHECKS,
     SCHEMA_TYPE_GUIDELINES,
 )
 from .prompt import Prompt
@@ -113,6 +109,8 @@ ORGANIZE_ACTION_TYPES = frozenset(
         "create_model_task",
         "create_page",
         "create_task",
+        "complete_task",
+        "set_task_due_date",
         "add_form_to_page",
         "add_page_category",
         "update_form_schema",
@@ -184,7 +182,7 @@ to run it.
         """,
         section_title="Organize report task",
     )
-    prompt.add_preflight_checks(ORGANIZE_PLANNING_PREFLIGHT)
+    prompt.add_preflight_checks(REPORT_PREFLIGHT_CHECKS)
 
     return prompt
 
@@ -221,10 +219,9 @@ task choices. Prefer an existing matching form/category/project/model task when
 one is a close conceptual fit; otherwise propose creating the needed structure
 before creating pages or tasks that depend on it.
 
-Do not preserve or generate data.submission or data.updates values. Select the
-right form or exact existing page/task target and assign the exact supporting
-files; the submission completion stage will rebuild form data from the revised
-structure and summaries.
+Preserve correct final submission values and updates. Rebuild only values that
+the feedback or changed structure invalidates, using exact schemas and evidence.
+Return every requested action with complete executable data.
 
 References in current_proposal_json may already be executable stored ids.
 Preserve those references exactly when keeping an existing page/task/form/file;
@@ -234,7 +231,7 @@ do not add a hash: prefix to an existing long id.
         role="revision_task",
         unique=True,
     )
-    prompt.add_preflight_checks(ORGANIZE_PLANNING_PREFLIGHT)
+    prompt.add_preflight_checks(REPORT_PREFLIGHT_CHECKS)
 
     return prompt
 
@@ -272,6 +269,7 @@ def _organize_update_prompt(report, user, feedback=None):
     prompt.add_context(
         "report_action_permissions", report_action_permission_context(user, allowed)
     )
+    prompt.add_instructions(ORGANIZE_WORKFLOW, section_title="Organize workflow")
     prompt.add_instructions(
         ORGANIZE_UPDATE_GUIDELINES, section_title="Organize updates"
     )
@@ -298,13 +296,11 @@ def _organize_prompt_base(
     retrieval_context=None,
 ):
     allowed_actions = _organize_allowed_actions(user)
-    if getattr(report, "origin", None) in {"api", "email"}:
-        allowed_actions = (*allowed_actions, "complete_task", "set_task_due_date")
     prompt = Prompt(intro, user=user, type="organize report")
     prompt.set_instructions_before_context()
     # Leave thinking unset so each primary model uses its native default; a raw
     # token budget can constrain Gemini 3 and makes model A/B tests less comparable.
-    prompt.enable_tools(*READ_ONLY_CONTEXT_TOOLS)
+    prompt.enable_tools(*READ_ONLY_CONTEXT_TOOLS, "get_task_history")
     prompt.set_max_tool_iterations(ORGANIZE_MAX_TOOL_ITERATIONS)
     prompt.set_max_tool_file_parts_per_turn(ORGANIZE_MAX_TOOL_FILE_PARTS_PER_TURN)
     prompt.set_allowed_actions(allowed_actions)
@@ -312,20 +308,16 @@ def _organize_prompt_base(
         report_proposal_response_schema(
             allowed_actions,
             require_issues=True,
-            include_submission_fields=False,
+            include_submission_fields=True,
         )
     )
     prompt.add_output_contract(
         "JSON",
-        permission_filtered_output_contract(
-            ORGANIZE_PLANNING_OUTPUT,
-            allowed_actions,
-        ),
+        "Return summary, confidence, issues and actions using the response schema. "
+        "Include final submissions and field updates; do not return an intermediate plan.",
         include_requirements=False,
     )
-    prompt.add_workspace_concepts(
-        (f"{LAGNIAPPE_WORKSPACE_CONCEPTS}\n\n{ORGANIZE_PLANNING_CONCEPTS.strip()}")
-    )
+    prompt.add_workspace_concepts(LAGNIAPPE_WORKSPACE_CONCEPTS)
     prompt.add_context("current_date", dates.user_today(user).date().isoformat())
     prompt.add_context("user_instructions", report.instructions or "None provided.")
     prompt.add_context(
@@ -364,15 +356,19 @@ reading another guideline bundle.
         """,
         section_title="On-demand guidelines",
     )
-    prompt.add_decision_policy(ORGANIZE_PLANNING_POLICY)
+    prompt.add_decision_policy(ORGANIZE_WORKFLOW)
     prompt.add_instructions(
         report_action_permission_instructions(),
         section_title="Report action permissions",
         role="action_permissions",
         unique=True,
     )
-    prompt.add_instructions(ORGANIZE_PLANNING_TOOLS, role="tool_use")
-    prompt.add_instructions(ORGANIZE_PLANNING_ACTIONS, role="action_planning")
+    prompt.add_instructions(
+        'Read get_guidelines(task="report_actions", actions=[...]) for the chosen '
+        "operations when their rules are not already supplied. Include final "
+        "values using the exact target schemas and preserve all required file attachments.",
+        role="action_planning",
+    )
     return prompt
 
 
@@ -439,35 +435,32 @@ def generate_organize_plan(prompt):
     # @reason Inline validator behavior is exercised through organize generation.
     def validate_plan(proposal):
         ai_debug("organize.generate.raw_proposal", **_proposal_debug_summary(proposal))
+        if isinstance(proposal, dict):
+            confidence = proposal.get("confidence")
+            if not isinstance(proposal.get("summary"), str) or not proposal["summary"].strip():
+                raise exceptions.AIException("Organize requires a non-empty summary of its final actions.")
+            if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+                raise exceptions.AIException("Organize confidence must be a number between 0 and 1.")
+            if not proposal.get("actions"):
+                raise exceptions.AIException("Organize requires at least one action for the requested work.")
         return validate_or_repair_proposal(
             prompt,
             proposal,
             report_label="Organize",
-            allow_empty_submission_updates=not getattr(prompt, "_organize_update_only", False),
-            require_pending_submission_target=not getattr(prompt, "_organize_update_only", False),
-            allow_pending_submissions=not getattr(prompt, "_organize_update_only", False),
+            allow_pending_submissions=False,
+            repair=False,
         )
 
-    proposal = ai_model.generate_content(prompt, validator=validate_plan)
+    proposal = ai_model.generate_content(
+        prompt, validator=validate_plan, validation_retries=2
+    )
     ai_debug("organize.generate.planned", **_proposal_debug_summary(proposal))
     return proposal
 
 
 # @testable true
-# @tests tests_unit/test_020f_ai_report_completion.py::test_generate_organize_report_completes_planned_submissions
-# @matrix ai-report : generate pipeline submission-completion
-# @matrix submission : evidence-mapping focused-prompt
-# @pair form-schema:structured-output
+# @tests tests_unit/test_020f_ai_report_completion.py::test_generate_organize_report_preserves_final_submissions_without_completion
+# @matrix ai-report : generate pipeline submission
 def generate_organize_report(prompt, report, user):
-    """Generate, complete, and validate an Organize report proposal."""
-    proposal = generate_organize_plan(prompt)
-    if is_organize_update(report):
-        return proposal
-    proposal = complete_organize_submissions(
-        proposal,
-        report,
-        user,
-        service_tier=getattr(prompt, "service_tier", None),
-    )
-    ai_debug("organize.generate.validated", **_proposal_debug_summary(proposal))
-    return proposal
+    """Generate a complete, validated Organize proposal in one conversation."""
+    return generate_organize_plan(prompt)

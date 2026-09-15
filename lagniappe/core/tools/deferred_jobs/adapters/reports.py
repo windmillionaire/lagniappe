@@ -175,7 +175,7 @@ class ReportAdapter(DeferredJobAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_retry_uses_priority_for_every_generation_stage
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_prepare_stops_before_report_save_after_cancellation
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
-# @matrix ai-report : plan-resume submission-completion
+# @matrix ai-report : plan-resume submission-completion proposal-publication status
 # @matrix ai-report : remote-update transport-boundary
 # @matrix deferred-jobs : cancellation checkpoint quota retry service-tier
 class OrganizeReportAdapter(ReportAdapter):
@@ -253,6 +253,7 @@ class OrganizeReportAdapter(ReportAdapter):
             )
             stage_index = 2
 
+        proposal_complete = bool(checkpoint.get("proposal_complete"))
         if stage_index < 3:
             context.set_phase(DeferredJobPhase.GENERATING)
             retrieval_context = (
@@ -276,9 +277,10 @@ class OrganizeReportAdapter(ReportAdapter):
                 prompt.set_service_tier(service_tier)
             proposal = ai.generate_organize_plan(prompt)
             context.ensure_active()
+            proposal_complete = True
             context.checkpoint_stage(
                 "plan_ready",
-                {"proposal": proposal},
+                {"proposal": proposal, "proposal_complete": True},
                 phase=DeferredJobPhase.VALIDATING.value,
             )
         else:
@@ -286,7 +288,8 @@ class OrganizeReportAdapter(ReportAdapter):
 
         if stage_index < 4:
             context.set_phase(DeferredJobPhase.FINALIZING)
-            if not update_only:
+            # Older plan_ready checkpoints contain structure without final values.
+            if not update_only and not proposal_complete:
                 proposal = ai.complete_organize_submissions(
                     proposal,
                     report,

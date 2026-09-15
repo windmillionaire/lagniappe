@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import codecs
 import json
+import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +26,7 @@ REQUIREMENTS_PATHS = (
     Path("requirements-installer.txt"),
     Path("requirements.txt"),
     Path("requirements-dev.txt"),
+    Path("build/font-requirements.txt"),
 )
 NODE_VERSION_PIN_PATH = Path(".nvmrc")
 
@@ -124,78 +130,155 @@ def _format_command(command: list[str] | str) -> str:
 
 
 # @testable false
-# @reason upgrade subprocess/report adapter is exercised by package upgrade flows
+# @covered-by runner/upgrade.py::run_command
+# @reason cancel only the subprocess group created for this dependency command
+def _stop_command(process):
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    else:
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+            timeout=10,
+        )
+        if process.poll() is None:
+            process.kill()
+    process.wait(timeout=5)
+
+
+# @testable true
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_command_streams_prompts_and_preserves_output
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_command_timeout_preserves_output_and_stops_children
+# @matrix dependencies : subprocess-output timeout cancellation
 def run_command(
     command: list[str],
     check: bool = True,
-    capture: bool = True,
+    capture: bool = False,
     report: UpgradeReport | None = None,
+    timeout: float = 900,
 ) -> subprocess.CompletedProcess:
-    """Run a command, keeping stdout/stderr quiet unless written to the report."""
+    """Stream commands and prompts, retaining output even on timeout or cancel."""
+    print(f"\n  $ {_format_command(command)}", flush=True)
+    output = {"stdout": [], "stderr": []}
     try:
-        result = subprocess.run(
-            command,
-            capture_output=capture,
-            text=True,
-            check=check,
-            timeout=900,
+        process = subprocess.Popen(
+            command, stdin=subprocess.DEVNULL if capture else None,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            start_new_session=os.name == "posix",
         )
-        if report is not None:
-            report.record_command(
-                command,
-                result.returncode,
-                stdout=result.stdout,
-                stderr=result.stderr,
-            )
-        return result
-    except subprocess.CalledProcessError as e:
-        if report is not None:
-            report.record_command(
-                command,
-                e.returncode,
-                stdout=e.stdout,
-                stderr=e.stderr,
-                error=str(e),
-            )
-        if check:
-            raise
-        return subprocess.CompletedProcess(
-            e.cmd,
-            e.returncode,
-            stdout=e.stdout,
-            stderr=e.stderr,
-        )
-    except FileNotFoundError as e:
+    except OSError as e:
         if report is not None:
             report.record_command(command, None, error=str(e))
         raise
 
+    # @testable false
+    # @covered-by runner/upgrade.py::run_command
+    # @reason drain both pipes without waiting for newline-terminated prompts
+    def drain(pipe, name, destination):
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        with pipe:
+            while chunk := pipe.read1(65536):
+                text = decoder.decode(chunk)
+                output[name].append(text)
+                if not capture:
+                    destination.write(text)
+                    destination.flush()
+            text = decoder.decode(b"", final=True)
+            output[name].append(text)
+            if not capture:
+                destination.write(text)
+                destination.flush()
 
+    readers = [
+        threading.Thread(target=drain, args=(process.stdout, "stdout", sys.stdout), daemon=True),
+        threading.Thread(target=drain, args=(process.stderr, "stderr", sys.stderr), daemon=True),
+    ]
+    for reader in readers:
+        reader.start()
+    started = time.monotonic()
+    failure = None
+    try:
+        while True:
+            remaining = timeout - (time.monotonic() - started)
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            try:
+                process.wait(timeout=min(30, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                elapsed = time.monotonic() - started
+                if elapsed >= timeout:
+                    raise subprocess.TimeoutExpired(command, timeout) from None
+                print(f"  Still running ({elapsed:.0f}s)...", flush=True)
+    except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+        failure = error
+        _stop_command(process)
+    finally:
+        for reader in readers:
+            reader.join(timeout=3)
+        if any(reader.is_alive() for reader in readers):
+            _stop_command(process)
+            for reader in readers:
+                reader.join(timeout=3)
+        stdout, stderr = "".join(output["stdout"]), "".join(output["stderr"])
+        if report is not None:
+            report.record_command(
+                command, process.returncode, stdout=stdout, stderr=stderr,
+                error="Interrupted" if isinstance(failure, KeyboardInterrupt) else str(failure or ""),
+            )
+    if failure:
+        if isinstance(failure, subprocess.TimeoutExpired):
+            failure.output, failure.stderr = stdout, stderr
+        raise failure
+    if check and process.returncode:
+        raise subprocess.CalledProcessError(process.returncode, command, stdout, stderr)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+# @testable false
+# @covered-by runner/upgrade.py::upgrade_npm_packages
+# @reason select the upgraded Node runtime while preserving command I/O options
 def run_nvm_command(
     args: list[str],
     *,
     check: bool = True,
+    capture: bool = False,
     report: UpgradeReport | None = None,
+    timeout: float = 900,
 ) -> subprocess.CompletedProcess:
     """Run node/npm commands in an nvm shell so they use the latest version.
 
     nvm is shell-scoped: `nvm use` only affects that shell. Direct subprocess
-    direct subprocess calls use whatever node is currently on PATH (often the
+    calls use whatever node is currently on PATH (often the
     old default). This wraps commands with nvm setup so they see the upgraded
     version.
     """
     nvm_script = Path.home() / ".nvm" / "nvm.sh"
     if not nvm_script.exists():
-        return run_command(args, check=check, report=report)
+        return run_command(args, check=check, capture=capture, report=report, timeout=timeout)
     shell_args = list(args)
     if shell_args and shell_args[0] in {NODE_CLI, NPM_CLI}:
         shell_args[0] = Path(shell_args[0]).name
     cmd_str = " ".join(shlex.quote(a) for a in shell_args)
     shell_script = (
         f"source {shlex.quote(str(nvm_script))} "
-        f"&& nvm use node 2>/dev/null && {cmd_str}"
+        f"&& nvm use --silent node && exec {cmd_str}"
     )
-    return run_command(["bash", "-lc", shell_script], check=check, report=report)
+    return run_command(
+        ["bash", "-lc", shell_script], check=check, capture=capture,
+        report=report, timeout=timeout,
+    )
 
 
 def _normalize_package_name(name: str) -> str:
@@ -341,7 +424,7 @@ def upgrade_node(report: UpgradeReport | None = None) -> bool:
     before_version = None
     try:
         result = run_command(
-            [NODE_COMMAND, "--version"], check=False, report=report
+            [NODE_COMMAND, "--version"], check=False, capture=True, report=report
         )
         if result.returncode == 0:
             before_version = _node_version_from_output(result.stdout)
@@ -365,6 +448,7 @@ def upgrade_node(report: UpgradeReport | None = None) -> bool:
                 verify = run_nvm_command(
                     [NODE_COMMAND, "--version"],
                     check=False,
+                    capture=True,
                     report=report,
                 )
                 if verify.returncode != 0:
@@ -384,9 +468,9 @@ def upgrade_node(report: UpgradeReport | None = None) -> bool:
     try:
         result = run_command(["which", "n"], check=False, capture=True, report=report)
         if result.returncode == 0:
-            upgrade = run_command(["sudo", "n", "lts"], check=False, report=report)
+            upgrade = run_command(["sudo", "n", "latest"], check=False, report=report)
             verify = run_command(
-                [NODE_COMMAND, "--version"], check=False, report=report
+                [NODE_COMMAND, "--version"], check=False, capture=True, report=report
             )
             if upgrade.returncode != 0:
                 report.add_error("Node.js", "n upgrade command failed")
@@ -410,8 +494,13 @@ def upgrade_node(report: UpgradeReport | None = None) -> bool:
     return False
 
 
+# @testable true
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_npm_upgrade_uses_one_bounded_lookup_and_preserves_package_metadata
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_npm_lookup_failure_does_not_modify_or_install_dependencies
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_npm_interruption_records_completed_file_changes
+# @matrix dependencies : upgrade failure-propagation package-lock cancellation upgrade-report
 def upgrade_npm_packages(report: UpgradeReport | None = None) -> bool:
-    """Check and upgrade npm packages using npm-check-updates."""
+    """Look up latest versions once, update direct ranges, then install and audit."""
     report = report or UpgradeReport()
 
     package_json = Path("package.json")
@@ -424,60 +513,67 @@ def upgrade_npm_packages(report: UpgradeReport | None = None) -> bool:
 
     nvm_script = Path.home() / ".nvm" / "nvm.sh"
     run_node = run_nvm_command if nvm_script.exists() else run_command
-    ok = True
-
     result = run_node(
-        [NPM_COMMAND, "list", "-g", "npm-check-updates"],
-        check=False,
-        report=report,
+        [
+            NPM_COMMAND, "exec", "--yes", "--package=npm-check-updates", "--",
+            "ncu", "--jsonUpgraded", "--no-interactive", "--install", "never",
+            "--timeout", "60000", "--retry", "1",
+        ],
+        check=False, capture=True, report=report, timeout=90,
     )
     if result.returncode != 0:
-        report.add_note("npm-check-updates was not installed globally; installing it.")
-        install = run_node(
-            [NPM_COMMAND, "install", "-g", "npm-check-updates"],
-            check=False,
-            report=report,
-        )
-        if install.returncode != 0:
-            report.add_error(
-                "npm",
-                "Failed to install npm-check-updates globally",
-            )
-            ok = False
-
-    for command, description in (
-        (["ncu"], "Checking npm package updates"),
-        (["ncu", "-u"], "Updating package.json with npm package updates"),
-        ([NPM_COMMAND, "install"], "Installing npm package updates"),
-        ([NPM_COMMAND, "audit", "fix"], "Running npm audit fix"),
+        report.add_error("npm", f"Package lookup failed: {result.stderr or result.stdout}")
+        return False
+    try:
+        updates = json.loads(result.stdout)
+    except (ValueError, TypeError):
+        report.add_error("npm", "Package lookup did not return valid JSON; no files changed.")
+        return False
+    if not isinstance(updates, dict) or not all(
+        isinstance(name, str) and isinstance(version, str)
+        for name, version in updates.items()
     ):
-        result = run_node(command, check=False, report=report)
-        if result.returncode != 0:
-            report.add_error(
-                "npm",
-                f"{description} failed with exit code {result.returncode}",
-            )
-            ok = False
+        report.add_error("npm", "Package lookup returned invalid versions; no files changed.")
+        return False
 
-    after_specs = read_package_json_specs(package_json, report)
-    after_lock_versions = read_package_lock_versions(report=report)
-    direct_names = set(before_specs) | set(after_specs)
+    package = _load_json_file(package_json, report, "npm")
+    if _root_npm_dependencies(package) != before_specs:
+        report.add_error("npm", "Dependency ranges changed during lookup; rerun the command.")
+        return False
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        for name in package.get(section, {}):
+            if name in updates:
+                print(f"  {name}: {package[section][name]} -> {updates[name]}", flush=True)
+                package[section][name] = updates[name]
+    if updates:
+        package_json.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
 
-    record_mapping_changes(
-        report,
-        "npm",
-        before_lock_versions,
-        after_lock_versions,
-        "package-lock.json",
-        direct_names=direct_names,
-    )
-    record_mapping_changes(
-        report,
-        "npm",
-        before_specs,
-        after_specs,
-        "package.json",
-    )
+    ok = True
+    try:
+        for command, description in (
+            ([NPM_COMMAND, "install"], "Installing npm package updates"),
+            ([NPM_COMMAND, "audit"], "Auditing npm dependencies"),
+        ):
+            result = run_node(command, check=False, report=report)
+            if result.returncode != 0:
+                report.add_error(
+                    "npm",
+                    f"{description} failed with exit code {result.returncode}",
+                )
+                ok = False
+                break
+    finally:
+        # Include already-applied edits when an install times out or is cancelled.
+        after_specs = read_package_json_specs(package_json, report)
+        after_lock_versions = read_package_lock_versions(report=report)
+        direct_names = set(before_specs) | set(after_specs)
+        record_mapping_changes(
+            report, "npm", before_lock_versions, after_lock_versions,
+            "package-lock.json", direct_names=direct_names,
+        )
+        record_mapping_changes(
+            report, "npm", before_specs, after_specs, "package.json",
+        )
 
     if not any(change.ecosystem == "npm" for change in report.changes):
         report.add_note("No npm package version changes were detected.")
@@ -575,7 +671,7 @@ def record_pip_version_changes(
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files
 # @pair dependencies:upgrade-requirements
 def upgrade_pip_packages(report: UpgradeReport | None = None) -> bool:
-    """Resolve setup, runtime, and development requirements in one transaction."""
+    """Resolve direct setup, runtime, development, and font-tool requirements."""
     report = report or UpgradeReport()
 
     requirements_paths = [path for path in REQUIREMENTS_PATHS if path.exists()]
@@ -599,7 +695,7 @@ def upgrade_pip_packages(report: UpgradeReport | None = None) -> bool:
     before_versions = collect_pip_installed_versions(None, report)
     result = run_command(
         PIP_COMMAND
-        + ["install", "--upgrade", "--upgrade-strategy", "eager", *packages],
+        + ["install", "--upgrade", "--upgrade-strategy", "only-if-needed", *packages],
         check=False,
         report=report,
     )
@@ -698,7 +794,7 @@ def _update_requirements_file(
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files
 # @pair dependencies:upgrade-requirements
 def update_requirements_files(report: UpgradeReport | None = None) -> bool:
-    """Update setup, runtime, and development pins from the environment."""
+    """Update direct requirement pins only after Python resolution validates."""
     report = report or UpgradeReport()
 
     if any(
@@ -924,6 +1020,10 @@ def render_upgrade_report(report: UpgradeReport) -> str:
             "requirements-dev.txt Pins",
             _changes_by(report, "pip", "requirements-dev.txt"),
         ),
+        (
+            "build/font-requirements.txt Pins",
+            _changes_by(report, "pip", "build/font-requirements.txt"),
+        ),
     ):
         change_lines.extend(_render_change_table(title, changes))
 
@@ -1053,36 +1153,51 @@ def print_upgrade_summary(
         for error in report.errors[:5]:
             print(f"  {error}")
         remaining = len(report.errors) - 5
-        if remaining:
+        if remaining > 0:
             print(f"  ... {remaining} more in the report")
 
     print(f"\nReport: {report_path}")
 
 
-def upgrade_all() -> int:
-    """Run all upgrade steps and write a report."""
+# @testable true
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_upgrade_stops_on_failure_and_saves_report
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_upgrade_saves_report_on_interrupt
+# @matrix dependencies : cancellation failure-propagation upgrade-report
+def upgrade_all(*, only: str | None = None) -> int:
+    """Run selected upgrade steps with visible progress and a durable report."""
     report = UpgradeReport()
     success = True
-
-    for step_name, step in (
-        ("Node.js", upgrade_node),
-        ("npm", upgrade_npm_packages),
-        ("pip", upgrade_pip_packages),
-        ("pip check", check_pip_environment),
-        ("requirements files", update_requirements_files),
-    ):
-        try:
-            step_ok = step(report)
-            if not step_ok and report.errors:
+    interrupted = False
+    steps = [
+        ("node", "Node.js", upgrade_node),
+        ("npm", "npm packages", upgrade_npm_packages),
+        ("python", "Python packages", upgrade_pip_packages),
+        ("python", "Python dependency check", check_pip_environment),
+        ("python", "Requirements files", update_requirements_files),
+    ]
+    steps = [item for item in steps if only is None or item[0] == only]
+    try:
+        for index, (_, step_name, step) in enumerate(steps, start=1):
+            print(f"\n[{index}/{len(steps)}] {step_name}", flush=True)
+            started = time.monotonic()
+            try:
+                step_ok = step(report)
+                if not step_ok and report.errors:
+                    success = False
+                    break
+            except Exception as error:
+                report.add_error(step_name, str(error))
                 success = False
-        except Exception as e:
-            report.add_error(step_name, str(e))
-            success = False
-
-    if report.errors:
+                break
+            print(f"  Finished in {time.monotonic() - started:.1f}s", flush=True)
+    except KeyboardInterrupt:
+        interrupted = True
         success = False
-
-    report_path = write_upgrade_report(report)
-    print_upgrade_summary(report, success, report_path)
-
+        report.add_error("Cancelled", "Interrupted by the user; completed changes are retained.")
+    finally:
+        success = success and not report.errors
+        report_path = write_upgrade_report(report)
+        print_upgrade_summary(report, success, report_path)
+    if interrupted:
+        return 130
     return 0 if success else 1

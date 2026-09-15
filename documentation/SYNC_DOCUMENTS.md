@@ -100,6 +100,9 @@ blob; failed/ambiguous writes never trigger deletion of the accepted pair.
 existing Yjs `default` fragment without reconstructing old nodes. Only new,
 sanitized Markdown fragments are converted; existing rich content and IDs remain
 untouched. New AI-created documents are initialized with Yjs state immediately.
+Whitespace between list or table-cell blocks is ignored during conversion,
+so source formatting cannot create empty paragraphs before bold list text.
+Explicit paragraphs, nested lists, and code-block whitespace are preserved.
 
 The action requires a saved baseline: pending Redis edits or an older HTML-only
 document stop execution rather than guessing or replacing a draft. The latter

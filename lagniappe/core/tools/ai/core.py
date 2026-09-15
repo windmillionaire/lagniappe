@@ -33,6 +33,7 @@ from .observability import (
     GenerationObserver,
     current_execution_control,
     current_observer,
+    mark_outcome,
 )
 
 MINIMUM_SAFETY_SETTINGS = [
@@ -466,7 +467,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
     # @matrix ai : output-format provider-errors quota search tool-loop
     # @matrix ai : empty-response-retry model-routing site-policy provider-boundary
-    def generate_content(self, prompt, *, validator=None):
+    def generate_content(self, prompt, *, validator=None, validation_retries=0):
         """Generate and optionally validate text under one observable call boundary."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -479,9 +480,16 @@ class GenAI:
             observer.resolution(model=model, location=settings.get("AI_LOCATION"))
             for attempt in range(EMPTY_TEXT_RETRY_ATTEMPTS):
                 try:
-                    result = self._generate_content_once(prompt, model=model)
-                    observer.provider_result(result)
-                    if validator is not None:
+                    if validation_retries:
+                        result = self._generate_content_once(
+                            prompt, model=model, validator=validator,
+                            validation_retries=validation_retries,
+                        )
+                    else:
+                        result = self._generate_content_once(prompt, model=model)
+                    if not validation_retries:
+                        observer.provider_result(result)
+                    if validator is not None and not validation_retries:
                         execution_control = current_execution_control()
                         if execution_control is not None:
                             execution_control.set_phase("validating")
@@ -493,6 +501,7 @@ class GenAI:
                 except exceptions.AIException as error:
                     if (
                         str(error) != EMPTY_TEXT_RESPONSE_MESSAGE
+                        or validation_retries
                         or attempt + 1 >= EMPTY_TEXT_RETRY_ATTEMPTS
                     ):
                         raise
@@ -518,10 +527,17 @@ class GenAI:
     # @covered-by lagniappe/core/tools/ai/category.py::generate_category
     # @covered-by lagniappe/core/tools/ai/project.py::generate_project
     # @reason single-attempt provider flow is exercised through the public retry wrapper and downstream generators
-    def _generate_content_once(self, prompt, model):
+    def _generate_content_once(self, prompt, model, validator=None, validation_retries=0):
         """Generate text content from a Prompt, including optional tool-call loops."""
         contents = self._build_contents(prompt)
         output_format = prompt.output_format.get("type")
+        if validator is not None and prompt.response_schema:
+            # Keep the contract visible when provider-side schema constraints are
+            # disabled. Dynamic form values must survive local validation intact.
+            contents.append(types.Content(role="user", parts=[types.Part.from_text(
+                text="Return the complete proposal using this JSON schema:\n"
+                + json.dumps(prompt.response_schema)
+            )]))
         config = GenAI.create_config(prompt)
         final_config = None
         if (prompt.tools or prompt.search) and output_format == "JSON":
@@ -534,7 +550,7 @@ class GenAI:
                 response_mime_type=None,
                 response_schema=None,
             )
-            if prompt.response_schema:
+            if prompt.response_schema and validator is None:
                 final_config = GenAI.create_config(
                     prompt,
                     tools=list(GOOGLE_SEARCH_TOOL) if prompt.search else None,
@@ -565,7 +581,7 @@ class GenAI:
             observer.response(response)
         self._log_response(response, "initial")
 
-        if not prompt.tools or not response.function_calls:
+        if validator is None and (not prompt.tools or not response.function_calls):
             if final_config:
                 return self._generate_structured_final(
                     contents,
@@ -588,6 +604,8 @@ class GenAI:
             output_format,
             final_config=final_config,
             model=model,
+            validator=validator,
+            validation_retries=validation_retries,
         )
 
     # @testable false
@@ -629,7 +647,7 @@ class GenAI:
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_loop_limit_exception_includes_trace
-    # @matrix ai : error-context tool-dispatch trace
+    # @matrix ai : error-context tool-dispatch trace validation repair
     def _tool_loop(
         self,
         response,
@@ -639,95 +657,135 @@ class GenAI:
         output_format,
         final_config=None,
         model=None,
+        validator=None,
+        validation_retries=0,
     ):
         max_iterations = prompt.max_tool_iterations or MAX_TOOL_ITERATIONS
         model = model or GenAI._model_for_prompt(prompt)
         tool_cache = {}
         tool_trace = []
-        for iteration in range(max_iterations):
+        validation_attempts = 0
+        while True:
+            observer = current_observer()
+            execution_control = current_execution_control()
+            iteration = len(tool_trace)
+            provider_stage = "tool"
             if not response.function_calls:
-                if debug_enabled():
-                    debug_log(f"[ai:tool-loop] Complete after {iteration} iteration(s)")
                 if final_config:
                     return self._generate_structured_final(
-                        contents,
-                        final_config,
-                        prompt,
-                        output_format,
-                        source_response=response,
-                        tool_trace=tool_trace,
-                        model=model,
+                        contents, final_config, prompt, output_format,
+                        source_response=response, tool_trace=tool_trace, model=model,
                     )
-                break
+                try:
+                    result = GenAI._extract_text(response, output_format)
+                    if result is None:
+                        raise exceptions.AIException(EMPTY_TEXT_RESPONSE_MESSAGE)
+                    if validator is not None:
+                        if execution_control is not None:
+                            execution_control.set_phase("validating")
+                        if observer is not None:
+                            observer.provider_result(result)
+                            observer.begin_validation(result)
+                        result = validator(result)
+                        if observer is not None:
+                            observer.validated_result(result)
+                    return result
+                except exceptions.AIException as error:
+                    if validator is None or validation_attempts >= validation_retries:
+                        raise
+                    validation_attempts += 1
+                    mark_outcome("model_repair")
+                    ai_debug(
+                        "ai.generate.validation_failed", error=str(error),
+                        attempt=validation_attempts, max_attempts=validation_retries,
+                    )
+                    if response.candidates and response.candidates[0].content:
+                        contents.append(response.candidates[0].content)
+                    contents.append(types.Content(role="user", parts=[
+                        types.Part.from_text(text=(
+                            f"Response validation failed: {error}\n"
+                            "Correct the executable data using the evidence, exact "
+                            "references and schemas already in this conversation. "
+                            "You may read tools for missing information. Return the "
+                            "complete corrected JSON response, preserving all requested "
+                            "outcomes and valid values. Follow the original output "
+                            "contract and make any summary match the final content. "
+                            "Do not turn a formatting or validation error into a "
+                            "question for the user or a needs_review action."
+                        )),
+                    ]))
+                    provider_stage = "validation_repair"
+            else:
+                if iteration >= max_iterations:
+                    break
+                iteration_trace = {
+                    "iteration": iteration + 1,
+                    "requested_calls": summarize_function_calls(response.function_calls),
+                    "calls": [],
+                }
+                tool_trace.append(iteration_trace)
 
-            iteration_trace = {
-                "iteration": iteration + 1,
-                "requested_calls": summarize_function_calls(response.function_calls),
-                "calls": [],
-            }
-            tool_trace.append(iteration_trace)
+                if debug_enabled():
+                    debug_log(f"[ai:tool-loop] Iteration {iteration + 1}/{max_iterations}")
+                contents.append(response.candidates[0].content)
 
-            if debug_enabled():
-                debug_log(f"[ai:tool-loop] Iteration {iteration + 1}/{max_iterations}")
-            contents.append(response.candidates[0].content)
+                try:
+                    observer = current_observer()
+                    tool_responses, file_parts = execute_function_calls(
+                        response.function_calls,
+                        prompt.user,
+                        cache=tool_cache,
+                        debug=debug_enabled(),
+                        trace=iteration_trace["calls"],
+                        max_file_parts=prompt.max_tool_file_parts_per_turn,
+                        execution_control=current_execution_control(),
+                    )
+                except Exception as e:
+                    execution_control = current_execution_control()
+                    if execution_control is not None:
+                        execution_control.ensure_active()
+                    if observer is not None:
+                        observer.tool_round(
+                            response.function_calls,
+                            iteration_trace["calls"],
+                        )
+                    context = {
+                        "ai_tool_loop": {
+                            "prompt_type": prompt.prompt_type,
+                            "search_enabled": prompt.search,
+                            "tools_enabled": prompt.tools,
+                            "max_iterations": max_iterations,
+                            "failed_iteration": iteration + 1,
+                            "trace": tool_trace,
+                        }
+                    }
+                    exceptions.capture(e, context=context)
+                    raise exceptions.AIException(
+                        f"Error executing function calls: {e}",
+                        context=context,
+                    ) from e
 
-            try:
-                observer = current_observer()
-                tool_responses, file_parts = execute_function_calls(
-                    response.function_calls,
-                    prompt.user,
-                    cache=tool_cache,
-                    debug=debug_enabled(),
-                    trace=iteration_trace["calls"],
-                    max_file_parts=prompt.max_tool_file_parts_per_turn,
-                    execution_control=current_execution_control(),
-                )
-            except Exception as e:
-                execution_control = current_execution_control()
-                if execution_control is not None:
-                    execution_control.ensure_active()
                 if observer is not None:
                     observer.tool_round(
                         response.function_calls,
                         iteration_trace["calls"],
                     )
-                context = {
-                    "ai_tool_loop": {
-                        "prompt_type": prompt.prompt_type,
-                        "search_enabled": prompt.search,
-                        "tools_enabled": prompt.tools,
-                        "max_iterations": max_iterations,
-                        "failed_iteration": iteration + 1,
-                        "trace": tool_trace,
-                    }
-                }
-                exceptions.capture(e, context=context)
-                raise exceptions.AIException(
-                    f"Error executing function calls: {e}",
-                    context=context,
-                ) from e
 
-            if observer is not None:
-                observer.tool_round(
-                    response.function_calls,
-                    iteration_trace["calls"],
-                )
+                contents.append(types.Content(role="tool", parts=tool_responses))
 
-            contents.append(types.Content(role="tool", parts=tool_responses))
-
-            if file_parts:
-                uri_parts = [
-                    types.Part.from_uri(file_uri=f["uri"], mime_type=f["mime_type"])
-                    for f in file_parts
-                ]
-                contents.append(types.Content(role="user", parts=uri_parts))
+                if file_parts:
+                    uri_parts = [
+                        types.Part.from_uri(file_uri=f["uri"], mime_type=f["mime_type"])
+                        for f in file_parts
+                    ]
+                    contents.append(types.Content(role="user", parts=uri_parts))
 
             try:
                 execution_control = current_execution_control()
                 if execution_control is not None:
-                    execution_control.before_provider("tool")
+                    execution_control.before_provider(provider_stage)
                 if observer is not None:
-                    observer.request("tool")
+                    observer.request(provider_stage)
                 response = self.client.models.generate_content(
                     model=model, contents=contents, config=config
                 )
@@ -747,7 +805,7 @@ class GenAI:
                 if observer is not None:
                     observer.provider_error(
                         e,
-                        "tool",
+                        provider_stage,
                         quota=is_provider_quota_error(e),
                     )
                 if is_provider_quota_error(e):
@@ -760,7 +818,7 @@ class GenAI:
                     raise quota_error from e
                 raise
             if execution_control is not None:
-                execution_control.after_provider("tool")
+                execution_control.after_provider(provider_stage)
             if observer is not None:
                 observer.response(response)
             self._log_response(response, "tool-loop")

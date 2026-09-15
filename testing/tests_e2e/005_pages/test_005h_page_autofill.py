@@ -130,7 +130,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
         monkeypatch.setattr(
             autofill_adapter.ai,
             "generate_autofilled_submission",
-            lambda prompt: {FIELD_ID: EXPECTED_VALUE},
+            lambda prompt, **kwargs: {FIELD_ID: EXPECTED_VALUE},
         )
         with user.page.expect_response("**/pages/*/info/replace"):
             with web_app.test_request_context("/"):

@@ -227,7 +227,9 @@ class AutofillAdapter(DeferredJobAdapter):
             )
             prompt = ai.form_autofill_prompt(**prompt_data)
             context.set_phase(DeferredJobPhase.GENERATING)
-            prepared_submission = ai.generate_autofilled_submission(prompt)
+            prepared_submission = ai.generate_autofilled_submission(
+                prompt, entity=context.input("target"), user=context.actor
+            )
 
         checkpoint = {"submission": prepared_submission}
         if upload:
@@ -321,7 +323,10 @@ class AutofillAdapter(DeferredJobAdapter):
             else:
                 target.properties.files.add(attached_file)
 
-        target.ai_submission(deepcopy(context.checkpoint["submission"]))
+        target.ai_submission(
+            deepcopy(context.checkpoint["submission"]), actor=context.actor,
+            preserve_existing=True,
+        )
         if attached_file:
             Entities.save(attached_file, target)
             context.inputs["attachment"] = attached_file

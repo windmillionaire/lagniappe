@@ -194,6 +194,7 @@ def test_dependency_upgrade_tracks_all_requirement_files():
         "requirements-installer.txt",
         "requirements.txt",
         "requirements-dev.txt",
+        "font-requirements.txt",
     ]
 
 
@@ -207,14 +208,17 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     setup_requirements = tmp_path / "requirements-installer.txt"
     runtime_requirements = tmp_path / "requirements.txt"
     dev_requirements = tmp_path / "requirements-dev.txt"
+    font_requirements = tmp_path / "font-requirements.txt"
     setup_requirements.write_text("yaspin==3.4.0\n", encoding="utf-8")
     runtime_requirements.write_text("flask==3.1.2\n", encoding="utf-8")
     dev_requirements.write_text("ruff==0.15.21\n", encoding="utf-8")
+    font_requirements.write_text("fonttools==4.59.2\n", encoding="utf-8")
 
     requirement_paths = (
         setup_requirements,
         runtime_requirements,
         dev_requirements,
+        font_requirements,
     )
     monkeypatch.setattr(upgrade, "REQUIREMENTS_PATHS", requirement_paths)
     monkeypatch.setattr(
@@ -241,14 +245,15 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
             "install",
             "--upgrade",
             "--upgrade-strategy",
-            "eager",
+            "only-if-needed",
             "yaspin",
             "flask",
             "ruff",
+            "fonttools",
         ]
     ]
 
-    freeze = "\n".join(["yaspin==3.5.0", "Flask==3.1.3", "ruff==0.15.22"])
+    freeze = "\n".join(["yaspin==3.5.0", "Flask==3.1.3", "ruff==0.15.22", "fonttools==4.60.2"])
     monkeypatch.setattr(
         upgrade,
         "run_command",
@@ -264,6 +269,7 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     assert setup_requirements.read_text(encoding="utf-8") == "yaspin==3.5.0\n"
     assert runtime_requirements.read_text(encoding="utf-8") == "flask==3.1.3\n"
     assert dev_requirements.read_text(encoding="utf-8") == "ruff==0.15.22\n"
+    assert font_requirements.read_text(encoding="utf-8") == "fonttools==4.60.2\n"
 
 
 # @pair dependencies:upgrade-report
@@ -278,9 +284,11 @@ def test_dependency_upgrade_report_includes_setup_pins(capsys):
         "3.5.0",
         "requirements-installer.txt",
     )
+    report.add_change("pip", "fonttools", "4.59.2", "4.60.2", "build/font-requirements.txt")
 
     markdown = upgrade.render_upgrade_report(report)
     assert "requirements-installer.txt Pins" in markdown
+    assert "build/font-requirements.txt Pins" in markdown
     assert "yaspin" in markdown
 
     report_path = Path("reports/upgrade-test.md")

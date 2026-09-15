@@ -301,6 +301,9 @@ SCHEMA_TYPE_GUIDELINES = """
   them as numbers.
 - Only fill with information that matches the input type (`text`, `email`, `date`, `number`, `tel`)
 - Dates should be in format YYYY-MM-DD, times in HH:MM (e.g., 17:00 for 5 PM), tel numbers in 123-456-7890
+- Date fields are calendar days in the acting user's timezone. Preserve supplied
+  check-in/check-out and other calendar dates as YYYY-MM-DD; do not convert them
+  to UTC or add a time/offset. The application handles UTC storage.
 
 #### `textarea` Submission Value Guidelines
 

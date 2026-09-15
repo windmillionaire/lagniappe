@@ -21,6 +21,7 @@ from lagniappe.core.tools.ai.guidelines import (
     SUBMISSION_OUTPUT_REQUIREMENTS,
 )
 from lagniappe.core.tools.ai.prompt import Prompt
+from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools.files.ooxml import (
     OOXMLExtractionResult,
     OOXMLTruncationReason,
@@ -371,7 +372,7 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
         "workflow": "autofill",
         "stage": "generation",
         "id": "form-autofill",
-        "version": 3,
+        "version": 4,
     }
     assert autofill_prompt.output_format["type"] == "JSON"
     assert (
@@ -441,7 +442,13 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
 
     class Submission:
         def __init__(self, value):
-            self.ai_value = value
+            self.fields = {}
+            for field_id, answer in value.items():
+                field = SchemaFields.create_field(
+                    {"id": field_id, "type": "input", "input": "text", "title": "Assessment"}, SimpleNamespace()
+                )
+                field.db_value = answer
+                self.fields[field_id] = field
             self.user = None
 
     class EvidenceFile:
@@ -483,6 +490,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         description="Property assessment record",
         model=category,
         form=form,
+        submission_schema=form.schema,
         files=[page_file],
         properties=SimpleNamespace(
             submission=Submission({"input-value": ""}),
@@ -498,6 +506,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         description="Use the attached evidence",
         page=page,
         form=form,
+        submission_schema=form.schema,
         files=[task_file],
         properties=SimpleNamespace(
             submission=Submission({"input-value": ""}),

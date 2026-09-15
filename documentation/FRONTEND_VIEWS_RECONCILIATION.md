@@ -155,6 +155,9 @@ Subsequent operation responses supply the current phase.
 The terminal result may replace an active form automatically only
 when the operation matches its durable lock and the form has no unsaved or
 queued state. Otherwise normal form reconciliation protects the draft.
+For a Task job owned by its parent Page, an unchanged Task entity poll still
+checks the matching operation lock. This installs completion even if an earlier
+poll already staged the saved values for review.
 
 Ordinary polling pauses while hidden, unfocused, or offline. A visible tab in
 an unfocused window may retain only connected, rendered operation progress for

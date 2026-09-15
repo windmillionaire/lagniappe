@@ -120,7 +120,7 @@ def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatc
         monkeypatch.setattr(
             autofill_adapter.ai,
             "generate_autofilled_submission",
-            lambda prompt: {FIELD_ID: EXPECTED_VALUE},
+            lambda prompt, **kwargs: {FIELD_ID: EXPECTED_VALUE},
         )
         with user.page.expect_response("**/tasks/*/replace"):
             with web_app.test_request_context("/"):

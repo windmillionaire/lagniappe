@@ -18,13 +18,19 @@ def page_details(details, data, action=None):
     details.reference("Form", data, "form")
     details.submission(data, form_present=bool(details.first_value(data, "form")))
     if data.get("document_markdown") or data.get("document"):
-        details.add("Document", data.get("document_markdown") or data.get("document"))
+        details.add(
+            "Document", data.get("document_markdown") or data.get("document"),
+            preview="document",
+        )
 
 
 # @testable infrastructure
 def document_details(details, data, action=None):
     details.reference("Page", data, "page")
-    details.add("Append", data.get("document_markdown") or data.get("document"))
+    details.add(
+        "Append", data.get("document_markdown") or data.get("document"),
+        preview="document",
+    )
     details.add("Attribution", "Server-recorded time and source; existing text is preserved.")
 
 

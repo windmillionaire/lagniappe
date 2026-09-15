@@ -46,7 +46,7 @@ OUTCOME_PRIORITY = {
     "review_fallback": 5,
     "validation_failed": 6,
 }
-KNOWN_PROVIDER_STAGES = {"initial", "tool", "structured_final"}
+KNOWN_PROVIDER_STAGES = {"initial", "tool", "structured_final", "validation_repair"}
 KNOWN_TOOL_NAMES = {
     "search_entities",
     "get_entity",

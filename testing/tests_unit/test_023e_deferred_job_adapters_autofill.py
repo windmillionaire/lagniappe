@@ -371,7 +371,8 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
                 on_add=lambda file: setattr(file.properties.task, "key", self.key)
             )
 
-        def ai_submission(self, submission):
+        def ai_submission(self, submission, *, actor, preserve_existing):
+            assert preserve_existing is True
             self.properties.submission.value = submission
 
         def save(self):
@@ -450,6 +451,7 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
 
     context = SimpleNamespace(
         parameters={"upload_record": {"token": "signed-upload"}},
+        actor=SimpleNamespace(),
         checkpoint={
             "submission": {"field-one": "Autofilled answer"},
             "attachment": {

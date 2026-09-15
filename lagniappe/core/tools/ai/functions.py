@@ -176,7 +176,7 @@ def tool_catalog(*, names=None, names_only=False, transport=None):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
 # @matrix agent-api ai : permission-context provider-neutral-dispatch tool-registry
-# @tests tests_unit/test_032d_external_guidance.py::test_guidance_dispatch_keeps_external_completion_out_of_provider_workflow
+# @tests tests_unit/test_032d_external_guidance.py::test_organize_guidance_is_shared_across_provider_and_external_dispatch
 # @tests tests_unit/test_032d_external_guidance.py::test_search_dispatch_and_catalog_match_across_ai_entry_points
 # @matrix ai agent-api : guidelines tool-dispatch
 def execute_registered_tool(name, args, user, *, external=False):

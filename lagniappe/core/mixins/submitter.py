@@ -271,15 +271,26 @@ class SubmitterMixin:
 
     # @testable true
     # @tests tests_unit/test_004i_form_definitions.py::test_generated_answers_reject_unknown_fields_before_resetting_values
-    # @matrix submission : ai unknown-fields preservation
-    def ai_submission(self, generated_submission):
+    # @matrix submission : ai unknown-fields preservation validation
+    def ai_submission(self, generated_submission, *, actor=None, preserve_existing=False):
+        from ..properties.schema import SchemaFields
+
         require_mutable_submission(self)
         unknown = set(generated_submission) - set(self.properties.submission.fields)
         if unknown:
             raise ValidationError("Generated answers include unavailable fields and need review.")
+        prepared = {}
         for field_id, field in self.properties.submission.fields.items():
+            if preserve_existing and field.is_set and field.db_value not in (None, "", [], {}):
+                continue
+            prepared[field_id] = SchemaFields.prepare_ai_field(
+                field, generated_submission.get(field_id), self, user=actor
+            )
+        for field_id, candidate in prepared.items():
+            field = self.properties.submission.fields[field_id]
             field.reset()
-            field.validate_ai(generated_submission.get(field_id, None))
+            if candidate.is_set:
+                field.db_value = candidate.db_value
 
         self.save_submission()
 

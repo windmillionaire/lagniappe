@@ -178,7 +178,11 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         # ai_submission should be a dict with a "rows" key that contains a list of submission values for each row
         # each row should be a dict with the field ids as keys and the submission values as values
         for row in ai_submission.get("rows", []):
-            self.rows.append(RowSubmission.validate_ai(self, row))
+            row_submission = RowSubmission.validate_ai(self, row)
+            for field in row_submission.fields.values():
+                self.errors.extend(field.errors)
+                self.warnings.extend(field.warnings)
+            self.rows.append(row_submission)
         if self.rows:
             self._value = {"rows": [r.db_value for r in self.rows]}
         else:

@@ -119,6 +119,28 @@ def test_render_markdown_preserves_code_block_newlines():
     assert soup.find("code").get_text() == "first line\nsecond line\n"
 
 
+# @source lagniappe/core/tools/files/html.py::render_markdown
+# @matrix editor files markdown : list-kind soft-wrap
+@pytest.mark.unit
+@pytest.mark.parametrize("marker", ["-", "1."])
+def test_render_markdown_keeps_loose_list_paragraphs_without_spacer_text(marker):
+    html = file_html.render_markdown(
+        f"{marker} **First**\n    *item.*\n\n"
+        "    Another paragraph.\n\n    - Nested item\n\n"
+        f"{marker} **Second** item."
+    )
+    soup = BeautifulSoup(html, "html.parser")
+    first = soup.find("li")
+
+    assert [child.name for child in first.contents] == ["p", "p", "ul"]
+    assert first.p.get_text() == "First item."
+    assert first.p.strong.get_text() == "First"
+    assert first.p.em.get_text() == "item."
+    assert first.find_all("p", recursive=False)[1].get_text() == "Another paragraph."
+    assert first.ul.li.get_text() == "Nested item"
+    assert soup.find_all("li")[-1].p.get_text() == "Second item."
+
+
 # @matrix editor files markdown : task-list
 @pytest.mark.unit
 def test_render_markdown_creates_editor_task_lists():

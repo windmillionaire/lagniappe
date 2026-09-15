@@ -36,7 +36,7 @@ def _attach_report_process(report):
 
 
 def _with_validator(generate):
-    def wrapped(prompt, *, validator=None):
+    def wrapped(prompt, *, validator=None, validation_retries=0):
         result = generate(prompt)
         return validator(result) if validator else result
 

@@ -2530,21 +2530,27 @@ def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
         runner_gcloud.activate_repository_gcloud()
 
 
-def test_run_py_upgrade_without_branch_runs_dependency_upgrade(monkeypatch):
+# @matrix dependencies : cli-routing upgrade
+@pytest.mark.parametrize("only", [None, "node", "npm", "python"])
+def test_run_py_upgrade_dependencies_runs_dependency_upgrade(monkeypatch, only):
     config_module = types.ModuleType("config")
     config_module.__path__ = ["config"]
     upgrade_module = types.ModuleType("runner.upgrade")
-    upgrade_module.upgrade_all = lambda: 4
+    received = []
+    upgrade_module.upgrade_all = lambda **options: received.append(options) or 4
 
     monkeypatch.setitem(sys.modules, "config", config_module)
     monkeypatch.setitem(sys.modules, "runner.upgrade", upgrade_module)
 
-    assert run.run_upgrade_command([]) == 4
+    assert run.run_dependency_upgrade_command(["--only", only] if only else []) == 4
+    assert received == [{"only": only}]
 
 
-def test_run_py_upgrade_rejects_removed_software_upgrade_branch():
+# @matrix dependencies : cli-routing upgrade
+def test_run_py_upgrade_dependencies_rejects_software_upgrade_branch(capsys):
     with pytest.raises(SystemExit, match="2"):
-        run.run_upgrade_command(["--branch", "release/candidate"])
+        run.run_dependency_upgrade_command(["--branch", "release/candidate"])
+    assert "run.py upgrade-dependencies" in capsys.readouterr().err
 
 
 def _git(repo: Path, *args: str):

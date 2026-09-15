@@ -464,6 +464,7 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
 # @source lagniappe/core/tools/email/notifications/links.py::origin
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 # @source mcp/src/lagniappe_mcp/files.py::upload_local_files
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 # @template notifications.html::item
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
@@ -789,7 +790,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         guidelines = _structured(workflow["organize"]["guidelines"])
         assert guidelines["task"] == "organize"
         assert (
-            "author the final summaries and form submissions or updates yourself"
+            "final form submissions and updates in the same proposal"
             in guidelines["guidelines"]
         )
         assert (
