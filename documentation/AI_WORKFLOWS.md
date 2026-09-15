@@ -193,6 +193,9 @@ Ask, and reveals a newly created report's category.
 
 List snippets flatten Markdown to plain text and show at most five lines at
 the current screen width. Full summaries remain available in each report.
+Document creation and append details show plain-text previews limited to ten
+lines, with a control to expand the full text. The stored proposal retains the
+complete executable HTML; only its review display is shortened.
 
 On-site and external schema plans carry exact converted values or explicit
 unresolved reasons in `conversions`. The planning model prepares these from the

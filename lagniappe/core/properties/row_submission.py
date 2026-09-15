@@ -42,7 +42,7 @@ class TableColumnFields(Enum):
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
-    # @matrix form-table : search-value table-fields
+    # @matrix form-table : search-value table-fields timezone
     @classmethod
     def create_field(cls, definition, table):
         """Create a field instance from a column definition dict."""
@@ -53,7 +53,7 @@ class TableColumnFields(Enum):
         if name not in cls.__members__:
             return None
 
-        field = cls[name].value(definition, entity=table.entity)
+        field = cls[name].value(definition, entity=table.entity, user=table.user)
         field.icon = "column"
         field.label = f"[{table.label}] {field.label}"
         field.field_type = FieldType.LIST

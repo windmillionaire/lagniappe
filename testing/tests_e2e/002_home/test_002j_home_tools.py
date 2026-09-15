@@ -1274,6 +1274,74 @@ def test_report_detail_runs_ready_report(get_user):
     modal.element.get_by_role("button", name="Cancel").click()
 
 
+# @source lagniappe/core/tools/ai/reporting/display/details.py::ProposalDetailCollector
+# @matrix ai-report : details proposal
+# @template tools/report.html::proposal_details
+def test_report_document_previews_are_plain_text_and_at_most_ten_lines(get_user, tmp_path):
+    user = get_user(Users.OWNER)
+    report, _, _ = _ready_report(user)
+    prose = "Review the document before applying this plan. " * 100
+    html = (
+        "<p><strong>Hotel details.</strong> Preserve &lt;original&gt; values.</p>"
+        f"<p>{prose}</p><p>End of hotel document.</p>"
+    )
+    markdown = f"**Flight details.** Preserve &lt;original&gt; values.\n\n{prose}\n\nEnd of flight document."
+    proposal = deepcopy(report.proposal)
+    proposal["actions"][1]["data"]["document"] = html
+    proposal["actions"].append({
+        "id": "append",
+        "type": "append_page_document",
+        "display_label": "Add flight details",
+        "depends_on": ["page"],
+        "data": {"page_action": "page", "document_markdown": markdown},
+    })
+    report.proposal = proposal
+    Entities.save(report)
+
+    report_page = user.go(Report.for_entity(user, report))
+    documents = report_page.proposal_actions.locator("[data-role='proposal-document']")
+    expect(documents).to_have_count(2)
+    for width in (1280, 390):
+        user.page.set_viewport_size({"width": width, "height": 900})
+        user.page.evaluate("() => document.fonts.ready.then(() => true)")
+        for title, ending in (
+            ("Hotel details.", "End of hotel document."),
+            ("Flight details.", "End of flight document."),
+        ):
+            document = documents.filter(has_text=title)
+            preview = document.locator("[data-role='proposal-document-preview']")
+            full = document.locator("[data-role='proposal-document-full']")
+            expect(preview).to_be_visible()
+            expect(preview).to_contain_text(f"{title} Preserve <original> values.")
+            expect(preview).not_to_contain_text("<p>")
+            expect(preview).not_to_contain_text("**")
+            expect(document.locator("p, strong, original")).to_have_count(0)
+            expect(full).not_to_be_visible()
+            size = preview.evaluate(
+                """element => ({
+                    height: element.getBoundingClientRect().height,
+                    lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+                    scrollHeight: element.scrollHeight,
+                    width: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
+                })"""
+            )
+            assert 9.9 <= size["height"] / size["lineHeight"] <= 10.1
+            assert size["scrollHeight"] > size["height"]
+            assert size["scrollWidth"] <= size["width"] + 1
+            document.get_by_text("Show full text", exact=True).click()
+            expect(preview).not_to_be_visible()
+            expect(full).to_be_visible()
+            expect(full).to_contain_text(ending)
+            document.get_by_text("Show less", exact=True).click()
+            expect(preview).to_be_visible()
+            expect(full).not_to_be_visible()
+        user.page.screenshot(path=str(tmp_path / f"document-previews-{width}.png"))
+
+    saved = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
+    assert saved.proposal == proposal
+
+
 # @matrix ai-report : details proposal submission-review
 # @pair form-schema:submission-review
 # @template tools/report.html::proposal_details

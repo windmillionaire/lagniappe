@@ -19,7 +19,7 @@ class DateMixin:
 
     All values are stored in UTC. The setter accepts datetimes (with or
     without tzinfo), ISO strings, and timestamps -- naive datetimes and
-    date strings are assumed to be in the user's timezone.
+    date strings use the property's acting user (or request context) timezone.
 
     Provides:
         value (datetime): UTC datetime (setter converts to UTC).
@@ -58,11 +58,11 @@ class DateMixin:
             else:
                 dt = datetime.fromisoformat(value)
             if not dt.tzinfo:
-                return dates.user_date_string_to_utc_datetime(value)
+                return dates.user_date_string_to_utc_datetime(value, user=self.user)
             return dt.astimezone(timezone.utc)
         elif isinstance(value, datetime):
             if not value.tzinfo:
-                value = value.replace(tzinfo=dates.user_timezone())
+                value = value.replace(tzinfo=dates.user_timezone(self.user))
             return value.astimezone(timezone.utc)
         elif isinstance(value, float):
             return datetime.fromtimestamp(value, timezone.utc)
@@ -77,7 +77,7 @@ class DateMixin:
         value = super().value
         if not value:
             return None
-        return dates.utc_datetime_to_user_datetime(value)
+        return dates.utc_datetime_to_user_datetime(value, user=self.user)
 
     @property
     def sort_value(self):
@@ -87,7 +87,7 @@ class DateMixin:
     @property
     def ai_value(self):
         return (
-            dates.utc_datetime_to_user_date_string(self.value) if self.value else None
+            dates.utc_datetime_to_user_date_string(self.value, user=self.user) if self.value else None
         )
 
     # Filter Attributes
@@ -105,12 +105,12 @@ class DateMixin:
         details = super().filter_details(condition)
         if isinstance(condition.value, list):
             details["value"] = [
-                datetime.fromtimestamp(v, dates.user_timezone())
+                datetime.fromtimestamp(v, dates.user_timezone(self.user))
                 for v in condition.value
             ]
         else:
             details["value"] = datetime.fromtimestamp(
-                condition.value, dates.user_timezone()
+                condition.value, dates.user_timezone(self.user)
             )
         return details
 
@@ -126,7 +126,7 @@ class DateMixin:
     @property
     def form_value(self):
         return (
-            self.value.astimezone(dates.user_timezone()).date().isoformat()
+            self.value.astimezone(dates.user_timezone(self.user)).date().isoformat()
             if self.value
             else None
         )

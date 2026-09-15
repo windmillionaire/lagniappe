@@ -75,7 +75,7 @@ class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_date_input
-# @matrix date-input : ai-value column filter-value import
+# @matrix date-input : ai-value column filter-value form-submission import timezone
 class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     """Date input field. Stored as UTC datetime.
 
@@ -104,7 +104,7 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
     # AI Attributes
     def validate_ai(self, value):
-        """Parse AI-submitted date string (YYYY-MM-DD format, UTC)."""
+        """Parse an AI calendar date in the acting user's timezone; store UTC."""
         if value:
             self.value = date_parser.parse(value)
         else:

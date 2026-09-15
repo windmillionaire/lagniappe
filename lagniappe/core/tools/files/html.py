@@ -231,7 +231,11 @@ def _collapse_flow_newlines(content):
         if "\n" not in value:
             continue
         if not value.strip():
-            if parent.name in FLOW_TEXT_TAGS:
+            block_boundary = any(
+                getattr(sibling, "name", None) in TASK_BLOCK_TAGS
+                for sibling in (node.previous_sibling, node.next_sibling)
+            )
+            if parent.name in FLOW_TEXT_TAGS and not block_boundary:
                 node.replace_with(" ")
             else:
                 node.extract()

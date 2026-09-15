@@ -211,6 +211,42 @@ def test_append_converts_supported_markdown_blocks():
     assert dict(root.children[4].children[0].attributes)["checked"] is True
 
 
+# @source lagniappe/core/tools/document_crdt.py::append_fragment
+# @matrix editor markdown : document append formatting
+@pytest.mark.parametrize("list_tag", ["ol", "ul"])
+@pytest.mark.parametrize("source", ["markdown", "saved_html"])
+def test_append_list_paragraphs_do_not_gain_empty_spacer_paragraphs(list_tag, source):
+    if source == "markdown":
+        marker = "1." if list_tag == "ol" else "-"
+        html = render_markdown(
+            f"{marker} **First** *item*\n\n"
+            "    Second paragraph.\n\n    - Nested\n\n"
+            f"{marker} Next item"
+        )
+    else:
+        # Older plans can contain formatting whitespace outside real paragraphs.
+        html = (
+            f"<{list_tag}><li> \n<p><strong>First</strong> <em>item</em></p>\n"
+            "<p>Second paragraph.</p>\n<ul><li>Nested</li></ul> \n</li>"
+            f"<li>Next item</li></{list_tag}>"
+        )
+    snapshot, _ = crdt.append_fragment(None, html, "list-formatting")
+    document = crdt.load_document(snapshot)
+    items = document["default"].children[0].children
+
+    assert len(items) == 2
+    assert [child.tag for child in items[0].children] == [
+        "paragraph", "paragraph", "bulletList"
+    ]
+    assert "First" in str(items[0].children[0])
+    assert "item" in str(items[0].children[0])
+    assert str(items[0].children[1]) == "<paragraph>Second paragraph.</paragraph>"
+    assert str(items[0].children[2]) == (
+        "<bulletList><listItem><paragraph>Nested</paragraph></listItem></bulletList>"
+    )
+    assert str(items[1]) == "<listItem><paragraph>Next item</paragraph></listItem>"
+
+
 # @matrix editor sync : document append undo tombstones
 def test_undo_emits_tombstones_without_resetting_existing_nodes():
     baseline, _ = crdt.append_fragment(None, "<p>Keep</p>", "initial")

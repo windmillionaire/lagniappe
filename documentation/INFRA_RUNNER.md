@@ -62,7 +62,7 @@ provider provisioning.
 | `run.py release-check ...` | Frozen release-tree validation. |
 | `run.py version ...` | Coordinated package/settings/release-note version. |
 | `run.py icons` | Material Symbols registry subset refresh. |
-| `run.py upgrade` | Maintainer dependency upgrade. |
+| `run.py upgrade-dependencies` | Maintainer dependency upgrade. |
 | deployment command | `runner/deploy.py`. |
 
 ## MCP service environment
@@ -171,9 +171,26 @@ generated application settings, the matching release note, and the applicable
 version in the error-reporting privacy notice. It does not change that notice's
 effective date unless its substance changes.
 
-`run.py upgrade` updates Node, npm, and the direct Python requirement sets,
-validates with npm audit/pip check, and writes a detailed report. It does not
-fetch or replace repository source; `./setup.sh upgrade` owns source replacement.
+`run.py upgrade-dependencies` updates Node, npm, and the direct Python requirement
+sets to their latest releases, including major versions. Python resolution
+includes `build/font-requirements.txt` alongside installer, runtime, and
+development requirements. Transitive Python packages update when required by
+the selected direct upgrades. The separate locked MCP environment remains
+managed by the MCP tooling.
+
+The command prints each step and streams subprocess output, including prompts,
+while keeping a report. Quiet machine-readable lookups have closed stdin; npm
+version discovery runs once with a 90-second limit. Other commands have a
+15-minute limit and print a waiting message every 30 seconds. Timeout and
+Ctrl+C stop the command's process tree and retain available output in the report.
+The workflow stops on failure and writes a report on cancellation. Completed
+updates remain available for review; requirement pins are rewritten only after
+Python resolution and `pip check` succeed. npm audit reports issues without
+silently running `npm audit fix`.
+
+Use `--only node`, `--only npm`, or `--only python` to resume a particular
+ecosystem. `./setup.sh upgrade` continues to own application source upgrades;
+the former maintainer command name `run.py upgrade` is no longer accepted.
 
 ## Material Symbols
 

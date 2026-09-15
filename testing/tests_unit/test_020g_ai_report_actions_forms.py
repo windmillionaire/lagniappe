@@ -20,6 +20,61 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
+# @source lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_values
+# @source lagniappe/core/properties/row_submission.py::TableColumnFields.create_field
+# @matrix ai-report submission : batch-field-patch persistence
+# @matrix form-table : table-fields timezone
+@pytest.mark.unit
+@pytest.mark.parametrize("zone", ["America/Los_Angeles", "Asia/Tokyo"])
+def test_report_hotel_dates_use_actor_timezone_without_request(monkeypatch, zone):
+    """Real report field validation preserves table dates in background execution."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    from lagniappe import CONFIG
+    from lagniappe.core.properties.form_table import Table
+
+    monkeypatch.setattr(CONFIG, "TEST_CURRENT_USER", None)
+    user = _test_user("hotel-date-owner")
+    user.db["timezone"] = zone
+    page = TestEntities.get("PAGE", {"name": "College trip"})
+    form = TestEntities.get("FORM", {"name": "Accommodations"})
+    form.form_type = "task"
+    form.schema = [{"id": "table-hotels", "type": "table", "title": "Hotels", "columns": [
+        {"id": "row-checkin", "type": "input", "input": "date", "title": "Check-in"},
+        {"id": "row-checkout", "type": "input", "input": "date", "title": "Check-out"},
+        {"id": "row-confirmation", "type": "input", "input": "text", "title": "Confirmation"},
+    ]}]
+    task = TestEntities.get("TASK", {"name": "Book Hotels"}, page=page)
+    task.form = form
+    rows = [
+        {"row-checkin": "2026-09-24", "row-checkout": "2026-09-27", "row-confirmation": "90801586"},
+        {"row-checkin": "2026-09-27", "row-checkout": "2026-09-29", "row-confirmation": "90829655"},
+    ]
+    report = TestEntities.get("REPORT", {"name": "Hotel dates", "user": user, "parent": user,
+        "status": "ready", "pending": False, "proposal": {"summary": "Record hotel stays", "confidence": 1,
+        "actions": [{"id": "hotels", "type": "update_form_values", "data": {"updates": [{
+            "task": task.urlsafe_key, "schema_id": "table-hotels", "new_value": {"rows": rows},
+        }]}}]}})
+    monkeypatch.setattr(report_runner.Entities, "fetch_one", _fetch_one_from({task.urlsafe_key: task}))
+    saved = []
+    monkeypatch.setattr(report_runner.Entities, "save", lambda *entities: saved.extend(entities))
+
+    result = report_runner.run_report(report, user)
+    assert result["status"] == "complete"
+    assert task in saved
+    stored = task.submission["table-hotels"]
+    for row, original in zip(stored["rows"], rows):
+        for column in ("row-checkin", "row-checkout"):
+            expected = datetime.fromisoformat(original[column]).replace(tzinfo=ZoneInfo(zone)).astimezone(timezone.utc)
+            assert datetime.fromisoformat(row[column]) == expected
+        assert row["row-confirmation"] == original["row-confirmation"]
+    restored = Table(form.schema[0], entity=task, user=user)
+    restored.db_value = copy.deepcopy(stored)
+    assert restored.form_value == {"rows": rows}
+    assert restored.ai_value == {"rows": rows}
+
+
 # @matrix ai-report submission : validation failure-isolation
 @pytest.mark.parametrize("bad_rows", [["Airline & Flight #"], [{"Flight": "UA1458"}]])
 @pytest.mark.unit

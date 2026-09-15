@@ -70,7 +70,9 @@ def test_reviewed_document_append_updates_open_editor_and_undo(get_user):
     editor = collaborator_page.editor
     expect(editor.text_entry).to_contain_text("Keep the original notes.")
     report_page = owner.go(Report.for_entity(owner, report))
-    expect(report_page.proposal_actions).to_contain_text("Added **reviewed** notes.")
+    expect(
+        report_page.proposal_actions.locator("[data-role='proposal-document-preview']")
+    ).to_have_text("Added reviewed notes.")
     report_page.execute()
     expect(owner.page.get_by_text("Work done.")).to_be_visible()
     expect(report_page.result).to_contain_text("Page Document Updated:")

@@ -82,6 +82,12 @@ Stored fields receive their backend value; absent fields remain unset. The
 submission's stored projection omits unset and blank values, so an empty
 submission removes `db["submission"]`.
 
+Date fields accept calendar dates in the acting user's timezone and store UTC
+datetimes. DateMixin uses the property's explicit user when there is no browser
+session; table column fields inherit their table's user. AI values, form values
+and displayed columns convert back through that same user context. AI proposals
+should preserve supplied calendar days as YYYY-MM-DD without converting to UTC.
+
 Aggregate projections are intentionally separate:
 
 | Projection | Use |

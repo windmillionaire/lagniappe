@@ -47,7 +47,7 @@ class ProposalDetailCollector:
         self.entity_label = entity_label
         self.values = []
 
-    def add(self, label, value):
+    def add(self, label, value, *, preview=None):
         if value:
             self.values.append(
                 {
@@ -56,6 +56,8 @@ class ProposalDetailCollector:
                     "kind": DETAIL_KINDS.get(label, "default"),
                 }
             )
+            if preview:
+                self.values[-1]["preview"] = preview
 
     def reference(self, label, data, *roots):
         self.add_reference(label, self.first_value(data, *roots))

@@ -41,6 +41,7 @@ test_roots:
   - testing/tests_tooling/test_010_runtime_outbound_http.py
   - testing/tests_tooling/test_012_mcp_environment.py
   - testing/tests_tooling/test_012c_remote_mcp_config.py
+  - testing/tests_tooling/test_014_dependency_upgrade.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:

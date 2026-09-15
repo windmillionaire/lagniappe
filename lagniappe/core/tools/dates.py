@@ -43,9 +43,9 @@ def parse_imported_date_as_utc(date_string, *, user=None):
 # @testable false
 # @covered-by lagniappe/core/mixins/date.py::DateMixin
 # @reason user-facing date formatting is owned by DateMixin projections
-def utc_datetime_to_user_date_string(utc_dt):
+def utc_datetime_to_user_date_string(utc_dt, *, user=None):
     """Format a UTC datetime as YYYY-MM-DD in the user's timezone."""
-    return utc_dt.astimezone(user_timezone()).strftime("%Y-%m-%d") if utc_dt else ""
+    return utc_dt.astimezone(user_timezone(user)).strftime("%Y-%m-%d") if utc_dt else ""
 
 
 # @testable true
@@ -81,21 +81,21 @@ def utc_date_string_to_utc_datetime(value):
 # @testable false
 # @covered-by lagniappe/core/mixins/date.py::DateMixin
 # @reason user-timezone datetime projection is owned by DateMixin
-def utc_datetime_to_user_datetime(utc_dt):
+def utc_datetime_to_user_datetime(utc_dt, *, user=None):
     """Convert a UTC datetime to the user's timezone."""
-    return utc_dt.astimezone(user_timezone()) if utc_dt else None
+    return utc_dt.astimezone(user_timezone(user)) if utc_dt else None
 
 
 # @testable false
 # @covered-by lagniappe/core/mixins/date.py::DateMixin
 # @covered-by lagniappe/core/properties/task_scheduling.py::Periodic.update
 # @reason user date parsing is owned by DateMixin and periodic schedule update
-def user_date_string_to_utc_datetime(date_string):
+def user_date_string_to_utc_datetime(date_string, *, user=None):
     """Parse YYYY-MM-DD in the user's timezone and preserve the current time."""
     if not date_string:
         return None
     try:
-        user_tz = user_timezone()
+        user_tz = user_timezone(user)
         base_date = datetime.strptime(date_string, "%Y-%m-%d")
         now_user = datetime.now(user_tz)
         value = base_date.replace(

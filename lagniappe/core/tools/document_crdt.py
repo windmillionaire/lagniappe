@@ -207,15 +207,21 @@ def _append_nodes(parent, nodes, marks=None):
                     "pre",
                     "table",
                 }:
-                    if pending:
+                    if any(
+                        not isinstance(part, NavigableString) or str(part).strip()
+                        for part in pending
+                    ):
                         paragraph = XmlElement("paragraph")
                         element.children.append(paragraph)
                         _append_nodes(paragraph, pending)
-                        pending = []
+                    pending = []
                     _append_nodes(element, [child])
                 else:
                     pending.append(child)
-            if pending or not len(element.children):
+            if not len(element.children) or any(
+                not isinstance(part, NavigableString) or str(part).strip()
+                for part in pending
+            ):
                 paragraph = XmlElement("paragraph")
                 element.children.append(paragraph)
                 _append_nodes(paragraph, pending)
