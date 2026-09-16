@@ -185,6 +185,7 @@ OUTPUT_SCHEMAS = {
             "content_bytes": {"type": "integer"},
             "section_count": {"type": "integer"},
             "filters": {"type": "object"},
+            "action_schema": {"type": "object"},
         },
     ),
     "get_schema": _object(

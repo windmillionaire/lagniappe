@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b9517a42';
-import { p as primitives } from './primitives.js?v=b9517a42';
-import { s as setIcon } from './icons.js?v=b9517a42';
+import { STYLES } from './styles.js?v=bb1ed2ee';
+import { p as primitives } from './primitives.js?v=bb1ed2ee';
+import { s as setIcon } from './icons.js?v=bb1ed2ee';
 
 /**
  * @licstart The following is the entire license notice for the

@@ -12,6 +12,7 @@ def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch
     orphan = SimpleNamespace(has_references=False)
     attached = SimpleNamespace(has_references=True)
     report = SimpleNamespace(
+        available=True,
         origin="web",
         status="complete",
         deferred_job=None,
@@ -64,7 +65,7 @@ def test_bulk_delete_scopes_ownership_state_snapshot_and_partial_failures(monkey
 
     def report(tool="create", status="complete", user=owner, **extra):
         return Entities.REPORT.create(
-            {"user": user, "tool": tool, "status": status, **extra}
+            {"user": user, "status": status, "proposal": {"summary": "Saved", "actions": [] if tool == "ask" else [{"type": "needs_review", "data": {}}]}, **extra}
         )
 
     rows = {

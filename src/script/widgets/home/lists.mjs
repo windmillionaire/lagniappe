@@ -2,7 +2,7 @@ import { BaseList } from "../../elements/base/baseList";
 import { localStore } from "../../shared/storage";
 import { withTransition } from "../../shared/utilities";
 
-const REPORT_FILTERS = ["active", "executed", "ask"];
+const REPORT_FILTERS = ["active", "executed", "answers"];
 
 /**
  * @testable true
@@ -10,8 +10,8 @@ const REPORT_FILTERS = ["active", "executed", "ask"];
  * @matrix ai-report : filter-categories
  */
 function reportCategory(report) {
-	if (report.tool === "ask") return "ask";
-	return ["create", "organize"].includes(report.tool) &&
+	if (report.outputKind === "answer") return "answers";
+	return report.outputKind === "proposal" &&
 		report.status === "complete"
 		? "executed"
 		: "active";
@@ -167,7 +167,7 @@ export class ToolReportList extends BaseList {
 			Array.isArray(saved) &&
 				saved.every((value) => REPORT_FILTERS.includes(value))
 				? saved
-				: ["active", "ask"],
+				: ["active", "answers"],
 		);
 		this._click = this._click.bind(this);
 		this._deleteMessage = "";
@@ -224,7 +224,7 @@ export class ToolReportList extends BaseList {
 	 * @matrix ai-report : filter-categories filter-counts filter-empty
 	 */
 	_renderFilters() {
-		const counts = { active: 0, executed: 0, ask: 0 };
+		const counts = { active: 0, executed: 0, answers: 0 };
 		let visible = 0;
 		for (const item of this.reportItems) {
 			const category = reportCategory(item.dataset);
@@ -250,7 +250,7 @@ export class ToolReportList extends BaseList {
 					? {
 							active: "No active proposals.",
 							executed: "No executed proposals.",
-							ask: "No Ask reports.",
+							answers: "No answers.",
 						}[[...this.filters][0]]
 					: "No reports match the selected types.";
 		}

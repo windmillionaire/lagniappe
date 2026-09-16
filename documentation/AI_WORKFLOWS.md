@@ -1,148 +1,60 @@
 # AI Workflows
 
-Lagniappe uses one provider and durable-job foundation for several workflows,
-but each workflow owns its context, tools, validation, checkpoints, and apply
-contract.
+## Unified reports
 
-## Comparison
+The homepage has one AI panel with the existing upload, screenshot-paste,
+prompt-preview, and report-review controls. A prompt and files are individually
+optional; at least one is required. Files alone request filing. Questions can
+use files as evidence without proposing their placement. Mixed questions and
+changes stay in one report, including later revisions before execution.
 
-| Workflow | Context and tools | Provider stages | Durable outcome |
-| --- | --- | --- | --- |
-| Ask | Question/report context; Search, workspace reads, Task history, filter schema/query. | Initial/tool loop, structured final, optional repair. | Read-only answer. |
-| Create | Creation request and workspace concepts; Search and workspace reads. | Initial/tool loop, structured final, optional repair. | Reviewed creation proposal. |
-| Organize | Uploaded-file metadata, saved summaries, retrieval candidates, workspace reads. | Utility summaries, primary plan/tool loop, optional repair, optional form completion. | Reviewed organization proposal. |
-| Autofill | One target, form, partial submission, parent context, direct attachments. | One JSON/tool conversation and local validation. | Submission applied to the target. |
-| File summary | One File and summary options. | Utility-model generation with extraction/provider fallback. | Summary/process state on the File. |
-| Report execution | Approved proposal; no model tools. | No provider call. | Action ledger, domain mutations, and optional undo. |
+`POST /tools/ai` and `/tools/ai/direct-upload` replace the three old routes.
+`REPORT_AI` runs `AIReportAdapter` and `tools/ai/planner.py`. There is no intent
+router, upload-dependent action profile, or separate completion-model stage.
+The report conversation has 17 common workspace read tools and Google Search.
+Its initial structured output contract is compact: summary, optional
+answer_markdown, confidence, issues, actions, and file_usage. The model obtains
+exact action schemas and their guidance with
+`get_guidelines(task="report_actions", actions=[...])`; actions must be a
+nonempty selection. The shared validator checks the complete proposal and can
+return errors to the same conversation twice for correction.
 
-Lagniappe preserves canonical MIME types on stored Files and downloads. At the
-Gemini request boundary, recognized Markdown (`text/markdown`) and vCard
-(`text/vcard`) inputs are sent as the provider-supported `text/plain` media type;
-their content remains unchanged. The same normalization applies to stored-file
-URI parts and direct inline autofill attachments.
+`AI.ASK` permits answers and evidence files. `AI.CREATE` additionally permits
+proposals, constrained by live workspace permissions. Available actions do not
+depend on whether files were uploaded. Jobs recheck entitlement before publishing
+mutations; deterministic browser execution also checks resource permissions.
+External clients use their own model and do not require provider entitlement.
 
-## Ask
+Each upload has exactly one `{file, usage}` entry in the report's `file_usage`,
+where usage is `evidence` or `organize`. Organize files require an executable
+attachment destination; external proposals additionally supply one summarize_file
+action and two retrieval terms for each organize file. Evidence files require
+neither action. Native jobs checkpoint finalized uploads and summary preparation
+before the single planning conversation, then checkpoint the validated proposal
+and file_usage before publication.
 
-Ask uses a lean initial prompt and retrieves workspace data on demand. Its
-tool set includes shared entity/file reads, Task history, saved-filter schema,
-and permission-filtered structured filter queries. A result requires a nonempty
-summary, confidence from 0 to 1, optional Markdown, and an empty actions array.
-The validator converts the Markdown through the shared sanitized,
-editor-compatible renderer and stores the resulting answer HTML.
+A proposal contains summary, optional answer_markdown, confidence, issues, and
+actions. Markdown is sanitized by the server. `output_kind` is derived from
+actions: empty means answer, otherwise proposal. Answers complete immediately;
+proposals become ready for browser review. Revisions may cross that boundary
+until execution begins. Approval, execution ledgers, skip controls, and undo use
+the existing deterministic report runner.
 
-The `AskReportAdapter` checkpoints the prepared answer before publishing it to
-the `AIReport`. Ask is always read-only, so a valid answer becomes complete. A
-request for workspace changes is redirected to Create or Organize rather than
-being represented as Ask actions.
+## Upgrade boundary
 
-Email-origin Ask may summarize attached evidence first. Those Files remain
-read-only evidence and do not grant Organize placement actions.
+Pause intake and drain deferred report/email jobs before upgrading. Do not
+migrate saved reports, proposals, or old job checkpoints. New reports carry
+format_version=1. Leftover old or structurally incompatible reports render
+`this plan is no longer available` in lists and details, with the normal Delete
+control and no polling, execution, revision, or undo. Deleting a report preserves
+files that have workspace references.
 
-## Create
-
-Create uses the same small-prompt/read-tool pattern for Pages, Categories,
-Projects, Forms, and Tasks. Its output is always a proposal. It may use Search
-for public facts and workspace tools for existing structure, then passes the
-shared proposal contract and repair boundary.
-
-The in-app Create prompt includes the authenticated user's guaranteed editable
-personal Page reference directly, matching the external Create plan contract.
-The same reference also remains available from `list_workspace_resources`.
-
-Create Page proposals distinguish top-level Page metadata from attached form
-submissions. Without a form, `name` and `description` live directly on the
-Page action. With a form, canonical top-level values win and the corresponding
-form fields mirror them consistently.
-
-Create and Organize expose optional Page rich text to models as
-`document_markdown`. Shared proposal validation renders it to sanitized,
-editor-compatible `document` HTML before the proposal is stored. Existing
-ready reports that already contain `document` HTML remain executable.
-
-Updates to normal Page documents use `append_page_document`: preserve existing
-content and append the requested text with a server-generated source/time quote
-before the addition. Form-builder generation uses a separate prompt and may
-replace static instruction text in its local draft; that replacement behavior
-does not apply to normal document updates.
-
-## Organize
-
-Organize evaluates an upload batch as a whole:
-
-1. finalize direct uploads one at a time and checkpoint `upload_manifest`;
-2. generate and save a summary plus at most two search terms for each File;
-3. query up to five Category/Page/Form candidates per term from Redis;
-4. inspect targets and schemas, then author the complete proposal including final
-   form values and all requested updates/completions/document additions;
-5. validate file coverage, references, action shapes, schema conversions and ordering;
-6. apply safe mechanical corrections, or return the precise validation error to
-   the same model conversation for at most two correction attempts.
-
-A valid candidate is accepted directly, without another model rewriting its JSON.
-Correction turns retain prior tool results and the exact-call cache; they share
-one pinned model and the existing tool-round budget. Technical validation failure
-raises a generation error if corrections are exhausted. It does not become a
-generic question with a stale success summary. Models may still propose
-`needs_review` for genuinely ambiguous intent or conflicting evidence.
-
-Planning preflight compares each requested outcome with its executable target
-actions; summaries must describe only those actions and omissions belong in
-review issues. Existing-target table patches are checked against current schemas
-(and preceding schema updates), including internal-link resolution, before
-acceptance. References to newly created action targets or newly assigned forms are checked
-at execution.
-Execution validates all patches on detached fields before changing a submission.
-Table cells propagate validation errors to their table; a missing internal-link
-record cannot silently disappear while its task is marked complete. Failed
-updates block dependent completions. Older reports with skipped submission errors
-display those errors instead of an unconditional “Work done.”
-
-Finalized uploads remain report-only evidence before browser execution. They
-are addressable through the owning report and its exact file references, but
-are omitted from ordinary workspace search while they have no Page or Task
-attachment. A successful attachment action makes the File searchable through
-the normal post-commit cache refresh. This boundary is shared by API, email,
-and on-site Organize uploads.
-
-The stages `uploads_finalized`, `summaries_ready`, `plan_ready`, and
-`ready_to_apply` are durable. A retry resumes without repeating completed
-uploads, summaries, or planning. New `plan_ready` checkpoints include
-`proposal_complete: true` and proceed directly to `ready_to_apply`. Older upload
-checkpoints without that marker retain the legacy completion path so a deployment
-update can resume an already-prepared structural plan safely.
-
-Planning clusters Files by stable subject and chooses specific existing or new
-Pages. It does not create one Page per document by default or use a broad
-overview Page as a catch-all. A Category default Page form is proposed only
-when nearly every Page is an instance of one small repeated schema.
-
-Every uploaded File must appear in an executable attachment action with an
-exact target. If corrections cannot produce complete safe coverage, generation
-fails with its validation error. Large or unreadable Files remain represented by metadata
-and visible issues so the proposal does not silently drop evidence.
-
-Website, API/MCP, and email Organize support the same fileless existing-record
-update profile, including `create_task` on editable existing Pages. A proposal
-can create a destination Task and move existing files into it using
-`move_file.data.to_task_action` plus `depends_on` referencing the earlier task
-creation action. Other creation actions remain exclusive to Create or file-backed
-Organize. Trusted intake origin and the absence of uploads select that
-profile. Instruction-only website Organize requests now produce reviewed update
-proposals. The email classifier can choose
-Organize for an update without attachments, but does not discover targets itself.
-The planner discovers exact editable records, reads relevant schemas, and
-proposes bounded updates for the same browser approval and execution pipeline.
-No additional toolbar option or top-level completion command is introduced.
-
-The update profile omits upload summaries, retrieval prepasses, and secondary
-form completion. Its planner authors final task submissions and field patches
-directly, including on revision or validation repair. Once uploads are supplied,
-normal file coverage and final-value obligations apply. External starters return a compact
-action contract; `start_organize(actions=[...])` can include selected schemas in
-that first response. Clients request additional schemas and guidance on demand.
-Table-shaped patches are checked during proposal validation, so malformed row
-arrays enter the existing proposal repair flow before browser review. Execution
-also checks the current Form's exact column ids before saving any field patches.
+Email configuration is the only conversion: installer update converts
+AI_EMAIL_CONFIG version 1 to 2 before strict validation, retains the configured
+AI address/domain/provider credentials, and removes Ask/Create/Organize aliases.
+There are no old route, MCP starter, or worker aliases. External contract version
+9 requires file_usage and rejects old submission contracts. Upgrade the app and
+MCP service together.
 
 ## Autofill
 
@@ -156,7 +68,7 @@ Autofill is a direct mutation for one Page or Task form. Its prompt includes:
 Existing answers use the same exact field-ID projection as `get_schema`, including
 typed table cells. Labels are context, never submission keys. Autofill validates
 the response against the target's effective schema using the same detached field
-validator as Organize. Unknown IDs and invalid values enter the shared conversation
+validator as report planning. Unknown IDs and invalid values enter the shared conversation
 correction loop (at most two corrections); generation is marked validated only
 after this check succeeds. Existing nonempty answers, including false and zero,
 remain authoritative. Guarded apply validates all new values before mutation and
@@ -178,7 +90,7 @@ The worker checks current authorization, active lock ownership, and a
 form-specific revision immediately before apply.
 
 Multi-file Page upload summary is a separate synchronous route path. It checks
-`AI.CREATE`, runs the Organize summary prepass, then saves the Files.
+`AI.CREATE`, runs the shared report summary prepass, then saves the Files.
 
 ## File summary
 
@@ -197,12 +109,13 @@ partial-extraction note.
 
 ## Reviewed report execution
 
-The homepage Plans & Reports panel has independent Active, Executed, and Ask
-filters. Active includes unfinished Create/Organize proposals (including failed,
-revising, and undone states); Executed includes only complete Create/Organize
-proposals. All Ask reports stay in Ask regardless of status. Counts include
-hidden reports. The browser remembers each user's choices, initially Active and
-Ask, and reveals a newly created report's category.
+The homepage Plans & Reports panel has independent Active, Executed, and Answers
+filters. Active includes unfinished proposals and pending requests (including
+failed, revising, and undone states); Executed includes completed proposals.
+Saved answers appear under Answers. Counts include hidden reports. The browser
+remembers each user's choices, initially Active and Answers, and reveals a newly
+created report's category. Unavailable old reports remain visible under Active
+with their normal Delete control.
 
 List snippets flatten Markdown to plain text and show at most five lines at
 the current screen width. Full summaries remain available in each report.
@@ -227,7 +140,7 @@ path: report-only uploads and undo history are removed, while workspace changes
 and attached files remain. Missing, changed, busy, or ineligible reports are
 skipped; individual failures do not stop the remaining deletions.
 
-Create and Organize proposals may include reviewed create, move, rename,
+AI proposals may include reviewed create, move, rename,
 attach, schema, and submission actions. `reporting/execution/` owns deterministic
 application; the model is not called during execution.
 
@@ -304,7 +217,7 @@ changes to saved values. The shared preparation layer records complete affected
 identities and source preconditions for review, and the Form-change adapter
 handles deterministic and AI conversions in the same guarded mutation workflow.
 Both report origins supply strict candidates before approval and execute without
-a provider. Native Organize binds and validates candidates inside its conversation
+a provider. Native report planning binds and validates candidates inside its conversation
 validation loop, before the complete result is checkpointed. Malformed candidates
 can be corrected before review; exhausted corrections fail generation. Publication and execution still recheck current
 preconditions. Missing, invalid or stale candidates prevent proposal publication

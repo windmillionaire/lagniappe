@@ -20,15 +20,12 @@ class FakeEnvironment(Enum):
 
 def _disabled_ai_email_config():
     return {
-        "version": 1,
+        "version": 2,
         "provider": "resend",
         "enabled": False,
         "domain": "INBOUND.Example.COM.",
         "aliases": {
             "ai": "ai",
-            "ask": "ASK",
-            "create": "create",
-            "organize": "organize",
         },
         "resend": {
             "domainId": "domain-1",

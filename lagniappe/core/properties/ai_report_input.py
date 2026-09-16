@@ -2,6 +2,21 @@
 
 from .base_db import DBProperty
 
+
+# @testable infrastructure
+class FormatVersion(DBProperty):
+    """Server-owned report format; missing versions are unavailable."""
+
+    _id = "format_version"
+
+
+# @testable infrastructure
+class FileUsage(DBProperty):
+    """Reviewed usage of each uploaded file, separate from executable actions."""
+
+    _id = "file_usage"
+    json = True
+
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
 # @pair ai-report:upload-manifest

@@ -117,7 +117,7 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
 ):
     now = datetime(2026, 7, 20, tzinfo=timezone.utc)
     job = RunnerJob()
-    job.job_type = DeferredJobType.REPORT_ORGANIZE.value
+    job.job_type = DeferredJobType.REPORT_AI.value
     job.status = DeferredJobStatus.FAILED.value
     job.dispatch_state = "delivery_pending"
     job.modified = now - timedelta(minutes=3)

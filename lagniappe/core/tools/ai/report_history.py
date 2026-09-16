@@ -17,6 +17,16 @@ def delete_report_record(report, *, guarded=False):
     """Reuse ordinary deletion, with a revision fence for bulk/API requests."""
     from .reporting.schema_updates import migration_pending
 
+    if not report.available:
+        snapshot = external_operations.report_snapshot(report)
+        files_to_delete = [file for file in report.input_files if not file.has_references]
+        outcome = external_operations.delete_plan_if_idle(report, snapshot, report, *files_to_delete)
+        if outcome == agent_api_store.PLAN_OPERATION_COMMITTED:
+            try:
+                ai.cleanup_report_upload_manifest(report)
+            except (ValueError, TypeError, AttributeError, KeyError):
+                pass  # Obsolete payloads cannot prevent deletion of the report.
+        return outcome
     if migration_pending(report):
         return agent_api_store.PLAN_OPERATION_BUSY
     guarded = guarded or any((action.get("_schema_change") or {}).get("migration") for action in (getattr(report, "proposal", None) or {}).get("actions", []))
@@ -59,7 +69,8 @@ def delete_executed_reports(user, keys):
             if (
                 not isinstance(report, Entities.REPORT)
                 or report.properties.parent.key != user.key
-                or report.tool not in {"create", "organize"}
+                or not report.available
+                or report.output_kind != "proposal"
                 or report.status != "complete"
                 or report.pending
             ):

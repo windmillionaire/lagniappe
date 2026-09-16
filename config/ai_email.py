@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 
-AI_EMAIL_CONFIG_VERSION = 1
+AI_EMAIL_CONFIG_VERSION = 2
 AI_EMAIL_PROVIDER = "resend"
 AI_EMAIL_LIMITS = {
     "maxBodyBytes": 65536,
@@ -15,7 +15,7 @@ AI_EMAIL_LIMITS = {
     "hourlyPerUser": 30,
     "dailyPerUser": 200,
 }
-AI_EMAIL_TOOLS = ("ai", "ask", "create", "organize")
+AI_EMAIL_TOOLS = ("ai",)
 
 _TOP_LEVEL_KEYS = {
     "version",
@@ -206,13 +206,13 @@ def _normalize_resend(value):
 # @matrix ai-email : config limits normalization secrets validation
 # @pair config:ai-email
 def normalize_ai_email_config(value):
-    """Return canonical schema-1 configuration, or ``None`` when absent."""
+    """Return canonical schema-2 configuration, or ``None`` when absent."""
     if value in (None, ""):
         return None
     config = _mapping(value, "AI_EMAIL_CONFIG")
     _reject_unknown_keys(config, _TOP_LEVEL_KEYS, "AI_EMAIL_CONFIG")
     if config.get("version") != AI_EMAIL_CONFIG_VERSION:
-        raise AIEmailConfigurationError("AI_EMAIL_CONFIG.version must be 1.")
+        raise AIEmailConfigurationError("AI_EMAIL_CONFIG.version must be 2.")
     if config.get("provider") != AI_EMAIL_PROVIDER:
         raise AIEmailConfigurationError("AI_EMAIL_CONFIG.provider must be 'resend'.")
     enabled = config.get("enabled")
@@ -225,7 +225,7 @@ def normalize_ai_email_config(value):
     _reject_unknown_keys(limits, set(AI_EMAIL_LIMITS), "AI_EMAIL_CONFIG.limits")
     if limits != AI_EMAIL_LIMITS:
         raise AIEmailConfigurationError(
-            "AI_EMAIL_CONFIG.limits must match the locked schema-1 envelope."
+            "AI_EMAIL_CONFIG.limits must match the locked schema-2 envelope."
         )
     return {
         "version": AI_EMAIL_CONFIG_VERSION,

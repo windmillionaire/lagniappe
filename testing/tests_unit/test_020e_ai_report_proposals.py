@@ -13,33 +13,16 @@ from types import SimpleNamespace
 import pytest
 
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai import create, organize, references as ai_references
-from lagniappe.core.tools.ai.reporting.proposals import validation as proposal_validation
+from lagniappe.core.tools.ai import planner, references as ai_references
+from lagniappe.core.tools.ai.reporting.proposals import selection
+from lagniappe.core.tools.ai.reporting.proposals import (
+    validation as proposal_validation,
+)
 from testing.utility.ai_report_fakes import (
-    _assert_repair_prompt_contract,
-    _prompt_context,
-    _with_validator,
     _test_user,
     _fetch_one_from,
 )
 from testing.utility.test_entities import TestEntities
-
-# @matrix ai-report : generate validate
-@pytest.mark.unit
-def test_generate_organize_report_validates_ai_output(monkeypatch):
-    proposal = {
-        "summary": "Skip unsupported input.",
-        "confidence": 0.6,
-        "actions": [{"type": "skip", "reason": "Nothing to organize."}],
-    }
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(lambda prompt: proposal),
-    )
-
-    assert organize.generate_organize_plan(object()) == proposal
 
 
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
@@ -124,276 +107,6 @@ def test_validate_proposal_rejects_invalid_static_form_content(form_type, field)
         proposal_validation.validate_proposal(proposal)
 
 
-
-
-# @matrix ai-report : generate repair validate
-@pytest.mark.unit
-def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
-    invalid = {
-        "summary": "Attach the file.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "attach_file",
-                "type": "attach_file_page",
-                "data": {"page": "page-id", "file": "file-id"},
-            }
-        ],
-    }
-    repaired = {
-        "summary": "Attach the file.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "attach_file",
-                "type": "attach_file",
-                "data": {'entity': "page-id", "file": "file-id"},
-            }
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("attach_file", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][0]["type"] == "attach_file"
-    assert len(calls) == 2
-    _assert_repair_prompt_contract(
-        calls[1],
-        invalid_proposal=invalid,
-        allowed_actions=prompt.allowed_actions,
-    )
-    assert calls[1].thinking_budget is None
-
-
-
-
-# @matrix ai-report : file-placement repair
-@pytest.mark.unit
-def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
-    invalid = {
-        "summary": "Create two record pages.",
-        "confidence": 0.8,
-        "issues": [],
-        "actions": [
-            {
-                "id": "school_logs",
-                "type": "create_page",
-                "data": {"name": "School Logs"},
-            },
-            {
-                "id": "school_resources",
-                "type": "create_page",
-                "data": {"name": "School Resources"},
-            },
-        ],
-    }
-    repaired = {
-        **invalid,
-        "summary": "Create two record pages and attach their source files.",
-        "actions": [
-            *invalid["actions"],
-            {
-                "id": "attach_log",
-                "type": "attach_file",
-                "data": {'entity_action': "school_logs", "file": "file-log-id"},
-            },
-            {
-                "id": "attach_resource",
-                "type": "attach_file",
-                "data": {
-                    'entity_action': "school_resources",
-                    "file": "file-resource-id",
-                },
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "attach_file", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-        context_blocks=[
-            {
-                "label": "Report Input Files",
-                "value": (
-                    "```\n"
-                    '[{"report_file_ref": "file-log-id"}, '
-                    '{"report_file_ref": "file-resource-id"}]'
-                    "\n```"
-                ),
-            }
-        ],
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert [action["data"]["file"] for action in result["actions"][2:]] == [
-        "file-log-id",
-        "file-resource-id",
-    ]
-    assert len(calls) == 2
-    assert "attach every report input file" in _prompt_context(
-        calls[1], "Validation Error"
-    )
-    repair_text = calls[1].preview()
-    assert "Every exact report_file_ref must appear" in repair_text
-    assert "Creating a page or task" in repair_text
-
-
-
-
-# @matrix ai-report : fallback file-placement
-@pytest.mark.unit
-def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch):
-    incomplete = {
-        "summary": "Create the records page.",
-        "confidence": 0.6,
-        "issues": [],
-        "actions": [
-            {
-                "id": "records",
-                "type": "create_page",
-                "data": {"name": "Records"},
-            }
-        ],
-    }
-    calls = []
-    captured = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return incomplete
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured.append(context),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "attach_file", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-        context_blocks=[
-            {
-                "label": "Report Input Files",
-                "value": '```\n[{"report_file_ref": "missing-file-id"}]\n```',
-            }
-        ],
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert len(calls) == 2
-    assert result["actions"][0]["type"] == "needs_review"
-    assert result["confidence"] == 0
-    assert captured == []
-
-
-
-
-# @matrix ai-report : references repair
-@pytest.mark.unit
-def test_generate_organize_report_repairs_invalid_action_references_once(monkeypatch):
-    invalid = {
-        "summary": "Record the invoice.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "create_task_sousa_doors_final_invoice",
-                "type": "create_task",
-                "data": {
-                    "name": "Sousa Doors Final Invoice",
-                    "page_action": (
-                        "2,000.00 deposit paid on Jan 27, 2021 via check 1096. "
-                        "Remaining $2,250.00 balance due by Feb 26, 2021."
-                    ),
-                },
-            }
-        ],
-    }
-    repaired = {
-        "summary": "Record the invoice.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "create_sousa_doors_page",
-                "type": "create_page",
-                "data": {"name": "Sousa Doors"},
-            },
-            {
-                "id": "create_task_sousa_doors_final_invoice",
-                "type": "create_task",
-                "data": {
-                    "name": "Sousa Doors Final Invoice",
-                    "page_action": "create_sousa_doors_page",
-                },
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "create_task", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][1]["data"]["page_action"] == "create_sousa_doors_page"
-    assert len(calls) == 2
-    _assert_repair_prompt_contract(
-        calls[1],
-        invalid_proposal=invalid,
-        allowed_actions=prompt.allowed_actions,
-    )
-
-
 # @pairs ai-report:reference-kind permissions:personal-page
 @pytest.mark.unit
 def test_validate_proposal_accepts_virtual_user_kind_as_personal_page(monkeypatch):
@@ -472,179 +185,202 @@ def test_validate_proposal_requires_create_task_page_reference():
         proposal_validation.validate_proposal(proposal)
 
 
-# @matrix ai-report : references repair
-@pytest.mark.unit
-def test_generate_organize_report_repairs_category_used_as_page_reference(monkeypatch):
-    invalid = {
-        "summary": "File the attendance form.",
-        "confidence": 0.8,
-        "issues": [],
-        "actions": [
-            {
-                "id": "attach_attendance",
-                "type": "attach_file",
-                "data": {
-                    'entity': "hash:abc123def456",
-                    'entity_name': "Homeschool",
-                    "file": "hash:def456abc789",
-                },
-            }
-        ],
-    }
-    repaired = {
-        "summary": "File the attendance form.",
-        "confidence": 0.8,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_administration_page",
-                "type": "create_page",
-                "data": {
-                    "name": "Administration",
-                    "category": "hash:abc123def456",
-                },
-            },
-            {
-                "id": "attach_attendance",
-                "type": "attach_file",
-                "data": {
-                    'entity_action': "create_administration_page",
-                    "file": "hash:def456abc789",
-                },
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    monkeypatch.setattr(
-        ai_references.cache,
-        "get_details_by_hash",
-        lambda hashes: {
-            "abc123def456": {
-                "id": "category-id",
-                "kind": "category",
-                "name": "Homeschool",
-            },
-            "def456abc789": {
-                "id": "file-id",
-                "kind": "file",
-                "name": "attendanceform",
-            },
-        },
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "attach_file", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert len(calls) == 2
-    assert result["actions"][0]["data"]["category"] == "category-id"
-    assert result["actions"][1]["data"]["entity_action"] == (
-        "create_administration_page"
-    )
-    assert result["actions"][1]["data"]["file"] == "file-id"
-    assert "uses category 'Homeschool' as its entity reference" in _prompt_context(
-        calls[1], "Validation Error"
-    )
-
-
-
-
 # @matrix ai-report : repair validation
 # @matrix ai : tool-loop tool-dispatch
-# @source lagniappe/core/tools/ai/organize.py::generate_organize_plan
+# @source lagniappe/core/tools/ai/planner.py::generate_report
 # @source lagniappe/core/tools/ai/core.py::GenAI.generate_content
 # @source lagniappe/core/tools/ai/core.py::GenAI._tool_loop
-# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::validate_or_repair_proposal
+# @source lagniappe/core/tools/ai/planner.py::generate_report
 @pytest.mark.unit
-@pytest.mark.parametrize("mode", ["valid", "repair", "invalid_json", "exhausted", "empty_exhausted"])
-def test_organize_conversation_validation_preserves_complete_proposal(monkeypatch, mode):
+@pytest.mark.parametrize(
+    "mode", ["valid", "repair", "invalid_json", "exhausted", "empty_exhausted"]
+)
+def test_organize_conversation_validation_preserves_complete_proposal(
+    monkeypatch, mode
+):
     from lagniappe.core.tools.ai import core, functions, observability, settings
 
     user = _test_user("email-travel-owner")
-    report = TestEntities.get("REPORT", {
-        "name": "Travel details", "parent": user, "user": user,
-        "origin": "email", "tool": "organize",
-        "instructions": "Update both bookings, complete both tasks, and append the tour link.",
-    })
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Travel details",
+            "parent": user,
+            "user": user,
+            "origin": "email",
+            "tool": "organize",
+            "instructions": "Update both bookings, complete both tasks, and append the tour link.",
+        },
+    )
     report.origin, report.tool = "email", "organize"
     page = TestEntities.get("PAGE", {"name": "College trip"})
     task = TestEntities.get("TASK", {"name": "Book Plane Tickets"}, page=page)
     form = TestEntities.get("FORM", {"name": "Flights"})
     form.form_type = "task"
-    form.schema = [{"id": "table-flights", "type": "table", "title": "Flights", "columns": [
-        {"id": "row-flight", "type": "input", "input": "text", "title": "Flight"},
-        {"id": "row-confirmation", "type": "input", "input": "text", "title": "Confirmation"},
-    ]}]
+    form.schema = [
+        {
+            "id": "table-flights",
+            "type": "table",
+            "title": "Flights",
+            "columns": [
+                {
+                    "id": "row-flight",
+                    "type": "input",
+                    "input": "text",
+                    "title": "Flight",
+                },
+                {
+                    "id": "row-confirmation",
+                    "type": "input",
+                    "input": "text",
+                    "title": "Confirmation",
+                },
+            ],
+        }
+    ]
     task.form = form
-    flights = {"rows": [
-        {"row-flight": "UA1458", "row-confirmation": "PR2FYB"},
-        {"row-flight": "B61680", "row-confirmation": "PSDSX9"},
-        {"row-flight": "UA1434", "row-confirmation": "PSJLBB"},
-    ]}
-    proposal = {"summary": "Update both bookings, complete both tasks, and append the tour link.",
-        "confidence": 1, "issues": [], "actions": [
-        {"id": "flights", "type": "update_form_values", "data": {"updates": [{
-            "task": task.urlsafe_key, "schema_id": "table-flights", "new_value": flights,
-        }]}},
-        {"id": "hotels", "type": "update_form_values", "data": {"updates": [{
-            "task": "hotel-task-id", "schema_id": "textarea-booking", "new_value": "Confirmed hotel",
-        }]}},
-        {"id": "flight-done", "type": "complete_task", "depends_on": ["flights"], "data": {"task": task.urlsafe_key}},
-        {"id": "hotel-done", "type": "complete_task", "depends_on": ["hotels"], "data": {"task": "hotel-task-id"}},
-        {"id": "tour", "type": "append_page_document", "data": {"page": page.urlsafe_key, "document_markdown": "[Tour](https://example.com/tour)"}},
-    ]}
+    flights = {
+        "rows": [
+            {"row-flight": "UA1458", "row-confirmation": "PR2FYB"},
+            {"row-flight": "B61680", "row-confirmation": "PSDSX9"},
+            {"row-flight": "UA1434", "row-confirmation": "PSJLBB"},
+        ]
+    }
+    proposal = {
+        "summary": "Update both bookings, complete both tasks, and append the tour link.",
+        "confidence": 1,
+        "issues": [],
+        "file_usage": [],
+        "actions": [
+            {
+                "id": "flights",
+                "type": "update_form_values",
+                "data": {
+                    "updates": [
+                        {
+                            "task": task.urlsafe_key,
+                            "schema_id": "table-flights",
+                            "new_value": flights,
+                        }
+                    ]
+                },
+            },
+            {
+                "id": "hotels",
+                "type": "update_form_values",
+                "data": {
+                    "updates": [
+                        {
+                            "task": "hotel-task-id",
+                            "schema_id": "textarea-booking",
+                            "new_value": "Confirmed hotel",
+                        }
+                    ]
+                },
+            },
+            {
+                "id": "flight-done",
+                "type": "complete_task",
+                "depends_on": ["flights"],
+                "data": {"task": task.urlsafe_key},
+            },
+            {
+                "id": "hotel-done",
+                "type": "complete_task",
+                "depends_on": ["hotels"],
+                "data": {"task": "hotel-task-id"},
+            },
+            {
+                "id": "tour",
+                "type": "append_page_document",
+                "data": {
+                    "page": page.urlsafe_key,
+                    "document_markdown": "[Tour](https://example.com/tour)",
+                },
+            },
+        ],
+    }
     invalid = copy.deepcopy(proposal)
-    invalid["actions"][0]["data"]["updates"][0]["new_value"] = {"rows": ["Flight", "Confirmation"]}
+    invalid["actions"][0]["data"]["updates"][0]["new_value"] = {
+        "rows": ["Flight", "Confirmation"]
+    }
     reads, requests, summaries = [], [], []
+
     def get_schema(args, actor):
         reads.append(args)
         return {"schema": form.schema, "evidence": "All three confirmed flights"}
+
     def response(value=None, tool=False):
-        part = (genai_types.Part.from_function_call(name="get_schema", args={"id": task.urlsafe_key})
-                if tool else genai_types.Part.from_text(text=value if isinstance(value, str) else json.dumps(value)))
-        return genai_types.GenerateContentResponse(candidates=[genai_types.Candidate(
-            content=genai_types.Content(role="model", parts=[part])
-        )])
+        part = (
+            genai_types.Part.from_function_call(
+                name="get_schema", args={"id": task.urlsafe_key}
+            )
+            if tool
+            else genai_types.Part.from_text(
+                text=value if isinstance(value, str) else json.dumps(value)
+            )
+        )
+        return genai_types.GenerateContentResponse(
+            candidates=[
+                genai_types.Candidate(
+                    content=genai_types.Content(role="model", parts=[part])
+                )
+            ]
+        )
+
     if mode == "valid":
         responses = [response(tool=True), response(proposal)]
     elif mode in {"exhausted", "empty_exhausted"}:
         failed = "" if mode == "empty_exhausted" else invalid
-        responses = [response(tool=True), response(failed), response(failed), response(failed)]
+        responses = [
+            response(tool=True),
+            response(failed),
+            response(failed),
+            response(failed),
+        ]
     else:
-        responses = [response(tool=True), response("{broken JSON" if mode == "invalid_json" else invalid),
-                     response(tool=True), response(proposal)]
+        responses = [
+            response(tool=True),
+            response("{broken JSON" if mode == "invalid_json" else invalid),
+            response(tool=True),
+            response(proposal),
+        ]
+
     def generate_content(**kwargs):
         requests.append({**kwargs, "contents": list(kwargs["contents"])})
         return responses[len(requests) - 1]
+
     monkeypatch.setitem(functions.HANDLERS, "get_schema", get_schema)
-    monkeypatch.setattr(core.ai_model, "_client", SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)))
+    monkeypatch.setattr(
+        core.ai_model,
+        "_client",
+        SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)),
+    )
     monkeypatch.setattr(settings.site_database, "ai", lambda: None)
     monkeypatch.setattr(observability, "prune_old_records", lambda: None)
-    monkeypatch.setattr(observability, "_write_summary", lambda summary: summaries.append(summary.payload()))
-    monkeypatch.setattr(organize.Entities, "fetch_one", _fetch_one_from({task.urlsafe_key: task}))
-    prompt = organize.organize_prompt(report, user)
+    monkeypatch.setattr(
+        observability,
+        "_write_summary",
+        lambda summary: summaries.append(summary.payload()),
+    )
+    monkeypatch.setattr(
+        proposal_validation.Entities,
+        "fetch_one",
+        _fetch_one_from({task.urlsafe_key: task}),
+    )
+    prompt = planner.report_prompt(report, user)
     prompt.set_max_tool_iterations(2)
     if mode in {"exhausted", "empty_exhausted"}:
-        expected_error = "no text content" if mode == "empty_exhausted" else "must be an object keyed by column ids"
+        expected_error = (
+            "no text content"
+            if mode == "empty_exhausted"
+            else "must be an object keyed by column ids"
+        )
         with pytest.raises(exceptions.AIException, match=expected_error):
-            organize.generate_organize_report(prompt, report, user)
+            planner.generate_report(prompt)["proposal"]
         assert len(requests) == 4
     else:
-        result = organize.generate_organize_report(prompt, report, user)
+        result = planner.generate_report(prompt)["proposal"]
         assert len(result["actions"]) == 5
         assert result["actions"][0]["data"]["updates"][0]["new_value"] == flights
         assert result["actions"][2]["depends_on"] == ["flights"]
@@ -660,896 +396,21 @@ def test_organize_conversation_validation_preserves_complete_proposal(monkeypatc
     assert summaries[0]["success"] is (mode not in {"exhausted", "empty_exhausted"})
     if mode != "valid":
         history = requests[-1]["contents"]
-        text = "\n".join(part.text or "" for content in history if not isinstance(content, str) for part in content.parts)
+        text = "\n".join(
+            part.text or ""
+            for content in history
+            if not isinstance(content, str)
+            for part in content.parts
+        )
         assert "Response validation failed" in text
         assert "complete corrected JSON response" in text
-        assert any(part.function_response for content in history if not isinstance(content, str) for part in content.parts)
+        assert any(
+            part.function_response
+            for content in history
+            if not isinstance(content, str)
+            for part in content.parts
+        )
         assert len(history) > len(requests[1]["contents"])
-
-
-# @matrix ai-report : repair required-data
-@pytest.mark.unit
-def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch):
-    invalid = {
-        "summary": "Centralize family files.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "create_family_records_page",
-                "type": "create_page",
-                "data": {},
-            },
-            {
-                "id": "move_file_richardson",
-                "type": "move_file",
-                "data": {
-                    "file": "richardson-file-id",
-                    "display_name": "Richardson Family Records.pdf",
-                    "to_page_action": "create_family_records_page",
-                },
-            },
-        ],
-    }
-    repaired = {
-        "summary": "Centralize family files.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "create_family_records_page",
-                "type": "create_page",
-                "data": {"name": "Family Records"},
-            },
-            {
-                "id": "move_file_richardson",
-                "type": "move_file",
-                "data": {
-                    "file": "richardson-file-id",
-                    "display_name": "Richardson Family Records.pdf",
-                    "from_page": "richardson-source-page-id",
-                    "from_page_name": "Richardson Records",
-                    "to_page_action": "create_family_records_page",
-                },
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    captured_repairs = []
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured_repairs.append(
-            {"error": error, "context": context, "level": level}
-        ),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "move_file", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="ask report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][0]["data"]["name"] == "Family Records"
-    assert result["actions"][1]["data"]["from_page"] == "richardson-source-page-id"
-    assert len(calls) == 2
-    _assert_repair_prompt_contract(
-        calls[1],
-        invalid_proposal=invalid,
-        allowed_actions=prompt.allowed_actions,
-    )
-    assert captured_repairs == []
-
-
-
-
-# @matrix ai-report : add-category repair required-data
-@pytest.mark.unit
-def test_generate_organize_report_repairs_missing_add_page_category_target(monkeypatch):
-    invalid = {
-        "summary": "Add Sheik Orthodontics to Lucy.",
-        "confidence": 0.7,
-        "issues": [],
-        "actions": [
-            {
-                "id": "add_sheik_ortho_to_lucy",
-                "type": "add_page_category",
-                "data": {
-                    "page": "lucy-page-id",
-                    "page_name": "Lucy",
-                    "category_name": "Sheik Orthodontics",
-                },
-            }
-        ],
-    }
-    repaired = {
-        "summary": "Add Sheik Orthodontics to Lucy.",
-        "confidence": 0.7,
-        "issues": [
-            (
-                "The Sheik Orthodontics category could not be identified from "
-                "the proposal."
-            )
-        ],
-        "actions": [
-            {
-                "id": "review_sheik_ortho_category",
-                "type": "needs_review",
-                "data": {
-                    "note": (
-                        "Choose the Sheik Orthodontics category before adding "
-                        "it to Lucy."
-                    ),
-                    "questions": [
-                        "Which existing category should be added to Lucy?",
-                    ],
-                },
-            }
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("add_page_category", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][0]["type"] == "needs_review"
-    assert len(calls) == 2
-    _assert_repair_prompt_contract(
-        calls[1],
-        invalid_proposal=invalid,
-        allowed_actions=prompt.allowed_actions,
-    )
-
-
-
-
-# @matrix ai-report : submission validate
-@pytest.mark.unit
-def test_legacy_organize_validation_accepts_pending_submission(monkeypatch):
-    invalid = {
-        "summary": "Create a pharmacy page.",
-        "confidence": 0.7,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_cvs_pharmacy",
-                "type": "create_page",
-                "data": {
-                    "name": "CVS Pharmacy",
-                    "form": "business-form-id",
-                    "form_name": "Business",
-                },
-            }
-        ],
-    }
-    repaired = {
-        "summary": "Create a pharmacy page.",
-        "confidence": 0.7,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_cvs_pharmacy",
-                "type": "create_page",
-                "data": {
-                    "name": "CVS Pharmacy",
-                    "form": "business-form-id",
-                    "form_name": "Business",
-                    "submission": {
-                        "input-business-name": "CVS Pharmacy",
-                    },
-                },
-            }
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.validate_or_repair_proposal(
-        prompt, invalid, allow_pending_submissions=True
-    )
-
-    assert "submission" not in result["actions"][0]["data"]
-    assert len(calls) == 0
-
-
-
-
-# @matrix ai-report : capture empty-form repair
-@pytest.mark.unit
-def test_generate_organize_report_repairs_empty_form_schema_without_capture(monkeypatch):
-    invalid = {
-        "summary": "Create a record form.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "record_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Record Form",
-                    "form_type": "page",
-                    "schema": [],
-                },
-            }
-        ],
-    }
-    repaired = {
-        "summary": "Create a record form.",
-        "confidence": 0.7,
-        "actions": [
-            {
-                "id": "record_form_review",
-                "type": "needs_review",
-                "data": {
-                    "note": "No useful structured fields were identified.",
-                    "questions": ["What fields should the form collect?"],
-                },
-            }
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid if len(calls) == 1 else repaired
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    captured_repairs = []
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured_repairs.append(
-            {"error": error, "context": context, "level": level}
-        ),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("create_form", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][0]["type"] == "needs_review"
-    assert len(calls) == 2
-    _assert_repair_prompt_contract(
-        calls[1],
-        invalid_proposal=invalid,
-        allowed_actions=prompt.allowed_actions,
-    )
-    assert 'get_guidelines("page_form")' in calls[1].preview()
-    assert "Do not merely claim a schema was corrected" in calls[1].preview()
-    assert "Do not replace a form action with needs_review merely" in (
-        calls[1].preview()
-    )
-    assert captured_repairs == []
-
-
-
-
-# @matrix ai-report : deterministic-repair schema-field-id
-@pytest.mark.unit
-def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypatch):
-    invalid = {
-        "summary": "Create an orthodontist form.",
-        "confidence": 0.7,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_orthodontist_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Orthodontist",
-                    "form_type": "page",
-                    "schema": [
-                        {
-                            "id": "input-practice-name",
-                            "type": "input",
-                            "title": "Practice Name",
-                        },
-                        {
-                            "type": "textarea",
-                            "title": "Treatment Notes",
-                        },
-                    ],
-                },
-            }
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return invalid
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-
-    prompt = SimpleNamespace(
-        allowed_actions=("create_form", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    fields = result["actions"][0]["data"]["schema"]
-    assert [field["id"] for field in fields] == [
-        "input-practice-name",
-        "textarea-treatment-notes",
-    ]
-    assert fields[0]["input"] == "text"
-    assert len(calls) == 1
-
-
-
-
-# @matrix ai-report form-schema : deterministic-repair schema-update
-@pytest.mark.unit
-def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
-    from lagniappe.core.tools.ai.reporting import schema_updates
-
-    # This characterization owns mechanical field completion; workspace-backed
-    # preparation and candidate repair are covered by test_004l.
-    monkeypatch.setattr(schema_updates, "prepare_schema_updates", lambda proposal, user: proposal)
-    proposal = {
-        "summary": "Add a payment reference field.",
-        "confidence": 0.8,
-        "issues": [],
-        "actions": [
-            {
-                "id": "add_payment_reference",
-                "type": "update_form_schema",
-                "data": {
-                    "form": "invoice-form",
-                    "operations": [
-                        {
-                            "op": "add_field",
-                            "field": {
-                                "type": "input",
-                                "label": "Payment Reference",
-                            },
-                        }
-                    ],
-                },
-            }
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return proposal
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("update_form_schema", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    field = result["actions"][0]["data"]["operations"][0]["field"]
-    assert field == {
-        "id": "input-payment-reference",
-        "type": "input",
-        "input": "text",
-        "label": "Payment Reference",
-        "title": "Payment Reference",
-    }
-    assert len(calls) == 1
-
-
-
-
-# @matrix ai-report : deterministic-repair form-type
-# @pair form-schema:form-type
-@pytest.mark.unit
-def test_generate_organize_report_infers_create_form_type_from_usage(monkeypatch):
-    proposal = {
-        "summary": "Propose a record category and form.",
-        "confidence": 0.8,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_record_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Record Form",
-                    "schema": [
-                        {
-                            "id": "textarea-notes",
-                            "type": "textarea",
-                            "title": "Notes",
-                        }
-                    ],
-                },
-            },
-            {
-                "id": "create_record_category",
-                "type": "create_category",
-                "data": {
-                    "name": "Records",
-                    "form_action": "create_record_form",
-                },
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return proposal
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_form", "create_category", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][0]["data"]["form_type"] == "page"
-    assert len(calls) == 1
-
-
-
-
-# @matrix ai-report : deterministic-repair page-form references
-@pytest.mark.unit
-def test_generate_organize_report_infers_unambiguous_add_form_reference(monkeypatch):
-    proposal = {
-        "summary": "Use the property-tax form on the existing Toft page.",
-        "confidence": 0.8,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_property_tax_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Property Tax Record",
-                    "form_type": "page",
-                    "schema": [
-                        {
-                            "id": "input-apn",
-                            "type": "input",
-                            "input": "text",
-                            "title": "Assessor Parcel Number",
-                        }
-                    ],
-                },
-            },
-            {
-                "id": "create_payment_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Payment Record",
-                    "form_type": "task",
-                    "schema": [
-                        {
-                            "id": "date-paid-on",
-                            "type": "date",
-                            "title": "Paid On",
-                        }
-                    ],
-                },
-            },
-            {
-                "id": "add_form_to_toft",
-                "type": "add_form_to_page",
-                "display_label": "Apply Property Tax Form to Toft Property Tax Page",
-                "data": {"page": "toft-property-tax-page"},
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return proposal
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_form", "add_form_to_page", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["actions"][2]["data"] == {
-        "page": "toft-property-tax-page",
-        "form_action": "create_property_tax_form",
-    }
-    assert "form_action" not in proposal["actions"][2]["data"]
-    assert len(calls) == 1
-
-
-
-
-# @matrix ai-report : fallback needs-review page-form per-action-fallback references
-@pytest.mark.unit
-def test_generate_organize_report_reviews_ambiguous_missing_add_form_reference(
-    monkeypatch,
-):
-    invalid = {
-        "summary": "Prepare the property-tax records.",
-        "confidence": 0.6,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_property_tax_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Property Tax Record",
-                    "form_type": "page",
-                    "schema": [
-                        {
-                            "id": "input-apn",
-                            "type": "input",
-                            "input": "text",
-                            "title": "Assessor Parcel Number",
-                        }
-                    ],
-                },
-            },
-            {
-                "id": "create_property_summary_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Property Summary",
-                    "form_type": "page",
-                    "schema": [
-                        {
-                            "id": "textarea-notes",
-                            "type": "textarea",
-                            "title": "Notes",
-                        }
-                    ],
-                },
-            },
-            {
-                "id": "add_form_to_toft",
-                "type": "add_form_to_page",
-                "display_label": "Apply a Form to Toft Property Tax Page",
-                "data": {"page": "toft-property-tax-page"},
-            },
-            {
-                "id": "keep_source_summary",
-                "type": "skip",
-                "data": {"note": "The source summary is already retained."},
-            },
-        ],
-    }
-    calls = []
-    captured = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return copy.deepcopy(invalid)
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured.append(
-            {"error": error, "context": context, "level": level}
-        ),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=(
-            "create_form",
-            "add_form_to_page",
-            "skip",
-            "needs_review",
-        ),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert [action["type"] for action in result["actions"]] == [
-        "create_form",
-        "create_form",
-        "needs_review",
-        "skip",
-    ]
-    review = result["actions"][2]
-    assert review["id"] == "add_form_to_toft"
-    assert review["display_label"] == "Apply a Form to Toft Property Tax Page"
-    assert review["data"]["questions"] == [
-        "Which existing or proposed form should this action use?"
-    ]
-    assert "workspace reference was unclear" in result["issues"][-1]
-    assert result["summary"] == invalid["summary"]
-    assert len(calls) == 2
-    _assert_repair_prompt_contract(
-        calls[1],
-        invalid_proposal=invalid,
-        allowed_actions=prompt.allowed_actions,
-    )
-    repair_text = calls[1].preview()
-    assert "add_form_to_page actions must include both" in repair_text
-    assert "data.form/data.form_action" in repair_text
-    assert captured == []
-
-
-
-
-# @matrix ai-report : needs-review per-action-fallback references
-@pytest.mark.unit
-def test_generate_organize_report_reviews_unresolved_references_after_failed_repair(
-    monkeypatch,
-):
-    invalid = {
-        "summary": "Record the legal payment.",
-        "confidence": 0.6,
-        "issues": [],
-        "actions": [
-            {
-                "id": "keep_summary",
-                "type": "skip",
-                "data": {"note": "The source file is already summarized."},
-            },
-            {
-                "id": "create_task_legal_payment",
-                "type": "create_task",
-                "data": {
-                    "name": "Legal Retainer Payment",
-                    "page_action": (
-                        "$1,500.00 credit card transaction for legal "
-                        "representation retainer."
-                    ),
-                },
-            },
-        ],
-    }
-    calls = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return copy.deepcopy(invalid)
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_task", "skip", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert [action["type"] for action in result["actions"]] == [
-        "skip",
-        "needs_review",
-    ]
-    review = result["actions"][1]
-    assert review["display_label"] == "Legal Retainer Payment"
-    assert "could not be linked safely" in review["reason"]
-    assert "needs review" in result["issues"][-1]
-    assert len(calls) == 2
-    assert "Do not mention validation errors" in calls[1].preview()
-
-
-
-
-# @matrix ai-report : malformed-data needs-review per-action-fallback
-@pytest.mark.unit
-def test_generate_organize_report_downgrades_malformed_action_after_failed_repair(
-    monkeypatch,
-):
-    invalid = {
-        "summary": "Create a divorce form.",
-        "confidence": 0.5,
-        "actions": [
-            {
-                "id": "create_divorce_form",
-                "type": "create_form",
-                "data": {
-                    "name": "Divorce",
-                    "schema": [{"type": "textarea", "title": "Notes"}],
-                },
-            }
-        ],
-    }
-    calls = []
-    captured = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return copy.deepcopy(invalid)
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured.append(
-            {"error": error, "context": context, "level": level}
-        ),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_form", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert result["summary"] == "Create a divorce form."
-    assert result["confidence"] == 0.5
-    assert [action["type"] for action in result["actions"]] == ["needs_review"]
-    assert result["actions"][0]["display_label"] == "Divorce"
-    assert result["actions"][0]["data"]["questions"] == [
-        "What exact workspace record and values should this action use?"
-    ]
-    assert "Divorce needs review because its action data was incomplete." in result[
-        "issues"
-    ]
-    assert len(calls) == 2
-    assert captured == []
-
-
-
-
-# @matrix ai-report : needs-review per-action-fallback references
-@pytest.mark.unit
-def test_generate_organize_report_downgrades_missing_category_without_sentry_capture(
-    monkeypatch,
-):
-    invalid = {
-        "summary": "Organize the comic book drawer plans.",
-        "confidence": 0.7,
-        "issues": [],
-        "actions": [
-            {
-                "id": "create_comic_drawers_page",
-                "type": "create_page",
-                "display_label": "Create page for Comic Book Drawers Plan",
-                "data": {"name": "Comic Book Drawers Plan"},
-            },
-            {
-                "id": "add_comics_category_to_drawers",
-                "type": "add_page_category",
-                "display_label": "Add Comics category to Comic Book Drawers",
-                "data": {
-                    "completed": False,
-                    "completed_on": None,
-                    "due_date": None,
-                    "note": None,
-                    "page_action": "create_comic_drawers_page",
-                    "questions": [],
-                    "to_page": None,
-                    "to_task": None,
-                    "updates": [],
-                },
-            },
-        ],
-    }
-    calls = []
-    captured = []
-
-    def fake_generate(prompt):
-        calls.append(prompt)
-        return copy.deepcopy(invalid)
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(fake_generate),
-    )
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured.append(
-            {"error": error, "context": context, "level": level}
-        ),
-    )
-    prompt = SimpleNamespace(
-        allowed_actions=("create_page", "add_page_category", "needs_review"),
-        output_format={"type": "JSON", "description": "Return report JSON."},
-        prompt_type="organize report",
-        user=None,
-    )
-
-    result = organize.generate_validated_proposal(prompt)
-
-    assert [action["type"] for action in result["actions"]] == [
-        "create_page",
-        "needs_review",
-    ]
-    assert result["actions"][1]["id"] == "add_comics_category_to_drawers"
-    assert result["actions"][1]["data"]["questions"] == [
-        "Which existing or proposed category should this action use?"
-    ]
-    assert len(calls) == 2
-    assert captured == []
-
-
 
 
 # @matrix ai-report form-schema : proposal schema-update validation
@@ -1574,9 +435,7 @@ def test_validate_proposal_rejects_unsafe_schema_update_operations():
     }
 
     with pytest.raises(exceptions.AIException, match="unsupported op"):
-        organize.validate_proposal(proposal)
-
-
+        proposal_validation.validate_proposal(proposal)
 
 
 # @matrix ai-report : move-references proposal validation
@@ -1613,9 +472,7 @@ def test_validate_proposal_requires_move_entity_references(
     }
 
     with pytest.raises(exceptions.AIException, match=rf"requires data\.{missing}"):
-        organize.validate_proposal(proposal)
-
-
+        proposal_validation.validate_proposal(proposal)
 
 
 # @matrix ai-report : canonical-target legacy-target proposal rename validation
@@ -1649,7 +506,7 @@ def test_validate_proposal_accepts_rename_and_move_task_target_aliases():
         ],
     }
 
-    assert organize.validate_proposal(proposal) == proposal
+    assert proposal_validation.validate_proposal(proposal) == proposal
 
     for data, missing in (
         ({"name": "Teeth"}, "entity"),
@@ -1663,43 +520,7 @@ def test_validate_proposal_accepts_rename_and_move_task_target_aliases():
             exceptions.AIException,
             match=rf"rename_page \(rename_entity\) requires data\.{missing}",
         ):
-            organize.validate_proposal(invalid)
-
-
-
-
-# @matrix ai-report : create generate validate
-@pytest.mark.unit
-def test_generate_create_report_validates_non_empty_actions(monkeypatch):
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(
-            lambda prompt: {
-                "summary": "No actions.",
-                "confidence": 0.5,
-                "actions": [],
-            }
-        ),
-    )
-
-    with pytest.raises(exceptions.AIException, match="at least one action"):
-        create.generate_create_report(object())
-
-    proposal = {
-        "summary": "Create a page.",
-        "confidence": 0.8,
-        "actions": [{"type": "create_page", "data": {"name": "Generated"}}],
-    }
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(lambda prompt: proposal),
-    )
-
-    assert create.generate_create_report(object()) == proposal
-
-
+            proposal_validation.validate_proposal(invalid)
 
 
 # @matrix ai-report : explicit-task-identity proposal validation
@@ -1709,7 +530,7 @@ def test_validate_proposal_requires_completed_root_task_targets():
         exceptions.AIException,
         match="target an existing task only for a completed occurrence",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Invalid active task target.",
                 "actions": [
@@ -1750,7 +571,9 @@ def test_validate_proposal_requires_completed_root_task_targets():
             },
         ],
     }
-    assert organize.validate_proposal(copy.deepcopy(proposal))["issues"] == []
+    assert (
+        proposal_validation.validate_proposal(copy.deepcopy(proposal))["issues"] == []
+    )
 
     proposal["actions"].append(
         {
@@ -1768,7 +591,7 @@ def test_validate_proposal_requires_completed_root_task_targets():
         exceptions.AIException,
         match="earlier untargeted completed create_task",
     ):
-        organize.validate_proposal(proposal)
+        proposal_validation.validate_proposal(proposal)
 
 
 # @matrix ai-report : completed-task future-date proposal validation
@@ -1798,12 +621,10 @@ def test_validate_proposal_rejects_future_completed_dates(monkeypatch):
         exceptions.AIException,
         match="completion date cannot be in the future",
     ):
-        organize.validate_proposal(copy.deepcopy(proposal))
+        proposal_validation.validate_proposal(copy.deepcopy(proposal))
 
     proposal["actions"][0]["data"]["completed_on"] = "2026-08-31"
-    assert organize.validate_proposal(proposal)["issues"] == []
-
-
+    assert proposal_validation.validate_proposal(proposal)["issues"] == []
 
 
 # @matrix ai-report : dependencies proposal validation
@@ -1825,12 +646,12 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
     )
 
     with pytest.raises(exceptions.AIException, match="Unknown report action"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {"summary": "Nope", "confidence": 0.1, "actions": [{"type": "dance"}]}
         )
 
     with pytest.raises(exceptions.AIException, match="depends on unknown"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Bad dependency",
                 "confidence": 0.1,
@@ -1848,7 +669,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
             }
         )
 
-    cleaned_dependencies = organize.validate_proposal(
+    cleaned_dependencies = proposal_validation.validate_proposal(
         {
             "summary": "Bad explicit dependency note",
             "confidence": 0.5,
@@ -1876,7 +697,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
     assert cleaned_dependencies["issues"] == []
 
     with pytest.raises(exceptions.AIException, match="not allowed"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Forbidden",
                 "confidence": 0.1,
@@ -1886,7 +707,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         )
 
     with pytest.raises(exceptions.AIException, match="issues"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Bad issues",
                 "confidence": 0.1,
@@ -1899,7 +720,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"create_page\) requires data.name",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Nameless page",
                 "confidence": 0.1,
@@ -1920,7 +741,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"create_form\) requires at least one data.schema field",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Blank form",
                 "confidence": 0.1,
@@ -1942,7 +763,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"data.schema\[1\] requires title",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Bad form field",
                 "confidence": 0.1,
@@ -1964,7 +785,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"uses a form and requires non-empty data.submission",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Page form without submission",
                 "confidence": 0.1,
@@ -1981,7 +802,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
             }
         )
 
-    pending_submission = organize.validate_proposal(
+    pending_submission = proposal_validation.validate_proposal(
         {
             "summary": "Page form with pending completion",
             "confidence": 0.8,
@@ -2003,12 +824,12 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"uses a form and requires non-empty data.submission",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             pending_submission,
             allow_pending_submissions=False,
         )
 
-    empty_completed_submission = organize.validate_proposal(
+    empty_completed_submission = proposal_validation.validate_proposal(
         {
             "summary": "Page form with completed empty submission pass",
             "confidence": 0.8,
@@ -2029,15 +850,16 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         },
         allow_pending_submissions=False,
     )
-    assert empty_completed_submission["actions"][0]["data"][
-        "submission_empty_reason"
-    ] == "No submission fields were filled from the available evidence."
+    assert (
+        empty_completed_submission["actions"][0]["data"]["submission_empty_reason"]
+        == "No submission fields were filled from the available evidence."
+    )
 
     with pytest.raises(
         exceptions.AIException,
         match=r"uses a form and requires non-empty data.submission",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Task form with empty submission",
                 "confidence": 0.1,
@@ -2060,7 +882,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"move_file\) requires exactly one source",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Missing move source",
                 "confidence": 0.1,
@@ -2087,7 +909,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"add_page_category\) requires data.page",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Missing page category add",
                 "confidence": 0.1,
@@ -2104,7 +926,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"update_form_values\) requires at least one data.updates row",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Empty submission update",
                 "confidence": 0.1,
@@ -2122,7 +944,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
         exceptions.AIException,
         match=r"data.updates\[1\] requires exactly one page or task",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Malformed submission update",
                 "confidence": 0.1,
@@ -2143,7 +965,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
             }
         )
 
-    recoverable_file_reference_proposal = organize.validate_proposal(
+    recoverable_file_reference_proposal = proposal_validation.validate_proposal(
         {
             "summary": "Recoverable file reference problems",
             "confidence": 0.1,
@@ -2160,7 +982,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                     "id": "attachment",
                     "type": "attach_file",
                     "data": {
-                        'entity': "existing-page",
+                        "entity": "existing-page",
                         "display_name": "Pettis Proposal",
                         "file": "unavailable-report-file",
                     },
@@ -2196,7 +1018,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
     ]
 
     with pytest.raises(exceptions.AIException, match="attach_file"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             {
                 "summary": "Invalid task attachment shape",
                 "confidence": 0.9,
@@ -2214,7 +1036,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
             }
         )
 
-    proposal = organize.validate_proposal(
+    proposal = proposal_validation.validate_proposal(
         {
             "summary": "OK",
             "confidence": 0.9,
@@ -2257,7 +1079,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                     "id": "completed_task_attachment",
                     "type": "attach_file",
                     "data": {
-                        'entity_action': "completed_task",
+                        "entity_action": "completed_task",
                         "file": "registration.pdf",
                     },
                 },
@@ -2267,7 +1089,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
     assert proposal["summary"] == "OK"
     assert proposal["issues"] == []
 
-    normalized = organize.validate_proposal(
+    normalized = proposal_validation.validate_proposal(
         {
             "summary": "Normalize hash refs",
             "confidence": 0.9,
@@ -2287,7 +1109,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
                     "id": "attach_task_file",
                     "type": "attach_file",
                     "data": {
-                        'entity_action': "task",
+                        "entity_action": "task",
                         "file": "hash:def456abc789",
                     },
                 },
@@ -2308,8 +1130,6 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
     assert normalized["actions"][0]["data"]["submission"] == {
         "input-abc123def456": "Schema ids are not references."
     }
-
-
 
 
 # @matrix ai-report : action-reference-namespace proposal submission validation
@@ -2344,13 +1164,12 @@ def test_validate_proposal_treats_action_like_submission_fields_as_content():
         ],
     }
 
-    validated = organize.validate_proposal(copy.deepcopy(proposal))
+    validated = proposal_validation.validate_proposal(copy.deepcopy(proposal))
 
-    assert validated["actions"][1]["data"]["submission"] == proposal["actions"][1][
-        "data"
-    ]["submission"]
-
-
+    assert (
+        validated["actions"][1]["data"]["submission"]
+        == proposal["actions"][1]["data"]["submission"]
+    )
 
 
 # @matrix ai-report : file-placement proposal validation
@@ -2373,7 +1192,7 @@ def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
                 "id": "attach_first",
                 "type": "attach_file",
                 "data": {
-                    'entity': "existing-page",
+                    "entity": "existing-page",
                     "file": "hash:aaaaaaaaaaaa",
                 },
             },
@@ -2389,7 +1208,7 @@ def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
         exceptions.AIException,
         match=r"Missing report_file_ref values: hash:bbbbbbbbbbbb",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             proposal,
             required_file_refs=("hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb"),
         )
@@ -2397,7 +1216,7 @@ def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
     proposal["actions"][1]["data"]["entity"] = "existing-task"
     proposal["actions"][1]["type"] = "attach_file"
 
-    validated = organize.validate_proposal(
+    validated = proposal_validation.validate_proposal(
         proposal,
         required_file_refs=("hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb"),
     )
@@ -2424,12 +1243,12 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
             {
                 "id": "attach_first",
                 "type": "attach_file",
-                "data": {'entity': "existing-page", "file": "hash:aaaaaaaaaaaa"},
+                "data": {"entity": "existing-page", "file": "hash:aaaaaaaaaaaa"},
             },
             {
                 "id": "attach_second",
                 "type": "attach_file",
-                "data": {'entity': "existing-task", "file": "hash:bbbbbbbbbbbb"},
+                "data": {"entity": "existing-task", "file": "hash:bbbbbbbbbbbb"},
             },
         ],
     }
@@ -2439,7 +1258,7 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
         exceptions.AIException,
         match=r"Missing report_file_ref values: hash:aaaaaaaaaaaa, hash:bbbbbbbbbbbb",
     ):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             copy.deepcopy(proposal),
             required_file_refs=required,
             require_file_summaries=True,
@@ -2470,7 +1289,7 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
         ]
     )
 
-    validated = organize.validate_proposal(
+    validated = proposal_validation.validate_proposal(
         copy.deepcopy(proposal),
         required_file_refs=required,
         require_file_summaries=True,
@@ -2484,7 +1303,7 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
     missing_terms = copy.deepcopy(proposal)
     missing_terms["actions"][2]["data"].pop("retrieval_terms")
     with pytest.raises(exceptions.AIException, match="exactly two distinct"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             missing_terms,
             required_file_refs=required,
             require_file_summaries=True,
@@ -2498,7 +1317,7 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
         }
     )
     with pytest.raises(exceptions.AIException, match="exactly one summary"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             duplicate,
             required_file_refs=required,
             require_file_summaries=True,
@@ -2517,13 +1336,11 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
         }
     )
     with pytest.raises(exceptions.AIException, match="must target report input"):
-        organize.validate_proposal(
+        proposal_validation.validate_proposal(
             unexpected,
             required_file_refs=required,
             require_file_summaries=True,
         )
-
-
 
 
 # @matrix ai-report : dependencies proposal skip
@@ -2542,13 +1359,13 @@ def test_skip_proposal_actions_marks_dependencies():
             {
                 "id": "attachment",
                 "type": "attach_file",
-                "data": {'entity_action': "page", "file": "scan.pdf"},
+                "data": {"entity_action": "page", "file": "scan.pdf"},
             },
             {"id": "other", "type": "needs_review", "data": {}},
         ],
     }
 
-    skipped = organize.skip_proposal_actions(proposal, 0)
+    skipped = selection.skip_proposal_actions(proposal, 0)
 
     assert skipped == [1, 2, 3]
     assert [action.get("skip") for action in proposal["actions"]] == [
@@ -2557,8 +1374,6 @@ def test_skip_proposal_actions_marks_dependencies():
         True,
         None,
     ]
-
-
 
 
 # @matrix ai-report : dependencies grouped-display proposal restore skip
@@ -2577,13 +1392,13 @@ def test_toggle_proposal_action_skip_restores_dependencies():
             {
                 "id": "attachment",
                 "type": "attach_file",
-                "data": {'entity_action': "page", "file": "scan.pdf"},
+                "data": {"entity_action": "page", "file": "scan.pdf"},
             },
             {"id": "other", "type": "needs_review", "data": {}},
         ],
     }
 
-    skipped = organize.toggle_proposal_action_skip(proposal, 0)
+    skipped = selection.toggle_proposal_action_skip(proposal, 0)
 
     assert skipped == {"changed": [1, 2, 3], "skipped": [1, 2, 3]}
     assert [action.get("skip") for action in proposal["actions"]] == [
@@ -2593,7 +1408,7 @@ def test_toggle_proposal_action_skip_restores_dependencies():
         None,
     ]
 
-    restored = organize.toggle_proposal_action_skip(proposal, 0)
+    restored = selection.toggle_proposal_action_skip(proposal, 0)
 
     assert restored == {"changed": [1, 2, 3], "skipped": []}
     assert [action.get("skip") for action in proposal["actions"]] == [
@@ -2603,7 +1418,7 @@ def test_toggle_proposal_action_skip_restores_dependencies():
         None,
     ]
 
-    grouped = organize.toggle_proposal_action_indexes(proposal, 1, [0, 1])
+    grouped = selection.toggle_proposal_action_indexes(proposal, 1, [0, 1])
 
     assert grouped == {"changed": [1, 2, 3], "skipped": [1, 2, 3]}
     assert [action.get("skip") for action in proposal["actions"]] == [

@@ -17,7 +17,7 @@ def _request_data():
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report_direct
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report_direct
 # @covered-by lagniappe/web/routes/pages/main.py::update_direct
 # @reason route response is thin plumbing over tested storage session creation
 def direct_upload_response():

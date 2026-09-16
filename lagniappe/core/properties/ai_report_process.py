@@ -41,7 +41,7 @@ class ReportProcess(ProcessProperty):
         actions = proposal.get("actions") or []
         self.status = (
             "complete"
-            if self.entity.tool == "ask" and not actions
+            if not actions
             else "ready"
         )
         self.pending = None
@@ -56,10 +56,10 @@ class ReportProcess(ProcessProperty):
         if result is not None:
             self.result = result
 
-    def set_proposal(self, proposal, status="ready"):
+    def set_proposal(self, proposal):
         self.proposal = proposal
         self.summary = proposal.get("summary") if isinstance(proposal, dict) else None
-        self.status = status
+        self.status = "ready" if proposal.get("actions") else "complete"
         self.pending = None
         self.error = None
         self.result = None
@@ -212,17 +212,16 @@ class Note(Property):
 
     @property
     def value(self):
+        if not self.entity.available:
+            from ..entities.ai_report import UNAVAILABLE_PLAN_MESSAGE
+            return UNAVAILABLE_PLAN_MESSAGE
         if self.entity.error:
             return self.entity.error
         if self.entity.summary:
             return self.entity.summary
-        pending = {
-            "ask": "Thinking...",
-            "create": "Planning creation...",
-        }.get(self.entity.tool, "Analyzing files...")
         labels = {
             "draft": "Waiting for external plan",
-            "pending": pending,
+            "pending": "Thinking...",
             "revising": "Revising report...",
             "ready": "Ready to run",
             "running": "Running report...",

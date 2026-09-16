@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b9517a42';
-import { B as BaseElement } from './baseElement.js?v=b9517a42';
-import { p as primitives } from './primitives.js?v=b9517a42';
-import './icons.js?v=b9517a42';
+import { STYLES } from './styles.js?v=bb1ed2ee';
+import { B as BaseElement } from './baseElement.js?v=bb1ed2ee';
+import { p as primitives } from './primitives.js?v=bb1ed2ee';
+import './icons.js?v=bb1ed2ee';
 
 /**
  * @testable infrastructure

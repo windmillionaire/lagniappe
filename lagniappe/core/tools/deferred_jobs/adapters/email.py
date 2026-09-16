@@ -15,7 +15,6 @@ from lagniappe.core.definitions import (
     FileConsumer,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import utility as database_utility
 
 from .base import DeferredJobAdapter
@@ -37,12 +36,6 @@ class EmailIngestAdapter(DeferredJobAdapter):
     failure_prefix = "Email submission failed."
     notification_policy = "failure"
 
-    def authorization(self, spec):
-        authorization = super().authorization(spec)
-        report = spec.inputs.get("report")
-        authorization["tool"] = getattr(report, "tool", None)
-        return authorization
-
     def authorize(self, context):
         super().authorize(context)
         report = context.input("report")
@@ -50,13 +43,8 @@ class EmailIngestAdapter(DeferredJobAdapter):
             raise exceptions.ValidationError("Email report user is invalid.")
         if not isinstance(report, Entities.REPORT) or report.origin != "email":
             raise exceptions.ValidationError("Email report is invalid.")
-        required = AI.ASK if report.tool == "ask" else AI.CREATE
-        if report.tool not in {"ask", "create", "organize"} or not context.actor.access(
-            required
-        ):
-            raise exceptions.ValidationError(
-                "This user does not have the required AI access."
-            )
+        if not report.available or not context.actor.access(AI.ASK):
+            raise exceptions.ValidationError("This user does not have the required AI access or the plan is unavailable.")
         if not report.allowed(Action.EDIT, user=context.actor):
             raise exceptions.ValidationError(
                 "You do not have permission to update this report."
@@ -82,7 +70,6 @@ class EmailIngestAdapter(DeferredJobAdapter):
         attachments = parameters.get("attachments") or []
         if not isinstance(attachments, list):
             raise exceptions.ValidationError("Email attachment manifest is invalid.")
-        self._route_shared_address(report, actor, parameters, attachments)
         config = CONFIG.AI_EMAIL_CONFIG
         if not config:
             raise exceptions.ValidationError("AI email configuration is unavailable.")
@@ -158,18 +145,13 @@ class EmailIngestAdapter(DeferredJobAdapter):
         report.input_files = input_files
         report.summary = None
         Entities.save(report, actor)
-        report_job_types = {
-            "ask": DeferredJobType.REPORT_ASK,
-            "create": DeferredJobType.REPORT_CREATE,
-            "organize": DeferredJobType.REPORT_ORGANIZE,
-        }
         parameters["_diagnostic_code"] = "report_start_failed"
         child, _notification = DeferredJobs.start(
             DeferredJobSpec(
-                job_type=report_job_types[report.tool],
+                job_type=DeferredJobType.REPORT_AI,
                 actor=actor,
                 inputs={"report": report},
-                notification_body=f"Creating {report.tool} report...",
+                notification_body="Creating AI report...",
                 notification_target=report,
                 client={
                     "source_widget": "CreateToolReport",
@@ -191,55 +173,6 @@ class EmailIngestAdapter(DeferredJobAdapter):
             phase=DeferredJobPhase.PREPARED.value,
         )
         return context.checkpoint
-
-    # @testable true
-    # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_routes_shared_address_once
-    # @matrix ai-email deferred-jobs : idempotency permissions routing utility-model
-    def _route_shared_address(self, report, actor, parameters, attachments):
-        manifest = dict(report.inbound_manifest or {})
-        requested_tool = (
-            parameters.get("requested_tool")
-            or manifest.get("requested_tool")
-            or manifest.get("tool")
-            or report.tool
-        )
-        if requested_tool != "ai":
-            return report.tool
-
-        resolved_tool = manifest.get("resolved_tool")
-        if resolved_tool not in {"ask", "create", "organize"}:
-            eligible = ["ask"]
-            if actor.access(AI.CREATE):
-                eligible.extend(("create", "organize"))
-            parameters["_diagnostic_code"] = "email_route_failed"
-            route = ai.route_ai_email(
-                manifest.get("subject"),
-                manifest.get("body"),
-                attachments,
-                eligible,
-            )
-            resolved_tool = route["workflow"]
-            manifest.update(
-                {
-                    "requested_tool": "ai",
-                    "resolved_tool": resolved_tool,
-                    "tool": resolved_tool,
-                    "route_confidence": route["confidence"],
-                    "route_reason": route["reason"],
-                }
-            )
-            report.inbound_manifest = manifest
-
-        required = AI.ASK if resolved_tool == "ask" else AI.CREATE
-        if not actor.access(required):
-            raise exceptions.ValidationError(
-                "This user does not have the required AI access."
-            )
-        if report.tool != resolved_tool or report.inbound_manifest != manifest:
-            report.tool = resolved_tool
-            report.inbound_manifest = manifest
-        Entities.save(report, actor)
-        return resolved_tool
 
     def apply(self, context):
         return {
@@ -290,7 +223,6 @@ class EmailIngestAdapter(DeferredJobAdapter):
         context.parameters.pop("provider_message_id", None)
         context.parameters.pop("attachments", None)
         context.parameters.pop("event_digest", None)
-        context.parameters.pop("requested_tool", None)
         context.parameters.pop("_diagnostic_code", None)
 
     def external_delivery_required(self, context):

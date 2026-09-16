@@ -1,9 +1,9 @@
 # AI Workflow Evaluation Process
 
-This guide covers model-in-the-loop evaluation of Lagniappe's Ask, Create, and
-Organize workflows. Use it when a change can affect model behavior, external
-tool use, proposal quality, or the equivalence of the external API, on-site,
-and email entry points.
+This guide covers model-in-the-loop evaluation of Lagniappe's unified AI
+workflow: questions, creation, updates, and filing. Use it when a change can
+affect model behavior, external tool use, proposal quality, or the equivalence
+of the external API, on-site, and email entry points.
 
 Remote Streamable HTTP is the only maintained MCP transport. The direct REST
 API/skill remains an independent alternative. Local stdio MCP captures are
@@ -207,10 +207,13 @@ produce a narrower proposal or `needs_review`; that is not a transport failure.
     baseline/current rollover only when requested; leave unselected case/arm
     results untouched. Comparison alone does not authorize replacing a baseline.
 
-Do not execute Create or Organize proposals unless execution is the behavior
-under test. A successful `ready` receipt is not a workspace mutation. Ask may
-save a completed read-only report, while Create and Organize leave reviewable
-reports and may leave report-owned uploads.
+Do not execute proposals unless execution is the behavior under test. A
+successful `ready` receipt is not a workspace mutation. External questions
+remain plan-free unless saving is requested; saved answers complete with empty
+actions. Mutation proposals remain ready for review and may leave report-owned
+uploads. On-site AI persists both answers and proposals. Historical case
+rubrics that require saving every answer need an explicit saving request for a
+controlled comparison with the unified workflow.
 
 Deleting a test report should delete its otherwise unattached report-only
 Files. A File already attached somewhere else must survive. After cleanup,

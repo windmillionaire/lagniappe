@@ -514,16 +514,13 @@ def _setup_config(
 ):
     return normalize_ai_email_config(
         {
-            "version": 1,
+            "version": 2,
             "provider": "resend",
             "enabled": True,
             "domain": domain,
             "aliases": (existing or {}).get("aliases")
             or {
                 "ai": "ai",
-                "ask": "ask",
-                "create": "create",
-                "organize": "organize",
             },
             "resend": {
                 "domainId": domain_id,
@@ -710,7 +707,7 @@ def activate_ai_email(candidate=None):
 
     f = FORMATTER.initialize()
     print(f.success(wrap_text("AI email provider configuration is ready.")))
-    for tool in ("ai", "ask", "create", "organize"):
+    for tool in ("ai",):
         print(
             ui.value(
                 f"  {tool.title()}",

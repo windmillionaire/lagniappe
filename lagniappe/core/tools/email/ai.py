@@ -632,7 +632,7 @@ def _select_inline_attachments(attachments, body, html):
 # @testable false
 # @covered-by lagniappe/core/tools/email/ai.py::normalize_resend_message
 # @reason alias routing is exercised through provider message normalization
-def _recognized_tool(recipients, config):
+def _validate_recipient(recipients, config):
     if not isinstance(recipients, (list, tuple)):
         raise AIEmailRejection("route_invalid", "AI email recipient is invalid.")
     recognized = []
@@ -701,7 +701,7 @@ def normalize_resend_message(message, attachments, config):
     recipients = message.get("to")
     if not isinstance(recipients, list):
         raise AIEmailProviderError("Resend returned invalid recipients.")
-    tool = _recognized_tool(recipients, config)
+    _validate_recipient(recipients, config)
     sender = parse_mailbox(message.get("from"))
     subject = _normalize_subject(message.get("subject"))
     body = normalize_message_body(message.get("text"), message.get("html"))
@@ -728,7 +728,7 @@ def normalize_resend_message(message, attachments, config):
         headers=headers,
         received_at=received_at,
         attachments=normalized_attachments,
-    ), tool
+    )
 
 
 # @testable false
@@ -770,17 +770,16 @@ def _instructions(subject, body):
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
 # @matrix ai-email : access attachment-contract body-contract rate-limit
 # @pair ai-email:signature
-def _preflight_submission(message, tool, user, config):
+def _preflight_submission(message, user, config):
     from lagniappe.core.definitions import AI
     from lagniappe.core.tools.cache.rate_limit import check_limit
 
     if _automated_message(message):
         raise AIEmailRejection("automated_mail", "Automated mail is ignored.", silent=True)
-    required_access = AI.ASK if tool in {"ai", "ask"} else AI.CREATE
-    if not user.access(required_access):
+    if not user.access(AI.ASK):
         raise AIEmailRejection(
             "ai_access_denied",
-            f"Your account does not currently have access to {tool.title()} reports.",
+            "Your account does not currently have access to AI reports.",
         )
 
     submitted = tuple(item for item in message.attachments if item.submitted)
@@ -802,22 +801,9 @@ def _preflight_submission(message, tool, user, config):
         raise AIEmailRejection(
             "attachment_contract", "Attachments may total no more than 50 MiB."
         )
-    if tool == "create" and submitted:
-        raise AIEmailRejection(
-            "attachment_contract",
-            "Create email does not accept attachments. Send files to the Organize address.",
-        )
     instructions = _instructions(message.subject, message.text_body)
-    if (tool in {"ask", "create"} or (tool == "organize" and not submitted)) and not (
-        message.subject or message.text_body
-    ):
-        raise AIEmailRejection(
-            "body_required", f"{tool.title()} email requires a subject or message body."
-        )
-    if tool == "ai" and not (message.subject or message.text_body or submitted):
-        raise AIEmailRejection(
-            "body_required", "AI email requires a subject, message body, or attachment."
-        )
+    if not (message.subject or message.text_body or submitted):
+        raise AIEmailRejection("body_required", "AI email requires a subject, message body, or attachment.")
     if len(instructions.encode("utf-8")) > limits["maxBodyBytes"]:
         raise AIEmailRejection(
             "body_too_large", "The email subject and message body exceed 64 KiB."
@@ -840,16 +826,11 @@ def _preflight_submission(message, tool, user, config):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
 # @pair ai-email:routing
-def _compact_report_name(tool, message, attachments):
-    if tool == "organize":
-        if len(attachments) == 1:
-            return f"Organize: {attachments[0].filename}"[:100]
-        return f"Organize: {len(attachments)} files"
+def _compact_report_name(message, attachments):
     source = message.subject or " ".join(message.text_body.split())
-    source = source[:80]
-    suffix = "..." if len(message.subject or message.text_body) > 80 else ""
-    prefix = "Email" if tool == "ai" else tool.title()
-    return f"{prefix}: {source}{suffix}"[:100]
+    if not source:
+        source = attachments[0].filename if len(attachments) == 1 else f"{len(attachments)} files"
+    return f"AI: {source[:80]}{'...' if len(source) > 80 else ''}"
 
 
 # @testable false
@@ -868,8 +849,8 @@ def report_url(report, config=None):
 # @testable false
 # @covered-by lagniappe/core/tools/email/ai.py::_feedback_payload
 # @reason reply-address construction is exercised through outbound feedback
-def receiving_address(config, tool):
-    return f"{config['aliases'][tool]}@{config['domain']}"
+def receiving_address(config):
+    return f"{config['aliases']['ai']}@{config['domain']}"
 
 
 # @testable false
@@ -886,19 +867,18 @@ def _stored_email(user):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_report_feedback_links_to_report_and_remains_available_after_disable
 # @matrix ai-email : acceptance disabled-completion idempotency reply-to terminal-link
-def _feedback_payload(config, user, tool, kind, *, report=None, message=None):
-    label = tool.title()
+def _feedback_payload(config, user, kind, *, report=None, message=None):
+    label = "AI"
     link = report_url(report) if report is not None else None
     if kind == "acceptance":
         subject = f"{label} email accepted"
         text = f"Your email was accepted and a {label} report is being prepared."
-        if tool in {"create", "organize"}:
-            text += " Any proposed changes will require review in Lagniappe."
+        text += " Any proposed changes will require review in Lagniappe."
     elif kind == "success":
-        subject = f"{label} {'answer' if tool == 'ask' else 'proposal'} ready"
+        subject = f"{label} {'answer' if report and report.output_kind == 'answer' else 'proposal'} ready"
         text = (
-            "Your Ask answer is ready."
-            if tool == "ask"
+            "Your answer is ready."
+            if report and report.output_kind == "answer"
             else f"Your {label} proposal is ready for review. No changes were applied."
         )
     elif kind == "failure":
@@ -921,16 +901,7 @@ def _feedback_payload(config, user, tool, kind, *, report=None, message=None):
             for part in html_parts
         ]
     resend = config["resend"]
-    reply_to = receiving_address(config, tool)
-    if report is not None:
-        manifest = getattr(report, "inbound_manifest", None) or {}
-        original_alias = manifest.get("alias") if isinstance(manifest, dict) else None
-        configured_addresses = {
-            receiving_address(config, configured_tool)
-            for configured_tool in config["aliases"]
-        }
-        if original_alias in configured_addresses:
-            reply_to = original_alias
+    reply_to = receiving_address(config)
     return {
         "from": f"{resend['senderName']} <{resend['senderEmail']}>",
         "to": [user.email],
@@ -965,7 +936,7 @@ def send_report_feedback(report, kind, *, message=None, client=None):
     """Send one idempotent acceptance/result email for an email-origin report."""
     from lagniappe import CONFIG
 
-    if report.origin != "email" or report.tool not in {"ask", "create", "organize"}:
+    if report.origin != "email" or not report.available:
         return None
     user = report.user
     if user is None:
@@ -982,7 +953,6 @@ def send_report_feedback(report, kind, *, message=None, client=None):
         _feedback_payload(
             config,
             user,
-            report.tool,
             kind,
             report=report,
             message=message,
@@ -994,12 +964,11 @@ def send_report_feedback(report, kind, *, message=None, client=None):
 # @testable false
 # @covered-by lagniappe/core/tools/email/ai.py::process_resend_email
 # @reason rejection delivery is a private terminal branch of event processing
-def _send_rejection(config, user, tool, rejection, digest, client):
+def _send_rejection(config, user, rejection, digest, client):
     return client.send_email(
         _feedback_payload(
             config,
             user,
-            tool,
             "rejection",
             message=rejection.public_message,
         ),
@@ -1011,7 +980,7 @@ def _send_rejection(config, user, tool, rejection, digest, client):
 # @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
 # @matrix ai-email : idempotency privacy report-handoff routing
 def _create_email_report(
-    message, tool, user, instructions, attachments, digest, config
+    message, user, instructions, attachments, digest, config
 ):
     from lagniappe.core.definitions import DeferredJobSpec, DeferredJobType, Fetch
     from lagniappe.core.entities import Entities
@@ -1021,13 +990,11 @@ def _create_email_report(
     key = database_utility.create_named_key("report", f"email-{digest}", user)
     report = Entities.fetch_one(key, request=Fetch.direct())
     if not isinstance(report, Entities.REPORT):
-        effective_tool = "ask" if tool == "ai" else tool
         report = Entities.REPORT.create(
             {
                 "parent": user,
                 "user": user,
-                "name": _compact_report_name(tool, message, attachments),
-                "tool": effective_tool,
+                "name": _compact_report_name(message, attachments),
                 "instructions": instructions,
                 "status": "pending",
                 "pending": True,
@@ -1035,9 +1002,7 @@ def _create_email_report(
                 "inbound_manifest": {
                     "subject": message.subject,
                     "body": message.text_body,
-                    "tool": effective_tool,
-                    "requested_tool": tool,
-                    "alias": receiving_address(config, tool),
+                        "alias": receiving_address(config),
                     "received_at": message.received_at,
                     "attachments": [item.display_record() for item in attachments],
                 },
@@ -1055,9 +1020,8 @@ def _create_email_report(
                 "provider_message_id": message.provider_message_id,
                 "attachments": [item.job_record() for item in attachments],
                 "event_digest": digest,
-                "requested_tool": tool,
             },
-            notification_body=f"Preparing {tool} report from email...",
+            notification_body="Preparing AI report from email...",
             notification_target=report,
             client={},
             idempotency_key=f"ai-email/ingest/{digest}",
@@ -1100,7 +1064,7 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
         if str(raw_message.get("id") or "") != email_id:
             raise AIEmailProviderError("Resend returned a different received email.")
         attachment_rows = client.list_received_attachments(email_id)
-        message, tool = normalize_resend_message(raw_message, attachment_rows, config)
+        message = normalize_resend_message(raw_message, attachment_rows, config)
 
         raw_user = database_get.user(message.sender)
         user = (
@@ -1117,19 +1081,18 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
 
         try:
             instructions, attachments = _preflight_submission(
-                message, tool, user, config
+                message, user, config
             )
         except AIEmailRejection as rejection:
             if rejection.silent:
                 terminal_state = "ignored"
                 return AIEmailSubmissionResult("ignored", code=rejection.code)
-            _send_rejection(config, user, tool, rejection, digest, client)
+            _send_rejection(config, user, rejection, digest, client)
             terminal_state = "rejected"
             return AIEmailSubmissionResult("rejected", code=rejection.code)
 
         report = _create_email_report(
             message,
-            tool,
             user,
             instructions,
             attachments,

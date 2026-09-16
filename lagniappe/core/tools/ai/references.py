@@ -13,7 +13,6 @@ HASH_TOKEN_REGEX = re.compile(r"\bhash:([A-Za-z0-9_-]+)\b")
 
 
 # @testable true
-# @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_renders_answer_markdown
 # @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
 # @pairs ai-report:answer-only markdown:html-sanitization
 def render_ai_markdown(text):

@@ -13,9 +13,9 @@ class Report(SiteResource):
     VIEW = "[lp-view][data-kind='report']"
     TITLE = "[data-nav='view'] [data-role='title']"
     STATUS = "[data-role='report-status']"
-    ANSWER = "[data-role='ask-answer']"
-    ANSWER_HTML = "[data-role='ask-answer-html']"
-    ANSWER_SUMMARY = "[data-role='ask-answer-summary']"
+    ANSWER = "[data-role='report-answer']"
+    ANSWER_HTML = "[data-role='report-answer-html']"
+    ANSWER_SUMMARY = "[data-role='report-answer-summary']"
     PROPOSAL_ACTION = "[data-role='proposal-action']"
     RESULT = "[data-role='report-result']"
 

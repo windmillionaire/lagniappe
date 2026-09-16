@@ -8,11 +8,9 @@ from lagniappe.core.tools.ai.guidelines import (
     REPORT_DOCUMENT_GUIDELINES,
     FORM_AUTOFILL_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
-    ORGANIZE_ACTION_GUIDELINES,
-    ORGANIZE_WORKFLOW,
+    FILE_ORGANIZATION_GUIDELINES,
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
-    REPORT_OUTPUT_REQUIREMENTS,
     REPORT_TASK_SCHEDULING_GUIDELINES,
     SCHEMA_TYPE_GUIDELINES,
     SCHEMA_EVOLUTION_GUIDELINES,
@@ -89,14 +87,14 @@ ACTION_GUIDELINES = {
         "Put the target inside every data.updates row, alongside schema_id and "
         "new_value. Each row requires exactly one of page, task, page_action, or "
         "task_action; action references identify earlier creation actions. "
-        "Top-level data.page/data.task are for legacy pending checkpoints only, "
-        "not external executable proposals. Include only grounded field changes. "
+        "Top-level data.page/data.task are not valid proposal targets. "
+        "Include only grounded field changes. "
         'Example data: {"updates":[{"task":"hash:012345abcdef",'
         '"schema_id":"textarea-notes","new_value":"Updated notes"}]}.'
     ),
     "attach_file": "Attach the exact report file ref to data.entity (an editable existing Page, Task or task history) or data.entity_action (an earlier create_page/create_task action). This links the file; it does not convert it into document text. Use the completed occurrence as the target for its evidence.",
-    "move_page": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
-    "move_task": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
+    "move_page": "Use exact editable source and destination references; propose only requested moves.",
+    "move_task": "Use exact editable source and destination references; propose only requested moves.",
     "move_file": "Use an exact file and editable source/destination; preserve evidence attachments required by the plan.",
     "rename_entity": "Use one exact editable target and a concise stable name supported by the request.",
     "suggest_page_deletion": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
@@ -107,8 +105,8 @@ ACTION_GUIDELINES = {
 
 
 GUIDELINE_BUNDLES = {
-    "organize": {
-        "description": "Complete Organize proposals from evidence and workspace context.",
+    "filing": {
+        "description": "Plan file organization from evidence and workspace context.",
         "instructions": (
             "Settle targets and structure, then author all final form submissions "
             "and updates in the same proposal. Use the current action contract. "
@@ -116,7 +114,7 @@ GUIDELINE_BUNDLES = {
         ),
         "sections": (
             LAGNIAPPE_WORKSPACE_CONCEPTS,
-            ORGANIZE_WORKFLOW,
+            FILE_ORGANIZATION_GUIDELINES,
             SUMMARY_GENERATION_GUIDELINES,
         ),
     },
@@ -165,7 +163,7 @@ GUIDELINE_BUNDLES = {
     },
     "report_actions": {
         "description": "Detailed report action and output contract.",
-        "sections": (ORGANIZE_ACTION_GUIDELINES, REPORT_OUTPUT_REQUIREMENTS),
+        "sections": (),
     },
 }
 
@@ -219,8 +217,8 @@ GET_GUIDELINES = types.FunctionDeclaration(
     name="get_guidelines",
     description=(
         "Return detailed prompt guidelines for one report-planning subtask. Use this "
-        "tool with task=organize when the caller has not already received its "
-        "Organize workflow. Use the other tasks for detailed rules about "
+        "tool with task=filing when the caller needs file organization guidance. "
+        "Use the other tasks for detailed rules about "
         "generated structure, form schemas, form submissions, page documents, file "
         "summaries, or action data. Request one bundle per call. Independent bundles "
         "may be requested in parallel when the client supports it."
@@ -249,7 +247,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
                     "enum": sorted(ACTION_GUIDELINES),
                 },
                 "description": (
-                    "For task=report_actions, return only rules for the selected "
+                    "For task=report_actions, require a nonempty selection and return exact schemas and rules for "
                     "proposal action types. For task=form_autofill, select "
                     "[update_form_values] for patch guidance instead of full autofill."
                 ),
@@ -313,6 +311,8 @@ def _guidelines_result(args, *, external):
     )
     if error:
         return error
+    if task == "report_actions" and not actions:
+        return {"error": "report_actions requires a nonempty actions array."}
     if actions is not None and task == "form_autofill":
         if actions != ["update_form_values"]:
             return {"error": "form_autofill actions must be [update_form_values]."}
@@ -333,15 +333,13 @@ def _guidelines_result(args, *, external):
     for section in bundle["sections"]:
         if section == SCHEMA_TYPE_GUIDELINES and field_types is not None:
             section = _schema_type_guidance(field_types)
-        if task == "report_actions" and actions is not None:
-            if section == ORGANIZE_ACTION_GUIDELINES:
-                section = _selected_action_guidance(actions)
-            elif section == REPORT_OUTPUT_REQUIREMENTS:
-                section = (
-                    "### Output Boundary\n\nUse the action fields and final JSON "
-                    "shape defined by the current workflow response schema."
-                )
         sections.append(section)
+    if task == "report_actions":
+        sections.extend((
+            _selected_action_guidance(actions),
+            "### Output Boundary\n\nUse the action fields and final JSON "
+            "shape defined by the current report response schema.",
+        ))
 
     if external and task == "report_actions" and (
         actions is None or "create_task" in actions
@@ -368,7 +366,7 @@ def _guidelines_result(args, *, external):
             "the proposal. Read tools never execute the proposal."
         )
     content = f"{instructions}\n\n{guidelines}"
-    return {
+    result = {
         "task": task,
         "description": bundle["description"],
         "guidelines": content,
@@ -379,6 +377,15 @@ def _guidelines_result(args, *, external):
             **({"actions": actions} if actions is not None else {}),
         },
     }
+    if task == "report_actions":
+        from ..reporting.contracts.schema import report_proposal_response_schema, external_report_proposal_response_schema
+
+        schema = (
+            external_report_proposal_response_schema(allowed_actions=actions, include_submission_fields=True, require_file_summary_terms=True)
+            if external else report_proposal_response_schema(actions, include_submission_fields=True)
+        )
+        result["action_schema"] = {**schema["properties"]["actions"]["items"], **({"$defs": schema["$defs"]} if "$defs" in schema else {})}
+    return result
 
 
 # @testable false

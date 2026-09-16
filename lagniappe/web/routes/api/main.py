@@ -546,7 +546,8 @@ def _plan_payload(report, *, include_proposal=True):
     payload = {
         "id": report.urlsafe_key,
         "status": report.status,
-        "tool": report.tool,
+        "output_kind": report.output_kind,
+        "file_usage": report.file_usage or [],
         "name": report.name,
         "instructions": report.instructions,
         "files": [_file_payload(file) for file in report.input_files],
@@ -586,12 +587,12 @@ def _plan_payload(report, *, include_proposal=True):
     }
     if include_proposal:
         payload["proposal"] = external_api.public_plan_proposal(report, g.agent_api_user)
-        if report.tool != "ask":
+        if report.output_kind == "proposal":
             payload["execution"] = external_api.public_execution_receipt(
                 report, g.agent_api_user
             )
         payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
-    if report.tool != "ask":
+    if report.output_kind == "proposal":
         payload["action_summary"] = summarize_actions(report.proposal, maximum=external_api.MAX_PROPOSAL_ACTIONS)
     return _json_safe(payload)
 
@@ -633,6 +634,8 @@ def _load_plan(plan_id):
         or owner_key != actor.key
     ):
         raise APIProblem("not_found", "Plan not found.", 404)
+    if not report.available:
+        raise APIProblem("plan_unavailable", "this plan is no longer available", 410)
     return report
 
 
@@ -654,14 +657,14 @@ def _require_draft(report):
 def _require_tools_available(report):
     if report.status == "draft":
         return
-    if report.tool == "ask" and report.status == "complete":
+    if report.output_kind == "answer" and report.status == "complete":
         return
-    if report.tool in {"create", "organize"} and report.status == "ready":
+    if report.output_kind == "proposal" and report.status == "ready":
         return
     raise APIProblem(
         "plan_tools_unavailable",
-        "Read tools are available only for draft plans, completed Ask plans, and "
-        "ready Create or Organize plans. For ordinary workspace reads after "
+        "Read tools are available only for draft plans, completed answers, and "
+        "ready proposals. For ordinary workspace reads after "
         "execution, omit plan_id; use get_plan for the execution outcomes.",
         409,
     )
@@ -844,7 +847,7 @@ def openapi_document():
                     "user can access. Inspect the selected tool's exact input_schema "
                     "instead of guessing argument names. Select Ask, Create, or "
                     "Organize when creating a plan; Organize clients should fetch "
-                    "get_guidelines task=organize before analyzing files. Use returned "
+                    "get_guidelines task=filing before analyzing files. Use returned "
                     "hash: references only as allowed by the selected plan contract."
                 ),
                 "tags": ["Discovery"],
@@ -919,12 +922,11 @@ def openapi_document():
         "/api/v1/plans": {
             "post": {
                 "operationId": "createPlan",
-                "summary": "Create an Ask, Create, or Organize plan draft",
+                "summary": "Create an AI plan draft",
                 "description": (
                     "Starts a durable provider-free workspace. Creation does not run "
-                    "a model or change workspace data. The client chooses one fixed "
-                    "tool for this plan and may create another plan if the conversation "
-                    "later changes modes. Keep the returned opaque ID for Plan-scoped "
+                    "a model or change workspace data. Reuse the same Plan for questions, "
+                    "creation, updates, and filing. Keep the returned opaque ID for Plan-scoped "
                     "read tools and uploads when supported. Follow the returned "
                     "contract_url, submit_url, and status_url exactly instead of "
                     "reconstructing those lifecycle paths."
@@ -936,13 +938,8 @@ def openapi_document():
                         {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": ["instructions"],
+                            "required": [],
                             "properties": {
-                                "tool": {
-                                    "type": "string",
-                                    "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
-                                    "default": "organize",
-                                },
                                 "name": {
                                     "type": "string",
                                     "maxLength": 120,
@@ -950,8 +947,6 @@ def openapi_document():
                                 },
                                 "instructions": {
                                     "type": "string",
-                                    "minLength": 1,
-                                    "pattern": "\\S",
                                     "description": (
                                         "The question or requested work, limited to 65,536 "
                                         "UTF-8 bytes."
@@ -999,8 +994,8 @@ def openapi_document():
                 "summary": "Get the final proposal contract",
                 "description": (
                     "Fetch immediately before constructing the final response. For "
-                    "Organize, fetch after all uploads are finalized. The response is "
-                    "tool-, plan-, user-, file-, and permission-specific; its "
+                    "uploaded files, fetch after finalization. The response is "
+                    "plan-, user-, file-, and permission-specific; its "
                     "proposal_schema, workflow_rules, reference_rules, and "
                     "required_file_refs are authoritative."
                 ),
@@ -1140,7 +1135,7 @@ def openapi_document():
                 "summary": "Run one permission-bounded read tool",
                 "description": (
                     "Runs one listTools definition during interactive planning. "
-                    "Completed Ask plans and ready Create or Organize plans may "
+                    "Completed answers and ready proposals may "
                     "continue reading for conversational refinement. Put that "
                     "definition's complete input in the "
                     "top-level arguments object. Other top-level fields are rejected. "
@@ -1187,20 +1182,15 @@ def openapi_document():
                 "operationId": "submitPlan",
                 "summary": "Validate and publish the final proposal",
                 "description": (
-                    "Requires the current tool-specific contract and no pending "
-                    "uploads. Remote Organize can update existing records without "
-                    "files; uploaded files still require summaries and placement. A "
-                    "valid Ask response becomes a completed read-only report and "
-                    "is saved only after the user requests saving the answer. A valid "
-                    "Create or Organize proposal becomes ready for review and returns "
-                    "preview_url. Submission itself never executes actions. Repeating "
-                    "the identical normalized result is accepted. While the report "
-                    "remains reusable, a later valid Ask answer or Create/Organize "
-                    "proposal replaces the saved result: revise the complete result, "
-                    "then submit it again. Present each Create or Organize preview_url "
-                    "and direct the user to the authenticated website to review and "
-                    "approve it. This API has no operation that applies proposals to "
-                    "the workspace."
+                    "Requires the current contract and no pending uploads. Updates and creation "
+                    "do not require files. Supply file_usage for every upload; only organize files "
+                    "require summaries and placement. Empty actions save an answer, only after "
+                    "the user requests saving. A mutation proposal becomes ready for review. "
+                    "Submission never executes actions. Repeating the same result is accepted; "
+                    "a later valid mutation proposal replaces the saved result until execution "
+                    "begins. Revise the complete result and submit it again. Direct the user to "
+                    "preview_url in the authenticated website to review and approve changes."
+
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -1210,12 +1200,13 @@ def openapi_document():
                         {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": ["contract_version", "proposal"],
+                            "required": ["contract_version", "proposal", "file_usage"],
                             "properties": {
                                 "contract_version": {
                                     "type": "integer",
                                     "const": external_api.CONTRACT_VERSION,
                                 },
+                                "file_usage": external_api.file_usage_schema(),
                                 "proposal": {
                                     "type": "object",
                                     "description": (
@@ -1267,7 +1258,7 @@ def openapi_document():
         "get": {
             "operationId": "answerQuestion",
             "summary": "Get plan-free answering guidance",
-            "description": "The client model answers using authorized read tools, then offers to save. This endpoint creates no report/session and invokes no model. Start an Ask Plan only after save consent.",
+            "description": "The client model answers using authorized read tools, then offers to save. This endpoint creates no report/session and invokes no model. Start a Plan only after save consent.",
             "tags": ["Tools"],
             "responses": {
                 "200": {
@@ -1312,27 +1303,16 @@ def openapi_document():
             "title": f"{CONFIG.APP_NAME} External Agent API",
             "version": "1.0.0",
             "description": (
-                "Use this API as a permission-bounded Ask, Create, and Organize backend "
-                "for an external model. The client selects the appropriate tool per "
-                "plan and may create a different plan as the conversation changes. "
-                "Verify the actor, create a draft, use permitted read tools, fetch the "
-                "tool-specific plan contract, and submit a conforming final result. "
-                "Use Create for new content and Organize for existing-record updates "
-                "or file organization. Remote updates do not require uploads. Fetch "
-                "selected action contracts for details. With uploads, follow the "
-                "get_guidelines task=organize two-phase workflow, including one summary "
-                "and two retrieval terms per file. Ask publishes a read-only answer. Create "
-                "and Organize publish proposals for authenticated browser review. "
-                "The external API never applies those proposals; direct the user to "
-                "preview_url, where the existing website Execute control is the only "
-                "approval and application path. The server does not call a model to "
-                "choose the tool, complete, repair, or summarize the result. When an "
-                "question is asked, use answer-context and plan-free tools and answer "
-                "in the conversation; offer to save afterward. Only if the user wants "
-                "to save, create an Ask Plan and submit the agreed answer; Ask submission "
-                "is read-only and later valid answers may replace it. Ready Create and "
-                "Organize proposals may likewise be revised and submitted again until "
-                "browser execution starts."
+                "Use one provider-free Plan for workspace questions, creation, updates, and filing. "
+                "Answer ordinary questions with answer-context and plan-free read tools. Only save "
+                "answers when requested. Requested mutations require a proposal. Start with compact "
+                "context; load selected action schemas and get_guidelines task=filing for artifacts. "
+                "Classify every upload in file_usage as evidence or organize. Only organize files "
+                "require an attachment, one summary and two retrieval terms. The server does not call a model "
+                "to complete or repair external proposals. The external API never applies those proposals; "
+                "the website Execute control is the only approval and application path. Reuse a Plan "
+                "for revisions until execution begins; follow returned lifecycle URLs."
+
             ),
         },
         "servers": [{"url": _api_absolute_url("/").rstrip("/")}],
@@ -1410,7 +1390,6 @@ def openapi_document():
                     "required": [
                         "id",
                         "status",
-                        "tool",
                         "name",
                         "instructions",
                         "files",
@@ -1437,12 +1416,10 @@ def openapi_document():
                                 "undo_failed",
                             ],
                         },
-                        "tool": {
-                            "type": "string",
-                            "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
-                        },
                         "name": {"type": "string"},
                         "instructions": {"type": "string"},
+                        "output_kind": {"enum": ["answer", "proposal", None]},
+                        "file_usage": external_api.file_usage_schema(),
                         "files": {
                             "type": "array",
                             "items": {"$ref": "#/components/schemas/PlanFile"},
@@ -1529,12 +1506,13 @@ def openapi_document():
                         "body": {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": ["contract_version", "proposal"],
+                            "required": ["contract_version", "proposal", "file_usage"],
                             "properties": {
                                 "contract_version": {
                                     "type": "integer",
                                     "const": external_api.CONTRACT_VERSION,
                                 },
+                                "file_usage": external_api.file_usage_schema(),
                                 "proposal": {"type": "object"},
                             },
                         },
@@ -1546,12 +1524,12 @@ def openapi_document():
                     "additionalProperties": False,
                     "required": [
                         "contract_version",
-                        "tool",
                         "current_date",
                         "timezone",
                         "personal_page",
                         "submission_format",
                         "proposal_schema",
+                    "file_usage_schema",
                         "schema_scope",
                         "schema_actions",
                         "schema_instructions",
@@ -1571,10 +1549,6 @@ def openapi_document():
                             "type": "integer",
                             "const": external_api.CONTRACT_VERSION,
                         },
-                        "tool": {
-                            "type": "string",
-                            "enum": list(external_api.SUPPORTED_PLAN_TOOLS),
-                        },
                         "current_date": {"type": "string", "format": "date"},
                         "timezone": {"type": "string"},
                         "personal_page": {"type": "object"},
@@ -1582,6 +1556,7 @@ def openapi_document():
                             "$ref": "#/components/schemas/PlanSubmissionFormat"
                         },
                         "proposal_schema": {"type": ["object", "null"]},
+                        "file_usage_schema": {"type": "object"},
                         "schema_scope": {"enum": ["full", "selected", "summary"]},
                         "schema_actions": {
                             "type": "array",
@@ -1712,7 +1687,7 @@ def openapi_document():
     }
     schemas = document["components"]["schemas"]
     schema_keys = (
-        "contract_version", "tool", "submission_format", "proposal_schema",
+        "contract_version", "submission_format", "proposal_schema", "file_usage_schema",
         "schema_scope", "schema_actions", "schema_instructions",
     )
     schemas["PlanSchemaContract"] = {
@@ -1749,9 +1724,7 @@ def me():
         },
         "credential": g.agent_api_credential,
         "capabilities": {
-            "ask": True,
-            "create": True,
-            "organize": True,
+            "plans": True,
         },
     }
 
@@ -1825,7 +1798,7 @@ def create_plan():
         *PLAN_START_RATE_LIMIT,
     )
     data = _json_body()
-    unsupported_fields = sorted(set(data) - {"instructions", "name", "tool"})
+    unsupported_fields = sorted(set(data) - {"instructions", "name"})
     if unsupported_fields:
         raise APIProblem(
             "unsupported_field",
@@ -1834,27 +1807,14 @@ def create_plan():
             details={
                 "path": "$",
                 "fields": unsupported_fields,
-                "allowed_fields": ["instructions", "name", "tool"],
+                "allowed_fields": ["instructions", "name"],
             },
         )
-    tool = data.get("tool", "organize")
-    if not isinstance(tool, str) or tool not in external_api.SUPPORTED_PLAN_TOOLS:
+    instructions = data.get("instructions", "")
+    if not isinstance(instructions, str):
         raise APIProblem(
-            "unsupported_tool",
-            "Plan tool must be ask, create, or organize.",
-            422,
-            details={"path": "$.tool"},
-        )
-    instructions = data.get("instructions")
-    if not isinstance(instructions, str) or not instructions.strip():
-        raise APIProblem(
-            "invalid_instructions",
-            '"instructions" must be a non-empty string.',
-            422,
-            details={
-                "path": "$.instructions",
-                "expected": "non-empty string",
-            },
+            "invalid_instructions", "instructions must be a string.", 422,
+            details={"path": "$.instructions", "expected": "string"},
         )
     name = data.get("name")
     if "name" in data and (not isinstance(name, str) or len(name) > 120):
@@ -1870,7 +1830,6 @@ def create_plan():
     report = external_api.create_plan(
         actor,
         instructions=instructions,
-        tool=tool,
         name=name,
         remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)),
     )
@@ -1955,12 +1914,6 @@ def _upload_sizes(report, requested):
 def create_uploads(plan_id):
     report = _load_plan(plan_id)
     _require_draft(report)
-    if report.tool != "organize":
-        raise APIProblem(
-            "uploads_not_supported",
-            "File uploads are supported only for Organize plans.",
-            409,
-        )
     if report.upload_manifest:
         raise APIProblem(
             "uploads_pending",
@@ -2077,12 +2030,6 @@ def create_uploads(plan_id):
         # resume from the authoritative state protected by this claim.
         report = _load_plan(plan_id)
         _require_draft(report)
-        if report.tool != "organize":
-            raise APIProblem(
-                "uploads_not_supported",
-                "File uploads are supported only for Organize plans.",
-                409,
-            )
         if report.upload_manifest:
             raise APIProblem(
                 "uploads_pending",
@@ -2174,12 +2121,6 @@ def create_uploads(plan_id):
 def finalize_uploads(plan_id):
     report = _load_plan(plan_id)
     _require_draft(report)
-    if report.tool != "organize":
-        raise APIProblem(
-            "uploads_not_supported",
-            "File uploads are supported only for Organize plans.",
-            409,
-        )
     data = _json_body()
     unsupported_fields = sorted(set(data) - {"upload_batch_id"})
     if unsupported_fields:
@@ -2235,12 +2176,6 @@ def finalize_uploads(plan_id):
         # in-memory manifest.
         report = _load_plan(plan_id)
         _require_draft(report)
-        if report.tool != "organize":
-            raise APIProblem(
-                "uploads_not_supported",
-                "File uploads are supported only for Organize plans.",
-                409,
-            )
         if _upload_batch_id(report) != upload_batch_id:
             raise APIProblem(
                 "upload_batch_mismatch",
@@ -2450,7 +2385,7 @@ def execute_tool(plan_id, tool_name):
 @_route
 def submit_plan(plan_id):
     report = _load_plan(plan_id)
-    reusable_status = "complete" if report.tool == "ask" else "ready"
+    reusable_status = "complete" if report.output_kind == "answer" else "ready"
     if report.status not in {"draft", reusable_status}:
         raise APIProblem(
             "plan_state_conflict",
@@ -2480,7 +2415,7 @@ def submit_plan(plan_id):
         # overwrite a newly staged manifest or be overwritten by a stale
         # upload creator.
         report = _load_plan(plan_id)
-        reusable_status = "complete" if report.tool == "ask" else "ready"
+        reusable_status = "complete" if report.output_kind == "answer" else "ready"
         if report.status not in {"draft", reusable_status}:
             raise APIProblem(
                 "plan_state_conflict",
@@ -2511,6 +2446,7 @@ def submit_plan(plan_id):
                 g.agent_api_user,
                 data.get("proposal"),
                 contract_version=data.get("contract_version"),
+                file_usage=data.get("file_usage"),
                 save=save,
                 **{
                     field: data[field]

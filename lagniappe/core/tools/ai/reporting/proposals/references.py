@@ -2,7 +2,7 @@
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/planner.py::generate_report
 # @reason file reference extraction is asserted through completion behavior tests
 def _proposal_file_refs(data):
     refs = []

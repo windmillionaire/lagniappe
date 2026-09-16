@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=b9517a42';
-import { l as localStore } from './storage.js?v=b9517a42';
-import { w as withTransition } from './foundation.js?v=b9517a42';
-import './upstreamUnavailable.js?v=b9517a42';
-import './connectivity.js?v=b9517a42';
+import { BaseList } from './baseList.js?v=bb1ed2ee';
+import { l as localStore } from './storage.js?v=bb1ed2ee';
+import { w as withTransition } from './foundation.js?v=bb1ed2ee';
+import './upstreamUnavailable.js?v=bb1ed2ee';
+import './connectivity.js?v=bb1ed2ee';
 
-const REPORT_FILTERS = ["active", "executed", "ask"];
+const REPORT_FILTERS = ["active", "executed", "answers"];
 
 /**
  * @testable true
@@ -13,8 +13,8 @@ const REPORT_FILTERS = ["active", "executed", "ask"];
  * @matrix ai-report : filter-categories
  */
 function reportCategory(report) {
-	if (report.tool === "ask") return "ask";
-	return ["create", "organize"].includes(report.tool) &&
+	if (report.outputKind === "answer") return "answers";
+	return report.outputKind === "proposal" &&
 		report.status === "complete"
 		? "executed"
 		: "active";
@@ -170,7 +170,7 @@ class ToolReportList extends BaseList {
 			Array.isArray(saved) &&
 				saved.every((value) => REPORT_FILTERS.includes(value))
 				? saved
-				: ["active", "ask"],
+				: ["active", "answers"],
 		);
 		this._click = this._click.bind(this);
 		this._deleteMessage = "";
@@ -227,7 +227,7 @@ class ToolReportList extends BaseList {
 	 * @matrix ai-report : filter-categories filter-counts filter-empty
 	 */
 	_renderFilters() {
-		const counts = { active: 0, executed: 0, ask: 0 };
+		const counts = { active: 0, executed: 0, answers: 0 };
 		let visible = 0;
 		for (const item of this.reportItems) {
 			const category = reportCategory(item.dataset);
@@ -253,7 +253,7 @@ class ToolReportList extends BaseList {
 					? {
 							active: "No active proposals.",
 							executed: "No executed proposals.",
-							ask: "No Ask reports.",
+							answers: "No answers.",
 						}[[...this.filters][0]]
 					: "No reports match the selected types.";
 		}
@@ -326,7 +326,7 @@ class ToolReportList extends BaseList {
 		if (!element) return;
 		this._openingDelete = true;
 		try {
-			const { Modal } = await import('./modal.js?v=b9517a42');
+			const { Modal } = await import('./modal.js?v=bb1ed2ee');
 			if (this._destroyed) return;
 			this._deleteModal?.destroy();
 			const modal = new Modal(this.view, trigger);
@@ -376,7 +376,7 @@ class ToolReportList extends BaseList {
 		error.hidden = true;
 		this._renderFilters();
 		try {
-			const { request } = await import('./foundation.js?v=b9517a42').then(function (n) { return n.n; });
+			const { request } = await import('./foundation.js?v=bb1ed2ee').then(function (n) { return n.n; });
 			const response = await request.delete(route, { keys });
 			if (!response?.ok)
 				throw new Error("Reports could not be deleted. Please try again.");

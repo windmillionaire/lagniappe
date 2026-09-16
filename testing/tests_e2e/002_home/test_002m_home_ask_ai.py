@@ -45,15 +45,12 @@ def _start_ask_report(user, question):
     home = user.go(SitePages.HOME)
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
-    form.locator("[data-role='tool-switcher']").get_by_role(
-        "button", name="Ask"
-    ).click()
     form.locator("textarea[name='instructions']").fill(question)
 
     with expect_successful_response(
         user.page,
         method="POST",
-        path="/tools/ask",
+        path="/tools/ai",
     ) as response_info:
         form.get_by_role("button", name="Start").click()
 
@@ -67,13 +64,12 @@ def _start_ask_report(user, question):
     item = report_list.list.locator(f"li[data-key='{report_key}']")
     expect(item).to_be_visible()
     expect(item.locator("[data-role='report-stage']")).to_have_text(
-        "Answer pending"
+        "Proposal pending"
     )
     expect(item).to_have_attribute("data-operation", operation)
 
     report = Entities.fetch_one(report_key, request=Fetch.direct())
     job = Entities.fetch_one(operation, request=Fetch.direct())
-    assert report.tool == "ask"
     assert report.instructions == question
     assert report.status == "pending"
     assert report.pending is True

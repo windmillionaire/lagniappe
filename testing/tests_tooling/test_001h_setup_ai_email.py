@@ -17,15 +17,12 @@ pytestmark = pytest.mark.tooling
 
 def _valid_config():
     return {
-        "version": 1,
+        "version": 2,
         "provider": "resend",
         "enabled": False,
         "domain": "INBOUND.Exämple.COM.",
         "aliases": {
             "ai": "ai",
-            "ask": "ASK",
-            "create": "create",
-            "organize": "organize",
         },
         "resend": {
             "domainId": "domain-1",
@@ -45,11 +42,7 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     normalized = normalize_ai_email_config(_valid_config())
 
     assert normalized["domain"] == "inbound.xn--exmple-cua.com"
-    assert normalized["version"] == 1
-    legacy_schema_one = _valid_config()
-    legacy_schema_one["aliases"].pop("ai")
-    assert normalize_ai_email_config(legacy_schema_one)["aliases"]["ai"] == "ai"
-    assert normalized["aliases"]["ask"] == "ask"
+    assert normalized["version"] == 2
     assert ai_email_public_config(normalized) == {
         "enabled": False,
         "addresses": {},
@@ -61,9 +54,6 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
         "enabled": True,
         "addresses": {
             "ai": "ai@inbound.xn--exmple-cua.com",
-            "ask": "ask@inbound.xn--exmple-cua.com",
-            "create": "create@inbound.xn--exmple-cua.com",
-            "organize": "organize@inbound.xn--exmple-cua.com",
         },
     }
 
@@ -504,9 +494,6 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
         "\n".join(
             (
                 "  Ai:       ai@inbound.app.example.com",
-                "  Ask:      ask@inbound.app.example.com",
-                "  Create:   create@inbound.app.example.com",
-                "  Organize:  organize@inbound.app.example.com",
             )
         )
         in output
@@ -649,3 +636,22 @@ def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
     disabled = settings.APP["AI_EMAIL_CONFIG"]
     assert disabled["enabled"] is False
     assert disabled["resend"]["webhookSecret"] == existing["resend"]["webhookSecret"]
+
+
+# @matrix ai-email : config normalization upgrade aliases
+def test_update_converts_only_email_config_and_preserves_custom_address():
+    from installer.create_config import _upgrade_ai_email_config
+    current = _valid_config()
+    current["version"] = 1
+    current["aliases"] = {"ai": "assistant", "ask": "q", "create": "new", "organize": "file"}
+    settings = {"AI_EMAIL_CONFIG": current}
+    with pytest.raises(AIEmailConfigurationError):
+        normalize_ai_email_config(current)
+    _upgrade_ai_email_config(settings)
+    result = settings["AI_EMAIL_CONFIG"]
+    assert result["version"] == 2
+    assert result["aliases"] == {"ai": "assistant"}
+    assert result["resend"] == current["resend"]
+    assert result["domain"] == "inbound.xn--exmple-cua.com"
+    _upgrade_ai_email_config(settings)
+    assert settings["AI_EMAIL_CONFIG"] == result

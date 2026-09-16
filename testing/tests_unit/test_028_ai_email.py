@@ -11,7 +11,6 @@ import pytest
 from config.ai_email import AI_EMAIL_LIMITS, normalize_ai_email_config
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.email import ai as ai_email
-from lagniappe.core.tools import ai as ai_tools
 from lagniappe.core.tools.email.ai import (
     AIEmailRejection,
     AIEmailWebhookError,
@@ -33,15 +32,12 @@ pytestmark = pytest.mark.unit
 def _config():
     return normalize_ai_email_config(
         {
-            "version": 1,
+            "version": 2,
             "provider": "resend",
             "enabled": True,
             "domain": "inbound.example.com",
             "aliases": {
                 "ai": "ai",
-                "ask": "ask",
-                "create": "create",
-                "organize": "organize",
             },
             "resend": {
                 "domainId": "domain-1",
@@ -299,11 +295,11 @@ def test_authentication_results_candidates_handle_folding_comments_and_multiple_
 
 # @matrix ai-email normalization : attachments exact-local html-fallback reply-marker routing sender
 def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
-    message, tool = normalize_resend_message(
+    message = normalize_resend_message(
         {
             "id": "email-1",
             "from": "Owner <Owner@EXAMPLE.COM>",
-            "to": ["Ask@inbound.example.com"],
+            "to": ["AI@inbound.example.com"],
             "subject": "  Review\r\nthis  ",
             "text": f"Keep this\n\n{REPLY_MARKER}\nOld thread",
             "headers": {},
@@ -319,17 +315,16 @@ def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
         ],
         _config(),
     )
-    assert tool == "ask"
     assert message.sender == "Owner@example.com"
     assert message.subject == "Review this"
     assert message.text_body == "Keep this"
     assert message.attachments[0].filename == "notes.txt"
 
-    html_message, _tool = normalize_resend_message(
+    html_message = normalize_resend_message(
         {
             "id": "email-2",
             "from": "Owner@example.com",
-            "to": ["ask@inbound.example.com"],
+            "to": ["ai@inbound.example.com"],
             "subject": "HTML",
             "text": "",
             "html": "<p>Hello <strong>there</strong></p><script>bad()</script>",
@@ -384,7 +379,7 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
         "lagniappe.core.tools.cache.rate_limit.check_limit",
         lambda *_args: {"allowed": True, "retry_after": 0},
     )
-    message, _tool = normalize_resend_message(
+    message = normalize_resend_message(
         {
             "id": "email-inline",
             "from": "Owner@example.com",
@@ -433,21 +428,13 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
 
     user = SimpleNamespace(access=lambda _required: True, urlsafe_key="user-one")
     _instructions, attachments = ai_email._preflight_submission(
-        message, "ai", user, _config()
+        message, user, _config()
     )
 
     assert [attachment.id for attachment in attachments] == ["photo"]
-    assert (
-        ai_tools.route_ai_email(
-            message.subject,
-            message.text_body,
-            [attachment.job_record() for attachment in attachments],
-            ("ask", "create", "organize"),
-        )["workflow"]
-        == "organize"
-    )
 
-    image_only, _tool = normalize_resend_message(
+
+    image_only = normalize_resend_message(
         {
             "id": "email-image-only",
             "from": "Owner@example.com",
@@ -470,7 +457,7 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
         _config(),
     )
     _instructions, attachments = ai_email._preflight_submission(
-        image_only, "ai", user, _config()
+        image_only, user, _config()
     )
 
     assert [attachment.id for attachment in attachments] == ["photo-only"]
@@ -491,7 +478,7 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
         "subject": "Quarterly notes",
         "body": "Summarize this",
         "tool": "ask",
-        "alias": "ask@inbound.example.com",
+        "alias": "ai@inbound.example.com",
         "received_at": "2026-08-14T12:00:00Z",
         "attachments": [{"filename": "notes.txt", "size": 12}],
     }
@@ -506,116 +493,15 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
 
 
 # @matrix ai-email : attachments generation privacy routing structured-output utility-model validation
-def test_ai_email_router_uses_utility_model_and_safe_metadata(monkeypatch):
-    prompts = []
-
-    def generate(prompt, *, validator=None):
-        prompts.append(prompt)
-        result = {
-            "workflow": "organize",
-            "confidence": 0.97,
-            "reason": "The attached invoice should fill a task submission.",
-        }
-        return validator(result) if validator else result
-
-    monkeypatch.setattr(ai_tools.ai_model, "generate_content", generate)
-    route = ai_tools.route_ai_email(
-        "Paid invoice",
-        "Update the existing task with its confirmation number.",
-        [
-            {
-                "id": "private-provider-id",
-                "filename": "invoice.pdf",
-                "content_type": "application/pdf",
-                "size": 1200,
-                "download_url": "https://provider.example/private",
-            }
-        ],
-        ("ask", "create", "organize"),
-    )
-
-    assert route["workflow"] == "organize"
-    prompt = prompts[0]
-    assert prompt.prompt_type == "ai email router"
-    assert prompt.model_tier == "utility"
-    assert prompt.thinking_budget == 0
-    assert prompt.search is False
-    assert prompt.tools is None
-    assert prompt.response_schema["properties"]["workflow"]["enum"] == [
-        "ask",
-        "organize",
-    ]
-    built = prompt.build()
-    assert "invoice.pdf" in built
-    assert "private-provider-id" not in built
-    assert "download_url" not in built
 
 
 # @matrix ai-email : attachment-contract routing validation
-def test_ai_email_router_normalizes_attachment_create_to_organize():
-    assert ai_tools.validate_ai_email_route(
-        {
-            "workflow": "create",
-            "confidence": 0.8,
-            "reason": "Create an invoice task from the attachment.",
-        },
-        attachments=[{"filename": "invoice.pdf"}],
-        eligible_workflows=("ask", "create", "organize"),
-    ) == {
-        "workflow": "organize",
-        "confidence": 0.8,
-        "reason": "Attachment-backed creation uses Organize.",
-    }
 
 
-# @source lagniappe/core/tools/ai/email_router.py::ai_email_routing_prompt
-# @source lagniappe/core/tools/ai/email_router.py::validate_ai_email_route
-# @source lagniappe/core/tools/ai/email_router.py::route_ai_email
 # @matrix ai-email : routing utility-model attachment-contract
-def test_ai_email_router_selects_fileless_updates_without_discovery(monkeypatch):
-    captured = []
-    def generate(prompt, *, validator):
-        captured.append(prompt)
-        return validator({"workflow": "organize", "confidence": 0.99, "reason": "Update an existing Task."})
-    monkeypatch.setattr(ai_tools.ai_model, "generate_content", generate)
-    result = ai_tools.route_ai_email("Finish CLI task", "Add implementation notes", [], ("ask", "create", "organize"))
-    assert result["workflow"] == "organize"
-    prompt = captured[0]
-    assert prompt.response_schema["properties"]["workflow"]["enum"] == ["ask", "create", "organize"]
-    assert prompt.tools is None and not prompt.search
-    assert "These requests do not require attachments" in prompt.build()
-    assert "browser review" in prompt.build()
-    assert prompt.model_tier == "utility"
 
 
 # @matrix ai-email : attachment-only deterministic inline routing
-def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch):
-    monkeypatch.setattr(
-        ai_tools.ai_model,
-        "generate_content",
-        lambda *_args, **_kwargs: pytest.fail(
-            "Attachment-only routing should not require a model call"
-        ),
-    )
-
-    result = ai_tools.route_ai_email(
-        "",
-        "[image: 2020_UCV_school_portrait.jpg]",
-        [
-            {
-                "filename": "2020_UCV_school_portrait.jpg",
-                "content_type": "image/jpeg",
-                "size": 77_546,
-            }
-        ],
-        ("ask", "create", "organize"),
-    )
-
-    assert result == {
-        "workflow": "organize",
-        "confidence": 1.0,
-        "reason": "Attachment-only email uses Organize.",
-    }
 
 
 # @matrix ai-email files : temporary-view-ownership
@@ -764,7 +650,7 @@ class _InboundClient:
         return {
             "id": email_id,
             "from": "Owner@example.com",
-            "to": ["ask@inbound.example.com"],
+            "to": ["ai@inbound.example.com"],
             "subject": "Question",
             "text": "What changed?",
             "headers": {},
@@ -808,7 +694,7 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     monkeypatch.setattr(
         ai_email,
         "_preflight_submission",
-        lambda message, tool, actor, config: ("Subject: Question\n\nWhat changed?", ()),
+        lambda message, actor, config: ("Subject: Question\n\nWhat changed?", ()),
     )
     monkeypatch.setattr(
         ai_email,
@@ -872,7 +758,6 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
 
     report = ai_email._create_email_report(
         message,
-        "ai",
         user,
         "Subject: Paid invoice\n\nFill its task.",
         (attachment,),
@@ -880,14 +765,12 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
         _config(),
     )
 
-    assert report.tool == "ask"
-    assert report.name == "Email: Paid invoice"
-    assert report.inbound_manifest["requested_tool"] == "ai"
-    assert report.inbound_manifest["tool"] == "ask"
+    assert not hasattr(report, "tool")
+    assert report.name == "AI: Paid invoice"
     assert report.inbound_manifest["alias"] == "ai@inbound.example.com"
     assert report.inbound_manifest["attachments"] == [attachment.display_record()]
     assert saved == [(report, user)]
-    assert starts[0].parameters["requested_tool"] == "ai"
+    assert "requested_tool" not in starts[0].parameters
     assert starts[0].parameters["attachments"] == [attachment.job_record()]
 
 
@@ -950,79 +833,12 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
         "stage": "acceptance_sent",
         "report_job": "child-job",
     }
-    assert starts[0].job_type.value == "report-ask"
+    assert starts[0].job_type.value == "report-ai"
     assert starts[0].idempotency_key == f"ai-email/report/{'a' * 64}"
     assert feedback == [(report, "acceptance")]
 
 
 # @matrix ai-email deferred-jobs : idempotency permissions routing utility-model
-def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
-    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
-
-    user = TestEntities.get("USER", {"name": "Owner", "owner": False})
-    user.access = lambda _required: True
-    report = TestEntities.get(
-        "REPORT",
-        {
-            "name": "AI: Paid invoice",
-            "tool": "ask",
-            "user": user,
-            "parent": user,
-        },
-    )
-    report.origin = "email"
-    report.inbound_manifest = {
-        "subject": "Paid invoice",
-        "body": "Fill the existing task with the confirmation number.",
-        "tool": "ask",
-        "requested_tool": "ai",
-        "alias": "ai@inbound.example.com",
-    }
-    calls = []
-    saved = []
-    monkeypatch.setattr(
-        email_adapters.ai,
-        "route_ai_email",
-        lambda *args: (
-            calls.append(args)
-            or {
-                "workflow": "organize",
-                "confidence": 0.96,
-                "reason": "The attachment should update a submission.",
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        email_adapters.Entities,
-        "save",
-        lambda *entities: saved.append(entities),
-    )
-    parameters = {"requested_tool": "ai"}
-    attachments = [
-        {
-            "id": "attachment-1",
-            "filename": "invoice.pdf",
-            "content_type": "application/pdf",
-            "size": 1200,
-        }
-    ]
-    adapter = email_adapters.EmailIngestAdapter()
-
-    assert (
-        adapter._route_shared_address(report, user, parameters, attachments)
-        == "organize"
-    )
-    assert (
-        adapter._route_shared_address(report, user, parameters, attachments)
-        == "organize"
-    )
-
-    assert len(calls) == 1
-    assert report.tool == "organize"
-    assert report.inbound_manifest["requested_tool"] == "ai"
-    assert report.inbound_manifest["resolved_tool"] == "organize"
-    assert report.inbound_manifest["route_confidence"] == 0.96
-    assert len(saved) == 2
 
 
 # @matrix ai-email deferred-jobs feedback : diagnostics failure privacy terminal-delivery
@@ -1103,26 +919,22 @@ def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
         text_body="Use the existing report workflow.",
         attachments=(InboundAttachment("file-1", "notes.txt", "text/plain", 10),),
     )
-    with pytest.raises(AIEmailRejection, match="Create email does not accept"):
-        ai_email._preflight_submission(message, "create", user, _config())
     update_instructions, update_files = ai_email._preflight_submission(
         SimpleNamespace(headers={}, subject="Complete the CLI task", text_body="", attachments=()),
-        "organize", user, _config(),
+        user, _config(),
     )
     assert update_files == ()
     assert "Complete the CLI task" in update_instructions
-    with pytest.raises(AIEmailRejection, match="requires a subject or message body"):
+    with pytest.raises(AIEmailRejection, match="requires a subject, message body, or attachment"):
         ai_email._preflight_submission(
             SimpleNamespace(
                 headers={}, subject="", text_body="", attachments=()
             ),
-            "organize",
             user,
             _config(),
         )
     instructions, attachments = ai_email._preflight_submission(
         message,
-        "ai",
         user,
         _config(),
     )

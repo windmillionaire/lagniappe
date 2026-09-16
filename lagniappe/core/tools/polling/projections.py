@@ -245,6 +245,8 @@ def render_operation_statuses(entities, user, *, status_loader=None):
     keys = []
     owners = {}
     for entity in entities:
+        if getattr(entity, "entity_kind", None) == "report" and not entity.available:
+            continue
         operation = dict(getattr(entity, "deferred_job", None) or {})
         key = operation.get("key")
         if not key:

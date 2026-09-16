@@ -1,6 +1,6 @@
 # AI Email
 
-AI email lets a registered User create an Ask, Create, or Organize report by
+AI email lets a registered User create an AI report by
 email. It is a signed transport into the existing report pipeline, not a login,
 permission bypass, or separate proposal engine.
 
@@ -27,8 +27,7 @@ saving local configuration; it does not delete provider domains, DNS records,
 webhooks, or API keys.
 
 `AI_EMAIL_CONFIG` is normalized by `config/ai_email.py`. It fixes the security
-and size limits, rejects unknown security fields, requires four unique aliases
-(`ai`, `ask`, `create`, `organize`), and exposes only a public enabled/address
+and size limits, rejects unknown security fields, requires one `ai` alias in version 2, and exposes only a public enabled/address
 projection to templates.
 
 ## Inbound boundary
@@ -42,40 +41,31 @@ headers.
 
 Inbound sender matching identifies the report owner but does not create a
 browser session. Report creation remains owner-scoped and rate-limited, AI tier
-and workspace reads are checked normally, and Create/Organize mutations require
+and workspace reads are checked normally, and mutations require
 sign-in, review, and explicit execution.
 
-## Routing
+## Intake
 
-Explicit aliases select their workflow directly. The shared `ai@` alias uses:
+Only the configured AI address is accepted. Every request goes directly to the
+unified planner; there is no classifier model or stored workflow selection.
+A subject/body or attachment is required. Files alone request organization;
+questions may use them as evidence. The sender needs AI.ASK for answers and
+AI.CREATE for proposals, with ordinary workspace permissions still enforced.
 
-- Organize for attachment-only messages when that workflow is available; or
-- the utility model to choose among the sender's eligible Ask, Create, and
-  Organize workflows from normalized subject/body and safe attachment metadata.
-
-The classifier has no Search or workspace tools. The chosen workflow and short
-diagnostic are stored in the report's `inbound_manifest` before attachment
-download so retries cannot make a different choice.
-
-Organize also accepts instruction-only updates to existing records, through
-either `ai@` classification or the explicit `organize@` alias. Completing a
-task, patching submission details, or renaming/moving a record requires no
-attachment in these remote flows. Empty messages still fail intake. The
-classifier selects intent only; the planner discovers and disambiguates exact
-targets, loads relevant schemas, and returns a plan for browser review.
-Fileless updates skip file preparation and secondary form-completion generation.
-Attachment-bearing requests retain the normal file-processing/placement rules.
-Website Organize uses this same update profile for instruction-only requests.
+The installer converts version 1 email configuration before runtime validation,
+preserving the configured AI address, domain, and credentials while dropping
+old aliases. Pause intake and drain old jobs before upgrading; reports and job
+checkpoints are not migrated.
 
 ## Durable handoff
 
 The webhook starts `EMAIL_INGEST`. Its adapter downloads ordinary attachments
 and intentional inline content outside the webhook request, creates
 deterministically keyed report-owned Files, and then starts the normal
-`REPORT_ASK`, `REPORT_CREATE`, or `REPORT_ORGANIZE` job.
+`REPORT_AI` job.
 
 `AIReport.inbound_manifest` contains only normalized message content, selected
-address, requested/resolved workflow, received time, and safe attachment display
+address, received time, and safe attachment display
 metadata. Provider IDs and signed URLs remain outside the report. Temporary
 `report_user` relationships let the submitting User read evidence attached only
 to the report without granting edit or placement authority. Report-only Files
@@ -104,7 +94,7 @@ receipt twice.
 | `installer/ai_email.py` | Provider domain, DNS, webhook, keys, deployment order, and disable flow. |
 | `config/ai_email.py` | Runtime-safe schema and public projection. |
 | `tools/email/ai.py` | Webhook verification, provider retrieval, normalization, identity matching, limits, and feedback. |
-| `tools/ai/email_router.py` | Shared-alias workflow classification. |
+| `tools/ai/planner.py` | Shared answer and proposal conversation. |
 | Deferred email adapter | Attachment ingestion and report-job handoff. |
 | `properties/ai_report_*` | Durable inbound manifest and report state. |
 

@@ -95,9 +95,7 @@ def test_registered_adapters_declare_required_ai_tiers():
     registry.adapter_registry._load_default_adapters()
 
     expected = {
-        DeferredJobType.REPORT_ASK: AI.ASK,
-        DeferredJobType.REPORT_ORGANIZE: AI.CREATE,
-        DeferredJobType.REPORT_CREATE: AI.CREATE,
+        DeferredJobType.REPORT_AI: AI.ASK,
         DeferredJobType.REPORT_EXECUTION: None,
         DeferredJobType.AUTOFILL: AI.CREATE,
         DeferredJobType.FILE_SUMMARIZE: AI.CREATE,

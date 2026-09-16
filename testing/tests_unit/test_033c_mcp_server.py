@@ -90,10 +90,10 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                     200,
                     json={
                         "contract_version": CONTRACT_VERSION_MAX,
-                        "tool": "organize",
                         "current_date": "2026-09-05",
                         "timezone": "UTC",
                         "personal_page": {},
+                        "file_usage_schema": {"type": "array"},
                         "proposal_schema": {
                             "type": "object",
                             "additionalProperties": False,
@@ -123,7 +123,7 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                             "contract_version": CONTRACT_VERSION_MAX,
                             "body": {
                                 "contract_version": CONTRACT_VERSION_MAX,
-                                "proposal": {},
+                                "proposal": {}, "file_usage": [],
                             },
                             "rule": "Review first.",
                         },
@@ -162,7 +162,6 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                     json={
                         "id": "plan-1",
                         "status": "draft",
-                        "tool": "organize",
                         "name": "Attachment plan",
                         "instructions": "Organize the notes.",
                         "files": inventory(),
@@ -339,7 +338,7 @@ def _actor(token):
             "expires_at": "2099-01-01T00:00:00+00:00",
             "generation": 1,
         },
-        "capabilities": {"ask": True, "create": True, "organize": True},
+        "capabilities": {"plans": True},
     }
 
 

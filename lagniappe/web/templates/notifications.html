@@ -4,9 +4,9 @@
   {% set target = notification.properties.target.column_value %}
   {% set target_entity = notification.properties.target.value %}
   {% set is_report = target and target.kind == "report" %}
-  {% set report_tool = target_entity.tool|capitalize if is_report and target_entity.tool else none %}
+  {% set report_tool = "AI" if is_report else none %}
   {% set report_name = target.name.split(":", 1) if report_tool and target.name.startswith(report_tool ~ ":") else [] %}
-  {% set report_summary = target_entity.summary if is_report and not notification.pending else none %}
+  {% set report_summary = target_entity.summary if is_report and target_entity.available and not notification.pending else none %}
   <div role="option"
        data-key="{{ notification.urlsafe_key }}"
        class="{{ styles.dropdown.search.result }} relative text-base-default">

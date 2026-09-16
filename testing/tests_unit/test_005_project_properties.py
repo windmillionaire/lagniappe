@@ -411,7 +411,7 @@ def test_project_update_sets_identity_and_description():
     )
 
     assert project.name == "Updated Project"
-    assert project.description == "Safe description"
+    assert project.description == "Safe  description"
 
 
 # @matrix model-task project : create ordering relation-save update

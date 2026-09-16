@@ -8,7 +8,6 @@ from lagniappe.core.definitions import (
     AI,
     DeferredJobInspection,
 )
-from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.deferred_jobs.adapters import reports as report_adapters
 from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
 from lagniappe.core.tools.deferred_jobs.errors import (
@@ -20,8 +19,22 @@ pytestmark = pytest.mark.unit
 
 
 # @matrix ai-report : input-files no-extra-read fresh-read
-@pytest.mark.parametrize("phase", ["input", "started", "inspect", "failure", "cleanup", "execution-inspect", "execution-failure", "execution-cleanup"])
-def test_report_phases_reuse_current_report_without_loading_input_files(monkeypatch, phase):
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "input",
+        "started",
+        "inspect",
+        "failure",
+        "cleanup",
+        "execution-inspect",
+        "execution-failure",
+        "execution-cleanup",
+    ],
+)
+def test_report_phases_reuse_current_report_without_loading_input_files(
+    monkeypatch, phase
+):
     from lagniappe.core.definitions import FetchDepth
     from lagniappe.core.tools.deferred_jobs import common
 
@@ -35,12 +48,16 @@ def test_report_phases_reuse_current_report_without_loading_input_files(monkeypa
 
         def __init__(self, file):
             self.db = {}
+            self.upload_manifest = None
+            self.available = True
             self.input_files = [file]
             self.deferred_job = {"key": "job"}
-            self.properties = SimpleNamespace(process=SimpleNamespace(
-                fail=lambda *_args, **_kwargs: None,
-                restore_after_execution_failure=lambda *_args, **_kwargs: None,
-            ))
+            self.properties = SimpleNamespace(
+                process=SimpleNamespace(
+                    fail=lambda *_args, **_kwargs: None,
+                    restore_after_execution_failure=lambda *_args, **_kwargs: None,
+                )
+            )
 
     stale = Report(SimpleNamespace(name="old-file"))
     current = Report(SimpleNamespace(name="current-file"))
@@ -59,17 +76,32 @@ def test_report_phases_reuse_current_report_without_loading_input_files(monkeypa
         events.append("saved")
 
     monkeypatch.setattr(report_adapters.Entities, "fetch_one", fetch_one)
-    monkeypatch.setattr(report_adapters.Entities, "fetch", lambda *_args, **_kwargs: pytest.fail("Report status needs no input file reads"))
+    monkeypatch.setattr(
+        report_adapters.Entities,
+        "fetch",
+        lambda *_args, **_kwargs: pytest.fail(
+            "Report status needs no input file reads"
+        ),
+    )
     monkeypatch.setattr(report_adapters.Entities, "save", save)
     context = DeferredJobContext(
-        job=SimpleNamespace(urlsafe_key="job", idempotency_key="job-input", status_revision=1),
-        actor=SimpleNamespace(), notification=None, inputs={"report": stale},
-        parameters={}, checkpoint={},
+        job=SimpleNamespace(
+            urlsafe_key="job", idempotency_key="job-input", status_revision=1
+        ),
+        actor=SimpleNamespace(),
+        notification=None,
+        inputs={"report": stale},
+        parameters={},
+        checkpoint={},
     )
     if phase == "input":
         assert common._load_reference({"kind": "report", "id": "report-key"}) is current
     else:
-        adapter = report_adapters.ReportExecutionAdapter() if phase.startswith("execution-") else report_adapters.ReportAdapter()
+        adapter = (
+            report_adapters.ReportExecutionAdapter()
+            if phase.startswith("execution-")
+            else report_adapters.ReportAdapter()
+        )
         adapter.validate_apply = lambda _context: None
         method = phase.removeprefix("execution-")
         if method == "failure":
@@ -82,110 +114,11 @@ def test_report_phases_reuse_current_report_without_loading_input_files(monkeypa
     assert events.count("report-read") == 1
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::OrganizeReportAdapter
-# @matrix ai-report : remote-update transport-boundary plan-resume
-# @matrix deferred-jobs : checkpoint
-@pytest.mark.parametrize("origin", ["email", "api", "web"])
-def test_organize_fileless_remote_pipeline_and_resume(monkeypatch, origin):
-    from testing.utility.ai_report_fakes import _test_user
-    actor = _test_user("email-update-owner")
-    report = SimpleNamespace(
-        tool="organize", origin=origin, input_files=[], upload_manifest=[],
-        instructions="Complete the CLI task", proposal=None,
-    )
-    monkeypatch.setattr(report_adapters.ai, "finalize_report_upload_manifest", lambda *_a, **_k: None)
-    for name in ("summarize_report_input_files", "prepare_organize_retrieval_context", "complete_organize_submissions"):
-        monkeypatch.setattr(report_adapters.ai, name, lambda *_a, **_k: pytest.fail("Fileless updates must not run file stages"))
-    proposal = {"summary": "Complete CLI", "confidence": 1, "actions": [{"id": "done", "type": "complete_task", "data": {"task": "hash:updatetask01"}}]}
-    generated = []
-    def generate(prompt):
-        assert "complete_task" in prompt.allowed_actions
-        assert "create_page" not in prompt.allowed_actions
-        generated.append(prompt)
-        return proposal
-    monkeypatch.setattr(report_adapters.ai, "generate_organize_plan", generate)
-    context = DeferredJobContext(job=SimpleNamespace(attempt=1), actor=actor, notification=None,
-        inputs={"report": report}, parameters={}, checkpoint={})
-    adapter = report_adapters.OrganizeReportAdapter()
-    adapter.prepare(context)
-    assert context.checkpoint["stage"] == "ready_to_apply"
-    assert context.checkpoint["proposal"] == proposal
-    assert context.checkpoint["status"] == "ready"
-    context.checkpoint["stage"] = "plan_ready"
-    adapter.prepare(context)
-    assert len(generated) == 1
-    assert context.checkpoint["proposal"] == proposal
-
-
-# @matrix deferred-jobs : quota retry service-tier
-def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
-    adapter = report_adapters.OrganizeReportAdapter()
-    report = SimpleNamespace(summary=None, input_files=[SimpleNamespace()])
-    actor = SimpleNamespace()
-    summary_calls = []
-    retrieval_calls = []
-    generated = []
-
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "finalize_report_upload_manifest",
-        lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "summarize_report_input_files",
-        lambda _report, **kwargs: summary_calls.append(kwargs) or [],
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "prepare_organize_retrieval_context",
-        lambda _report, _actor: retrieval_calls.append((_report, _actor)) or {},
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "organize_prompt",
-        lambda *_args: Prompt("Organize", type="organize report"),
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "generate_organize_plan",
-        lambda prompt: (
-            generated.append(("plan", prompt.service_tier))
-            or {"summary": "Ready", "actions": []}
-        ),
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "complete_organize_submissions",
-        lambda proposal, *_args, **kwargs: (
-            generated.append(("submissions", kwargs.get("service_tier"))) or proposal
-        ),
-    )
-
-    for attempt in (1, 2):
-        context = DeferredJobContext(
-            job=SimpleNamespace(attempt=attempt),
-            actor=actor,
-            notification=None,
-            inputs={"report": report},
-            parameters={},
-            checkpoint={},
-        )
-        adapter.prepare(context)
-
-    assert "service_tier" not in summary_calls[0]
-    assert summary_calls[1]["service_tier"] == "priority"
-    assert retrieval_calls == [(report, actor), (report, actor)]
-    assert generated == [
-        ("plan", None),
-        ("plan", "priority"),
-    ]
-
-
+# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::AIReportAdapter
 # @pair deferred-jobs:cancellation
 def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatch):
-    adapter = report_adapters.OrganizeReportAdapter()
-    report = SimpleNamespace(summary=None)
+    adapter = report_adapters.AIReportAdapter()
+    report = SimpleNamespace(summary=None, instructions="Question", input_files=[])
     saved = []
     monkeypatch.setattr(
         report_adapters.ai,
@@ -204,7 +137,7 @@ def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatc
     )
     context = DeferredJobContext(
         job=SimpleNamespace(attempt=1),
-        actor=SimpleNamespace(),
+        actor=SimpleNamespace(access=lambda _required: True),
         notification=None,
         inputs={"report": report},
         parameters={},
@@ -256,6 +189,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
                 self.report.result = result
 
     class FakeReport:
+        available = True
         input_files = ()
         entity_kind = "report"
         urlsafe_key = "report-key"
@@ -363,6 +297,7 @@ def test_external_report_execution_start_rejects_stale_browser_snapshot(monkeypa
             self.report.pending = True
 
     class FakeReport:
+        available = True
         input_files = ()
         origin = "api"
         urlsafe_key = "external-report-key"
@@ -444,6 +379,7 @@ def test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal(
     adapter = report_adapters.ReportExecutionAdapter()
 
     class FakeReport:
+        available = True
         input_files = ()
         origin = "api"
         urlsafe_key = "external-report-key"
@@ -526,6 +462,7 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
 
     class FakeReport:
+        available = True
         input_files = ()
         entity_kind = "report"
         urlsafe_key = "report-key"
@@ -586,11 +523,13 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
 # @matrix ai-report : active-operation failure-isolation
 # @pair deferred-jobs:superseded
 def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypatch):
-    adapter = report_adapters.OrganizeReportAdapter()
+    adapter = report_adapters.AIReportAdapter()
     events = []
 
     class FakeReport:
+        available = True
         input_files = ()
+
         def __init__(self):
             self.urlsafe_key = "report-key"
             self.deferred_job = {"key": "old-operation"}
@@ -647,281 +586,86 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     ]
 
 
-# @matrix ai-report : ask proposal-publication revision status
-# @pair deferred-jobs:checkpoint
-@pytest.mark.parametrize(
-    ("parameters", "response", "expected_prompt", "expected_status"),
-    [
-        (
-            {},
-            {
-                "summary": "No follow-up work is needed.",
-                "confidence": 0.9,
-                "actions": [],
-            },
-            "initial-prompt",
-            "complete",
-        ),
-        (
-            {"mode": "revise", "feedback": "Call out the ambiguity."},
-            {
-                "summary": "A human should confirm the ambiguous match.",
-                "confidence": 0.5,
-                "actions": [
-                    {
-                        "id": "review",
-                        "type": "needs_review",
-                        "data": {"note": "Confirm the matching record."},
-                    }
-                ],
-            },
-            "revision-prompt",
-            "ready",
-        ),
-    ],
-    ids=("answer", "revision-with-actions"),
-)
-def test_ask_report_adapter_prepares_and_applies_checkpointed_response(
-    monkeypatch,
-    parameters,
-    response,
-    expected_prompt,
-    expected_status,
-):
-    adapter = report_adapters.AskReportAdapter()
-    actor = SimpleNamespace()
-    saved = []
-    phases = []
-    prompt_calls = []
-
-    class Process:
-        def set_proposal(self, proposal, status="ready"):
-            report.proposal = proposal
-            report.summary = proposal.get("summary")
-            report.status = status
-            report.pending = None
-            report.error = None
-            report.result = None
-
-    report = SimpleNamespace(
-        urlsafe_key="ask-report",
-        deferred_job={"key": "ask-job"},
-        proposal={"summary": "Previous answer", "actions": []},
-        result={"stale": True},
-        properties=SimpleNamespace(process=Process()),
-    )
-    job = SimpleNamespace(
-        urlsafe_key="ask-job",
-        idempotency_key="ask-operation",
-    )
-
-    class Control:
-        def ensure_active(self):
-            return None
-
-        def set_phase(self, phase, **_details):
-            phases.append(str(getattr(phase, "value", phase)))
-
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "ask_prompt",
-        lambda current_report, current_actor: (
-            prompt_calls.append(("initial", current_report, current_actor))
-            or "initial-prompt"
-        ),
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "revise_ask_prompt",
-        lambda current_report, current_actor, feedback: (
-            prompt_calls.append(("revision", current_report, current_actor, feedback))
-            or "revision-prompt"
-        ),
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "generate_ask_report",
-        lambda prompt: prompt_calls.append(("generate", prompt)) or response,
-    )
-    monkeypatch.setattr(
-        report_adapters.Entities,
-        "save",
-        lambda *entities: saved.append(entities),
-    )
-    context = DeferredJobContext(
-        job=job,
-        actor=actor,
-        notification=None,
-        inputs={"report": report},
-        parameters=parameters,
-        checkpoint={},
-        execution_control=Control(),
-    )
-
-    checkpoint = adapter.prepare(context)
-
-    assert checkpoint == {"proposal": response, "status": expected_status}
-    assert phases == ["generating", "validating"]
-    assert prompt_calls[-1] == ("generate", expected_prompt)
-    if parameters:
-        assert prompt_calls[0] == (
-            "revision",
-            report,
-            actor,
-            parameters["feedback"],
-        )
-    else:
-        assert prompt_calls[0] == ("initial", report, actor)
-    assert report.result == {"stale": True}
-
-    context.checkpoint = checkpoint
-    result = adapter.apply(context)
-
-    assert result == {
-        "report_key": "ask-report",
-        "status": expected_status,
-        "action_count": len(response["actions"]),
-    }
-    assert report.proposal == response
-    assert report.proposal is not response
-    assert report.status == expected_status
-    assert report.result is None
-    assert saved == [(report, actor)]
-
-
-# @matrix ai-report : plan-resume proposal-publication status submission-completion
-# @pair deferred-jobs:checkpoint
-def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypatch):
-    adapter = report_adapters.OrganizeReportAdapter()
-    proposal = {"summary": "Planned", "actions": []}
-    completed = {"summary": "Completed", "actions": []}
-    calls = []
-    checkpoints = []
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "generate_organize_plan",
-        lambda _prompt: pytest.fail("planning should not run again"),
-    )
-    monkeypatch.setattr(
-        report_adapters.ai,
-        "complete_organize_submissions",
-        lambda value, report, actor, **kwargs: (
-            calls.append((value, report, actor, kwargs)) or completed
-        ),
-    )
-    saved = []
-
-    class Process:
-        def set_proposal(self, value, status="ready"):
-            report.proposal = value
-            report.status = status
-
-    report = SimpleNamespace(
-        urlsafe_key="organize-report",
-        input_files=[SimpleNamespace()],
-        deferred_job={"key": "organize-job"},
-        properties=SimpleNamespace(process=Process()),
-    )
-    actor = SimpleNamespace()
-    monkeypatch.setattr(
-        report_adapters.Entities,
-        "save",
-        lambda *entities: saved.append(entities),
-    )
-    context = DeferredJobContext(
-        job=SimpleNamespace(
-            attempt=2,
-            urlsafe_key="organize-job",
-            idempotency_key="organize-operation",
-        ),
-        actor=actor,
-        notification=None,
-        inputs={"report": report},
-        parameters={},
-        checkpoint={
-            "schema_version": 1,
-            "stage": "plan_ready",
-            "proposal": proposal,
-        },
-        active_check=lambda: True,
-        checkpoint_callback=lambda checkpoint, *, progress=None: checkpoints.append(
-            (checkpoint, progress)
-        ),
-    )
-
-    assert adapter.checkpoint_ready(context) is False
-    assert (
-        adapter.checkpoint_ready(
-            SimpleNamespace(
-                checkpoint={
-                    "schema_version": 1,
-                    "stage": "ready_to_apply",
-                    "proposal": completed,
-                }
-            )
-        )
-        is True
-    )
-    assert (
-        adapter.checkpoint_ready(
-            SimpleNamespace(
-                checkpoint={
-                    "schema_version": 2,
-                    "stage": "ready_to_apply",
-                    "proposal": completed,
-                }
-            )
-        )
-        is False
-    )
-
-    assert adapter.prepare(context) is None
-    assert calls == [(proposal, report, actor, {"service_tier": "priority"})]
-    assert checkpoints == [
-        (
-            {
-                "schema_version": 1,
-                "stage": "ready_to_apply",
-                "proposal": completed,
-                "status": "ready",
-            },
-            {"phase": "prepared"},
-        )
-    ]
-
-    result = adapter.apply(context)
-
-    assert result == {
-        "report_key": "organize-report",
-        "status": "ready",
-        "action_count": 0,
-    }
-    assert report.proposal == completed
-    assert report.proposal is not completed
-    assert report.status == "ready"
-    assert saved == [(report, actor)]
-
-
-# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::OrganizeReportAdapter
 # @matrix ai-report : plan-resume proposal-publication status
-@pytest.mark.unit
-def test_organize_resumes_complete_upload_proposal_without_generation(monkeypatch):
-    report = SimpleNamespace(input_files=[SimpleNamespace()])
-    proposal = {"summary": "Complete upload proposal", "actions": [
-        {"id": "page", "type": "create_page", "data": {"name": "Receipt", "submission": {"merchant": "Acme"}}},
-    ]}
-    def unexpected(*args, **kwargs):
-        pytest.fail("A complete proposal must not run another generation stage.")
-    for name in ("generate_organize_plan", "complete_organize_submissions", "summarize_report_input_files"):
-        monkeypatch.setattr(report_adapters.ai, name, unexpected)
-    context = DeferredJobContext(
-        job=SimpleNamespace(attempt=2), actor=SimpleNamespace(), notification=None,
-        inputs={"report": report}, parameters={},
-        checkpoint={"schema_version": 1, "stage": "plan_ready", "proposal_complete": True, "proposal": proposal},
+# @matrix deferred-jobs : quota retry service-tier
+@pytest.mark.parametrize("changes", [False, True])
+@pytest.mark.parametrize("revision", [False, True])
+def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):
+    from testing.utility.ai_report_fakes import _test_user
+
+    actor = _test_user("report-owner")
+    report = SimpleNamespace(
+        urlsafe_key="report",
+        available=True,
+        instructions="Review tasks",
+        input_files=[],
+        upload_manifest=[],
+        deferred_job={"key": "job"},
+        proposal={"summary": "Old answer", "actions": []},
+        file_usage=[],
+        result=None,
     )
-    adapter = report_adapters.OrganizeReportAdapter()
+    calls, summaries, saved = [], [], []
+    proposal = {
+        "summary": "Ready",
+        "confidence": 1,
+        "actions": [
+            {"id": "review", "type": "needs_review", "data": {"reason": "Review"}}
+        ]
+        if changes
+        else [],
+    }
+
+    def generate(prompt):
+        assert {"create_task", "move_file", "create_page"} <= set(
+            prompt.allowed_actions
+        )
+        calls.append(prompt)
+        return {"proposal": proposal, "file_usage": []}
+
+    def set_proposal(value, **kwargs):
+        report.proposal = value
+        report.status = "ready" if value["actions"] else "complete"
+
+    report.properties = SimpleNamespace(
+        process=SimpleNamespace(set_proposal=set_proposal)
+    )
+    monkeypatch.setattr(
+        report_adapters.ai, "finalize_report_upload_manifest", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        report_adapters.ai,
+        "summarize_report_input_files",
+        lambda *a, **k: summaries.append(k),
+    )
+    monkeypatch.setattr(report_adapters.ai, "generate_report", generate)
+    monkeypatch.setattr(
+        report_adapters.Entities, "save", lambda *entities: saved.append(entities)
+    )
+    context = DeferredJobContext(
+        job=SimpleNamespace(attempt=2, urlsafe_key="job"),
+        actor=actor,
+        notification=None,
+        inputs={"report": report},
+        parameters={"mode": "revise", "feedback": "Also make changes"}
+        if revision
+        else {},
+        checkpoint={},
+    )
+    adapter = report_adapters.AIReportAdapter()
     adapter.prepare(context)
+    assert calls[0].service_tier == "priority"
+    assert summaries[0]["service_tier"] == "priority"
     assert context.checkpoint["stage"] == "ready_to_apply"
-    assert context.checkpoint["proposal"] == proposal
-    assert context.checkpoint["status"] == "ready"
     assert adapter.checkpoint_ready(context)
+    adapter.prepare(context)
+    assert len(calls) == len(summaries) == 1
+    result = adapter.apply(context)
+    assert result["status"] == ("ready" if changes else "complete")
+    assert report.file_usage == []
+    assert report.proposal == proposal
+    assert saved == [(report, actor)]
+    if changes:
+        actor.access = lambda _required: False
+        with pytest.raises(Exception, match="Creating proposals requires"):
+            adapter.apply(context)

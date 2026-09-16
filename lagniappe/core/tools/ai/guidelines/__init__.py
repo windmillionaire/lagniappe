@@ -65,11 +65,8 @@ from .schema_evolution import (
     SCHEMA_EVOLUTION_GUIDELINES,
 )
 
-from .organize import (
-    ORGANIZE_ACTION_GUIDELINES,
-    ORGANIZE_WORKFLOW,
-    REPORT_PREFLIGHT_CHECKS,
-    REPORT_OUTPUT_REQUIREMENTS,
+from .reports import (
+    FILE_ORGANIZATION_GUIDELINES,
 )
 
 __all__ = [
@@ -120,9 +117,6 @@ __all__ = [
     "SUMMARY_GENERATION_GUIDELINES",
     # Schema evolution
     "SCHEMA_EVOLUTION_GUIDELINES",
-    # Organize
-    "ORGANIZE_ACTION_GUIDELINES",
-    "ORGANIZE_WORKFLOW",
-    "REPORT_PREFLIGHT_CHECKS",
-    "REPORT_OUTPUT_REQUIREMENTS",
+    # Report filing
+    "FILE_ORGANIZATION_GUIDELINES",
 ]

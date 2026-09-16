@@ -4,8 +4,6 @@ from .actions import ACTION_ORDER
 
 
 # @testable true
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_filter_actions_by_user_permissions
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_always_allow_tasks_on_the_personal_page
 # @matrix ai-report : action-capabilities permissions
 # @pair permissions:own-page
 def allowed_report_actions(user):
@@ -50,11 +48,10 @@ def allowed_report_actions(user):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/organize.py::organize_prompt
-# @covered-by lagniappe/core/tools/ai/ask.py::ask_prompt
+# @covered-by lagniappe/core/tools/ai/planner.py::report_prompt
 # @reason prompt text is verified through public prompt builders
 def report_action_permission_context(user, allowed_actions=None):
-    allowed = tuple(allowed_actions or allowed_report_actions(user))
+    allowed = tuple(allowed_report_actions(user) if allowed_actions is None else allowed_actions)
     allowed_set = set(allowed)
     user_capabilities = user.properties.restrictions.ai_action_capabilities
     capabilities = {
@@ -158,33 +155,3 @@ def report_action_permission_context(user, allowed_actions=None):
         "capabilities": capabilities,
         "rules": rules,
     }
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/organize.py::organize_prompt
-# @covered-by lagniappe/core/tools/ai/ask.py::ask_prompt
-# @reason filtered contracts are observed through prompt output tests
-def permission_filtered_output_contract(contract, allowed_actions):
-    allowed_lines = "\n".join(f"- {action}" for action in allowed_actions)
-    marker = "Allowed action types:"
-    next_section = "\n\nReference rules:"
-    if marker not in contract or next_section not in contract:
-        return contract
-    before, rest = contract.split(marker, 1)
-    _old_actions, after = rest.split(next_section, 1)
-    return f"{before}{marker}\n{allowed_lines}{next_section}{after}"
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/organize.py::organize_prompt
-# @covered-by lagniappe/core/tools/ai/ask.py::ask_prompt
-# @reason permission instruction composition is verified through prompt tests
-def report_action_permission_instructions():
-    return """
-The allowed action list is user-specific. Do not include action types that are
-not listed in Report Action Permissions. When using an existing category,
-project, page, task, or model task, first confirm the relevant tool result says
-it can be edited for the intended action. If a useful workspace change would
-require a forbidden action or an uneditable target, return needs_review or
-explain the limitation instead of proposing work the runner will reject.
-    """

@@ -29,8 +29,8 @@ may upload or reuse selected files before rendering the prompt.
 
 `GenAI` reads the live `site/ai` settings at the start of a top-level
 generation and falls back to deployed configuration. It pins the chosen model
-through SDK retries, tool turns, and a structured-final call. Separate
-Organize stages and later durable attempts are separate generations and may
+through SDK retries, tool turns, and a structured-final call. File summary
+prepasses and later durable attempts are separate generations and may
 resolve different saved settings.
 
 Foreground calls use the normal SDK retry profile. Deferred jobs use at most
@@ -71,21 +71,18 @@ On-site and external `search_entities` share the same tool description and
 select bounded candidate discovery through registered tool dispatch:
 sparse multiword queries may receive ranked OR matches in the same tool result,
 with cached parent/snippet and Task completion context. This does not load every
-candidate again to attach edit/create permissions. The automatic Organize
-retrieval prepass retains native full-text matching. Both paths preserve the
-explicit `exact_name` mode; Page candidates in either AI path can also use the
-existing Category `parent_id` scope. Ordinary website search is unchanged. The
-lower-level search handler retains full-text mode for the automatic prepass;
-model-facing dispatch selects ranked candidates for both AI entry points.
+candidate again to attach edit/create permissions. Explicit `exact_name` and
+Category `parent_id` scopes remain available. There is no automatic report
+retrieval prepass; the planner requests the discovery it needs.
 
 ## Structured output
 
 When JSON, tools, and a provider response schema are enabled together, the
 initial and tool turns omit the JSON MIME type and response schema so the model
 can request functions. After discovery, the application issues a separate
-structured-final request over the accumulated transcript. Ask, Create, and
-Organize then validate against their application contracts and may run one
-repair pass.
+structured-final request over the accumulated transcript. The unified report
+planner validates the complete candidate and returns errors to this same
+conversation for up to two corrections.
 
 Autofill does not attach a provider response schema. Its keys are dynamic form
 field IDs; the prompt names the exact expected fields and normal form validation
@@ -132,14 +129,14 @@ answers keyed by field ID, its recorded schema and generation. It requires edit
 access, matching the website's Original answers view. Ordinary history reads
 retain their existing view permission. Open Tasks return `original_completion:
 null`; an unavailable historical schema is explicit and omits unsafe raw values.
-The option is shared by native Ask/Organize and external clients.
+The option is shared by native reports and external clients.
 
 Prefer projections and reuse over splitting one
 natural read into several dependent calls: each extra Gemini round sends another
 provider request and replays prior tool output. Tool count alone is not the useful
 measure; observe rounds, cumulative tokens, latency and provider errors.
 
-`get_guidelines(task="organize")` shares complete-proposal guidance across
+`get_guidelines(task="filing")` shares complete-proposal guidance across
 built-in Gemini and external clients. The current contract selects the allowed
 actions and file responsibilities. Native jobs prepare summaries/retrieval terms
 before generation; external clients author `summarize_file` actions when their
@@ -168,8 +165,8 @@ integer calls and exposes that choice through `effective_limit`.
 Initial attachments and tool-returned files use the `FileConsumer` boundary.
 Autofill receives readable files directly attached to its target. It prefers
 saved summaries, may request extracted text for an unresolved field, and may
-request an original file only when text is insufficient. Organize starts from
-saved summaries and bounded retrieval candidates, then reads further evidence
+request an original file only when text is insufficient. The report planner starts
+from saved summaries and file metadata, then reads further evidence
 as needed in the same conversation that authors the complete proposal.
 
 ## Validation and cleanup
@@ -177,9 +174,9 @@ as needed in the same conversation that authors the complete proposal.
 `reporting/contracts/` defines action-specific schemas and ordering.
 `reporting/proposals/` normalizes and validates. Narrow deterministic repairs
 handle values such as stable field IDs and one unambiguous reference. Native
-Organize returns remaining errors to the same conversation for bounded
-correction; exhausted correction fails generation. The legacy separate-prompt
-repair path used by other workflows may return review-only fallback proposals.
+report planning returns remaining errors to the same conversation for bounded
+correction; exhausted correction fails generation. No separate report repair
+or form-completion model call remains.
 
 `GenAI.cleanup()` removes citation-shaped numeric markers while preserving
 ordinary bracketed text. Add only exact provider syntax to cleanup rules.
@@ -213,3 +210,10 @@ application validation, deterministic apply, and privacy-bounded telemetry.
 Provider behavior changes independently of this repository. Recheck the
 official Gemini function-calling, token-counting, context-caching, and service
 tier documentation before changing provider-specific behavior.
+
+The unified planner starts with a compact envelope and a permission-bounded
+catalog of actions. `get_guidelines(task="report_actions", actions=[...])`
+requires a nonempty selection and returns exact selected schemas as well as
+rules. No router or full action-schema union is included in the initial prompt.
+The output's file_usage classifies each upload as evidence or organize; only
+the latter creates filing obligations. See [AI_WORKFLOWS.md](AI_WORKFLOWS.md).

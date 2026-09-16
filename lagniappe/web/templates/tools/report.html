@@ -234,14 +234,25 @@
 {% endblock title %}
 
 {% block content %}
+  {% if not report.available %}
+    <main lp-view lp-entity data-key="{{ report.urlsafe_key }}" data-name="{{ report.name }}"
+          data-kind="report" data-fingerprint="{{ report.fingerprint }}" data-status="unavailable" data-pending="false"
+          class="group/view max-w-5xl mx-auto">
+      <div class="{{ styles.card.primary }} p-5">
+        <h1 class="text-lg font-semibold">{{ report.name }}</h1>
+        <p data-role="report-unavailable" class="my-4">this plan is no longer available</p>
+        {{ controls.delete(label='Delete ' ~ report.name) }}
+      </div>
+    </main>
+  {% else %}
   {% set has_actions = report.proposal and report.proposal.actions %}
   {% set executable_actions = report.proposal.actions|rejectattr("type", "equalto", "needs_review")|rejectattr("type", "equalto", "skip")|list if has_actions else [] %}
-  {% set is_ask = report.tool == "ask" %}
+  {% set is_ask = report.output_kind == "answer" %}
   {% set report_title = report.name %}
-  {% set report_icon = "ask" if report.tool == "ask" else "create" if report.tool == "create" else "organize" if report.tool == "organize" else "generate" %}
+  {% set report_icon = "generate" %}
   {% set can_ask_ai = current_user.access(AI.ASK) %}
   {% set can_create_ai = current_user.access(AI.CREATE) %}
-  {% set can_revise = report.origin != "api" and report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and ((is_ask and can_ask_ai) or (not is_ask and can_create_ai)) %}
+  {% set can_revise = report.origin != "api" and report.proposal and (report.status == "ready" or (is_ask and report.status == "complete")) and not report.result and can_ask_ai %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
   {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone and not migration_started %}
@@ -306,7 +317,7 @@
                     {% if inbound.requested_tool == "ai" and inbound.resolved_tool %}
                       AI / {{ inbound.resolved_tool|title }}
                     {% else %}
-                      {{ inbound.tool|title }}
+                      AI
                     {% endif %}
                   </span>
                 </div>
@@ -360,14 +371,15 @@
                 </p>
               {% endif %}
             </div>
-          {% elif is_ask and report.proposal %}
-            <div data-role="ask-answer" class="flex flex-col gap-2">
+          {% endif %}
+          {% if report.proposal and (is_ask or report.properties.proposal.answer_html) %}
+            <div data-role="report-answer" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">Answer</h2>
               {% if report.properties.proposal.answer_html %}
-                <div data-role="ask-answer-html"
+                <div data-role="report-answer-html"
                      class="html-content text-base-dark">{{ report.properties.proposal.answer_html|safe_html }}</div>
               {% else %}
-                <p data-role="ask-answer-summary" class="text-base-dark">{{ report.proposal.summary or report.summary or report.note }}</p>
+                <p data-role="report-answer-summary" class="text-base-dark">{{ report.proposal.summary or report.summary or report.note }}</p>
               {% endif %}
             </div>
           {% endif %}
@@ -621,7 +633,7 @@
                   data-submit="{{ revise_button_label }}"
                   data-submitting="{{ 'Revising Response' if is_ask else 'Revising Plan' }}"
                   data-submitted="Revision Started"
-                  data-icon="{{ 'ask' if is_ask else report.tool if report.tool == 'create' else 'generate' }}"
+                  data-icon="generate"
                   class="flex flex-col gap-2 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">
               <label for="report-feedback"
                      class="text-sm font-semibold text-base-dark">{{ revise_heading }}</label>
@@ -657,4 +669,5 @@
       </div>
     </div>
   </main>
+  {% endif %}
 {% endblock content %}

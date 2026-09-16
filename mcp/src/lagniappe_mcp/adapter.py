@@ -41,9 +41,7 @@ from .url_security import (
 
 
 PLAN_ROUTES = {
-    "start_ask": ("POST", "plans", "ask"),
-    "start_create": ("POST", "plans", "create"),
-    "start_organize": ("POST", "plans", "organize"),
+    "start_plan": ("POST", "plans", None),
     "get_plan": ("GET", "plans/{plan_id}", None),
     "get_plan_contract": ("GET", "plans/{plan_id}/contract", None),
     "upload_sessions": ("POST", "plans/{plan_id}/uploads", None),
@@ -317,12 +315,12 @@ class LagniappeAdapter:
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _start_plan(self, kind: str, arguments: dict[str, Any]) -> AdapterResult:
-        method, route, tool = PLAN_ROUTES[kind]
-        body = {"tool": tool, "instructions": arguments["instructions"]}
+        method, route, _ = PLAN_ROUTES[kind]
+        body = {"instructions": arguments.get("instructions", "")}
         if "name" in arguments:
             body["name"] = arguments["name"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
-        plan = self._safe_plan(value, expected_tool=tool)
+        plan = self._safe_plan(value)
         return await self._with_lifecycle_context(
             plan, plan_id=plan["id"], actions=arguments.get("actions")
         )
@@ -334,62 +332,38 @@ class LagniappeAdapter:
         value: dict[str, Any],
         *,
         plan_id: str,
-        organize_guidelines: bool = False,
         actions: list[str] | None = None,
     ) -> AdapterResult:
         """Bundle a read without turning a successful mutation into a retry."""
-        tool = "get_guidelines" if organize_guidelines else "get_plan_contract"
+        tool = "get_plan_contract"
         arguments = {"plan_id": plan_id}
-        if organize_guidelines:
-            arguments["task"] = "organize"
-        elif actions is not None:
+        if actions is not None:
             arguments.update(actions=actions, view="full")
         try:
-            if organize_guidelines:
-                definition = self.tools.get(tool)
-                if definition is None:
+            result = await self._get_contract_projection(
+                plan_id, actions=actions, view="full" if actions is not None else "summary",
+            )
+            if "upload_inventory" in value:
+                # A second caller can change the Plan between successful
+                # finalization and this read. Keep the completed upload's
+                # receipt, but do not bundle contradictory working context.
+                finalized_files = value["upload_inventory"]
+                inventory = result.value["upload_inventory"]
+                if (
+                    not isinstance(inventory, dict)
+                    or inventory.get("status") != "finalized"
+                    or inventory.get("authoritative") is not True
+                    or type(inventory.get("count")) is not int
+                    or inventory["count"] != len(finalized_files)
+                    or inventory.get("files") != finalized_files
+                    or result.value["required_file_refs"]
+                    != [item["ref"] for item in finalized_files]
+                ):
                     raise TransportError(
-                        "missing_guidelines", "Guidelines unavailable."
+                        "context_changed",
+                        "Upload context no longer matches finalization.",
                     )
-                validate_value(definition.input_schema, arguments, phase="input")
-                result = await self._read_tool(definition, arguments)
-                if not isinstance(result.value, dict) or "error" in result.value:
-                    raise TransportError(
-                        "invalid_guidelines", "Guidelines unavailable."
-                    )
-                context = {"guidelines": result.value}
-            else:
-                result = await self._get_contract_projection(
-                    plan_id,
-                    actions=actions,
-                    view="full" if actions is not None else "summary",
-                )
-                expected_tool = value.get("tool") or value["plan"]["tool"]
-                if result.value["tool"] != expected_tool:
-                    raise TransportError(
-                        "invalid_response", "Context does not match the Plan tool."
-                    )
-                if "upload_inventory" in value:
-                    # A second caller can change the Plan between successful
-                    # finalization and this read. Keep the completed upload's
-                    # receipt, but do not bundle contradictory working context.
-                    finalized_files = value["upload_inventory"]
-                    inventory = result.value["upload_inventory"]
-                    if (
-                        not isinstance(inventory, dict)
-                        or inventory.get("status") != "finalized"
-                        or inventory.get("authoritative") is not True
-                        or type(inventory.get("count")) is not int
-                        or inventory["count"] != len(finalized_files)
-                        or inventory.get("files") != finalized_files
-                        or result.value["required_file_refs"]
-                        != [item["ref"] for item in finalized_files]
-                    ):
-                        raise TransportError(
-                            "context_changed",
-                            "Upload context no longer matches finalization.",
-                        )
-                context = {"contract": result.value}
+            context = {"contract": result.value}
             enriched = AdapterResult({**value, "context": context})
             _reject_private_model_data(enriched.value, bearer=self.config.api_key)
             self._enforce_result_limits(enriched)
@@ -449,11 +423,9 @@ class LagniappeAdapter:
                             if actions is not None
                             else {}
                         ),
-                        **({"view": view} if view != "full" else {}),
+                        "view": view,
                     }
                 )
-                if actions is not None or view != "full"
-                else ""
             ),
         )
         if not isinstance(value, dict):
@@ -499,35 +471,14 @@ class LagniappeAdapter:
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _get_contract_projection(
-        self, plan_id: str, *, actions=None, view="full"
+        self, plan_id: str, *, actions=None, view="summary"
     ) -> AdapterResult:
         contract = await self._load_contract(plan_id, actions=actions, view=view)
         submission = contract.pop("submission_format")
-        # These contract-v6 clauses describe REST client orchestration. Keep
-        # their domain/review semantics, but present the MCP-owned equivalent
-        # rather than instructing the model to repeat the adapter's reads.
-        workflow_rules = [
-            rule.replace(
-                "When an answer is ready, fetch the latest contract and submit it "
-                "without waiting for separate save confirmation.",
-                "Only when the user asks to save the answer, call submit_plan.",
-            ).replace(
-                "Fetch this contract after finalizing uploads and immediately "
-                "before constructing the proposal.",
-                "Use the current contract supplied in upload completion's "
-                "context.contract for current file references and permissions. "
-                "If proposal_schema is null, use get_plan_contract with the "
-                "selected actions before constructing the proposal. If that context "
-                "is unavailable or relevant state changes, use get_plan_contract. "
-                "submit_plan performs the final fresh-contract check.",
-            )
-            for rule in contract.get("workflow_rules", [])
-        ]
-        if "workflow_rules" in contract:
-            contract["workflow_rules"] = workflow_rules
         contract["mcp_submission"] = {
             "contract_version": submission["contract_version"],
             "proposal": {},
+            "file_usage": [],
             "proposal_schema": "$.proposal_schema",
             "instructions": MCP_SUBMISSION_INSTRUCTIONS,
         }
@@ -553,6 +504,8 @@ class LagniappeAdapter:
         )
         submission = contract["submission_format"]
         body = deepcopy(submission["body"])
+        validate_value(contract["file_usage_schema"], arguments["file_usage"], phase="file_usage")
+        body["file_usage"] = deepcopy(arguments["file_usage"])
         body["proposal"] = deepcopy(arguments["proposal"])
         for field in ("name", "instructions"):
             if field in arguments:
@@ -571,7 +524,7 @@ class LagniappeAdapter:
 
         plan_id = arguments["plan_id"]
         contract = await self._load_contract(plan_id)
-        if contract["tool"] != "organize" or contract["uploads_supported"] is not True:
+        if contract["uploads_supported"] is not True:
             raise AdapterError(
                 "uploads_not_supported", "This Plan does not accept file uploads."
             )
@@ -738,7 +691,6 @@ class LagniappeAdapter:
         value: Any,
         *,
         expected_plan_id: str | None = None,
-        expected_tool: str | None = None,
     ) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise TransportError(
@@ -752,10 +704,6 @@ class LagniappeAdapter:
         ):
             raise TransportError(
                 "invalid_response", "Plan response identity does not match the request."
-            )
-        if expected_tool is not None and result.get("tool") != expected_tool:
-            raise TransportError(
-                "invalid_response", "Plan response tool does not match the request."
             )
         encoded = quote_path_segment(plan_id)
         for field, suffix in {

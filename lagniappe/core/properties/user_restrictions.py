@@ -143,8 +143,6 @@ class Restrictions(Property):
         return self._state_value("category_edit")
 
     # @testable true
-    # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_filter_actions_by_user_permissions
-    # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_always_allow_tasks_on_the_personal_page
     # @matrix ai-report : action-capabilities permissions
     # @pair permissions:own-page
     @property

@@ -261,7 +261,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         ask_start = await _call(
             client,
-            "start_ask",
+            "start_plan",
             {
                 "name": "MCP live Ask",
                 "instructions": (
@@ -285,7 +285,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         ask_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": ask["id"],
                 "contract_version": ask_contract_value["contract_version"],
                 "proposal": {
@@ -311,7 +311,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         create_start = await _call(
             client,
-            "start_create",
+            "start_plan",
             {
                 "name": "MCP live Create",
                 "instructions": "Prepare a browser-reviewable field guide Page.",
@@ -341,7 +341,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         create_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": create["id"],
                 "contract_version": create_contract_value["contract_version"],
                 "proposal": create_proposal,
@@ -372,7 +372,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         replacement_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": create["id"],
                 "contract_version": create_contract_value["contract_version"],
                 "proposal": replacement,
@@ -393,7 +393,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         update_start = await _call(
             client,
-            "start_organize",
+            "start_plan",
             {
                 "name": "MCP live existing-record update",
                 "instructions": "Propose renaming the existing test Page, without files.",
@@ -411,7 +411,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         update_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": update["id"],
                 "contract_version": _structured(update_contract)["contract_version"],
                 "proposal": {
@@ -440,7 +440,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         organize_start = await _call(
             client,
-            "start_organize",
+            "start_plan",
             {
                 "name": "MCP live Organize",
                 "instructions": "Attach and summarize the supplied image file.",
@@ -448,7 +448,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         )
         organize = _structured(organize_start)
         organize_guidelines = await _call(
-            client, "get_guidelines", {"plan_id": organize["id"], "task": "organize"}
+            client, "get_guidelines", {"plan_id": organize["id"], "task": "filing"}
         )
         organize_contract_before = await _call(
             client, "get_plan_contract", {"plan_id": organize["id"]}
@@ -535,7 +535,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         organize_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [{"file": file_ref, "usage": "organize"}],
                 "plan_id": organize["id"],
                 "contract_version": organize_contract_value["contract_version"],
                 "proposal": organize_proposal,

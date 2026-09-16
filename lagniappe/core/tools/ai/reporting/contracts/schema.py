@@ -444,8 +444,6 @@ def _report_action_response_schema(action_type, include_submission_fields):
 
 
 # @testable true
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_attach_provider_json_schema
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_report_response_schema_uses_provider_compatible_any_of_nodes
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_conversion_schema_rejects_flattened_items
 # @matrix ai-report : allowed-actions provider-validation schema structured-output
 def report_proposal_response_schema(
@@ -456,7 +454,7 @@ def report_proposal_response_schema(
     include_submission_fields=True,
 ):
     """Return typed provider JSON variants for report proposal responses."""
-    action_types = tuple(allowed_actions or ACTION_ORDER)
+    action_types = tuple(ACTION_ORDER if allowed_actions is None else allowed_actions)
     unknown_actions = [
         action for action in action_types if action not in REPORT_ACTION_DATA_CONTRACTS
     ]
@@ -468,6 +466,7 @@ def report_proposal_response_schema(
 
     properties = {
         "summary": {"type": "string"},
+        "answer_markdown": {"type": "string"},
         "confidence": {"type": "number"},
         "issues": {
             "type": "array",
@@ -745,7 +744,7 @@ def external_report_proposal_response_schema(
     JSON Schema composition to expose named action variants and executable
     reference-group requirements without changing internal model prompts.
     """
-    action_types = tuple(allowed_actions or ACTION_ORDER)
+    action_types = tuple(ACTION_ORDER if allowed_actions is None else allowed_actions)
     provider_schema = report_proposal_response_schema(
         allowed_actions=action_types,
         require_issues=require_issues,

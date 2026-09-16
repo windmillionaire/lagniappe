@@ -142,19 +142,19 @@ def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
     provider_parts, media = functions.execute_function_calls(
         [
             SimpleNamespace(
-                name="get_guidelines", args={"task": "organize", "external": True}
+                name="get_guidelines", args={"task": "filing", "external": True}
             )
         ],
         actor,
     )
     internal = json.loads(provider_parts[0].function_response.response["result"])
     external, external_media = functions.execute_registered_tool(
-        "get_guidelines", {"task": "organize", "external": False}, actor, external=True
+        "get_guidelines", {"task": "filing", "external": False}, actor, external=True
     )
 
     assert media == external_media == []
     assert internal == get_guidelines.execute_get_guidelines(
-        {"task": "organize"}, actor
+        {"task": "filing"}, actor
     )
     assert internal == external
     assert "same proposal" in internal["guidelines"]
@@ -256,9 +256,9 @@ def test_task_form_guidance_preserves_negative_answers_for_both_workflows(task):
 def test_external_duplicate_check_reuses_evidence_without_a_filename_search_ritual():
     actor = SimpleNamespace()
     external = get_guidelines.execute_external_get_guidelines(
-        {"task": "organize"}, actor
+        {"task": "filing"}, actor
     )["guidelines"]
-    internal = get_guidelines.execute_get_guidelines({"task": "organize"}, actor)[
+    internal = get_guidelines.execute_get_guidelines({"task": "filing"}, actor)[
         "guidelines"
     ]
 
@@ -445,7 +445,7 @@ def test_external_schedule_schema_matches_repeating_schedule_requirements(
     )
     errors = external_api.submission_validation_errors(
         {
-            "contract_version": external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION, "file_usage": [],
             "proposal": {
                 "summary": "Repeat this work.",
                 "confidence": 0.9,
@@ -557,11 +557,11 @@ def test_external_contract_reuses_known_guidance_and_exposes_canonical_schedulin
         "user_today",
         lambda user: datetime(2026, 9, 4, tzinfo=timezone.utc),
     )
-    for tool in ("create", "organize"):
+    for instructions in ("Create a task", "Organize existing records"):
         contract = external_api.plan_contract(
-            SimpleNamespace(tool=tool, input_files=[]),
+            SimpleNamespace(available=True, instructions=instructions, input_files=[]),
             actor,
-            submit_url=f"https://example.test/api/v1/plans/{tool}/submit",
+            submit_url="https://example.test/api/v1/plans/plan/submit", view="full",
         )
         assert REPORT_TASK_SCHEDULING_GUIDELINES.strip() in contract["workflow_rules"]
         assert "guidelines" not in contract

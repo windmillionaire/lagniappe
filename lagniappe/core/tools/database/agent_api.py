@@ -128,18 +128,17 @@ def _report_operation_state(report, phase):
     ):
         return None
 
-    tool = report.get("tool")
     report_process = _report_process(report)
     status = report_process.get("status") if report_process is not None else None
+    if report.get("format_version") != 1:
+        return None
     if phase in {"create", "finalize"}:
-        if tool != "organize" or status != "draft":
+        if status != "draft":
             return None
     else:
-        reusable_status = "complete" if tool == "ask" else "ready"
-        if tool not in {"ask", "create", "organize"} or status not in {
-            "draft",
-            reusable_status,
-        }:
+        proposal = report_process.get("proposal") if report_process else None
+        is_answer = isinstance(proposal, dict) and proposal.get("actions") == []
+        if status not in {"draft", "ready"} and not (status == "complete" and is_answer):
             return None
 
     manifest = _json_field(report, "upload_manifest", list, [])
@@ -168,12 +167,9 @@ def _report_operation_state(report, phase):
         )
     ):
         return None
-    if tool != "organize" and (manifest or current_batch_id is not None):
-        return None
     if phase == "submit" and deferred_job:
         return None
     return {
-        "tool": tool,
         "status": status,
         "manifest": manifest,
         "upload_batch_id": current_batch_id,
@@ -454,12 +450,11 @@ def commit_plan_operation(
 # @reason the fenced publication tests cover recipient, state, and durable replay identity
 def _prepare_publication_notification(report, user):
     """Prepare the first publication alert; its manifest marker outlives dismissal."""
-    tool = report.get("tool")
     if (
         report.get("origin") != "api"
         or report.get("user") != user.key
-        or tool not in {"ask", "create", "organize"}
-        or _report_status(report) != ("complete" if tool == "ask" else "ready")
+        or report.get("format_version") != 1
+        or _report_status(report) not in {"complete", "ready"}
     ):
         raise ValueError("Only the creator's published API Plan can notify them")
     manifest = _json_field(report, "agent_manifest", dict, {})
@@ -470,7 +465,7 @@ def _prepare_publication_notification(report, user):
     identifier = f"plan-published-{database_get.urlsafe_key(report.key)}"
     key = database_notifications.ordinary_notification_key(user, identifier)
     notification = database_notifications.prepare_ordinary_notification(
-        key, user, body=f"{tool.title()} report is ready.", target=report.key
+        key, user, body="AI report is ready.", target=report.key
     )
     return notification, {
         **manifest,

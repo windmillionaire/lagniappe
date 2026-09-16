@@ -60,6 +60,8 @@ class Actor:
         identifier = uuid4().hex
         self.urlsafe_key = f"actor-{identifier}"
         self.key = f"actor-key-{identifier}"
+        from collections import defaultdict
+        self.properties = SimpleNamespace(restrictions=SimpleNamespace(ai_action_capabilities=defaultdict(lambda: True)))
 
     def access(self, required):
         return required in {AI.ASK, AI.CREATE}
@@ -84,8 +86,15 @@ def _authenticated_client(monkeypatch, actor):
     return client
 
 
-def _report(actor, tool="organize"):
-    return SimpleNamespace(
+class Plan(SimpleNamespace):
+    @property
+    def output_kind(self):
+        return None if self.proposal is None else "proposal" if self.proposal.get("actions") else "answer"
+
+
+def _report(actor):
+    return Plan(
+        available=True, format_version=1, file_usage=[],
         key="report-datastore-key",
         kind="report",
         db={},
@@ -93,7 +102,6 @@ def _report(actor, tool="organize"):
         urlsafe_key="report-key",
         hash="reporthash12",
         status="draft",
-        tool=tool,
         name="External plan",
         instructions="Organize these files.",
         input_files=[],
@@ -203,7 +211,7 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
     monkeypatch,
 ):
     actor = Actor()
-    report = _report(actor, tool="ask")
+    report = _report(actor)
     report.urlsafe_key = f"rate-limit-plan-{uuid4().hex}"
     authorization = {"Authorization": "Bearer valid-key"}
     created = []
@@ -242,12 +250,12 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
         allowed = client.post(
             "/api/v1/plans",
             headers=authorization,
-            json={"tool": "ask", "instructions": "Check the plan-start boundary."},
+            json={"instructions": "Check the plan-start boundary."},
         )
         limited = client.post(
             "/api/v1/plans",
             headers=authorization,
-            json={"tool": "ask", "instructions": "Check the plan-start boundary."},
+            json={"instructions": "Check the plan-start boundary."},
         )
         assert allowed.status_code == 201
         assert allowed.json["id"] == report.urlsafe_key
@@ -258,13 +266,13 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
 
         tool_path = f"/api/v1/plans/{report.urlsafe_key}/tools/get_guidelines"
         allowed = client.post(
-            tool_path, headers=authorization, json={"arguments": {"task": "organize"}}
+            tool_path, headers=authorization, json={"arguments": {"task": "filing"}}
         )
         limited = client.post(
-            tool_path, headers=authorization, json={"arguments": {"task": "organize"}}
+            tool_path, headers=authorization, json={"arguments": {"task": "filing"}}
         )
         assert allowed.status_code == 200
-        assert dispatched == [("get_guidelines", {"task": "organize"}, actor, True)]
+        assert dispatched == [("get_guidelines", {"task": "filing"}, actor, True)]
         assert limited.status_code == 429
         assert limited.json["error"]["code"] == "rate_limited"
         assert 0 < int(limited.headers["Retry-After"]) <= 31 * 24 * 60 * 60
@@ -362,7 +370,7 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
         "/api/v1/plans",
         base_url=allowed_origin,
         headers=authorization,
-        json={"tool": "organize", "instructions": "Organize these files."},
+        json={"instructions": "Organize these files."},
     )
     assert created.status_code == 201
     for field in (
@@ -456,9 +464,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         },
     }
     assert authorized.json["capabilities"] == {
-        "ask": True,
-        "create": True,
-        "organize": True,
+        "plans": True,
     }
 
     family = client.get(
@@ -534,8 +540,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         in openapi.json["info"]["description"]
     )
     assert "website Execute control is the only" in openapi.json["info"]["description"]
-    assert "task=organize" in openapi.json["info"]["description"]
-    assert "two-phase workflow" in openapi.json["info"]["description"]
+    assert "task=filing" in openapi.json["info"]["description"]
     assert "does not call a model" in openapi.json["info"]["description"]
     assert "one summary and two retrieval terms" in openapi.json["info"]["description"]
     operations = [
@@ -549,14 +554,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     create_schema = openapi.json["paths"]["/api/v1/plans"]["post"]["requestBody"][
         "content"
     ]["application/json"]["schema"]
-    assert create_schema["required"] == ["instructions"]
+    assert create_schema["required"] == []
     assert create_schema["additionalProperties"] is False
-    assert create_schema["properties"]["instructions"]["pattern"] == "\\S"
-    assert create_schema["properties"]["tool"]["enum"] == [
-        "ask",
-        "create",
-        "organize",
-    ]
+    assert "tool" not in create_schema["properties"]
     create_description = openapi.json["paths"]["/api/v1/plans"]["post"]["description"]
     assert "Follow the returned contract_url, submit_url, and status_url" in (
         create_description
@@ -581,7 +581,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "upload_batch_id"
     ]
     tools_operation = openapi.json["paths"]["/api/v1/tools"]["get"]
-    assert "task=organize" in tools_operation["description"]
+    assert "task=filing" in tools_operation["description"]
     assert "exact input_schema" in tools_operation["description"]
     assert {parameter["name"] for parameter in tools_operation["parameters"]} == {
         "names",
@@ -591,7 +591,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     execute_tool_operation = openapi.json["paths"][
         "/api/v1/plans/{plan_id}/tools/{tool_name}"
     ]["post"]
-    assert "ready Create or Organize plans" in execute_tool_operation["description"]
+    assert "ready proposals" in execute_tool_operation["description"]
     assert "top-level arguments object" in execute_tool_operation["description"]
     assert "error.code=tool_error" in execute_tool_operation["description"]
     assert execute_tool_operation["responses"]["422"]["content"]["application/json"][
@@ -599,18 +599,18 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     ] == {"$ref": "#/components/schemas/Error"}
     submit_operation = openapi.json["paths"]["/api/v1/plans/{plan_id}/submit"]["post"]
     assert (
-        "Organize can update existing records without files"
+        "Updates and creation do not require files"
         in submit_operation["description"]
     )
     assert "never executes actions" in submit_operation["description"]
     assert "only after the user requests saving" in submit_operation["description"]
-    assert "Create/Organize proposal replaces" in submit_operation["description"]
+    assert "mutation proposal replaces" in submit_operation["description"]
     assert "submit it again" in submit_operation["description"]
     assert "authenticated website" in submit_operation["description"]
     submit_schema = submit_operation["requestBody"]["content"]["application/json"][
         "schema"
     ]
-    assert submit_schema["required"] == ["contract_version", "proposal"]
+    assert submit_schema["required"] == ["contract_version", "proposal", "file_usage"]
     assert submit_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ] == {"$ref": "#/components/schemas/SubmissionReceipt"}
@@ -628,7 +628,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     ]}
     compact_schema = openapi.json["components"]["schemas"]["PlanSchemaContract"]
     assert set(compact_schema["required"]) == {
-        "contract_version", "tool", "submission_format", "proposal_schema",
+        "contract_version", "file_usage_schema", "submission_format", "proposal_schema",
         "schema_scope", "schema_actions", "schema_instructions",
     }
     assert compact_schema["properties"]["proposal_schema"] == {"type": "object"}
@@ -638,7 +638,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "schema_actions",
         "schema_instructions",
         "contract_version",
-        "tool",
+        "file_usage_schema",
         "current_date",
         "timezone",
         "personal_page",
@@ -742,12 +742,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         (
             {"instructions": [report.instructions]},
             "invalid_instructions",
-            {"path": "$.instructions", "expected": "non-empty string"},
-        ),
-        (
-            {"instructions": "   \n\t"},
-            "invalid_instructions",
-            {"path": "$.instructions", "expected": "non-empty string"},
+            {"path": "$.instructions", "expected": "string"},
         ),
         (
             {"instructions": report.instructions, "name": 7},
@@ -775,8 +770,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         ),
         (
             {"tool": "ORGANIZE", "instructions": report.instructions},
-            "unsupported_tool",
-            {"path": "$.tool"},
+            "unsupported_field",
+            {"path": "$", "fields": ["tool"]},
         ),
     ]
     for payload, code, expected_details in malformed_plan_requests:
@@ -792,7 +787,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     created = client.post(
         "/api/v1/plans",
         headers={"Authorization": "Bearer valid-key"},
-        json={"tool": "organize", "instructions": report.instructions},
+        json={"instructions": report.instructions},
     )
     assert created.status_code == 201
     assert created.json["id"] == report.urlsafe_key
@@ -800,7 +795,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert created.json["status_url"].endswith("/api/v1/plans/report-key")
     assert created.json["submit_url"].endswith("/api/v1/plans/report-key/submit")
     assert "execute_url" not in created.json
-    assert created.json["execution"] is None
+    assert created.json["output_kind"] is None
+    assert "execution" not in created.json
     assert created.json["preview_url"].endswith("/tools/api-plan/reporthash12")
 
     monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
@@ -1062,11 +1058,11 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     guidance = client.post(
         "/api/v1/plans/report-key/tools/get_guidelines",
         headers={"Authorization": "Bearer valid-key"},
-        json={"arguments": {"task": "organize"}},
+        json={"arguments": {"task": "filing"}},
     )
     assert guidance.status_code == 200, guidance.get_data(as_text=True)
     assert (
-        "final form submissions and updates in the same proposal"
+        "Author final form values using exact target schema ids"
         in (guidance.json["result"]["guidelines"])
     )
     assert (
@@ -1209,7 +1205,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     }
     assert signed == [("private/person.vcf", 300)]
 
-    def submit(current, user, proposal, *, contract_version, save=None):
+    def submit(current, user, proposal, *, contract_version, file_usage, save=None):
         assert user is actor
         assert contract_version == external_api.CONTRACT_VERSION
         assert save is not None
@@ -1222,15 +1218,16 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         external_api,
         "_external_allowed_report_actions",
-        lambda user, tool="organize", report=None: (
-            ("needs_review", "summarize_file") if tool == "organize" else ()
-        ),
+        lambda user: ("needs_review", "summarize_file"),
     )
     proposal = {
         "summary": "Ready for review.",
         "confidence": 1,
         "issues": [],
-        "actions": [],
+        "actions": [{
+            "type": "needs_review",
+            "data": {"note": "Review requested changes.", "questions": []},
+        }],
     }
     malformed_submission = client.post(
         "/api/v1/plans/report-key/submit",
@@ -1247,7 +1244,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     submitted = client.post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
-        json={
+        json={"file_usage": [],
             "contract_version": external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
@@ -1276,7 +1273,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     revised_submission = client.post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
-        json={
+        json={"file_usage": [],
             "contract_version": external_api.CONTRACT_VERSION,
             "proposal": revised_proposal,
         },
@@ -1285,7 +1282,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert revised_submission.json["status"] == "ready"
     assert "proposal" not in revised_submission.json
 
-    report.tool = "create"
     create_ready_read = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
         headers={"Authorization": "Bearer valid-key"},
@@ -1296,7 +1292,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     create_revised_submission = client.post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
-        json={
+        json={"file_usage": [],
             "contract_version": external_api.CONTRACT_VERSION,
             "proposal": create_revision,
         },
@@ -1317,7 +1313,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     browser_execution_locked_revision = client.post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
-        json={
+        json={"file_usage": [],
             "contract_version": external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
@@ -1628,7 +1624,7 @@ def test_claimed_upload_routes_reload_before_storage_side_effects(monkeypatch):
 # @pairs mcp-upload:concurrency mcp-upload:plan-operation
 def test_submission_is_serialized_with_upload_operations(monkeypatch):
     actor = Actor()
-    report = _report(actor, tool="ask")
+    report = _report(actor)
     monkeypatch.setattr(
         agent_auth,
         "authenticate_credential",
@@ -1653,7 +1649,7 @@ def test_submission_is_serialized_with_upload_operations(monkeypatch):
     response = app.test_client().post(
         "/api/v1/plans/report-key/submit",
         headers={"Authorization": "Bearer valid-key"},
-        json={"contract_version": external_api.CONTRACT_VERSION, "proposal": {}},
+        json={"file_usage": [], "contract_version": external_api.CONTRACT_VERSION, "proposal": {}},
     )
     assert response.status_code == 409
     assert response.json["error"]["code"] == "plan_operation_in_progress"
@@ -1666,7 +1662,7 @@ def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibili
     monkeypatch,
 ):
     actor = Actor()
-    report = _report(actor, tool="create")
+    report = _report(actor)
     monkeypatch.setattr(
         agent_auth,
         "authenticate_credential",
@@ -1691,9 +1687,7 @@ def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibili
     actor_without_provider_access = client.get("/api/v1/me", headers=headers)
     assert actor_without_provider_access.status_code == 200
     assert actor_without_provider_access.json["capabilities"] == {
-        "ask": True,
-        "create": True,
-        "organize": True,
+        "plans": True,
     }
 
     actor.is_public = True
@@ -1763,7 +1757,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
             return False
 
     actor = ProviderDisabledActor()
-    report = _report(actor, tool="ask")
+    report = _report(actor)
     report.instructions = "Which pages have open tasks?"
     monkeypatch.setattr(
         agent_auth,
@@ -1779,11 +1773,10 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     )
     created_tools = []
 
-    def create(current, *, instructions, tool, name=None, remote_mcp=False):
+    def create(current, *, instructions, name=None, remote_mcp=False):
         assert current is actor
         assert remote_mcp is False
-        created_tools.append(tool)
-        report.tool = tool
+        created_tools.append(instructions)
         report.instructions = instructions
         return report
 
@@ -1819,35 +1812,33 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     capabilities = client.get("/api/v1/me", headers=headers)
     assert capabilities.status_code == 200
     assert capabilities.json["capabilities"] == {
-        "ask": True,
-        "create": True,
-        "organize": True,
+        "plans": True,
     }
 
     create_draft = client.post(
         "/api/v1/plans",
         headers=headers,
-        json={"tool": "create", "instructions": "Make a project."},
+        json={"instructions": "Make a project."},
     )
     assert create_draft.status_code == 201, create_draft.get_json()
 
     organize_draft = client.post(
         "/api/v1/plans",
         headers=headers,
-        json={"tool": "organize", "instructions": "Organize these files."},
+        json={"instructions": "Organize these files."},
     )
     assert organize_draft.status_code == 201, organize_draft.get_json()
 
     created = client.post(
         "/api/v1/plans",
         headers=headers,
-        json={"tool": "ask", "instructions": report.instructions},
+        json={"instructions": report.instructions},
     )
     assert created.status_code == 201, created.get_json()
-    assert created.json["tool"] == "ask"
+    assert "tool" not in created.json
     assert "execute_url" not in created.json
     assert "execution" not in created.json
-    assert created_tools == ["create", "organize", "ask"]
+    assert len(created_tools) == 3
 
     malformed_tool = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
@@ -1858,14 +1849,6 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     assert malformed_tool.json["error"]["code"] == "invalid_arguments"
     assert "top-level arguments object" in malformed_tool.json["error"]["message"]
 
-    upload = client.post(
-        "/api/v1/plans/report-key/uploads",
-        headers=headers,
-        json={"files": [{"filename": "notes.txt", "size": 5}]},
-    )
-    assert upload.status_code == 409
-    assert upload.json["error"]["code"] == "uploads_not_supported"
-
     proposal = {
         "summary": "Two pages have open tasks.",
         "answer_markdown": "## Open tasks\n\nTwo pages have open tasks.",
@@ -1873,7 +1856,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         "actions": [],
     }
 
-    def submit(current, user, value, *, contract_version, save=None):
+    def submit(current, user, value, *, contract_version, file_usage, save=None):
         assert current is report
         assert user is actor
         assert value is not None
@@ -1892,7 +1875,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     submitted = client.post(
         "/api/v1/plans/report-key/submit",
         headers=headers,
-        json={
+        json={"file_usage": [],
             "contract_version": external_api.CONTRACT_VERSION,
             "proposal": proposal,
         },
@@ -1918,7 +1901,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     revised = client.post(
         "/api/v1/plans/report-key/submit",
         headers=headers,
-        json={
+        json={"file_usage": [],
             "contract_version": external_api.CONTRACT_VERSION,
             "proposal": {**proposal, "summary": "One page has an open task."},
         },

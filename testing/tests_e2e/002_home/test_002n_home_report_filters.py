@@ -35,7 +35,7 @@ def _report(user, tool="create", status="ready", **data):
     report = Entities.REPORT.create(
         {
             "user": owner,
-            "tool": tool,
+            "proposal": {"summary": "Saved report", "actions": [] if tool == "answer" else [{"type": "needs_review", "data": {}}]},
             "status": status,
             "pending": False,
             "name": f"{tool.title()} {status} {uuid4().hex[:8]}",
@@ -60,7 +60,7 @@ def _filter(panel, value):
 
 
 def _executed_only(panel):
-    for value in ("active", "ask", "executed"):
+    for value in ("active", "answers", "executed"):
         button = _filter(panel, value)
         desired = value == "executed"
         if (button.get_attribute("aria-pressed") == "true") != desired:
@@ -78,7 +78,7 @@ def test_report_filters_persist_and_follow_live_status(
     user = _reader(get_user)
     ready = _report(user)
     done = _report(user, "organize", "complete")
-    answer = _report(user, "ask", "complete")
+    answer = _report(user, "answer", "complete")
     panel = _open_reports(user)
     if mobile:
         user.page.set_viewport_size({"width": 360, "height": 800})
@@ -86,13 +86,13 @@ def test_report_filters_persist_and_follow_live_status(
     expect(panel.get_by_role("link", name=ready.name)).to_be_visible()
     expect(panel.get_by_role("link", name=answer.name)).to_be_visible()
     expect(panel.get_by_role("link", name=done.name)).to_be_hidden()
-    for value in ("active", "executed", "ask"):
+    for value in ("active", "executed", "answers"):
         expect(
             _filter(panel, value).locator("[data-role='report-count']")
         ).to_have_text("1")
 
     _filter(panel, "active").click()
-    _filter(panel, "ask").focus()
+    _filter(panel, "answers").focus()
     user.page.keyboard.press("Space")
     expect(panel.locator("[data-role='report-empty']")).to_have_text(
         "Select a report type to show."
@@ -107,7 +107,7 @@ def test_report_filters_persist_and_follow_live_status(
     panel = _open_reports(user)
     expect(_filter(panel, "executed")).to_have_attribute("aria-pressed", "true")
     expect(_filter(panel, "active")).to_have_attribute("aria-pressed", "false")
-    expect(_filter(panel, "ask")).to_have_attribute("aria-pressed", "false")
+    expect(_filter(panel, "answers")).to_have_attribute("aria-pressed", "false")
     # Home collection subscriptions refresh on foreground/reconnect events;
     # reconnect through the real browser network lifecycle after a remote save.
     with browser_failures.expect_offline(user):
@@ -169,7 +169,7 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
         files.append(file)
     report.input_files = files
     Entities.save(*files, report)
-    answer = _report(user, "ask", "complete")
+    answer = _report(user, "answer", "complete")
     unfinished = _report(user)
     panel = _open_reports(user)
     _executed_only(panel)
@@ -230,7 +230,7 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
     expect(panel).to_be_visible()
     expect(clear).to_be_hidden()
     expect(_filter(panel, "executed")).to_have_attribute("aria-pressed", "true")
-    _filter(panel, "ask").click()
+    _filter(panel, "answers").click()
     expect(panel.get_by_role("link", name=answer.name)).to_be_visible()
 
 
@@ -242,7 +242,7 @@ def test_bulk_report_delete_rechecks_ownership_and_validates_input(
     foreign_user = _reader(get_user)
     own = _report(user, status="complete")
     foreign = _report(foreign_user, status="complete")
-    ask = _report(user, "ask", "complete")
+    ask = _report(user, "answer", "complete")
     active = _report(user)
     user.go(SitePages.HOME)
 

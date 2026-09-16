@@ -1066,15 +1066,12 @@ def test_recovery_accepts_and_redacts_optional_ai_email_config():
 
     snapshot = _valid_recovery_document()
     snapshot["AI_EMAIL_CONFIG"] = {
-        "version": 1,
+        "version": 2,
         "provider": "resend",
         "enabled": False,
         "domain": "inbound.example.com",
         "aliases": {
             "ai": "ai",
-            "ask": "ask",
-            "create": "create",
-            "organize": "organize",
         },
         "resend": {
             "domainId": "domain-1",

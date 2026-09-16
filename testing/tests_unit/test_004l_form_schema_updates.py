@@ -17,7 +17,7 @@ from lagniappe.core.tools import (
     form_conversions as conversions,
     form_schema_updates as updates,
 )
-from lagniappe.core.tools.ai import core as ai_core, form_conversion, observability, organize
+from lagniappe.core.tools.ai import core as ai_core, form_conversion, observability, planner
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai.observability import GenerationObserver
 from lagniappe.core.tools.ai.function_definitions.preview_form_schema_update import (
@@ -676,7 +676,7 @@ def test_organize_repairs_prepared_conversions_before_returning_plan(
         assert model == "primary-test"
         proposal = valid if len(calls) > 1 and repair_succeeds else invalid
         return genai_types.GenerateContentResponse(candidates=[genai_types.Candidate(
-            content=genai_types.Content(role="model", parts=[genai_types.Part.from_text(text=json.dumps(proposal))])
+            content=genai_types.Content(role="model", parts=[genai_types.Part.from_text(text=json.dumps({**proposal, "file_usage": []}))])
         )])
 
     monkeypatch.setattr(ai_core.CONFIG, "AI_ENABLED", True)
@@ -684,20 +684,22 @@ def test_organize_repairs_prepared_conversions_before_returning_plan(
     monkeypatch.setattr(ai_core, "runtime_ai_settings", lambda: {
         "AI_MODEL": "primary-test", "AI_UTILITY_MODEL": "utility-test",
     })
-    monkeypatch.setattr(organize.ai_model, "_client", SimpleNamespace(
+    monkeypatch.setattr(planner.ai_model, "_client", SimpleNamespace(
         models=SimpleNamespace(generate_content=provider_response)
     ))
     monkeypatch.setattr(observability, "_write_summary", lambda summary: summaries.append(summary.payload()))
     monkeypatch.setattr(observability, "prune_old_records", lambda: None)
     prompt = Prompt("Prepare a schema migration.", user=scope.actor, type="organize report")
     prompt.set_allowed_actions(("update_form_schema", "needs_review"))
-    prompt.set_response_schema(organize.report_proposal_response_schema(prompt.allowed_actions))
+    prompt.set_response_schema(planner.report_response_schema())
+    prompt.report_file_refs = ()
+    prompt.require_organization = False
     prompt.add_output_contract("JSON", "Return a complete proposal.")
     if repair_succeeds:
-        result = organize.generate_organize_plan(prompt)
+        result = planner.generate_report(prompt)["proposal"]
     else:
         with pytest.raises(exceptions.AIException):
-            organize.generate_organize_plan(prompt)
+            planner.generate_report(prompt)["proposal"]
     assert len(calls) == (2 if repair_succeeds else 3)
     assert "Response validation failed" in calls[-1][-1].parts[0].text
     assert len(summaries) == 1

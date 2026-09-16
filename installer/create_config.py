@@ -1870,6 +1870,7 @@ def update_config():
     if not version:
         raise RuntimeError("package.json must define the current application version.")
     SETTINGS.APP["VERSION"] = version
+    _upgrade_ai_email_config(SETTINGS.APP)
     SETTINGS.APP.setdefault(
         "GOOGLE_SIGNIN_ENABLED",
         constants.DEFAULT_GOOGLE_SIGNIN_ENABLED,
@@ -1877,6 +1878,22 @@ def update_config():
     _set_default_config()
 
     return version
+
+
+# @testable true
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_update_converts_only_email_config_and_preserves_custom_address
+# @matrix ai-email : config normalization upgrade aliases
+def _upgrade_ai_email_config(settings):
+    """Convert installation configuration before strict runtime validation."""
+    from copy import deepcopy
+    config = settings.get("AI_EMAIL_CONFIG")
+    if isinstance(config, dict) and config.get("version") == 1:
+        from config.ai_email import normalize_ai_email_config
+
+        config = deepcopy(config)
+        config["version"] = 2
+        config["aliases"] = {"ai": (config.get("aliases") or {}).get("ai") or "ai"}
+        settings["AI_EMAIL_CONFIG"] = normalize_ai_email_config(config)
 
 
 # @testable true

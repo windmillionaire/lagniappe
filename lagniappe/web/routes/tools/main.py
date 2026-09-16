@@ -23,25 +23,9 @@ from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
-from lagniappe.web.auth import ai_access, logged_in, require_ai_access
+from lagniappe.web.auth import ai_access, logged_in
 
 from . import tools
-
-REPORT_JOB_TYPES = {
-    "organize": DeferredJobType.REPORT_ORGANIZE,
-    "ask": DeferredJobType.REPORT_ASK,
-    "create": DeferredJobType.REPORT_CREATE,
-}
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
-# @covered-by lagniappe/web/routes/tools/main.py::create_ask_report
-# @covered-by lagniappe/web/routes/tools/main.py::create_create_report
-# @reason user-facing tool labels are route presentation plumbing
-def _tool_label(tool):
-    return {"organize": "Organize", "ask": "Ask", "create": "Create"}.get(tool, "AI")
-
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
@@ -71,7 +55,7 @@ def _uploaded_report_files():
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @reason signed upload manifest parsing is exercised through the organize route
 def _report_upload_manifest():
     direct_uploads.direct_upload_files(
@@ -86,7 +70,7 @@ def _report_upload_manifest():
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @reason prompt preview uses upload metadata without persisting files
 def _preview_report_files():
     files = []
@@ -120,64 +104,41 @@ def _preview_report_files():
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @reason explain modal shares the real organize prompt assembly
-def _explain_organize_prompt():
+def _explain_ai_prompt():
     report = SimpleNamespace(
-        tool="organize",
         origin="web",
         instructions=request.form.get("instructions"),
         input_files=_preview_report_files(),
     )
-    return responses.explain(ai.organize_prompt(report, current_user))
+    return responses.explain(ai.report_prompt(report, current_user))
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ask_report
-# @reason explain modal shares the real ask prompt assembly
-def _explain_ask_prompt():
-    report = SimpleNamespace(
-        instructions=request.form.get("instructions"),
-        input_files=[],
-    )
-    return responses.explain(ai.ask_prompt(report, current_user))
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_create_report
-# @reason explain modal shares the real create prompt assembly
-def _explain_create_prompt():
-    report = SimpleNamespace(instructions=request.form.get("instructions"))
-    return responses.explain(ai.create_prompt(report, current_user))
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @reason route permission mirrors the final organize upload endpoint
-@tools.route("/organize/direct-upload", methods=["POST"])
-@ai_access(AI.CREATE)
-def create_organize_report_direct():
+@tools.route("/ai/direct-upload", methods=["POST"])
+@ai_access(AI.ASK)
+def create_ai_report_direct():
     return direct_uploads.direct_upload_response()
 
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
 # @matrix ai-report : create title-truncation
-def _create_report_name(instructions):
+def _report_name(instructions):
     text = " ".join((instructions or "").split())
     if not text:
-        return "Create:"
+        return "AI:"
     suffix = "..." if len(text) > 80 else ""
-    return f"Create: {text[:80]}{suffix}"
+    return f"AI: {text[:80]}{suffix}"
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
-# @covered-by lagniappe/web/routes/tools/main.py::create_ask_report
-# @covered-by lagniappe/web/routes/tools/main.py::create_create_report
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @reason shared report persistence and dispatch are exercised through tool routes
 def _start_tool_report(
-    tool,
     instructions,
     *,
     default_name,
@@ -190,7 +151,6 @@ def _start_tool_report(
             "parent": current_user,
             "user": current_user,
             "name": request.form.get("name") or default_name,
-            "tool": tool,
             "instructions": instructions,
             "input_files": input_files,
             "upload_manifest": upload_manifest,
@@ -203,11 +163,11 @@ def _start_tool_report(
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
-                job_type=REPORT_JOB_TYPES[tool],
+                job_type=DeferredJobType.REPORT_AI,
                 actor=current_user._get_current_object(),
                 idempotency_key=request.form.get("operation-id"),
                 inputs={"report": report},
-                notification_body=f"Creating {_tool_label(tool).lower()} report...",
+                notification_body="Creating AI report...",
                 notification_target=report,
                 client={
                     "source_widget": "CreateToolReport",
@@ -216,15 +176,14 @@ def _start_tool_report(
             )
         )
     except Exception as e:
-        tool_label = _tool_label(tool)
         report.properties.process.fail(
-            f"{tool_label} report could not be started. Please try again."
+            "AI report could not be started. Please try again."
         )
         Entities.save(report, current_user)
         exceptions.capture(
             e,
             context={
-                "operation": f"{tool}_report_queue_start",
+                "operation": "ai_report_queue_start",
                 "report_key": report.urlsafe_key,
                 "report": report.db,
             },
@@ -242,86 +201,29 @@ def _start_tool_report(
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @matrix ai-report : remote-update async create http-boundary text-only upload validation
+# @matrix ai-report : remote-update async create http-boundary text-only upload validation persistence
 # @matrix ai-report : list stage-labels
-@tools.route("/organize", methods=["POST"])
-@ai_access(AI.CREATE)
-def create_organize_report():
+@tools.route("/ai", methods=["POST"])
+@ai_access(AI.ASK)
+def create_ai_report():
     if request.form.get("role") == "explain":
-        return _explain_organize_prompt()
+        return _explain_ai_prompt()
 
     try:
         input_files = _uploaded_report_files()
         upload_manifest = _report_upload_manifest()
     except (exceptions.ValidationError, FileConsumerLimitError) as error:
         return responses.error(str(error))
-    instructions = request.form.get("instructions")
+    instructions = (request.form.get("instructions") or "").strip()
     if not input_files and not upload_manifest and not instructions:
         return responses.error("Add files or instructions before creating a report.")
-    if not input_files and not upload_manifest:
-        return _start_tool_report(
-            "organize",
-            instructions,
-            default_name="Organize: " + _create_report_name(instructions).removeprefix("Create: "),
-        )
-
-    uploaded_filenames = [file.filename for file in input_files] + [
-        record["filename"] for record in upload_manifest
-    ]
-    default_name = (
-        f"Organize: {uploaded_filenames[0]}"
-        if len(uploaded_filenames) == 1
-        else f"Organize: {len(uploaded_filenames)} files"
+    filenames = [file.filename for file in input_files] + [record["filename"] for record in upload_manifest]
+    default_name = _report_name(instructions) if instructions else (
+        f"AI: {filenames[0]}" if len(filenames) == 1 else f"AI: {len(filenames)} files"
     )
-    return _start_tool_report(
-        "organize",
-        instructions,
-        default_name=default_name,
-        input_files=input_files,
-        upload_manifest=upload_manifest,
-    )
-
-
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @matrix ai-report : ask async explain-button persistence tool-switcher
-@tools.route("/ask", methods=["POST"])
-@ai_access(AI.ASK)
-def create_ask_report():
-    if request.form.get("role") == "explain":
-        return _explain_ask_prompt()
-
-    instructions = request.form.get("instructions")
-    if not instructions:
-        return responses.error("Ask a question before creating a report.")
-    return _start_tool_report(
-        "ask",
-        instructions,
-        default_name=ai.ask_report_name(instructions),
-    )
-
-
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-# @matrix ai-report : async create explain-button persistence tool-switcher
-@tools.route("/create", methods=["POST"])
-@ai_access(AI.CREATE)
-def create_create_report():
-    if request.form.get("role") == "explain":
-        return _explain_create_prompt()
-
-    instructions = request.form.get("instructions")
-    if not instructions:
-        return responses.error("Describe what to create before creating a report.")
-    return _start_tool_report(
-        "create",
-        instructions,
-        default_name=_create_report_name(instructions),
-    )
+    return _start_tool_report(instructions, default_name=default_name, input_files=input_files, upload_manifest=upload_manifest)
 
 
 # @testable false
@@ -329,7 +231,7 @@ def create_create_report():
 # @covered-by lagniappe/web/routes/tools/main.py::run_report
 # @covered-by lagniappe/web/routes/tools/main.py::delete_report
 # @reason report lookup and owner guard are exercised through report routes
-def _get_report(key):
+def _get_report(key, *, require_available=True):
     if getattr(current_user, "is_public", False):
         abort(403)
     report = Entities.fetch_one(
@@ -340,6 +242,8 @@ def _get_report(key):
         return None
     if report.properties.parent.key != current_user.key:
         abort(403)
+    if require_available and not report.available:
+        abort(410, description="this plan is no longer available")
     return report
 
 
@@ -378,7 +282,7 @@ def _external_plan_mutation_error(outcome):
 @tools.route("/reports/<key>", methods=["GET"])
 @logged_in
 def report(key):
-    report = _get_report(key)
+    report = _get_report(key, require_available=False)
     if not report:
         return responses.not_found("Report not found")
     return responses.tool_report(report)
@@ -566,11 +470,7 @@ def revise_report(key):
         return responses.error(
             "Externally submitted plans cannot be revised with the AI provider."
         )
-    if report.tool != "ask":
-        require_ai_access(AI.CREATE)
-    if report.tool not in {"organize", "ask", "create"}:
-        return responses.error("This report cannot be revised.")
-    can_revise = bool(report.proposal) and report.status == "ready"
+    can_revise = bool(report.proposal) and (report.status == "ready" or (report.output_kind == "answer" and report.status == "complete")) and not report.result
     if not can_revise:
         return responses.error("Only reports with saved responses can be revised.")
 
@@ -581,16 +481,15 @@ def revise_report(key):
     report.properties.process.revise()
     Entities.save(report, current_user)
 
-    tool_label = _tool_label(report.tool)
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
-                job_type=REPORT_JOB_TYPES[report.tool],
+                job_type=DeferredJobType.REPORT_AI,
                 actor=current_user._get_current_object(),
                 idempotency_key=request.form.get("operation-id"),
                 inputs={"report": report},
                 parameters={"mode": "revise", "feedback": feedback},
-                notification_body=f"Revising {tool_label.lower()} report...",
+                notification_body="Revising AI report...",
                 notification_target=report,
                 client={
                     "source_widget": "CreateToolReport",
@@ -600,13 +499,13 @@ def revise_report(key):
         )
     except Exception as e:
         report.properties.process.revision_failed(
-            f"{tool_label} report revision could not be started. Please try again."
+            "AI report revision could not be started. Please try again."
         )
         Entities.save(report, current_user)
         exceptions.capture(
             e,
             context={
-                "operation": f"{report.tool}_report_revision_queue_start",
+                "operation": "ai_report_revision_queue_start",
                 "report_key": report.urlsafe_key,
                 "report": report.db,
             },
@@ -675,7 +574,7 @@ def skip_report_action(key, action_index):
 @tools.route("/reports/<key>", methods=["DELETE"])
 @logged_in
 def delete_report(key):
-    report = _get_report(key)
+    report = _get_report(key, require_available=False)
     if not report:
         return responses.not_found("Report not found")
     outcome = report_history.delete_report_record(report)

@@ -10,7 +10,6 @@ from .row_submission import RowSubmission, TableColumnFields
 
 # @testable true
 # @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
-# @tests tests_unit/test_020f_ai_report_completion.py::test_submission_completion_rejects_malformed_table_rows
 # @matrix form-table : ai-value validation
 def validate_ai_table(value, columns=None):
     """Check the table envelope and exact column keys before consuming AI values."""

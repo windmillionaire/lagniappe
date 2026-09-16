@@ -277,7 +277,7 @@ class HostedAdapter(LagniappeAdapter):
             local,
             name="upload_files",
             input_schema=schema,
-            description="Upload files attached to this ChatGPT conversation into the existing Organize Plan, then finalize them. Reuse plan_id. Files are prepared for browser review and never applied automatically. If an attachment link expires, ask the user to reattach it.",
+            description="Upload files attached to this ChatGPT conversation into the existing Plan, then finalize them. Reuse plan_id. Files are prepared for browser review and never applied automatically. If an attachment link expires, ask the user to reattach it.",
         )
         self.tools.update(
             {tool.name: tool for tool in terminal_files.tool_definitions(local)}

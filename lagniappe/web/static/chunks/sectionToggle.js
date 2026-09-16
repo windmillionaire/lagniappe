@@ -1,14 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b9517a42';
-import { w as withTransition, E as ENDPOINTS, r as request } from './foundation.js?v=b9517a42';
-import './connectivity.js?v=b9517a42';
-import { s as setIcon, c as createIcon, i as iconDefinition } from './icons.js?v=b9517a42';
-import { F as FacetsBox } from './facets.js?v=b9517a42';
-import { b as buttons } from './buttons.js?v=b9517a42';
-import { p as primitives } from './primitives.js?v=b9517a42';
-import { f as formatting } from './formatting.js?v=b9517a42';
-import { B as BaseUpload } from './baseUpload.js?v=b9517a42';
-import { u as uploadElement, U as UploadMenu } from './upload.js?v=b9517a42';
+import { STYLES } from './styles.js?v=bb1ed2ee';
+import { w as withTransition, E as ENDPOINTS, r as request } from './foundation.js?v=bb1ed2ee';
+import './connectivity.js?v=bb1ed2ee';
+import { s as setIcon, c as createIcon, i as iconDefinition } from './icons.js?v=bb1ed2ee';
+import { F as FacetsBox } from './facets.js?v=bb1ed2ee';
+import { b as buttons } from './buttons.js?v=bb1ed2ee';
+import { p as primitives } from './primitives.js?v=bb1ed2ee';
+import { f as formatting } from './formatting.js?v=bb1ed2ee';
+import { B as BaseUpload } from './baseUpload.js?v=bb1ed2ee';
+import { u as uploadElement, U as UploadMenu } from './upload.js?v=bb1ed2ee';
 
 /**
  * @testable infrastructure
