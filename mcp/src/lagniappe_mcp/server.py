@@ -33,7 +33,9 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from lagniappe_mcp import __version__
-from lagniappe_mcp.adapter import LagniappeAdapter, _reject_private_model_data
+from lagniappe_mcp.adapter import (
+    LagniappeAdapter, _reject_private_model_data, validate_file_result,
+)
 from lagniappe_mcp.configuration import ConnectionConfig
 from lagniappe_mcp.errors import AdapterError, ConfigurationError
 from lagniappe_mcp.files import _preflight_contract, _preflight_requested_count
@@ -385,6 +387,10 @@ def create_app(config, *, adapter_factory=None):
             if proof:
                 if params.name == "prepare_file_uploads":
                     terminal_files.validate_manifest(result.value, bearer=proof)
+                elif params.name == "get_file":
+                    validate_file_result(
+                        result.value, arguments=params.arguments or {}, bearer=proof,
+                    )
                 else:
                     _reject_private_model_data(result.value, bearer=proof)
                 _reject_private_model_data(

@@ -78,6 +78,10 @@ permission-readonly Task forms use this mode.
 Table, Todo, Html, and Status implement their own `create()` because they do
 not follow the normal read/edit field shape.
 
+Standalone descriptions use the same textarea field and whitespace-preserving
+read mode. Entity headers, task descriptions, and public directory descriptions
+also preserve line breaks and spacing with `whitespace-pre-wrap`.
+
 Todo item text keeps the same normal color in checked and unchecked states,
 without strikethrough. The checkbox indicates completion in both interactive
 and read-only displays.

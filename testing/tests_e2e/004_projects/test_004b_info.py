@@ -37,6 +37,7 @@ def _wait_for_services_ready(user):
 # @matrix projects : info-form metadata-sync update
 # @template projects/project.html::view_header
 # @template projects/info.html::info_tab
+# @style entity.description
 def test_project_info_form(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_project_info_form.get(user)
@@ -44,7 +45,7 @@ def test_project_info_form(get_user):
     expect(user.page.get_by_role("button", name="Project actions")).to_be_visible()
 
     new_name = "Apples"
-    new_description = "Apples are mad tasty."
+    new_description = "Apples are mad tasty.\n\n  Keep this line indented."
 
     info_form = project.info_form
 
@@ -59,7 +60,9 @@ def test_project_info_form(get_user):
     name.value = new_name
     description.value = new_description
 
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page, method="PUT", path=f"/projects/{project.key}/update"
+    ):
         SpinnerButtons.UPDATE.click(info_form)
 
     assert SpinnerButtons.UPDATE_SUCCESS.successful(info_form)
@@ -78,6 +81,14 @@ def test_project_info_form(get_user):
 
     description = user.locate(project.PROJECT_DESCRIPTION)
     expect(description).to_contain_text(new_description)
+    expect(description).to_have_css("white-space", "pre-wrap")
+    assert description.text_content() == new_description
+
+    user.reload()
+    description = user.locate(project.PROJECT_DESCRIPTION)
+    expect(description).to_contain_text(new_description)
+    expect(description).to_have_css("white-space", "pre-wrap")
+    assert description.text_content() == new_description
 
 
 # @matrix edited-entity-notice projects : info-form replacement side-effect-free timestamp-only

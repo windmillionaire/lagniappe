@@ -8,12 +8,14 @@ real API credential only through the child environment.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import sys
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 from contextlib import asynccontextmanager
@@ -579,6 +581,63 @@ async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], 
     return result, diagnostics_text
 
 
+# @testable true
+# @pair mcp-adapter:product-contract
+# @tests tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_mcp_original_pdf_download_uses_existing_api_and_storage
+async def _original_file(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Consume download credentials in memory; persist only source evidence."""
+    async with _connection() as client:
+        arguments = {"id": specification["file_ref"]}
+        metadata = await _call(client, "get_file", arguments)
+        if specification.get("denied"):
+            return {"denied": await _call(client, "get_file", {
+                **arguments, "include_original": True,
+            })}, ""
+        _structured(metadata)
+        original = _structured(await _call(client, "get_file", {
+            **arguments, "include_original": True,
+        }))
+        url = original["original_file"]["download_url"]
+        content, mime = await client.rest.download_media(url, cap=4 * 1024 * 1024)
+        parsed = urlsplit(url)
+        query = dict(parse_qsl(parsed.query))
+        signature = query["X-Goog-Signature"]
+        query["X-Goog-Signature"] = ("b" if signature[0] == "a" else "a") + signature[1:]
+        invalid_urls = {
+            "tampered_signature": urlunsplit(parsed._replace(query=urlencode(query))),
+            "different_object": urlunsplit(parsed._replace(path=parsed.path + "-other")),
+            "expired": os.environ["LAGNIAPPE_MCP_EXPIRED_ORIGINAL"],
+        }
+        rejected = {}
+        for name, invalid_url in invalid_urls.items():
+            try:
+                await client.rest.download_media(invalid_url, cap=4 * 1024 * 1024)
+            except AdapterError as error:
+                rejected[name] = {"code": error.code, "status": error.status}
+            else:
+                raise RuntimeError("Storage accepted an invalid original capability")
+        refreshed = _structured(await _call(client, "get_file", {
+            **arguments, "include_original": True,
+        }))
+        fresh_content, _ = await client.rest.download_media(
+            refreshed["original_file"]["download_url"], cap=4 * 1024 * 1024,
+        )
+        return {
+            "metadata": metadata,
+            "original": {
+                "filename": original["filename"], "mimetype": original["mimetype"],
+                "delivery": original["delivery"],
+                "supported": original["original_file"]["supported"],
+                "attached": original["original_file"]["attached"],
+                "expires_in": original["original_file"]["expires_in"],
+            },
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "size_bytes": len(content), "mime_type": mime,
+            "rejected": rejected,
+            "refreshed_sha256": hashlib.sha256(fresh_content).hexdigest(),
+        }, ""
+
+
 def _sensitive_material(
     specification: dict[str, Any], *, extra_paths: tuple[str, ...] = ()
 ) -> list[tuple[str, str]]:
@@ -589,6 +648,7 @@ def _sensitive_material(
             (
                 os.environ.get("LAGNIAPPE_API_KEY"),
                 os.environ.get("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE"),
+                os.environ.get("LAGNIAPPE_MCP_EXPIRED_ORIGINAL"),
                 revoke.get("csrf_token"),
                 *(revoke.get("cookies") or {}).values(),
             ),
@@ -759,6 +819,8 @@ def main(arguments: list[str]) -> int:
             result, diagnostics = asyncio.run(_workflow(specification))
         elif mode == "foreign":
             result, diagnostics = asyncio.run(_foreign_plan(specification))
+        elif mode == "original_file":
+            result, diagnostics = asyncio.run(_original_file(specification))
         else:
             raise ValueError("unknown MCP E2E driver mode")
         sensitive = _sensitive_material(specification)

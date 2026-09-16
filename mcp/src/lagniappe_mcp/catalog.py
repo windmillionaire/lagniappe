@@ -504,7 +504,7 @@ def _plan_id_input() -> dict[str, Any]:
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_get_file_schema_projects_every_transport_extension
 def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
-    """Project signed REST transport fields out of the get_file result."""
+    """Expose a scoped original download alongside bounded inline media."""
     result = validate_schema_document(rest_schema)
     rest_properties = result.setdefault("properties", {})
     if not isinstance(rest_properties, dict):
@@ -535,14 +535,17 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
         original["required"] = [
             field for field in required_original if field in safe_original_fields
         ]
-    # REST deliberately permits transport extensions here. MCP exposes only
-    # stable descriptive fields and consumes every signed field privately.
+    original["properties"].update({
+        "download_url": {"type": "string", "minLength": 1, "maxLength": 8192},
+        "expires_in": {"type": "integer", "minimum": 1, "maximum": 300},
+    })
+    # Only the explicit download variant may expose a signed read capability.
     original["additionalProperties"] = False
     properties["delivery"] = {
         "type": "object",
         "required": ["kind"],
         "properties": {
-            "kind": {"enum": ["none", "image", "audio"]},
+            "kind": {"enum": ["none", "image", "audio", "download"]},
             "mime_type": {"type": "string"},
             "size_bytes": {"type": "integer", "minimum": 0},
             "content_index": {"type": "integer", "minimum": 1},
@@ -559,7 +562,17 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
                         ]
                     }
                 },
-                "else": {"required": ["mime_type", "size_bytes", "content_index"]},
+                "else": {
+                    "if": {"properties": {"kind": {"const": "download"}}},
+                    "then": {
+                        "required": ["mime_type"],
+                        "not": {"anyOf": [
+                            {"required": ["size_bytes"]},
+                            {"required": ["content_index"]},
+                        ]},
+                    },
+                    "else": {"required": ["mime_type", "size_bytes", "content_index"]},
+                },
             }
         ],
         "additionalProperties": False,
@@ -570,6 +583,19 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
     required[:] = [field for field in required if field in properties]
     if "delivery" not in required:
         required.append("delivery")
+    result.setdefault("allOf", []).append({
+        "if": {"properties": {"delivery": {"properties": {"kind": {"const": "download"}}}}},
+        "then": {
+            "required": ["original_file"],
+            "properties": {"original_file": {
+                "required": ["supported", "attached", "download_url", "expires_in"],
+                "properties": {"supported": {"const": True}, "attached": {"const": False}},
+            }},
+        },
+        "else": {"properties": {"original_file": {"not": {"anyOf": [
+            {"required": ["download_url"]}, {"required": ["expires_in"]},
+        ]}}}},
+    })
     # REST permits evolving entity metadata, but this boundary cannot safely
     # infer whether an arbitrary new field is descriptive or a signed transport
     # capability. New fields therefore require an explicit adapter release.
@@ -920,8 +946,14 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
         if name == "get_file":
             description = (
                 description
-                + " MCP projects signed transport fields out of the result. "
-                "include_original=true delivers only bounded supported image/audio content. "
+                + " MCP include_original=true delivers small supported images/audio inline. "
+                "Other originals, including PDFs and oversized media, return "
+                "delivery.kind=download with original_file.download_url and expires_in. "
+                "Use your HTTP/file or browsing tools to fetch and read that original; "
+                "a URL or summary alone is not source inspection. Fetch with HTTPS GET "
+                "without added Authorization, cookies, or redirects. On expiry, request "
+                "get_file again with the same id. Keep temporary URLs out of answers, "
+                "reports, and logs; use the ordinary file URL for citations. "
                 "Inspect complete file evidence once; a summary or clipped excerpt "
                 "is not complete inspection. Independent file reads can run in parallel. "
                 + MCP_RESULT_INSTRUCTIONS

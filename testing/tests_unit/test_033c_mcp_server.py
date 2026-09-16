@@ -5,6 +5,7 @@ import base64
 from contextlib import asynccontextmanager
 import json
 import time
+from urllib.parse import urlencode
 
 import httpx
 import pytest
@@ -757,6 +758,102 @@ def test_hosted_catalog_and_error_results_cannot_reflect_workload_identity(monke
                 )
                 assert response.json()["result"]["isError"]
                 assert proof not in response.text
+
+    asyncio.run(scenario())
+
+
+# @matrix mcp-remote : privacy token-separation parity isolation
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/server.py::create_app
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+@pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
+def test_hosted_original_download_preserves_capability_but_rejects_credentials(version):
+    proof = "google.identity.proof"
+
+    async def scenario():
+        requests, revoked, reflected = [], set(), {}
+        query = {
+            "X-Goog-Algorithm": "GOOG4-RSA-SHA256",
+            "X-Goog-Credential": "account/20990101/auto/storage/goog4_request",
+            "X-Goog-Date": "20990101T000000Z", "X-Goog-Expires": "300",
+            "X-Goog-SignedHeaders": "host", "X-Goog-Signature": "a" * 64,
+        }
+        signed = "https://storage.googleapis.com/bucket/source.pdf?" + urlencode(query)
+
+        def override(request):
+            if request.url.path == "/api/v1/tools":
+                catalog = _catalog(TOKEN_A)
+                catalog["tools"] = [{
+                    "name": "get_file", "description": "Read a permitted original file.",
+                    "input_schema": {
+                        "type": "object", "required": ["id"],
+                        "properties": {"id": {"type": "string"}, "include_original": {"type": "boolean"}},
+                        "additionalProperties": False,
+                    },
+                    "output_schema": {"type": "object", "properties": {
+                        "original_file": {"type": "object", "properties": {
+                            "supported": {"type": "boolean"}, "attached": {"type": "boolean"},
+                            "reason": {"type": "string"},
+                        }},
+                    }},
+                    "result_paths": {},
+                }]
+                return httpx.Response(200, json=catalog)
+            if request.url.path.endswith("/tools/get_file"):
+                args = json.loads(request.content)["arguments"]
+                if args["id"] == "hash:deniedfile12":
+                    return httpx.Response(403, json={"error": {"code": "tool_error", "message": "Access denied"}})
+                original = {"supported": True, "attached": False}
+                value = {"filename": "source.pdf", "mimetype": "application/pdf", "original_file": original}
+                if args.get("include_original"):
+                    original.update(download_url=signed, expires_in=300)
+                    if reflected.get("field") in {"url", "encoded_url"}:
+                        original["download_url"] = "https://storage.googleapis.com/bucket/source.pdf?" + urlencode({
+                            **query, "X-Goog-Credential": reflected["secret"],
+                        })
+                        if reflected["field"] == "encoded_url":
+                            secret = reflected["secret"]
+                            original["download_url"] = original["download_url"].replace(
+                                secret, f"%{ord(secret[0]):02X}" + secret[1:],
+                            )
+                    elif reflected:
+                        value["summary"] = reflected["secret"]
+                return httpx.Response(200, json={"result": value})
+
+        app = hosted.create_app(CONFIG, adapter_factory=lambda token: _adapter(
+            token, requests, revoked, override=override, proof=proof,
+        ))
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin) as client:
+                async def read(arguments):
+                    response = await _rpc(client, "tools/call", params={"name": "get_file", "arguments": arguments}, version=version)
+                    assert response.status_code == 200
+                    assert response.headers["cache-control"] == "no-store"
+                    assert TOKEN_A not in response.text and proof not in response.text
+                    return response.json()["result"]
+
+                metadata = await read({"id": "hash:permitted123"})
+                assert metadata["isError"] is False
+                assert metadata["structuredContent"]["delivery"] == {"kind": "none"}
+                assert signed not in json.dumps(metadata)
+                args = {"id": "hash:permitted123", "include_original": True}
+                original = await read(args)
+                assert original["isError"] is False
+                value = original["structuredContent"]
+                assert value["delivery"] == {"kind": "download", "mime_type": "application/pdf"}
+                assert value["original_file"] == {"supported": True, "attached": False, "download_url": signed, "expires_in": 300}
+                assert "content" not in value
+                assert json.loads(original["content"][0]["text"]) == value
+                denied = await read({**args, "id": "hash:deniedfile12"})
+                assert denied["isError"] is True
+                assert signed not in json.dumps(denied)
+                for secret in (TOKEN_A, proof):
+                    for field in ("url", "encoded_url", "summary"):
+                        reflected.update(secret=secret, field=field)
+                        result = await read(args)
+                        assert result["isError"] is True
+                        assert "storage.googleapis.com" not in json.dumps(result)
+                assert not any(path == "/api/v1/plans" for _, path in requests)
 
     asyncio.run(scenario())
 

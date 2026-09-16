@@ -2,6 +2,7 @@
 
 ORGANIZE_UPDATE_ACTIONS = frozenset(
     {
+        "create_task",
         "complete_task",
         "set_task_due_date",
         "append_page_document",
@@ -18,9 +19,11 @@ ORGANIZE_UPDATE_ACTIONS = frozenset(
 )
 
 ORGANIZE_UPDATE_GUIDELINES = """
-Propose updates to existing workspace records for authenticated browser review;
-do not execute changes or say they have been performed. No upload is required
-for this Organize update profile. Creation requests belong in Create instead.
+Propose updates to existing workspace records and new Tasks on existing Pages
+for authenticated browser review; do not execute changes or say they have been
+performed. No upload is required
+for this Organize update profile. Creating Pages, Forms, Categories, Projects,
+or model tasks belongs in Create instead.
 
 Discover the intended records with permission-bounded reads. Compare approximate
 names, descriptions and parent context rather than assuming the user's wording
@@ -33,6 +36,17 @@ actions=[...]) for the selected operations when details are needed, and the
 schema_evolution bundle before Form schema changes. Fetch only relevant field
 types for form_autofill guidance. Do not load file-organization or task-creation
 guidance for a simple existing-record update.
+
+Use create_task for requested new Tasks, including destinations for existing
+files. Every create_task requires its editable existing Page in data.page.
+Reuse suitable existing Projects, model tasks and task Forms when needed;
+read the exact task Form schema and supply final data.submission values keyed
+by its field ids. There is no later submission-completion stage in this profile.
+Fetch report_actions guidance for create_task when creating Tasks. Use the
+schedule schema for repeating work and due_date alone for a one-time date.
+To move an existing file into a new Task, put create_task first, then move_file
+with data.to_task_action set to that creation action's exact id and depends_on
+containing the same id. Keep the file and source references exact.
 
 Use update_form_values for named field patches, preserving other values;
 read existing values before replacing them and clear a value only when requested.

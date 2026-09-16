@@ -261,7 +261,7 @@ class Summary(CacheMixin, AIMixin, DBProperty):
     @value.setter
     def value(self, value):
         if isinstance(value, str):
-            value = strip_tags(value).strip()
+            value = strip_tags(value, preserve_whitespace=True).strip()
         DBProperty.value.fset(self, value)
 
     # @testable true

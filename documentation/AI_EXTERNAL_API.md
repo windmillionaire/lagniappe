@@ -107,8 +107,10 @@ above apply to MCP and direct REST access.
 Terminal uploads send user-selected bytes directly to existing Google Storage
 resumable sessions, then finalize the exact batch through authenticated MCP.
 Only `prepare_file_uploads` exposes validated storage write URLs, in an explicit
-upload manifest. This is the sole upload-capability exception;
-all ordinary results still reject private transport capabilities. OAuth and
+upload manifest. Explicit `get_file(include_original=true)` reads may expose
+one validated signed storage read URL in `original_file.download_url` when
+`delivery.kind` is `download`. All other result fields still reject private
+transport capabilities. OAuth and
 service identity tokens never enter upload instructions or storage requests.
 Treat the manifest as a temporary credential: save it mode 600, do not include
 it in answers or tracked captures, and remove it after transfer. Upload session
@@ -497,7 +499,7 @@ Yes/No options with distinct non-empty string values; an optional checkbox may
 remain unchecked. This is guidance for choosing fields, not a change to existing
 form schemas or task-completion validation.
 
-`create_task` is always part of Create and file-backed Organize contracts because
+`create_task` is always part of Create and both Organize profiles because
 every user has an editable personal Page. The coarse capability projection does
 not expose a redundant `can_create_tasks` flag. A Task proposal must still name
 an editable target in `data.page`, or use `data.page_action` when an earlier
@@ -647,8 +649,13 @@ unchanged.
 ### Publication and browser approval
 
 Fileless website, API/MCP, and email Organize drafts use an existing-record update subset:
-completion, Form-value patches, document appends, reviewed schema changes,
-rename/move and category/form attachment. `needs_review` handles ambiguous work.
+Task creation on existing editable Pages, completion, Form-value patches,
+document appends, reviewed schema changes, rename/move and category/form
+attachment. `needs_review` handles ambiguous work.
+To move an existing file to a new Task, place `create_task` first and reference
+its action id in `move_file.data.to_task_action` and `depends_on`. Task Form
+submissions must contain final values; this profile has no secondary completion
+stage. Other creation actions remain unavailable without uploads.
 Trusted intake origin and the absence of uploads select this shared profile;
 there is no new UI tool or client-controlled authorization flag. Instruction-only
 website Organize produces an update proposal for browser review.
@@ -769,7 +776,9 @@ See [document sync](SYNC_DOCUMENTS.md#reviewed-document-appends) for persistence
 
 Uploading files switches back to the file-backed contract, including mandatory
 summaries and placements for every file; pending uploads always block submission.
-New-record creation belongs in Create when there are no uploaded artifacts.
+Creating Pages, Forms, Categories, Projects, or model tasks belongs in Create
+when there are no uploaded artifacts; new Tasks on existing Pages are supported
+by either workflow.
 No upload is necessary just to complete a Task or correct submission details.
 
 Create and Organize submission saves a `ready` report and returns a compact
@@ -986,6 +995,31 @@ remains the default so clients do not fetch original bytes unnecessarily. A
 metadata-only call reports when the REST download fallback is available but
 does not create a signed URL. This remains true when the configured internal
 model cannot directly attach that file's MIME type.
+
+MCP preserves inline image/audio delivery up to 4 MiB. PDFs, other formats,
+and larger media use the same REST signed-original URL, without buffering
+download-only files in the MCP service. A download result includes
+`delivery: {"kind": "download", "mime_type": "application/pdf"}` (with the
+file's MIME type), `original_file.download_url`, `original_file.expires_in`,
+and the existing `filename` and `mimetype`. `original_file.supported` describes
+original availability through this transport; `attached` is true only when an
+inline content block is present. Summaries and optional extracted `content`
+remain distinct from original delivery. A missing original returns
+`original_unavailable`; inline size limits select download delivery, while
+unsafe URLs, MIME contradictions, and failed transfers remain errors.
+
+Clients use their own HTTP/file or browsing tools to retrieve and inspect the
+original. Use HTTPS GET without additional Authorization, cookies, or redirects.
+The URL is a temporary credential: keep it out of answers, saved reports, logs,
+and test captures; use the normal file page URL for citations. After expiry,
+repeat `get_file` with the same file id and `include_original=true`. Downloads
+do not require a Plan or browser session, and do not trigger OCR or a model.
+File permissions are checked at issuance. Revocation prevents issuing new URLs;
+an already issued URL can remain usable until its five-minute expiry.
+
+Client acceptance requires actually reading source content, including a PDF
+without extracted text. A successful tool response or a displayed download
+link alone does not establish that a particular client can inspect the file.
 
 Upload MIME types are normalized to their lowercase base media type, without
 parameters such as `charset`. Recognized text formats, including `.vcf`

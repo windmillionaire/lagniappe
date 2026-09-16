@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 import hashlib
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -15,9 +17,12 @@ from uuid import uuid4
 import pytest
 import requests
 from playwright.sync_api import expect
+from werkzeug.datastructures import FileStorage
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import notifications as notification_database
 from runner import mcp_environment
 from testing.definitions import Pages, SitePages, Users
@@ -121,6 +126,72 @@ MCP_BOUNDARY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8A"
     "AQUBAScY42YAAAAASUVORK5CYII="
 )
+
+
+# @pair mcp-adapter:product-contract
+# @pair agent-api:tool-dispatch
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
+# @source lagniappe/web/routes/api/main.py::execute_tool
+def test_mcp_original_pdf_download_uses_existing_api_and_storage(
+    get_user, tmp_path, monkeypatch, setup_test_server,
+):
+    from google.cloud.storage import _signing
+
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
+    for cookie in setup_test_server.browser_cookies:
+        if cookie["name"] == "__Host-lagniappe-e2e":
+            monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", cookie["value"])
+    _prepare_package_environment()
+    suffix = uuid4().hex
+    owner = get_user(UserDefinition(
+        name=f"Original PDF Owner {suffix}", email=f"pdf-owner-{suffix}@example.test", ai_access=AI.NONE,
+    ), creator=get_user(Users.OWNER))
+    intruder = get_user(UserDefinition(
+        name=f"Original PDF Intruder {suffix}", email=f"pdf-intruder-{suffix}@example.test", ai_access=AI.NONE,
+    ), creator=get_user(Users.OWNER))
+    owner.go(SitePages.HOME)
+    intruder.go(SitePages.HOME)
+    source = Path("testing/files/sample_document.pdf").read_bytes()
+    file = Entities.FILE.create(
+        upload=FileStorage(stream=BytesIO(source), filename="source.pdf", content_type="application/pdf"),
+        data={}, report_user=owner.entity,
+    )
+    file.summary = "A deliberately incomplete summary; read the original source."
+    file.save()
+    try:
+        owner_token, intruder_token = _issue_key(owner), _issue_key(intruder)
+        # Sign with a past issuance time, keeping a valid five-minute duration.
+        # This exercises actual Storage expiration without a five-minute wait.
+        with monkeypatch.context() as past:
+            past.setattr(_signing, "_NOW", lambda _tz: datetime.now(timezone.utc) - timedelta(minutes=10))
+            expired = storage_assets.get_signed_url(file.properties.file.value.path, expires_in=300)
+        monkeypatch.setenv("LAGNIAPPE_MCP_EXPIRED_ORIGINAL", expired)
+        specification = {"file_ref": f"hash:{file.hash}"}
+        result = _run_driver(tmp_path, monkeypatch, mode="original_file", token=owner_token, specification=specification)
+        metadata = _structured(result["metadata"])
+        assert metadata["summary"] == file.summary
+        assert "content" not in metadata
+        assert metadata["delivery"] == {"kind": "none"}
+        assert "download_url" not in metadata["original_file"]
+        assert result["original"] == {
+            "filename": "source.pdf", "mimetype": "application/pdf",
+            "delivery": {"kind": "download", "mime_type": "application/pdf"},
+            "supported": True, "attached": False, "expires_in": 300,
+        }
+        assert result["sha256"] == result["refreshed_sha256"] == hashlib.sha256(source).hexdigest()
+        assert result["size_bytes"] == len(source)
+        assert result["mime_type"] == "application/pdf"
+        assert set(result["rejected"]) == {"tampered_signature", "different_object", "expired"}
+        for name, rejection in result["rejected"].items():
+            assert rejection["code"] == "download_failed"
+            # Storage may classify an expired signature as a bad request.
+            assert rejection["status"] in ({400, 403} if name == "expired" else {403})
+        denied = _run_driver(tmp_path, monkeypatch, mode="original_file", token=intruder_token, specification={**specification, "denied": True})
+        assert _error(denied["denied"], code="tool_error", status=422)["message"] == "Access denied"
+    finally:
+        _revoke_if_active(owner)
+        _revoke_if_active(intruder)
+        Entities.delete(file)
 
 
 def _canonical_sha256(value) -> str:
@@ -415,6 +486,8 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
         "supported",
         "attached",
         "reason",
+        "download_url",
+        "expires_in",
     }
     assert get_file["properties"]["original_file"]["additionalProperties"] is False
     assert get_file["properties"]["delivery"]["additionalProperties"] is False
@@ -766,7 +839,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "rename_entity",
             "complete_task",
         }
-        assert "create_task" not in update_contract["permissions"]["allowed_actions"]
+        assert "create_task" in update_contract["permissions"]["allowed_actions"]
+        assert "create_page" not in update_contract["permissions"]["allowed_actions"]
         _assert_safe_receipt(workflow["update"]["receipt"], status="ready")
         update_get = _assert_safe_plan(
             workflow["update"]["get"], tool="organize", status="ready"

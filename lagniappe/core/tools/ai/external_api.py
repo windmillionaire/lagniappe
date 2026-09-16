@@ -342,7 +342,7 @@ def _guidance_requirements(tool, *, update_only=False):
     if update_only:
         for item in conditional:
             if item["request"].get("task") == "form_autofill":
-                item["request"]["actions"] = ["update_form_values"]
+                item["when"]["actions_any"] = ["create_task", "update_form_values"]
     return {
         "tool": "get_guidelines",
         "required_before_analysis": (
@@ -870,6 +870,9 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
             workflow_rules = [ORGANIZE_UPDATE_GUIDELINES.strip()]
             reference_rules = [
                 "Use exact tool-returned hash:<12-character-hash> references for existing entities; names are display context only.",
+                "Every create_task action requires its editable existing Page in data.page. page_name is display context only.",
+                "A field ending in *_action takes the exact id of an earlier creation action in this proposal, never a workspace hash or entity id. Use move_file.data.to_task_action for a newly created destination Task and include its action id in depends_on.",
+                "For a new Task with a Form, data.submission contains final values keyed by exact Form field ids; the server will not complete them with a model.",
                 "For submission patches use exact Form field ids and final values; the server will not complete or repair them with a model.",
                 "Submit the complete plan for browser review and present preview_url. No external tool executes it.",
             ]
@@ -926,8 +929,7 @@ def plan_contract(report, user, *, submit_url, actions=None, view="full"):
                 "Submission values must be final; server-side model repair is unavailable.",
             ]
         if (
-            not update_only
-            and view == "full"
+            view == "full"
             and (actions is None or "create_task" in actions)
         ):
             workflow_rules.append(REPORT_TASK_SCHEDULING_GUIDELINES.strip())

@@ -124,12 +124,13 @@ _RICH_CLEANER = nh3.Cleaner(
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_strip_tags
 # @pair utility:html-stripping
-def strip_tags(html_content):
-    """Strip HTML tags and collapse whitespace in text content."""
+def strip_tags(html_content, *, preserve_whitespace=False):
+    """Strip HTML tags, optionally retaining multiline text's whitespace."""
     if not isinstance(html_content, str):
         return html_content
     soup = BeautifulSoup(html_content, "html.parser")
-    return re.sub(r"\s+", " ", soup.get_text(separator=" ")).strip()
+    text = soup.get_text(separator=" ")
+    return text if preserve_whitespace else re.sub(r"\s+", " ", text).strip()
 
 
 # @testable false

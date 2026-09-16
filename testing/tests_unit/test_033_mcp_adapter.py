@@ -20,6 +20,7 @@ from lagniappe_mcp.adapter import (
     AdapterResult,
     LagniappeAdapter,
     _reject_private_model_data,
+    validate_file_result,
 )
 from lagniappe_mcp.catalog import (
     READ_ANNOTATIONS,
@@ -774,7 +775,9 @@ def test_get_file_schema_projects_every_transport_extension() -> None:
             phase="output",
         )
     original = projected["properties"]["original_file"]
-    assert set(original["properties"]) == {"supported", "attached", "reason"}
+    assert set(original["properties"]) == {
+        "supported", "attached", "reason", "download_url", "expires_in",
+    }
     assert original["required"] == ["supported", "attached"]
     assert original["additionalProperties"] is False
 
@@ -987,18 +990,25 @@ def test_original_media_delivery_matches_the_emitted_content_index(
     }
     assert rendered["content"][1]["type"] == kind
     assert rendered["content"][1]["mimeType"] == mime_type
+    assert result.value["original_file"] == {"supported": True, "attached": True}
     assert "storage.googleapis.com" not in json.dumps(rendered)
     asyncio.run(adapter.aclose())
 
 
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
-def test_original_media_rejects_unsupported_binary_after_safe_download() -> None:
+@pytest.mark.parametrize("mime_type,large", [
+    ("application/pdf", False), ("application/zip", False), ("text/plain", False),
+    ("image/png", True), ("audio/mpeg", True),
+])
+@pytest.mark.parametrize("has_text", [False, True])
+def test_original_download_fallback_preserves_source_without_fetching_binary(
+    mime_type, large, has_text,
+) -> None:
     rest = _WorkflowREST()
 
     async def download_media(_url: str, *, cap: int):
-        assert cap == MAX_MEDIA_RAW_BYTES
-        return b"pdf", "application/pdf"
+        pytest.fail("Download-only originals must not be buffered by MCP")
 
     rest.download_media = download_media
     adapter = LagniappeAdapter(
@@ -1006,8 +1016,10 @@ def test_original_media_rejects_unsupported_binary_after_safe_download() -> None
         rest=rest,  # type: ignore[arg-type]
     )
     raw = {
-        "content": "extracted text",
-        "mimetype": "application/pdf",
+        "filename": "source-file",
+        "summary": "A stored summary is not source content.",
+        "mimetype": mime_type,
+        "large": large,
         "original_file": {
             "supported": True,
             "attached": False,
@@ -1015,13 +1027,118 @@ def test_original_media_rejects_unsupported_binary_after_safe_download() -> None
             "expires_in": 300,
         },
     }
+    if has_text:
+        raw["content"] = "extracted text"
     try:
-        with pytest.raises(TransportError) as caught:
-            asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
-        assert caught.value.code == "unsupported_media"
-        assert "storage.googleapis.com" not in caught.value.render()
+        metadata = asyncio.run(adapter._project_file_result(raw, {}))
+        assert metadata.value["delivery"] == {"kind": "none"}
+        assert "download_url" not in metadata.value["original_file"]
+        assert metadata.value["original_file"]["attached"] is False
+        assert "include_original=true" in metadata.value["original_file"]["reason"]
+        result = asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
+        assert result.value["delivery"] == {"kind": "download", "mime_type": mime_type}
+        assert result.value["original_file"] == raw["original_file"]
+        assert result.value["filename"] == raw["filename"]
+        assert result.value["summary"] == raw["summary"]
+        assert ("content" in result.value) is has_text
+        assert result.media == ()
+        rendered = _success_result(result).model_dump(mode="json", by_alias=True)
+        assert len(rendered["content"]) == 1
+        assert json.loads(rendered["content"][0]["text"]) == rendered["structuredContent"]
     finally:
         asyncio.run(adapter.aclose())
+
+
+# @pair mcp-adapter:product-contract
+@pytest.mark.parametrize("code", [
+    "media_too_large", "download_failed", "download_timeout", "redirect_rejected",
+    "invalid_download", "unsafe_storage_url",
+])
+def test_oversized_original_media_falls_back_only_for_size_limit(code):
+    rest = _WorkflowREST()
+
+    async def download_media(_url, *, cap):
+        assert cap == MAX_MEDIA_RAW_BYTES
+        raise TransportError(code, "Bounded download failure.")
+
+    rest.download_media = download_media
+    adapter = LagniappeAdapter(
+        ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest,
+    )
+    raw = {
+        "mimetype": "image/png", "large": False,
+        "original_file": {
+            "supported": True, "attached": False,
+            "download_url": _signed_download_url(), "expires_in": 300,
+        },
+    }
+    try:
+        if code == "media_too_large":
+            result = asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
+            assert result.value["delivery"] == {"kind": "download", "mime_type": "image/png"}
+            assert result.value["original_file"] == raw["original_file"]
+            assert not result.media
+        else:
+            with pytest.raises(TransportError) as failure:
+                asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
+            assert failure.value.code == code
+    finally:
+        asyncio.run(adapter.aclose())
+
+
+# @pair mcp-adapter:product-contract
+def test_original_download_capability_is_scoped_to_requested_file_result():
+    value = {
+        "filename": "source.pdf", "mimetype": "application/pdf",
+        "original_file": {
+            "supported": True, "attached": False,
+            "download_url": _signed_download_url(), "expires_in": 300,
+        },
+        "delivery": {"kind": "download", "mime_type": "application/pdf"},
+    }
+    schema = get_file_output_schema({
+        "type": "object", "properties": {"original_file": {
+            "type": "object", "required": ["supported", "attached"],
+            "properties": {"supported": {"type": "boolean"}, "attached": {"type": "boolean"}},
+        }},
+    })
+    expected = deepcopy(value)
+    validate_file_result(value, arguments={"include_original": True}, bearer="private-key")
+    validate_value(schema, value, phase="output")
+    assert value == expected
+    for arguments in ({}, {"include_original": False}, {"include_original": "true"}):
+        with pytest.raises(TransportError):
+            validate_file_result(value, arguments=arguments, bearer="private-key")
+    for update in (
+        {"download_url": "https://example.com/source.pdf"},
+        {"download_url": _signed_download_url(**{"X-Goog-Expires": "301"}), "expires_in": 301},
+        {"download_url": _signed_download_url(**{"X-Goog-Credential": "private-key"})},
+        {"download_url": _signed_download_url(**{"X-Goog-Credential": "private-key"}).replace("private-key", "%70rivate-key")},
+        {"expires_in": 299}, {"expires_in": "300"}, {"expires_in": True},
+        {"supported": False}, {"attached": True}, {"download_url": None},
+        {"download_url": _signed_download_url() + "&token=other"},
+        {"download_url": _signed_download_url() + "&X-Goog-Expires=300"},
+    ):
+        changed = deepcopy(value)
+        changed["original_file"].update(update)
+        with pytest.raises(TransportError) as failure:
+            validate_file_result(changed, arguments={"include_original": True}, bearer="private-key")
+        assert "storage.googleapis.com" not in failure.value.render()
+        assert "private-key" not in failure.value.render()
+    for extra in (
+        {"summary": _signed_download_url()}, {"content": "private-key"},
+        {"url": _signed_download_url()}, {"nested": {"download_url": _signed_download_url()}},
+        {"delivery": {"kind": "none"}},
+    ):
+        with pytest.raises(TransportError):
+            validate_file_result({**value, **extra}, arguments={"include_original": True}, bearer="private-key")
+    for invalid in (
+        {**value, "delivery": {"kind": "none"}},
+        {**value, "delivery": {**value["delivery"], "content_index": 1}},
+        {**value, "original_file": {"supported": True, "attached": False}},
+    ):
+        with pytest.raises(SchemaError):
+            validate_value(schema, invalid, phase="output")
 
 
 # @pair mcp-adapter:product-contract
@@ -2183,7 +2300,7 @@ def test_requested_unsupported_original_is_a_bounded_tool_error() -> None:
     try:
         with pytest.raises(TransportError) as error:
             asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
-        assert error.value.code == "unsupported_media"
+        assert error.value.code == "original_unavailable"
         assert len(error.value.render().encode("utf-8")) < 4096
         projected = asyncio.run(
             adapter._project_file_result(raw, {"include_original": False})
@@ -3165,7 +3282,7 @@ def test_read_descriptions_localize_result_recovery_without_changing_catalog_sch
     assert "Reuse attached Form schemas" in tools["get_entity"].description
     assert "not complete inspection" in tools["get_file"].description
     assert (
-        "include_original=true delivers only bounded supported image/audio"
+        "include_original=true delivers small supported images/audio inline"
         in tools["get_file"].description
     )
 

@@ -113,7 +113,7 @@ STYLES = {
 	},
 	"entity": {
 		"cards": "flex flex-row flex-wrap items-start sm:flex-nowrap sm:gap-4 lg:gap-8",
-		"description": "rounded-md px-4 py-3 text-sm flex flex-row items-center w-full slide-right bg-kind-bg empty:hidden mt-4",
+		"description": "rounded-md px-4 py-3 text-sm whitespace-pre-wrap flex flex-row items-center w-full slide-right bg-kind-bg empty:hidden mt-4",
 		"tabIcon": "relative inline-grid place-items-center text-kind-default hover:text-kind-dark tab-icon outline-none",
 		"name": {
 			"wrapper": "min-w-0",

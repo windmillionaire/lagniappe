@@ -1,2 +1,167 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.1.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="67bb057f-8c56-4609-95a1-70363aa6bfd6",e._sentryDebugIdIdentifier="sentry-dbid-67bb057f-8c56-4609-95a1-70363aa6bfd6");}catch(e){}}();import{B as c}from"./baseUpload.js?v=bac5bebf";import{u as g,U as h}from"./upload.js?v=bac5bebf";import{r as f,w as I}from"./foundation.js?v=bac5bebf";import"./connectivity.js?v=bac5bebf";import{s as l}from"./icons.js?v=bac5bebf";import{S as _}from"./base.js?v=bac5bebf";import"./baseForm.js?v=bac5bebf";import"./primitives.js?v=bac5bebf";import"./styles.js?v=bac5bebf";import"./loader.js?v=bac5bebf";import"./buttons.js?v=bac5bebf";import"./formatting.js?v=bac5bebf";import"./dropdown.js?v=bac5bebf";import"./combobox.js?v=bac5bebf";import"./upstreamUnavailable.js?v=bac5bebf";const b="splash-";class S extends _{constructor(e){super(e),this._siteImage=null,this._uploadInitialization=null,this._uploadImage=this._uploadImage.bind(this)}updated(e){this._siteImage=e.site_image}postreconcile(){this._siteImage&&this._renderSiteImage(this._siteImage)}opened(){if(this._uploadInitialization)return this._uploadInitialization;const e=this._initUpload().catch(o=>{throw this._uploadInitialization===e&&(this._uploadInitialization=null),o});return this._uploadInitialization=e,e}async _initUpload(){const e=this.target.querySelector("[data-role='upload-site-image']");if(!e)return;const o=g.dropzone({text:"Drop image here, click to upload, or tap to choose camera/files"});this.upload=new c({target:e,dropzone:o,submitButton:e.querySelector("button[type='submit']"),inputName:"site-image",uploadType:"image",menuOptions:["paste","remove"],messages:{submit:"Update Site Image",submitting:"Processing Image",submitted:"Image Processed"},html:[o.element]}),this.upload.uploadMenu=new h(this.upload),await this.upload.init(),this.destroyables.push(this.upload),e.addEventListener("submit",this._uploadImage)}async _uploadImage(e){if(e.preventDefault(),e.stopPropagation(),!await this.upload.prepareSubmit({route:this.endpoints.setSiteImage}))return;const t=await f.post(this.endpoints.setSiteImage,this.upload.formData);if(!t.ok){t.error&&this.upload.showError(t.error),this.upload.form?.resetSubmitButton();return}this.upload.form?.success(),t.site_image&&(this._siteImage=t.site_image,I(()=>{this._renderSiteImage(t.site_image)}))}_renderSiteImage(e){const o=this.target.querySelector("[data-role='site-image']");if(!o||!e)return;const t=Object.entries(e).filter(([i])=>!i.startsWith(b)),s=document.createDocumentFragment(),n=e["apple-touch-icon.png"]||e["logo-192x192.png"];if(n){const i=document.createElement("img");i.src=`${n}?v=${Date.now()}`,i.alt="Site image",i.className="size-20 rounded-lg object-contain",s.appendChild(i)}if(t.length>0){const i=document.createElement("div");i.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";for(const[d,u]of t){const a=document.createElement("a");a.href=u,a.target="_blank",a.rel="noopener noreferrer",a.className="flex flex-row items-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-2 text-sm hover:bg-base-bg transition-colors";const m=document.createElement("span");l(m,"image","icon-xs text-base-medium");const r=document.createElement("span");r.className="text-base-dark font-medium truncate grow text-xs",r.textContent=d;const p=document.createElement("span");l(p,"next","icon-xs text-base-medium"),a.append(m,r,p),i.appendChild(a)}s.appendChild(i)}this.updateSummary(`${t.length} generated files`),o.replaceChildren(s)}}export{S as SiteImage};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseUpload } from './baseUpload.js?v=b9517a42';
+import { u as uploadElement, U as UploadMenu } from './upload.js?v=b9517a42';
+import { r as request, w as withTransition } from './foundation.js?v=b9517a42';
+import './connectivity.js?v=b9517a42';
+import { s as setIcon } from './icons.js?v=b9517a42';
+import { S as SiteSetting } from './base.js?v=b9517a42';
+import './baseForm.js?v=b9517a42';
+import './primitives.js?v=b9517a42';
+import './styles.js?v=b9517a42';
+import './loader.js?v=b9517a42';
+import './buttons.js?v=b9517a42';
+import './formatting.js?v=b9517a42';
+import './dropdown.js?v=b9517a42';
+import './combobox.js?v=b9517a42';
+import './upstreamUnavailable.js?v=b9517a42';
+
+const SPLASH_PREFIX = "splash-";
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+ * @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
+ */
+class SiteImage extends SiteSetting {
+	constructor(attributes) {
+		super(attributes);
+		this._siteImage = null;
+		this._uploadInitialization = null;
+		this._uploadImage = this._uploadImage.bind(this);
+	}
+
+	updated(response) {
+		this._siteImage = response.site_image;
+	}
+
+	postreconcile() {
+		if (this._siteImage) this._renderSiteImage(this._siteImage);
+	}
+
+	opened() {
+		if (this._uploadInitialization) return this._uploadInitialization;
+
+		const pending = this._initUpload().catch((error) => {
+			if (this._uploadInitialization === pending) {
+				this._uploadInitialization = null;
+			}
+			throw error;
+		});
+		this._uploadInitialization = pending;
+		return pending;
+	}
+
+	async _initUpload() {
+		const uploadForm = this.target.querySelector(
+			"[data-role='upload-site-image']",
+		);
+		if (!uploadForm) return;
+
+		const dropzone = uploadElement.dropzone({
+			text: "Drop image here, click to upload, or tap to choose camera/files",
+		});
+
+		this.upload = new BaseUpload({
+			target: uploadForm,
+			dropzone: dropzone,
+			submitButton: uploadForm.querySelector("button[type='submit']"),
+			inputName: "site-image",
+			uploadType: "image",
+			menuOptions: ["paste", "remove"],
+			messages: {
+				submit: "Update Site Image",
+				submitting: "Processing Image",
+				submitted: "Image Processed",
+			},
+			html: [dropzone.element],
+		});
+
+		this.upload.uploadMenu = new UploadMenu(this.upload);
+		await this.upload.init();
+		this.destroyables.push(this.upload);
+
+		uploadForm.addEventListener("submit", this._uploadImage);
+	}
+
+	async _uploadImage(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		const prepared = await this.upload.prepareSubmit({
+			route: this.endpoints.setSiteImage,
+		});
+		if (!prepared) return;
+
+		const response = await request.post(
+			this.endpoints.setSiteImage,
+			this.upload.formData,
+		);
+		if (!response.ok) {
+			if (response.error) this.upload.showError(response.error);
+			this.upload.form?.resetSubmitButton();
+			return;
+		}
+
+		this.upload.form?.success();
+		if (response.site_image) {
+			this._siteImage = response.site_image;
+			withTransition(() => {
+				this._renderSiteImage(response.site_image);
+			});
+		}
+	}
+
+	_renderSiteImage(imageData) {
+		const container = this.target.querySelector("[data-role='site-image']");
+		if (!container || !imageData) return;
+
+		const entries = Object.entries(imageData).filter(
+			([name]) => !name.startsWith(SPLASH_PREFIX),
+		);
+		const fragment = document.createDocumentFragment();
+
+		const previewUrl =
+			imageData["apple-touch-icon.png"] || imageData["logo-192x192.png"];
+		if (previewUrl) {
+			const preview = document.createElement("img");
+			preview.src = `${previewUrl}?v=${Date.now()}`;
+			preview.alt = "Site image";
+			preview.className = "size-20 rounded-lg object-contain";
+			fragment.appendChild(preview);
+		}
+
+		if (entries.length > 0) {
+			const grid = document.createElement("div");
+			grid.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";
+
+			for (const [filename, url] of entries) {
+				const link = document.createElement("a");
+				link.href = url;
+				link.target = "_blank";
+				link.rel = "noopener noreferrer";
+				link.className =
+					"flex flex-row items-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-2 text-sm hover:bg-base-bg transition-colors";
+
+				const icon = document.createElement("span");
+				setIcon(icon, "image", "icon-xs text-base-medium");
+
+				const name = document.createElement("span");
+				name.className = "text-base-dark font-medium truncate grow text-xs";
+				name.textContent = filename;
+
+				const arrow = document.createElement("span");
+				setIcon(arrow, "next", "icon-xs text-base-medium");
+
+				link.append(icon, name, arrow);
+				grid.appendChild(link);
+			}
+
+			fragment.appendChild(grid);
+		}
+
+		this.updateSummary(`${entries.length} generated files`);
+		container.replaceChildren(fragment);
+	}
+}
+
+export { SiteImage };

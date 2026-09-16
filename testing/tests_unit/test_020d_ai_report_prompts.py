@@ -43,14 +43,18 @@ def test_remote_organize_prompt_preserves_final_updates_and_compact_guidance(ori
     repaired = _proposal_repair_prompt(initial, report.proposal, ValueError("bad reference"), "Organize")
     for prompt in (initial, revised, repaired):
         schemas = _response_action_schemas(prompt)
-        assert {"complete_task", "update_form_values"} <= set(schemas)
-        assert "create_task" not in schemas
+        assert {"create_task", "complete_task", "update_form_values"} <= set(schemas)
+        assert not {"create_page", "create_form", "create_category", "create_project", "create_model_task"} & set(schemas)
         assert "attach_file" not in schemas
+        assert "submission" in schemas["create_task"]["properties"]["data"]["properties"]
+        assert "to_task_action" in schemas["move_file"]["properties"]["data"]["properties"]
         assert "updates" in schemas["update_form_values"]["properties"]["data"]["properties"]
         assert "search_entities" in prompt.tools
         assert "get_task_history" in prompt.tools
         text = str(prompt.preview())
         assert "normal completion rules" in text
+        assert "Every create_task requires its editable existing Page" in text
+        assert "data.to_task_action" in text
         assert "Check every requested outcome against the actions" in text
         assert "Write the\nsummary from the final actions" in text
         assert "Do not preserve or generate data.submission" not in text

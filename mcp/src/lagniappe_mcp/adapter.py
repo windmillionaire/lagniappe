@@ -8,7 +8,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import re
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 from .catalog import (
     ACTOR_SCHEMA,
@@ -35,7 +35,9 @@ from .limits import (
 )
 from .rest import RESTClient
 from .schema import compact_json, json_size, validate_schema_document, validate_value
-from .url_security import quote_path_segment, validate_api_url, validate_human_url
+from .url_security import (
+    quote_path_segment, validate_api_url, validate_human_url, validate_storage_url,
+)
 
 
 PLAN_ROUTES = {
@@ -153,6 +155,41 @@ def _reject_private_model_data(value: Any, *, bearer: str) -> None:
             )
 
 
+# @testable true
+# @pair mcp-adapter:product-contract
+# @tests tests_unit/test_033_mcp_adapter.py::test_original_download_capability_is_scoped_to_requested_file_result
+def validate_file_result(value: Any, *, arguments: dict, bearer: str) -> None:
+    """Permit one explicitly requested, validated original download capability."""
+    screened = deepcopy(value)
+    delivery = screened.get("delivery") if isinstance(screened, dict) else None
+    if isinstance(delivery, dict) and delivery.get("kind") == "download":
+        original = screened.get("original_file")
+        if (
+            arguments.get("include_original") is not True
+            or not isinstance(original, dict)
+            or original.get("supported") is not True
+            or original.get("attached") is not False
+            or not isinstance(original.get("download_url"), str)
+        ):
+            raise TransportError(
+                "invalid_download", "Original download delivery is invalid."
+            )
+        url = original.pop("download_url")
+        if bearer in url or bearer in unquote(url):
+            raise TransportError(
+                "unsafe_transport_extension",
+                "Original download contains private authentication data.",
+            )
+        validate_storage_url(url, upload=False)
+        expires = original.get("expires_in")
+        signed_expires = dict(parse_qsl(urlsplit(url).query))["X-Goog-Expires"]
+        if type(expires) is not int or expires != int(signed_expires):
+            raise TransportError(
+                "invalid_download", "Original download expiration is inconsistent."
+            )
+    _reject_private_model_data(screened, bearer=bearer)
+
+
 @dataclass(frozen=True, slots=True)
 class MediaContent:
     """One bounded original-file payload for an MCP content block."""
@@ -255,7 +292,10 @@ class LagniappeAdapter:
         except asyncio.CancelledError:
             raise
 
-        _reject_private_model_data(result.value, bearer=self.config.api_key)
+        if name == "get_file":
+            validate_file_result(result.value, arguments=value, bearer=self.config.api_key)
+        else:
+            _reject_private_model_data(result.value, bearer=self.config.api_key)
         _reject_private_model_data(
             tuple(item.data for item in result.media),
             bearer=self.config.api_key,
@@ -587,6 +627,9 @@ class LagniappeAdapter:
     # @tests tests_unit/test_033_mcp_adapter.py::test_requested_unsupported_original_is_a_bounded_tool_error
     # @tests tests_unit/test_033_mcp_adapter.py::test_requested_missing_original_is_a_bounded_tool_error
     # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_mime_must_match_upstream_file_metadata
+    # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_fallback_preserves_source_without_fetching_binary
+    # @tests tests_unit/test_033_mcp_adapter.py::test_oversized_original_media_falls_back_only_for_size_limit
+    # @tests tests_unit/test_033_mcp_adapter.py::test_original_media_delivery_matches_the_emitted_content_index
     async def _project_file_result(
         self,
         raw_value: Any,
@@ -629,10 +672,17 @@ class LagniappeAdapter:
                 for field in ("supported", "attached", "reason")
                 if field in original
             }
+            value["original_file"]["attached"] = False
             if requested and original.get("supported") is False:
                 raise TransportError(
-                    "unsupported_media",
-                    "The requested original is not available as supported MCP media.",
+                    "original_unavailable",
+                    "Original content is unavailable for this file.",
+                )
+            if not requested and original.get("supported") is True:
+                value["original_file"]["reason"] = (
+                    "Call get_file with include_original=true to read the original. "
+                    "Small supported images/audio are delivered inline; other originals "
+                    "use a five-minute download URL for your file or browsing tools."
                 )
             if requested:
                 if not isinstance(download_url, str):
@@ -640,41 +690,45 @@ class LagniappeAdapter:
                         "original_unavailable",
                         "The requested original did not include a safe download.",
                     )
-                data, mime_type = await self.rest.download_media(
-                    download_url,
-                    cap=MAX_MEDIA_RAW_BYTES,
-                )
-                # ``mimetype`` is upstream metadata used to validate the
-                # downloaded bytes, but it is intentionally not part of the
-                # projected MCP result.  Read it from the validated REST value
-                # rather than the allowlisted result projection.
-                declared_mime = raw_value.get("mimetype")
-                if (
-                    isinstance(declared_mime, str)
-                    and declared_mime
-                    and declared_mime != mime_type
-                ):
-                    raise TransportError(
-                        "mime_mismatch",
-                        "Original media type contradicts file metadata.",
-                    )
-                if mime_type in SUPPORTED_IMAGE_MIMES:
-                    kind = "image"
-                elif mime_type in SUPPORTED_AUDIO_MIMES:
-                    kind = "audio"
-                else:
-                    raise TransportError(
-                        "unsupported_media",
-                        "Original MIME type is not supported by this MCP adapter.",
-                    )
-                value["delivery"] = {
-                    "kind": kind,
-                    "mime_type": mime_type,
-                    "size_bytes": len(data),
-                    "content_index": 1,
+                declared_mime = raw_value.get("mimetype") or "application/octet-stream"
+                value["original_file"] = {
+                    "supported": True,
+                    "attached": False,
+                    "download_url": download_url,
+                    "expires_in": original.get("expires_in"),
                 }
-                media = (MediaContent(kind, mime_type, data),)
-        _reject_private_model_data(value, bearer=self.config.api_key)
+                value["delivery"] = {
+                    "kind": "download",
+                    "mime_type": declared_mime,
+                }
+                validate_file_result(value, arguments=arguments, bearer=self.config.api_key)
+                if (
+                    declared_mime in SUPPORTED_IMAGE_MIMES | SUPPORTED_AUDIO_MIMES
+                    and raw_value.get("large") is not True
+                ):
+                    try:
+                        data, mime_type = await self.rest.download_media(
+                            download_url, cap=MAX_MEDIA_RAW_BYTES,
+                        )
+                    except TransportError as error:
+                        if error.code != "media_too_large":
+                            raise
+                    else:
+                        if declared_mime != mime_type:
+                            raise TransportError(
+                                "mime_mismatch",
+                                "Original media type contradicts file metadata.",
+                            )
+                        kind = "image" if mime_type in SUPPORTED_IMAGE_MIMES else "audio"
+                        value["original_file"] = {"supported": True, "attached": True}
+                        value["delivery"] = {
+                            "kind": kind,
+                            "mime_type": mime_type,
+                            "size_bytes": len(data),
+                            "content_index": 1,
+                        }
+                        media = (MediaContent(kind, mime_type, data),)
+        validate_file_result(value, arguments=arguments, bearer=self.config.api_key)
         return AdapterResult(value, media)
 
     # @testable false

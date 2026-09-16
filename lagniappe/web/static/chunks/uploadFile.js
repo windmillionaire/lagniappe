@@ -1,2 +1,80 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.1.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1e03c6f1-eff9-4999-a223-23b7e2504a42",e._sentryDebugIdIdentifier="sentry-dbid-1e03c6f1-eff9-4999-a223-23b7e2504a42");}catch(e){}}();import{B as o}from"./baseUpload.js?v=bac5bebf";import{b as r}from"./buttons.js?v=bac5bebf";import{u as i,U as p}from"./upload.js?v=bac5bebf";import"./baseForm.js?v=bac5bebf";import"./foundation.js?v=bac5bebf";import"./upstreamUnavailable.js?v=bac5bebf";import"./connectivity.js?v=bac5bebf";import"./icons.js?v=bac5bebf";import"./primitives.js?v=bac5bebf";import"./styles.js?v=bac5bebf";import"./loader.js?v=bac5bebf";import"./formatting.js?v=bac5bebf";import"./dropdown.js?v=bac5bebf";import"./combobox.js?v=bac5bebf";const l="Drop file here, click to upload, or tap to choose camera/files";class a extends o{constructor(e){super(e),this.messages={submit:"Upload File",submitting:"Uploading File",submitted:"File Uploaded"},this.inputName="file-upload",this.multiple=!0,this.dropzone=i.dropzone({text:l}),this.processing=i.processing({aiCreate:this.target.dataset.aiCreate==="true"}),this.uploadType="file",this.menuOptions=["remove","replace","paste"],this.uploadMenu=new p(this),this.submitButton=r.submit({kind:"file",data:{visible:"false"}})}get html(){return[this.dropzone.element,this.processing.element]}onFileAttached(e,t){const s=this.fileInput?.element.files.length||0;this.processing.prefill({filename:t.filename,isTextFile:t.isTextFile,fileCount:s})}reset(){super.reset(),this.processing.clear()}created(){this._created=!0}postreconcile(){this._created&&this.reset()}}export{a as FileUpload};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseUpload } from './baseUpload.js?v=b9517a42';
+import { b as buttons } from './buttons.js?v=b9517a42';
+import { u as uploadElement, U as UploadMenu } from './upload.js?v=b9517a42';
+import './baseForm.js?v=b9517a42';
+import './foundation.js?v=b9517a42';
+import './upstreamUnavailable.js?v=b9517a42';
+import './connectivity.js?v=b9517a42';
+import './icons.js?v=b9517a42';
+import './primitives.js?v=b9517a42';
+import './styles.js?v=b9517a42';
+import './loader.js?v=b9517a42';
+import './formatting.js?v=b9517a42';
+import './dropdown.js?v=b9517a42';
+import './combobox.js?v=b9517a42';
+
+const FILE_DROPZONE_TEXT =
+	"Drop file here, click to upload, or tap to choose camera/files";
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
+ * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_without_existing_file_select
+ * @matrix pages : file-upload multi-file
+ */
+class FileUpload extends BaseUpload {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Upload File",
+			submitting: "Uploading File",
+			submitted: "File Uploaded",
+		};
+		this.inputName = "file-upload";
+		this.multiple = true;
+		this.dropzone = uploadElement.dropzone({ text: FILE_DROPZONE_TEXT });
+		this.processing = uploadElement.processing({
+			aiCreate: this.target.dataset.aiCreate === "true",
+		});
+		this.uploadType = "file";
+		this.menuOptions = ["remove", "replace", "paste"];
+		this.uploadMenu = new UploadMenu(this);
+		this.submitButton = buttons.submit({
+			kind: "file",
+			data: {
+				visible: "false",
+			},
+		});
+	}
+
+	get html() {
+		return [this.dropzone.element, this.processing.element];
+	}
+
+	onFileAttached(_file, context) {
+		const fileCount = this.fileInput?.element.files.length || 0;
+		this.processing.prefill({
+			filename: context.filename,
+			isTextFile: context.isTextFile,
+			fileCount,
+		});
+	}
+
+	reset() {
+		super.reset();
+		this.processing.clear();
+	}
+
+	created() {
+		this._created = true;
+	}
+
+	postreconcile() {
+		if (this._created) {
+			this.reset();
+		}
+	}
+}
+
+export { FileUpload };

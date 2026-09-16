@@ -122,7 +122,11 @@ fails with its validation error. Large or unreadable Files remain represented by
 and visible issues so the proposal does not silently drop evidence.
 
 Website, API/MCP, and email Organize support the same fileless existing-record
-update profile. Trusted intake origin and the absence of uploads select that
+update profile, including `create_task` on editable existing Pages. A proposal
+can create a destination Task and move existing files into it using
+`move_file.data.to_task_action` plus `depends_on` referencing the earlier task
+creation action. Other creation actions remain exclusive to Create or file-backed
+Organize. Trusted intake origin and the absence of uploads select that
 profile. Instruction-only website Organize requests now produce reviewed update
 proposals. The email classifier can choose
 Organize for an update without attachments, but does not discover targets itself.
@@ -131,9 +135,9 @@ proposes bounded updates for the same browser approval and execution pipeline.
 No additional toolbar option or top-level completion command is introduced.
 
 The update profile omits upload summaries, retrieval prepasses, and secondary
-form completion. Its planner authors final field patches directly, including
-on revision or validation repair. Once uploads are supplied, normal file
-coverage and final-value obligations apply. External starters return a compact
+form completion. Its planner authors final task submissions and field patches
+directly, including on revision or validation repair. Once uploads are supplied,
+normal file coverage and final-value obligations apply. External starters return a compact
 action contract; `start_organize(actions=[...])` can include selected schemas in
 that first response. Clients request additional schemas and guidance on demand.
 Table-shaped patches are checked during proposal validation, so malformed row

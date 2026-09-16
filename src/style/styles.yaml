@@ -379,8 +379,8 @@ entity:
     intent: cards presentation within entity
     surfaces: [server]
   description:
-    classes: rounded-md px-4 py-3 text-sm flex flex-row items-center w-full slide-right bg-kind-bg empty:hidden mt-4
-    intent: description presentation within entity
+    classes: rounded-md px-4 py-3 text-sm whitespace-pre-wrap flex flex-row items-center w-full slide-right bg-kind-bg empty:hidden mt-4
+    intent: entity description presentation preserving line breaks and spacing
     surfaces: [server]
     hooks: [slide-right]
     css: [src/style/navigation.css]

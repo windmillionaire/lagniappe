@@ -247,7 +247,8 @@ def _organize_update_prompt(report, user, feedback=None):
         if action in ORGANIZE_UPDATE_ACTIONS
     )
     prompt = Prompt(
-        "You are the Lagniappe Organize tool, planning updates to existing records.",
+        "You are the Lagniappe Organize tool, planning updates to existing records "
+        "and new Tasks on existing Pages.",
         user=user,
         type="organize report",
     )

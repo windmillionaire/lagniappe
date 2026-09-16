@@ -16,10 +16,11 @@ from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import references as ai_references
+from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
 from lagniappe.core.tools.database import get as database_get
-from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
+from testing.utility.ai_report_fakes import _fetch_one_from, _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
 
@@ -57,7 +58,8 @@ def test_remote_organize_update_contract_and_submission(monkeypatch):
     )
     assert summary["proposal_schema"] is None
     assert "complete_task" in summary["permissions"]["allowed_actions"]
-    assert "create_task" not in summary["permissions"]["allowed_actions"]
+    assert "create_task" in summary["permissions"]["allowed_actions"]
+    assert "create_page" not in summary["permissions"]["allowed_actions"]
     assert "summarize_file" not in summary["permissions"]["allowed_actions"]
     assert not summary["guidance_requirements"]["required_before_analysis"]
     assert "append_page_document" in summary["permissions"]["allowed_actions"]
@@ -71,7 +73,7 @@ def test_remote_organize_update_contract_and_submission(monkeypatch):
         "complete_task",
         "update_form_values",
     }
-    assert "### Task Scheduling" not in "\n".join(selected["workflow_rules"])
+    assert "### Report Task Scheduling" not in "\n".join(selected["workflow_rules"])
     proposal = {
         "summary": "Propose completing CLI",
         "confidence": 1,
@@ -108,6 +110,84 @@ def test_remote_organize_update_contract_and_submission(monkeypatch):
     assert file_contract["guidance_requirements"]["required_before_analysis"] == [
         {"task": "organize"}
     ]
+
+
+# @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external_api.py::submit_plan
+# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @source lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
+# @matrix agent-api ai-report : proposal-contract proposal-validation
+# @pair ai-report:deterministic-run
+# @pair files:move-file
+@pytest.mark.unit
+@pytest.mark.parametrize("origin", ["web", "api", "email"])
+def test_fileless_organize_creates_task_and_moves_existing_file(monkeypatch, origin):
+    from lagniappe.core.tools.ai.function_definitions.get_guidelines import (
+        execute_external_get_guidelines,
+    )
+
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("organize-owner")
+    page = TestEntities.get("PAGE", {"name": "Property Taxes", "hash": "propertypage"})
+    file = TestEntities.get("FILE", {
+        "name": "Property Taxes", "filename": "property-taxes.pdf",
+        "mimetype": "application/pdf", "hash": "taxrecord001",
+    })
+    file.page = page
+    entities = {entity.urlsafe_key: entity for entity in (page, file)}
+    saved = []
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(external_api.Entities, "fetch", lambda *ids, request: [entities[key] for key in ids])
+    monkeypatch.setattr(external_api.Entities, "fetch_one", _fetch_one_from(entities))
+    monkeypatch.setattr(external_api.cache, "get_details_by_hash", lambda hashes: {
+        entity.hash: {"id": entity.urlsafe_key, "name": entity.name, "kind": entity.entity_kind}
+        for entity in entities.values() if entity.hash in hashes
+    })
+    report = external_api.create_plan(actor, instructions="Create a Property Taxes task and move its file there.")
+    report.origin = origin
+    contract = external_api.plan_contract(
+        report, actor, actions=["create_task", "move_file"], submit_url="https://example.test/submit"
+    )
+    assert set(contract["proposal_schema"]["$defs"]) == {"create_task", "move_file"}
+    assert not {
+        "create_form", "create_category", "create_project", "create_model_task",
+        "create_page", "attach_file", "summarize_file", "suggest_page_deletion", "skip",
+    } & set(contract["permissions"]["allowed_actions"])
+    assert "### Report Task Scheduling" in "\n".join(contract["workflow_rules"])
+    autofill = next(item for item in contract["guidance_requirements"]["conditional"]
+                    if item["request"]["task"] == "form_autofill")
+    assert autofill["when"]["actions_any"] == ["create_task", "update_form_values"]
+    assert "error" not in execute_external_get_guidelines(autofill["request"], actor)
+    proposal = {
+        "summary": "Create a Property Taxes task and move the existing tax record into it.",
+        "confidence": 1,
+        "actions": [
+            {"id": "tax-task", "type": "create_task", "data": {
+                "name": "Property Taxes", "page": "hash:propertypage",
+            }},
+            {"id": "move-tax-file", "type": "move_file", "depends_on": ["tax-task"], "data": {
+                "file": "hash:taxrecord001", "from_page": "hash:propertypage", "to_task_action": "tax-task",
+            }},
+        ],
+    }
+    envelope = {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal}
+    assert external_api.submission_validation_errors(envelope, report, actor) == []
+    external_api.submit_plan(report, actor, proposal, contract_version=external_api.CONTRACT_VERSION)
+    assert report.status == "ready"
+    assert file.page is page  # Reviewing the proposal does not move the file.
+    assert not any(entity.entity_kind == "task" for entity in saved)
+
+    result = report_runner.run_report(report, actor)
+
+    assert result["status"] == "complete"
+    assert [action["status"] for action in result["actions"]] == ["complete", "complete"]
+    task = next(entity for entity in saved if entity.entity_kind == "task")
+    assert task.name == "Property Taxes"
+    assert task.page is page
+    assert file.db.get("page") is None
+    assert file.db["task"] == task.key
+    assert result["actions"][1]["moved"]["to"]["id"] == task.urlsafe_key
 
 
 def _contract_actor():

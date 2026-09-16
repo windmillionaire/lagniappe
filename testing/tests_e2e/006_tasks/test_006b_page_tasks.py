@@ -351,13 +351,14 @@ def test_create_page_task_with_due_date(get_user):
 # @matrix tasks : settings-form unsaved-marker update
 # @template controls.html::task_save
 # @template pages/tasks.html::task_title
+# @template pages/tasks.html::task_nav
 def test_update_page_task_settings_from_row(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_update_page_task_settings.get(user)
     user.go(task)
 
     updated_name = "Task Settings After"
-    updated_description = "Updated task settings description."
+    updated_description = "Updated task settings description.\n\n  Keep this line indented."
 
     settings_form = task.settings_form
     save_toggle = task.element.locator("[data-role='save-toggle']")
@@ -381,12 +382,18 @@ def test_update_page_task_settings_from_row(get_user):
     expect(save_toggle).to_have_attribute("aria-label", "Saved")
 
     expect(task.element.locator("[data-role='title']")).to_contain_text(updated_name)
-    expect(task.element).to_contain_text(updated_description)
+    description = task.element.locator("[data-role='task-description']")
+    expect(description).to_have_text(updated_description)
+    expect(description).to_have_css("white-space", "pre-wrap")
+    assert description.text_content() == updated_description
 
     user.reload()
     task.wait_for_load()
     expect(task.element.locator("[data-role='title']")).to_contain_text(updated_name)
-    expect(task.element).to_contain_text(updated_description)
+    description = task.element.locator("[data-role='task-description']")
+    expect(description).to_have_text(updated_description)
+    expect(description).to_have_css("white-space", "pre-wrap")
+    assert description.text_content() == updated_description
 
 
 # @matrix tasks : attach-form merged-submission widget-identity
