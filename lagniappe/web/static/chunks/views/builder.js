@@ -1,25 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="08b6b170-8e6c-4018-a3d4-5da0d11074ad",e._sentryDebugIdIdentifier="sentry-dbid-08b6b170-8e6c-4018-a3d4-5da0d11074ad");}catch(e){}}();import"../search.js?v=b39c632a";import"../entityMenu.js?v=b39c632a";import"../upload.js?v=b39c632a";import"../foundation.js?v=b39c632a";import"../connectivity.js?v=b39c632a";import"../modal.js?v=b39c632a";import{F as y}from"../builder.js?v=b39c632a";import"../styles.js?v=b39c632a";import"../remote.js?v=b39c632a";import"../queryLifecycle.js?v=b39c632a";import"../combobox.js?v=b39c632a";import"../primitives.js?v=b39c632a";import"../icons.js?v=b39c632a";import"../results.js?v=b39c632a";import"../storage.js?v=b39c632a";import"../formatting.js?v=b39c632a";import"../upstreamUnavailable.js?v=b39c632a";import"../dropdown.js?v=b39c632a";import"../buttons.js?v=b39c632a";import"../polling.js?v=b39c632a";import"../baseForm.js?v=b39c632a";import"../loader.js?v=b39c632a";import"../facets.js?v=b39c632a";import"../submitter.js?v=b39c632a";export{y as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b564d2b9';
-import '../entityMenu.js?v=b564d2b9';
-import '../upload.js?v=b564d2b9';
-import '../foundation.js?v=b564d2b9';
-import '../connectivity.js?v=b564d2b9';
-import '../modal.js?v=b564d2b9';
-export { F as default } from '../builder.js?v=b564d2b9';
-import '../styles.js?v=b564d2b9';
-import '../remote.js?v=b564d2b9';
-import '../queryLifecycle.js?v=b564d2b9';
-import '../combobox.js?v=b564d2b9';
-import '../primitives.js?v=b564d2b9';
-import '../icons.js?v=b564d2b9';
-import '../results.js?v=b564d2b9';
-import '../storage.js?v=b564d2b9';
-import '../formatting.js?v=b564d2b9';
-import '../upstreamUnavailable.js?v=b564d2b9';
-import '../dropdown.js?v=b564d2b9';
-import '../buttons.js?v=b564d2b9';
-import '../polling.js?v=b564d2b9';
-import '../baseForm.js?v=b564d2b9';
-import '../loader.js?v=b564d2b9';
-import '../facets.js?v=b564d2b9';
-import '../submitter.js?v=b564d2b9';

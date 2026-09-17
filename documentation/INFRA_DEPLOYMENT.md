@@ -392,8 +392,8 @@ successful application deployment.
 
 ## Report contract 10 cutover
 
-For `next/2.3.0`, pause report/email intake and drain existing work before
-`upgrade --branch next/2.3.0`. Deploy the application and MCP service from the
+For `next/2.2.1`, pause report/email intake and drain existing work before
+`upgrade --branch next/2.2.1`. Deploy the application and MCP service from the
 same candidate. Report format 2 makes older reports unavailable and deletable;
 it does not delete or migrate their workspace records. No legacy execution or
 Undo compatibility path remains. Resume intake after the coordinated upgrade,
