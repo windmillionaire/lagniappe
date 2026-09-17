@@ -28,9 +28,7 @@
       "current_inputs": {
         "prompt_sha256": "43905c70a05e30dbfa9a4a3145a34625e803d22f014e7cecd366d5a13421d73c",
         "on_site_prompt_sha256": "c342f6a9230e00fc40b2b19101700f06924e16ab8e2a3b68ddcd71f9593655b9",
-        "fixtures": {
-          ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        }
+        "fixtures": {}
       },
       "latest_results": {
         "mcp": {
@@ -376,9 +374,7 @@
       "current_inputs": {
         "prompt_sha256": "96386ee06b4201fba967f9d39b983ceaeab1fb8bafd59f67e337a515b61356ec",
         "on_site_prompt_sha256": "b67af63e7f6ba50281263e85f631c1601cc869b786f2112062a164c3ec48e52b",
-        "fixtures": {
-          ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        }
+        "fixtures": {}
       },
       "latest_results": {
         "mcp": {

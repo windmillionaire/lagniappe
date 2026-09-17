@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES = ROOT / "lagniappe" / "web" / "templates"
 SAFE_HTML_SINKS = {
     "lagniappe/web/templates/files/text.html": 1,
+    "lagniappe/web/templates/help/macros.html": 1,
     "lagniappe/web/templates/public/public.html": 1,
     "lagniappe/web/templates/tools/report.html": 1,
 }
