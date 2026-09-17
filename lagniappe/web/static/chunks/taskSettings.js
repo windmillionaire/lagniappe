@@ -1,31 +1,31 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=bb1ed2ee';
-import { InputElement } from './input.js?v=bb1ed2ee';
-import { S as SectionToggle } from './sectionToggle.js?v=bb1ed2ee';
-import { TextareaElement } from './textarea.js?v=bb1ed2ee';
-import { w as withTransition } from './foundation.js?v=bb1ed2ee';
-import './connectivity.js?v=bb1ed2ee';
-import './formRepresentation.js?v=bb1ed2ee';
-import './styles.js?v=bb1ed2ee';
-import './modal.js?v=bb1ed2ee';
-import './upstreamUnavailable.js?v=bb1ed2ee';
-import './baseForm.js?v=bb1ed2ee';
-import './icons.js?v=bb1ed2ee';
-import './primitives.js?v=bb1ed2ee';
-import './loader.js?v=bb1ed2ee';
-import './baseElement.js?v=bb1ed2ee';
-import './formatting.js?v=bb1ed2ee';
-import './facets.js?v=bb1ed2ee';
-import './remote.js?v=bb1ed2ee';
-import './queryLifecycle.js?v=bb1ed2ee';
-import './combobox.js?v=bb1ed2ee';
-import './results.js?v=bb1ed2ee';
-import './storage.js?v=bb1ed2ee';
-import './submitter.js?v=bb1ed2ee';
-import './buttons.js?v=bb1ed2ee';
-import './baseUpload.js?v=bb1ed2ee';
-import './upload.js?v=bb1ed2ee';
-import './dropdown.js?v=bb1ed2ee';
+import { F as FormElement } from './form2.js?v=b751984f';
+import { InputElement } from './input.js?v=b751984f';
+import { S as SectionToggle } from './sectionToggle.js?v=b751984f';
+import { TextareaElement } from './textarea.js?v=b751984f';
+import { w as withTransition } from './foundation.js?v=b751984f';
+import './connectivity.js?v=b751984f';
+import './formRepresentation.js?v=b751984f';
+import './styles.js?v=b751984f';
+import './modal.js?v=b751984f';
+import './upstreamUnavailable.js?v=b751984f';
+import './baseForm.js?v=b751984f';
+import './icons.js?v=b751984f';
+import './primitives.js?v=b751984f';
+import './loader.js?v=b751984f';
+import './baseElement.js?v=b751984f';
+import './formatting.js?v=b751984f';
+import './facets.js?v=b751984f';
+import './remote.js?v=b751984f';
+import './queryLifecycle.js?v=b751984f';
+import './combobox.js?v=b751984f';
+import './results.js?v=b751984f';
+import './storage.js?v=b751984f';
+import './submitter.js?v=b751984f';
+import './buttons.js?v=b751984f';
+import './baseUpload.js?v=b751984f';
+import './upload.js?v=b751984f';
+import './dropdown.js?v=b751984f';
 
 const TASK_BUTTONS = {
 	selectUser: "facet",
@@ -50,15 +50,26 @@ class BaseTaskSettings extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
 	 * @matrix tasks : attach-form create model-task-link
+	 * @matrix tasks : retained-draft manual-form-choice
 	 */
 	_formUpdatedListener(e) {
 		const project = e.detail.options
 			? Object.values(e.detail.options)[0]
 			: null;
-		const formSelected = this.buttons.selectForm?.active;
-		if (project?.form && !formSelected) {
-			this.buttons.selectForm.addOption(project.form);
+		const formControl = this.buttons.selectForm;
+		if (
+			e.detail.name === "project" &&
+			project?.form &&
+			formControl &&
+			!formControl.readonly
+		) {
+			if (formControl.details?.id !== project.form.id) {
+				formControl.clear();
+				formControl.addOption(project.form);
+			}
 		} else if (e.detail.name === "form") {
 			const options = Object.keys(e.detail.options);
 			if (options.length === 0) return;

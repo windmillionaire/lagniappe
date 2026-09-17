@@ -46,6 +46,12 @@ CreatePage requires a name in the browser, including after selecting an attached
 form. The category create endpoint also rejects empty or whitespace-only names
 before creating a page.
 
+Task creation retains its draft when closed. Selecting a model task with an
+attached form replaces the draft's current form selection, including after
+reopening the draft. Selecting a project or a model without a form leaves the
+form selection alone. A user can choose a different form after selecting the
+model task.
+
 ## BaseForm initialization
 
 `elements/base/baseForm.mjs`:

@@ -21,6 +21,7 @@ Definitions:
 
 import base64
 import re
+from uuid import uuid4
 
 from playwright.sync_api import expect
 
@@ -35,6 +36,7 @@ from testing.definitions import (
     Uploads,
     Users,
 )
+from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import (
     Badges,
     FormElements,
@@ -46,6 +48,7 @@ from testing.elements import (
     DateSelect,
     UserSelect,
 )
+from testing.resources.task import Task
 from testing.utility.network import expect_successful_response
 
 
@@ -292,6 +295,66 @@ def test_create_page_task_with_model_task(get_user):
 
     Badges.PROJECT.visible(task.element, project)
     Badges.MODEL_TASK.visible(task.element, model_beta)
+
+
+# @matrix tasks : attach-form create model-task-link retained-draft
+# @template pages/tasks.html::action_buttons
+def test_model_task_replaces_form_on_reopened_create_draft(get_user):
+    user = get_user(Users.OWNER)
+    page = Pages.test_create_page_task.get(user)
+    original_form = Forms.test_create_task_form.get(user)
+    token = uuid4().hex[:12]
+    project = Entities.PROJECT.create({"name": f"Draft model project {token}"})
+    project.save()
+    form = Entities.FORM.create(
+        {
+            "name": f"Current model form {token}",
+            "form-type": "task",
+            "schema": [
+                {
+                    "id": "current-result",
+                    "type": "input",
+                    "input": "text",
+                    "title": "Current result",
+                }
+            ],
+        }
+    )
+    form.save()
+    model = Entities.MODEL_TASK.create(
+        project, {"name": f"Draft model {token}", "form": form}
+    )
+    model.save()
+    task = Task(
+        user=user,
+        definition=TaskDefinition(
+            name=f"Retained draft task {token}", origin=Pages.test_create_page_task
+        ),
+    )
+    user.go(page)
+    create_form = page.create_task_form
+    create_form.locator(FormElements.NAME).fill(task.definition.name)
+    FormSelect(create_form).select(original_form)
+    user.locate(
+        "#tabs [data-role='controls'] button[lp-close='tasks:PageTaskList']"
+    ).click()
+    expect(create_form).not_to_be_visible()
+
+    create_form = page.create_task_form
+    expect(create_form.locator(FormElements.NAME)).to_have_value(task.definition.name)
+    assert FormSelect(create_form).contains(original_form)
+    Select(ProjectSelect(create_form).button).select_by_key(
+        model.urlsafe_key, query=model.name
+    )
+    expect(FormSelect(create_form).button).to_contain_text(form.name)
+    expect(create_form.locator("select[name='form']")).to_have_value(form.urlsafe_key)
+    expect(create_form.locator("select[name='form'] option:checked")).to_have_count(1)
+
+    task.key = _submit_create_task_form(user, page, task, create_form)
+    saved = Entities.fetch_one(task.key, request=Fetch.direct())
+    assert saved.properties.form.key == form.key
+    assert saved.properties.model.key == model.key
+    expect(task.task_form.locator("input[name='current-result']")).to_be_visible()
 
 
 # @matrix tasks : assignee badge create

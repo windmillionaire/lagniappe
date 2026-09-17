@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=bb1ed2ee';
-import './connectivity.js?v=bb1ed2ee';
-import { B as BaseUpload } from './baseUpload.js?v=bb1ed2ee';
-import { u as uploadElement, U as UploadMenu } from './upload.js?v=bb1ed2ee';
-import { b as buttons } from './buttons.js?v=bb1ed2ee';
-import { p as primitives } from './primitives.js?v=bb1ed2ee';
+import { w as withTransition } from './foundation.js?v=b751984f';
+import './connectivity.js?v=b751984f';
+import { B as BaseUpload } from './baseUpload.js?v=b751984f';
+import { u as uploadElement, U as UploadMenu } from './upload.js?v=b751984f';
+import { b as buttons } from './buttons.js?v=b751984f';
+import { p as primitives } from './primitives.js?v=b751984f';
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
 
