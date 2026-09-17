@@ -64,7 +64,6 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "mcp"
 
 
 # @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-# @source lagniappe/core/tools/ai/function_definitions/output_schemas.py::_object
 # @pair mcp-adapter:product-contract
 def test_canonical_read_output_schemas_fit_the_adapter_contract():
     # Load the app's dependency-free declarations without bootstrapping the app
