@@ -106,7 +106,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
             [{"uri": f"gs://private/{sentinel}", "mime_type": "text/plain"}],
         ),
     )
-    prompt = Prompt(sentinel, user=SimpleNamespace(), type="ask report")
+    prompt = Prompt(sentinel, user=SimpleNamespace(), type="ai report")
     prompt.enable_tools("get_file")
     prompt.set_model_tier("utility")
     prompt.set_service_tier("priority")
@@ -137,9 +137,9 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert set(summary) == set(observability.GenerationSummaryV1.__dataclass_fields__)
     assert sentinel not in json.dumps(summary, default=str)
     uuid.UUID(summary["correlation_id"])
-    assert summary["workflow"] == "ask"
-    assert summary["stage"] == "answer"
-    assert summary["prompt_contract_id"] == "ask-report"
+    assert summary["workflow"] == "reports"
+    assert summary["stage"] == "planning"
+    assert summary["prompt_contract_id"] == "ai-report"
     assert summary["resolved_model"] == "runtime-utility"
     assert summary["location"] == "us-central1"
     assert summary["model_tier"] == "utility"
@@ -174,12 +174,12 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
 def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
     monkeypatch, marked_outcome
 ):
-    from lagniappe.core.tools.ai.ask import validate_ask_response
+    from lagniappe.core.tools.ai.reporting.proposals.validation import validate_proposal
 
     persisted, _ = _capture(monkeypatch)
     answer = {
         "summary": "Inventory checked",
-        "confidence": 1,
+        "confidence": 1, "actions": [],
         "answer_markdown": "**Pens**: 0; Tape: missing.",
     }
 
@@ -190,11 +190,11 @@ def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
     def validate(value):
         if marked_outcome:
             observability.mark_outcome(marked_outcome)
-        return validate_ask_response(value)
+        return validate_proposal(value)
 
     generator = ai_core.GenAI()
     generator._client = SimpleNamespace(models=Models())
-    prompt = Prompt("Inspect inventory", type="ask report").set_output_format("JSON")
+    prompt = Prompt("Inspect inventory", type="ai report").set_output_format("JSON")
     result = generator.generate_content(prompt, validator=validate)
 
     assert "<strong>Pens</strong>" in result["answer_html"]
@@ -286,7 +286,7 @@ def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     generator._client = SimpleNamespace(models=Models())
     prompt = Prompt(
         "PRIVATE-PROMPT-CONTENT",
-        type="ask report",
+        type="ai report",
     ).set_output_format("TEXT")
 
     with observability.ai_execution_context(
@@ -329,10 +329,10 @@ def test_nested_model_repair_gets_its_own_summary(monkeypatch):
 
     generator = ai_core.GenAI()
     generator._client = SimpleNamespace(models=Models())
-    source_prompt = Prompt("private", type="organize report").set_output_format("JSON")
+    source_prompt = Prompt("private", type="ai report").set_output_format("JSON")
     repair_prompt = Prompt(
         "private repair",
-        type="organize report repair",
+        type="ai report",
     ).set_output_format("JSON")
 
     def repair(_value):
@@ -344,7 +344,7 @@ def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     }
     assert len(persisted) == 2
     nested, initiating = persisted
-    assert nested["stage"] == "model-repair"
+    assert nested["stage"] == "planning"
     assert nested["outcome"] == "not_validated"
     assert initiating["stage"] == "planning"
     assert initiating["outcome"] == "model_repair"

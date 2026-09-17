@@ -117,7 +117,7 @@ def tool_definitions(local):
             description=(
                 "Terminal clients: finalize the exact batch returned by prepare_file_uploads after Storage "
                 "returned HTTP 200 or 201 for every file's direct upload. Returns authoritative file references "
-                "and refreshed Organize guidance. Keep the same plan_id. Never finalize an incomplete transfer. "
+                "and refreshed filing guidance. Keep the same plan_id. Never finalize an incomplete transfer. "
                 "Workspace changes still require browser review."
             ),
             input_schema={

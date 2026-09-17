@@ -780,6 +780,23 @@ def test_entity_hash(get_test_entities):
             assert cache["hash"] == test_value
 
 
+# @matrix description : html-stripping whitespace
+@pytest.mark.parametrize("kind", ["PAGE", "TASK", "PROJECT", "CATEGORY"])
+def test_entity_description_preserves_whitespace(kind):
+    entity = getattr(Entities, kind)(testing=True)
+    description = "  First line\n\n  Indented\ttext  with spaces\nLast line\n"
+
+    for value in (description, f"<p>{description}</p><script>discard()</script>"):
+        entity.description = value
+        assert entity.description == description
+        assert entity.db["description"] == description
+        entity.properties.description.unset()
+        assert entity.description == description
+
+    entity.description = None
+    assert entity.description is None
+
+
 # @matrix name : ai cache column details filter property sort
 def test_entity_name(get_test_entities):
     """Test Name property with all mixins: Cache, Column, Details, AI, Filter.

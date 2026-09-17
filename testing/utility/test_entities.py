@@ -369,12 +369,15 @@ class TestEntityMixin:
             self.db["public"] = bool(test_spec["public"])
 
         if self.entity_kind == "report":
+            self.format_version = test_spec.get("format_version", 1)
+            self.file_usage = test_spec.get("file_usage")
+            self.status = test_spec.get("status", "pending")
             input_files = test_spec.get("input_files", [])
             self.properties.input_files._value = [
                 file if hasattr(file, "db") else TestEntities.get("FILE", file)
                 for file in input_files
             ]
-            for field in ["tool", "instructions"]:
+            for field in ["instructions", "origin"]:
                 if field in test_spec:
                     self.db[field] = test_spec[field]
             for field in [

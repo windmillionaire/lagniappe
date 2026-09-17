@@ -100,6 +100,11 @@ and `TableSorting` initialization complete.
 
 ## Specialized views
 
+Help articles use `ShellView` directly through the shared view registry. Their
+server-rendered article has no entity polling or Report state. The report-style
+header's Close link returns Home; Markdown body rendering is shared with the
+reference modal and manual.
+
 The Form Builder owns an unsaved local schema and does not extend Core. It still
 implements the shared connectivity `sync()` lifecycle. See
 [FRONTEND_BUILDER.md](FRONTEND_BUILDER.md).

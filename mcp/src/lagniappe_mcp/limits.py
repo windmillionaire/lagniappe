@@ -1,8 +1,8 @@
 """Safety limits and the supported shared AI contract version."""
 
 API_VERSION = "v1"
-CONTRACT_VERSION_MIN = 8
-CONTRACT_VERSION_MAX = 8
+CONTRACT_VERSION_MIN = 9
+CONTRACT_VERSION_MAX = 9
 
 MAX_CATALOG_BYTES = 1 * 1024 * 1024
 MAX_TOOL_COUNT = 64
@@ -49,9 +49,10 @@ MCP_RESULT_INSTRUCTIONS = (
 )
 
 MCP_SUBMISSION_INSTRUCTIONS = (
-    "Call submit_plan with this plan_id, contract_version, and a proposal "
+    "Call submit_plan with this plan_id, contract_version, file_usage, and a proposal "
     "matching proposal_schema. If it is null (summary view), first fetch "
-    "get_plan_contract with the selected actions for their exact schemas. "
+    "get_plan_contract with the selected actions for their exact schemas; "
+    "use actions=[] for a saved answer without changes. "
     "Optional name/instructions revise the current brief with the proposal. "
     "Keep this plan_id for investigation, submission, "
     "and revisions of the same request; starting again creates another report. "
@@ -66,4 +67,4 @@ MCP_SUBMISSION_INSTRUCTIONS = (
 # Some hosts prepend this to every tool description. Keep tool-specific
 # instructions in the descriptions and working context so short discovery
 # excerpts still expose each tool's purpose.
-MCP_INSTRUCTIONS = "Answer with plan-free reads; save Ask on request. Create/Organize require browser review."
+MCP_INSTRUCTIONS = "Answer with plan-free reads; save answers only on request. Workspace changes require a proposal and browser review."

@@ -7,6 +7,7 @@ import asyncio
 from copy import deepcopy
 import json
 from pathlib import Path
+import runpy
 import stat
 import time
 from typing import Any
@@ -20,6 +21,7 @@ from lagniappe_mcp.adapter import (
     AdapterResult,
     LagniappeAdapter,
     _reject_private_model_data,
+    validate_file_result,
 )
 from lagniappe_mcp.catalog import (
     READ_ANNOTATIONS,
@@ -61,6 +63,31 @@ from testing.utility import mcp_client_driver
 PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "mcp"
 
 
+# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
+# @pair mcp-adapter:product-contract
+def test_canonical_read_output_schemas_fit_the_adapter_contract():
+    # Load the app's dependency-free declarations without bootstrapping the app
+    # in the standalone MCP environment. One invalid tool blocks all discovery.
+    schemas = runpy.run_path(str(
+        PACKAGE_ROOT.parent / "lagniappe/core/tools/ai/function_definitions/output_schemas.py"
+    ))["OUTPUT_SCHEMAS"]
+    assert "get_help" in schemas
+    for name, schema in schemas.items():
+        try:
+            validate_schema_document(schema)
+        except SchemaError as error:
+            pytest.fail(f"{name}: {error}")
+    context = schemas["get_help"]["properties"]["topics"]["items"]["properties"]["context"]
+    for value in ({}, {"email_address": "ai@example.test"}, {
+        "skill_url": "https://example.test/api/v1/client-skill.md",
+        "mcp_url": "https://example.run.app/mcp",
+        "connection_name": "example-mcp",
+    }):
+        validate_value(context, value, phase="output")
+    with pytest.raises(SchemaError):
+        validate_value(context, {"mcp_url": 123}, phase="output")
+
+
 def _signed_download_url(**updates: str) -> str:
     values = {
         "X-Goog-Algorithm": "GOOG4-RSA-SHA256",
@@ -96,7 +123,7 @@ def _actor() -> dict[str, Any]:
             "expires_at": "2099-01-01T00:00:00+00:00",
             "generation": 1,
         },
-        "capabilities": {"ask": True, "create": True, "organize": True},
+        "capabilities": {"plans": True},
     }
 
 
@@ -104,9 +131,10 @@ def _plan() -> dict[str, Any]:
     return {
         "id": "abcdefghijkl",
         "status": "draft",
-        "tool": "create",
         "name": "Draft",
         "instructions": "Prepare one safe change.",
+        "output_kind": None,
+        "file_usage": [],
         "files": [],
         "uploads_pending": False,
         "upload_batch_id": None,
@@ -123,10 +151,10 @@ def _plan() -> dict[str, Any]:
 def _contract() -> dict[str, Any]:
     return {
         "contract_version": CONTRACT_VERSION_MAX,
-        "tool": "create",
         "current_date": "2026-09-04",
         "timezone": "UTC",
         "personal_page": {},
+        "file_usage_schema": {"type": "array", "items": {"type": "object"}},
         "proposal_schema": {
             "type": "object",
             "required": ["title"],
@@ -147,7 +175,7 @@ def _contract() -> dict[str, Any]:
             "method": "POST",
             "url": "https://example.com/api/v1/plans/abcdefghijkl/submit",
             "contract_version": CONTRACT_VERSION_MAX,
-            "body": {"contract_version": CONTRACT_VERSION_MAX, "proposal": {}},
+            "body": {"contract_version": CONTRACT_VERSION_MAX, "proposal": {}, "file_usage": []},
             "rule": "Replace the empty proposal template.",
         },
     }
@@ -176,7 +204,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
                 }
                 if target.endswith("view=summary"):
                     contract.update(proposal_schema=None, schema_scope="summary")
-                else:
+                elif "actions=" in target:
                     assert "actions=create_task" in target
                     contract.update(
                         schema_scope="selected", schema_actions=["create_task"],
@@ -184,7 +212,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
                     )
                     if target.endswith("view=schema"):
                         contract = {key: value for key, value in contract.items() if key in {
-                            "contract_version", "tool", "proposal_schema", "schema_scope",
+                            "contract_version", "proposal_schema", "file_usage_schema", "schema_scope",
                             "schema_actions", "schema_instructions", "submission_format",
                         }}
                 return contract, "contract"
@@ -206,7 +234,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
             "tools/search",
         ]
         started = await adapter.execute(
-            "start_create", {"instructions": "Create a task"}
+            "start_plan", {"instructions": "Create a task"}
         )
         assert started.value["context"]["contract"]["proposal_schema"] is None
         selected = await adapter.execute(
@@ -227,7 +255,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
         with pytest.raises(SchemaError):
             await adapter.execute(
                 "submit_plan",
-                {
+                {"file_usage": [],
                     "plan_id": "abcdefghijkl",
                     "contract_version": CONTRACT_VERSION_MAX,
                     "proposal": {"wrong": "shape"},
@@ -235,7 +263,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
             )
         receipt = await adapter.execute(
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": "abcdefghijkl",
                 "contract_version": CONTRACT_VERSION_MAX,
                 "proposal": {"title": "Task"},
@@ -244,8 +272,8 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
             },
         )
         assert receipt.value["status"] == "ready"
-        assert rest.requests[-2][1] == "plans/abcdefghijkl/contract"
-        assert rest.requests[-1][2] == {
+        assert rest.requests[-2][1] == "plans/abcdefghijkl/contract?view=full"
+        assert rest.requests[-1][2] == {"file_usage": [],
             "contract_version": CONTRACT_VERSION_MAX,
             "proposal": {"title": "Task"},
             "name": "Expanded request",
@@ -539,7 +567,7 @@ def test_catalog_requires_complete_frozen_metadata_and_result_paths() -> None:
             catalog_tools(incompatible)
         assert error.value.code == "invalid_catalog"
 
-    invalid_names = ("start_ask", "BadName", "bad-name", "x" * 65)
+    invalid_names = ("start_plan", "BadName", "bad-name", "x" * 65)
     for name in invalid_names:
         incompatible = deepcopy(catalog)
         incompatible["tools"][0]["name"] = name
@@ -556,7 +584,7 @@ def test_catalog_requires_complete_frozen_metadata_and_result_paths() -> None:
     too_many = deepcopy(catalog)
     template = too_many["tools"][0]
     too_many["tools"] = [
-        {**deepcopy(template), "name": f"read_{index}"} for index in range(57)
+        {**deepcopy(template), "name": f"read_{index}"} for index in range(65)
     ]
     too_many["selected_count"] = len(too_many["tools"])
     with pytest.raises(TransportError) as count_error:
@@ -774,7 +802,9 @@ def test_get_file_schema_projects_every_transport_extension() -> None:
             phase="output",
         )
     original = projected["properties"]["original_file"]
-    assert set(original["properties"]) == {"supported", "attached", "reason"}
+    assert set(original["properties"]) == {
+        "supported", "attached", "reason", "download_url", "expires_in",
+    }
     assert original["required"] == ["supported", "attached"]
     assert original["additionalProperties"] is False
 
@@ -987,18 +1017,25 @@ def test_original_media_delivery_matches_the_emitted_content_index(
     }
     assert rendered["content"][1]["type"] == kind
     assert rendered["content"][1]["mimeType"] == mime_type
+    assert result.value["original_file"] == {"supported": True, "attached": True}
     assert "storage.googleapis.com" not in json.dumps(rendered)
     asyncio.run(adapter.aclose())
 
 
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
-def test_original_media_rejects_unsupported_binary_after_safe_download() -> None:
+@pytest.mark.parametrize("mime_type,large", [
+    ("application/pdf", False), ("application/zip", False), ("text/plain", False),
+    ("image/png", True), ("audio/mpeg", True),
+])
+@pytest.mark.parametrize("has_text", [False, True])
+def test_original_download_fallback_preserves_source_without_fetching_binary(
+    mime_type, large, has_text,
+) -> None:
     rest = _WorkflowREST()
 
     async def download_media(_url: str, *, cap: int):
-        assert cap == MAX_MEDIA_RAW_BYTES
-        return b"pdf", "application/pdf"
+        pytest.fail("Download-only originals must not be buffered by MCP")
 
     rest.download_media = download_media
     adapter = LagniappeAdapter(
@@ -1006,8 +1043,10 @@ def test_original_media_rejects_unsupported_binary_after_safe_download() -> None
         rest=rest,  # type: ignore[arg-type]
     )
     raw = {
-        "content": "extracted text",
-        "mimetype": "application/pdf",
+        "filename": "source-file",
+        "summary": "A stored summary is not source content.",
+        "mimetype": mime_type,
+        "large": large,
         "original_file": {
             "supported": True,
             "attached": False,
@@ -1015,13 +1054,118 @@ def test_original_media_rejects_unsupported_binary_after_safe_download() -> None
             "expires_in": 300,
         },
     }
+    if has_text:
+        raw["content"] = "extracted text"
     try:
-        with pytest.raises(TransportError) as caught:
-            asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
-        assert caught.value.code == "unsupported_media"
-        assert "storage.googleapis.com" not in caught.value.render()
+        metadata = asyncio.run(adapter._project_file_result(raw, {}))
+        assert metadata.value["delivery"] == {"kind": "none"}
+        assert "download_url" not in metadata.value["original_file"]
+        assert metadata.value["original_file"]["attached"] is False
+        assert "include_original=true" in metadata.value["original_file"]["reason"]
+        result = asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
+        assert result.value["delivery"] == {"kind": "download", "mime_type": mime_type}
+        assert result.value["original_file"] == raw["original_file"]
+        assert result.value["filename"] == raw["filename"]
+        assert result.value["summary"] == raw["summary"]
+        assert ("content" in result.value) is has_text
+        assert result.media == ()
+        rendered = _success_result(result).model_dump(mode="json", by_alias=True)
+        assert len(rendered["content"]) == 1
+        assert json.loads(rendered["content"][0]["text"]) == rendered["structuredContent"]
     finally:
         asyncio.run(adapter.aclose())
+
+
+# @pair mcp-adapter:product-contract
+@pytest.mark.parametrize("code", [
+    "media_too_large", "download_failed", "download_timeout", "redirect_rejected",
+    "invalid_download", "unsafe_storage_url",
+])
+def test_oversized_original_media_falls_back_only_for_size_limit(code):
+    rest = _WorkflowREST()
+
+    async def download_media(_url, *, cap):
+        assert cap == MAX_MEDIA_RAW_BYTES
+        raise TransportError(code, "Bounded download failure.")
+
+    rest.download_media = download_media
+    adapter = LagniappeAdapter(
+        ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest,
+    )
+    raw = {
+        "mimetype": "image/png", "large": False,
+        "original_file": {
+            "supported": True, "attached": False,
+            "download_url": _signed_download_url(), "expires_in": 300,
+        },
+    }
+    try:
+        if code == "media_too_large":
+            result = asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
+            assert result.value["delivery"] == {"kind": "download", "mime_type": "image/png"}
+            assert result.value["original_file"] == raw["original_file"]
+            assert not result.media
+        else:
+            with pytest.raises(TransportError) as failure:
+                asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
+            assert failure.value.code == code
+    finally:
+        asyncio.run(adapter.aclose())
+
+
+# @pair mcp-adapter:product-contract
+def test_original_download_capability_is_scoped_to_requested_file_result():
+    value = {
+        "filename": "source.pdf", "mimetype": "application/pdf",
+        "original_file": {
+            "supported": True, "attached": False,
+            "download_url": _signed_download_url(), "expires_in": 300,
+        },
+        "delivery": {"kind": "download", "mime_type": "application/pdf"},
+    }
+    schema = get_file_output_schema({
+        "type": "object", "properties": {"original_file": {
+            "type": "object", "required": ["supported", "attached"],
+            "properties": {"supported": {"type": "boolean"}, "attached": {"type": "boolean"}},
+        }},
+    })
+    expected = deepcopy(value)
+    validate_file_result(value, arguments={"include_original": True}, bearer="private-key")
+    validate_value(schema, value, phase="output")
+    assert value == expected
+    for arguments in ({}, {"include_original": False}, {"include_original": "true"}):
+        with pytest.raises(TransportError):
+            validate_file_result(value, arguments=arguments, bearer="private-key")
+    for update in (
+        {"download_url": "https://example.com/source.pdf"},
+        {"download_url": _signed_download_url(**{"X-Goog-Expires": "301"}), "expires_in": 301},
+        {"download_url": _signed_download_url(**{"X-Goog-Credential": "private-key"})},
+        {"download_url": _signed_download_url(**{"X-Goog-Credential": "private-key"}).replace("private-key", "%70rivate-key")},
+        {"expires_in": 299}, {"expires_in": "300"}, {"expires_in": True},
+        {"supported": False}, {"attached": True}, {"download_url": None},
+        {"download_url": _signed_download_url() + "&token=other"},
+        {"download_url": _signed_download_url() + "&X-Goog-Expires=300"},
+    ):
+        changed = deepcopy(value)
+        changed["original_file"].update(update)
+        with pytest.raises(TransportError) as failure:
+            validate_file_result(changed, arguments={"include_original": True}, bearer="private-key")
+        assert "storage.googleapis.com" not in failure.value.render()
+        assert "private-key" not in failure.value.render()
+    for extra in (
+        {"summary": _signed_download_url()}, {"content": "private-key"},
+        {"url": _signed_download_url()}, {"nested": {"download_url": _signed_download_url()}},
+        {"delivery": {"kind": "none"}},
+    ):
+        with pytest.raises(TransportError):
+            validate_file_result({**value, **extra}, arguments={"include_original": True}, bearer="private-key")
+    for invalid in (
+        {**value, "delivery": {"kind": "none"}},
+        {**value, "delivery": {**value["delivery"], "content_index": 1}},
+        {**value, "original_file": {"supported": True, "attached": False}},
+    ):
+        with pytest.raises(SchemaError):
+            validate_value(schema, invalid, phase="output")
 
 
 # @pair mcp-adapter:product-contract
@@ -1567,28 +1711,6 @@ def test_failed_concurrent_startup_cancels_sibling_requests() -> None:
     assert fake.cancelled == {"me", "tools"}
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def test_plan_start_rejects_whitespace_instructions_before_dispatch() -> None:
-    async def exercise() -> list[tuple[str, str, Any]]:
-        rest = _WorkflowREST()
-        adapter = LagniappeAdapter(
-            ConnectionConfig(
-                normalize_site_url("https://example.com"),
-                "api-secret",
-            ),
-            rest=rest,  # type: ignore[arg-type]
-        )
-        await adapter.initialize()
-        with pytest.raises(SchemaError) as rejected:
-            await adapter.execute("start_ask", {"instructions": " \t\n "})
-        assert rejected.value.code == "input_validation_failed"
-        await adapter.aclose()
-        return rest.requests
-
-    assert asyncio.run(exercise()) == []
-
-
 @pytest.mark.parametrize(
     ("status", "code"), [(401, "unauthorized"), (403, "forbidden")]
 )
@@ -1672,7 +1794,7 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
         actor = await adapter.execute("get_actor", {})
         assert actor.value["user"]["hash"] == "abcdefghijkl"
         started = await adapter.execute(
-            "start_create", {"instructions": "Prepare one safe change."}
+            "start_plan", {"instructions": "Prepare one safe change."}
         )
         assert (
             not {
@@ -1704,7 +1826,7 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
     assert (
         "POST",
         "plans",
-        {"tool": "create", "instructions": "Prepare one safe change."},
+        {"instructions": "Prepare one safe change."},
     ) in rest.requests
     assert (
         "POST",
@@ -1716,32 +1838,6 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
     unsafe_actor["credential"]["api_key"] = "must-not-cross-mcp"
     with pytest.raises(SchemaError):
         validate_value(lifecycle_tools()[0].output_schema, unsafe_actor, phase="output")
-
-
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-def test_plan_start_rejects_a_valid_plan_for_the_wrong_requested_tool() -> None:
-    async def exercise() -> None:
-        rest = _WorkflowREST()
-        adapter = LagniappeAdapter(
-            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
-            rest=rest,  # type: ignore[arg-type]
-        )
-        await adapter.initialize()
-        with pytest.raises(TransportError) as error:
-            await adapter.execute(
-                "start_ask",
-                {"instructions": "Answer one question."},
-            )
-        assert error.value.code == "invalid_response"
-        assert rest.requests[-1] == (
-            "POST",
-            "plans",
-            {"tool": "ask", "instructions": "Answer one question."},
-        )
-        await adapter.aclose()
-
-    asyncio.run(exercise())
 
 
 # @pair mcp-adapter:product-contract
@@ -1824,7 +1920,7 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
         async def request_json(
             self, method: str, target: str, *, body: Any = None, **kwargs: Any
         ):
-            if target.endswith("/contract"):
+            if target.split("?", 1)[0].endswith("/contract"):
                 self.requests.append((method, target, body))
                 value = _contract()
                 value["submission_format"]["url"] = (
@@ -1843,7 +1939,7 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
         with pytest.raises(TransportError) as error:
             await candidate.execute(
                 "submit_plan",
-                {
+                {"file_usage": [],
                     "plan_id": "abcdefghijkl",
                     "contract_version": CONTRACT_VERSION_MAX,
                     "proposal": {"title": "Safe"},
@@ -1860,7 +1956,7 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
 
     rejected = asyncio.run(reject_submission())
     assert [target for _, target, _ in rejected.requests].count(
-        "plans/abcdefghijkl/contract"
+        "plans/abcdefghijkl/contract?view=full"
     ) == 1
 
 
@@ -1931,13 +2027,13 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
         with pytest.raises(SchemaError) as stale:
             await adapter.execute(
                 "submit_plan",
-                {"plan_id": "abcdefghijkl", "contract_version": 5, "proposal": {}},
+                {"file_usage": [], "plan_id": "abcdefghijkl", "contract_version": 5, "proposal": {}},
             )
         assert stale.value.code == "stale_contract_version"
         with pytest.raises(SchemaError):
             await adapter.execute(
                 "submit_plan",
-                {
+                {"file_usage": [],
                     "plan_id": "abcdefghijkl",
                     "contract_version": CONTRACT_VERSION_MAX,
                     "proposal": {"title": 7},
@@ -1947,7 +2043,7 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
 
         receipt = await adapter.execute(
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": "abcdefghijkl",
                 "contract_version": CONTRACT_VERSION_MAX,
                 "proposal": {"title": "Approved in the browser"},
@@ -1959,11 +2055,11 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
         return rest
 
     rest = asyncio.run(exercise())
-    assert sum(target.endswith("/contract") for _, target, _ in rest.requests) == 3
+    assert sum(target.split("?", 1)[0].endswith("/contract") for _, target, _ in rest.requests) == 3
     assert rest.requests[-1] == (
         "POST",
         "https://example.com/api/v1/plans/abcdefghijkl/submit",
-        {
+        {"file_usage": [],
             "contract_version": CONTRACT_VERSION_MAX,
             "proposal": {"title": "Approved in the browser"},
         },
@@ -2046,7 +2142,6 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(
                 method, target, body=body, **kwargs
             )
             if target.split("?", 1)[0].endswith("/contract"):
-                result["tool"] = "organize"
                 result["permissions"] = {"allowed_actions": list(definitions)}
                 result["proposal_schema"] = {
                     "type": "object", "$defs": definitions,
@@ -2069,7 +2164,7 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(
         "summary": "Update the existing task", "confidence": 1,
         "actions": [{"type": action_type, "data": data}],
     }
-    body = {"contract_version": CONTRACT_VERSION_MAX, "proposal": proposal}
+    body = {"contract_version": CONTRACT_VERSION_MAX, "proposal": proposal, "file_usage": []}
 
     async def exercise():
         rest = DateContractREST()
@@ -2089,7 +2184,7 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(
                 await adapter.execute("submit_plan", {"plan_id": "abcdefghijkl", **body})
             assert error.value.code == "proposal_validation_failed"
             assert not any(target.endswith("/submit") for _, target, _ in rest.requests)
-        assert sum(target.endswith("/contract") for _, target, _ in rest.requests) == 1
+        assert sum(target.split("?", 1)[0].endswith("/contract") for _, target, _ in rest.requests) == 1
         await adapter.aclose()
 
     asyncio.run(exercise())
@@ -2183,7 +2278,7 @@ def test_requested_unsupported_original_is_a_bounded_tool_error() -> None:
     try:
         with pytest.raises(TransportError) as error:
             asyncio.run(adapter._project_file_result(raw, {"include_original": True}))
-        assert error.value.code == "unsupported_media"
+        assert error.value.code == "original_unavailable"
         assert len(error.value.render().encode("utf-8")) < 4096
         projected = asyncio.run(
             adapter._project_file_result(raw, {"include_original": False})
@@ -2491,9 +2586,9 @@ class _SelectedStartREST(_WorkflowREST):
         self.requests.append((method, target, body))
         if self.failure:
             raise self.failure
-        query = parse_qs(urlsplit(target).query)
+        query = parse_qs(urlsplit(target).query, keep_blank_values=True)
         selected = query.get("actions", [None])[0]
-        actions = selected.split(",") if selected is not None else self.allowed
+        actions = [name for name in selected.split(",") if name] if selected is not None else self.allowed
         if any(action not in self.allowed for action in actions):
             raise AdapterError(
                 "validation_failed", "private upstream details", status=422
@@ -2502,6 +2597,7 @@ class _SelectedStartREST(_WorkflowREST):
         contract["permissions"] = {"allowed_actions": list(self.allowed)}
         contract["schema_actions"] = actions
         contract["schema_scope"] = "selected" if selected is not None else "full"
+        contract["schema_instructions"] = "Use selected schemas; submission checks current permissions."
         contract["proposal_schema"] = {
             "type": "object",
             "required": ["actions"],
@@ -2518,7 +2614,14 @@ class _SelectedStartREST(_WorkflowREST):
                 }
             },
         }
-        if query.get("view") == ["summary"]:
+        if not actions:
+            contract["proposal_schema"]["properties"]["actions"] = {"type": "array", "maxItems": 0}
+        if query.get("view") == ["schema"]:
+            contract = {key: value for key, value in contract.items() if key in {
+                "contract_version", "proposal_schema", "file_usage_schema", "schema_scope",
+                "schema_actions", "schema_instructions", "submission_format",
+            }}
+        if query.get("view") == ["summary"] and selected is None:
             contract.update(proposal_schema=None, schema_scope="summary")
         return contract, "contract"
 
@@ -2527,7 +2630,7 @@ class _SelectedStartREST(_WorkflowREST):
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 # @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 @pytest.mark.parametrize(
-    "actions", [None, ["create_task"], ["create_task", "create_page"]]
+    "actions", [None, [], ["create_task"], ["create_task", "create_page"]]
 )
 def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
     async def exercise():
@@ -2538,7 +2641,7 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         )
         await adapter.initialize()
         result = await adapter.execute(
-            "start_create",
+            "start_plan",
             {
                 "instructions": "File this bug.",
                 **({"actions": actions} if actions is not None else {}),
@@ -2549,12 +2652,12 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         assert contract["contract_version"] == CONTRACT_VERSION_MAX
         assert contract["permissions"]["allowed_actions"] == rest.allowed
         assert rest.requests == [
-            ("POST", "plans", {"tool": "create", "instructions": "File this bug."}),
+            ("POST", "plans", {"instructions": "File this bug."}),
             (
                 "GET",
                 f"plans/{plan_id}/contract?"
                 + (
-                    urlencode({"actions": ",".join(actions)})
+                    urlencode({"actions": ",".join(actions), "view": "full"})
                     if actions is not None
                     else "view=summary"
                 ),
@@ -2571,7 +2674,7 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         validate_value(contract["proposal_schema"], proposal, phase="proposal")
         receipt = await adapter.execute(
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": plan_id,
                 "contract_version": contract["contract_version"],
                 "proposal": proposal,
@@ -2580,14 +2683,23 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         assert receipt.value["id"] == plan_id
         assert receipt.value["status"] == "ready"
         # The only subsequent schema read is the adapter's fresh submission check.
-        assert rest.requests[-2] == ("GET", f"plans/{plan_id}/contract", None)
+        assert rest.requests[-2] == ("GET", f"plans/{plan_id}/contract?view=full", None)
         assert rest.requests[-1][2]["proposal"] == proposal
         assert sum(target == "plans" for _, target, _ in rest.requests) == 1
+        if not actions:
+            compact = await adapter.execute("get_plan_contract", {
+                "plan_id": plan_id, "actions": [], "view": "schema",
+            })
+            assert compact.value["proposal_schema"] == contract["proposal_schema"]
+            assert compact.value["schema_actions"] == []
+            with pytest.raises(SchemaError):
+                validate_value(compact.value["proposal_schema"], {"actions": [{"type": "create_task"}]}, phase="proposal")
+            return
         rest.allowed = ["create_page"]
         with pytest.raises(SchemaError):
             await adapter.execute(
                 "submit_plan",
-                {
+                {"file_usage": [],
                     "plan_id": plan_id,
                     "contract_version": contract["contract_version"],
                     "proposal": proposal,
@@ -2601,7 +2713,7 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         assert later.value["schema_actions"] == ["create_page"]
         revised = await adapter.execute(
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": plan_id,
                 "contract_version": contract["contract_version"],
                 "proposal": {"actions": [{"type": "create_page"}]},
@@ -2617,7 +2729,6 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
 @pytest.mark.parametrize(
     "actions",
     [
-        [],
         "create_task",
         [None],
         [""],
@@ -2635,7 +2746,7 @@ def test_create_start_rejects_malformed_selections_before_creating_plan(actions)
         await adapter.initialize()
         with pytest.raises(SchemaError):
             await adapter.execute(
-                "start_create", {"instructions": "File this bug.", "actions": actions}
+                "start_plan", {"instructions": "File this bug.", "actions": actions}
             )
         assert rest.requests == []
 
@@ -2660,7 +2771,7 @@ def test_create_start_schema_recovery_preserves_selection_and_created_plan(failu
         )
         await adapter.initialize()
         started = await adapter.execute(
-            "start_create", {"instructions": "File this bug.", "actions": actions}
+            "start_plan", {"instructions": "File this bug.", "actions": actions}
         )
         assert started.value["status"] == "draft"
         recovery = started.value["context"]["recovery"]
@@ -2687,46 +2798,6 @@ def test_create_start_schema_recovery_preserves_selection_and_created_plan(failu
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-@pytest.mark.parametrize("failure", [None, "disallowed", "transport"])
-def test_organize_start_selected_schemas_reuses_plan_on_recovery(failure):
-    class OrganizeREST(_SelectedStartREST):
-        async def request_json(self, method, target, *, body=None, **kwargs):
-            value, request_id = await super().request_json(method, target, body=body, **kwargs)
-            if "tool" in value:
-                value["tool"] = "organize"
-            return value, request_id
-
-    async def exercise():
-        rest = OrganizeREST()
-        rest.allowed = ["complete_task", "rename_entity"]
-        if failure == "disallowed":
-            rest.allowed = ["rename_entity"]
-        elif failure == "transport":
-            rest.failure = TransportError("offline", "private detail")
-        adapter = LagniappeAdapter(ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest)
-        await adapter.initialize()
-        with pytest.raises(SchemaError):
-            await adapter.execute("start_organize", {"instructions": "Complete this task", "actions": []})
-        assert rest.requests == []
-        result = await adapter.execute("start_organize", {"instructions": "Complete this task", "actions": ["complete_task"]})
-        assert result.value["tool"] == "organize"
-        if failure:
-            recovery = result.value["context"]["recovery"]
-            assert recovery["arguments"]["actions"] == ["complete_task"]
-            assert recovery["arguments"]["plan_id"] == result.value["id"]
-            rest.failure = None
-            rest.allowed = ["complete_task", "rename_entity"]
-            contract = (await adapter.execute(recovery["tool"], recovery["arguments"])).value
-        else:
-            contract = result.value["context"]["contract"]
-        assert contract["schema_actions"] == ["complete_task"]
-        assert contract["permissions"]["allowed_actions"] == ["complete_task", "rename_entity"]
-        assert sum(target == "plans" for _, target, _ in rest.requests) == 1
-        assert rest.requests[0][2]["tool"] == "organize"
-        receipt = await adapter.execute("submit_plan", {"plan_id": result.value["id"], "contract_version": CONTRACT_VERSION_MAX, "proposal": {"actions": [{"type": "complete_task"}]}})
-        assert receipt.value["status"] == "ready"
-        assert rest.requests[-2][1] == "plans/abcdefghijkl/contract"
-    asyncio.run(exercise())
 
 
 # @pair mcp-adapter:product-contract
@@ -2743,9 +2814,8 @@ def test_validation_errors_expose_only_safe_bounds(bound, limit, value):
 class _LifecycleContextREST(_WorkflowREST):
     """Deterministic REST boundary for post-write context reads."""
 
-    def __init__(self, tool="create", failure=None):
+    def __init__(self, failure=None):
         super().__init__()
-        self.tool = tool
         self.failure = failure
         self.files = []
 
@@ -2787,9 +2857,8 @@ class _LifecycleContextREST(_WorkflowREST):
             self.requests.append((method, target, body))
             self._fail_context()
             contract = _contract()
-            contract["tool"] = self.tool
-            contract["uploads_supported"] = self.tool == "organize"
-            if self.tool == "organize":
+            contract["uploads_supported"] = True
+            if True:
                 files = deepcopy(self.files)
                 if self.failure == "different_files":
                     files[0]["ref"] = "hash:zyxwvutsrqpo"
@@ -2804,14 +2873,12 @@ class _LifecycleContextREST(_WorkflowREST):
                 contract["workflow_rules"] = ["x" * MAX_STRUCTURED_RESULT_BYTES]
             if self.failure == "private":
                 contract["workflow_rules"] = ["api-secret"]
-            if self.failure == "wrong_tool":
-                contract["tool"] = "ask" if self.tool != "ask" else "create"
+            if self.failure == "incompatible":
+                contract["contract_version"] = CONTRACT_VERSION_MAX - 1
             return contract, "contract"
         result, request_id = await super().request_json(
             method, target, body=body, **kwargs
         )
-        if target == "plans":
-            result["tool"] = self.tool
         return result, request_id
 
     def _fail_context(self):
@@ -2823,17 +2890,16 @@ class _LifecycleContextREST(_WorkflowREST):
 
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-@pytest.mark.parametrize("tool", ["ask", "create", "organize"])
-def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool):
+def test_starters_bundle_current_context_without_an_actor_or_inventory_read():
     async def exercise():
-        rest = _LifecycleContextREST(tool)
+        rest = _LifecycleContextREST()
         adapter = LagniappeAdapter(
             ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
             rest=rest,
         )
         await adapter.initialize()
         result = await adapter.execute(
-            f"start_{tool}", {"instructions": "A natural request."}
+            "start_plan", {"instructions": "A natural request."}
         )
         return result.value, rest.requests
 
@@ -2848,7 +2914,7 @@ def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool
     contract = value["context"]["contract"]
     assert contract["current_date"] == "2026-09-04"
     assert contract["timezone"] == "UTC"
-    assert contract["tool"] == tool
+    assert "tool" not in contract
     assert contract["proposal_schema"] == _contract()["proposal_schema"]
     assert "personal_page" in contract
     instructions = contract["mcp_submission"]["instructions"]
@@ -2868,7 +2934,7 @@ def test_starters_bundle_current_context_without_an_actor_or_inventory_read(tool
 
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-@pytest.mark.parametrize("failure", ["transport", "oversize", "private", "wrong_tool"])
+@pytest.mark.parametrize("failure", ["transport", "oversize", "private", "incompatible"])
 def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(
     failure,
 ):
@@ -2880,7 +2946,7 @@ def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(
         )
         await adapter.initialize()
         result = await adapter.execute(
-            "start_create", {"instructions": "Create a reminder."}
+            "start_plan", {"instructions": "Create a reminder."}
         )
         return result.value, rest.requests
 
@@ -2919,7 +2985,6 @@ def test_upload_bundles_final_contract_without_replaying_successful_finalization
         assert contract["upload_inventory"]["status"] == "finalized"
         assert contract["upload_inventory"]["files"] == []
         plan = _plan()
-        plan["tool"] = "organize"
         plan["files"] = deepcopy(finalized_files)
         rest.files = deepcopy(finalized_files)
         rest.failure = failure
@@ -2928,7 +2993,7 @@ def test_upload_bundles_final_contract_without_replaying_successful_finalization
     monkeypatch.setattr(files_module, "upload_local_files", uploaded)
 
     async def exercise():
-        rest = _LifecycleContextREST("organize")
+        rest = _LifecycleContextREST()
         adapter = LagniappeAdapter(
             ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
             rest=rest,
@@ -2960,7 +3025,7 @@ def test_upload_bundles_final_contract_without_replaying_successful_finalization
         assert "hash:zyxwvutsrqpo" not in compact_json(value)
     else:
         contract = value["context"]["contract"]
-        assert contract["tool"] == "organize"
+        assert "tool" not in contract
         assert contract["upload_inventory"]["status"] == "finalized"
         assert contract["upload_inventory"]["authoritative"] is True
         assert contract["upload_inventory"]["count"] == 1
@@ -2979,7 +3044,7 @@ def test_context_enrichment_remains_cancellable():
         )
         await adapter.initialize()
         with pytest.raises(asyncio.CancelledError):
-            await adapter.execute("start_create", {"instructions": "Make a reminder."})
+            await adapter.execute("start_plan", {"instructions": "Make a reminder."})
         assert len(rest.requests) == 2
 
     asyncio.run(exercise())
@@ -2987,52 +3052,6 @@ def test_context_enrichment_remains_cancellable():
 
 # @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-def test_mcp_contract_replaces_rest_refetch_steps_and_resolves_contract_relative_schema():
-    class RestWorkflowRules(_LifecycleContextREST):
-        async def request_json(self, method, target, **kwargs):
-            result, request_id = await super().request_json(method, target, **kwargs)
-            if target.split("?", 1)[0].endswith("/contract"):
-                result["workflow_rules"] = [
-                    "When an answer is ready, fetch the latest contract and submit it without "
-                    "waiting for separate save confirmation. Submission only saves the "
-                    "read-only answer report; it does not modify workspace records. Then give "
-                    "the user the answer and preview_url.",
-                    "Fetch this contract after finalizing uploads and immediately before "
-                    "constructing the proposal.",
-                    "Every uploaded file still requires a grounded summary.",
-                ]
-            return result, request_id
-
-    async def exercise():
-        adapter = LagniappeAdapter(
-            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
-            rest=RestWorkflowRules(),
-        )
-        await adapter.initialize()
-        started = await adapter.execute(
-            "start_create", {"instructions": "A natural request."}
-        )
-        direct = await adapter.execute(
-            "get_plan_contract", {"plan_id": started.value["id"]}
-        )
-        return started.value["context"]["contract"], direct.value
-
-    bundled, direct = asyncio.run(exercise())
-    for contract in (bundled, direct):
-        rules = "\n".join(contract["workflow_rules"])
-        assert "fetch the latest contract" not in rules
-        assert "without waiting for separate save confirmation" not in rules
-        assert "Only when the user asks to save the answer" in rules
-        assert "Fetch this contract after finalizing" not in rules
-        assert "does not modify workspace records" in rules
-        assert "Every uploaded file still requires a grounded summary." in rules
-        assert "submit_plan performs the final fresh-contract check" in rules
-        pointer = contract["mcp_submission"]["proposal_schema"]
-        assert contract[pointer.removeprefix("$.")] == _contract()["proposal_schema"]
-        assert (
-            "relative to this contract object"
-            in contract["mcp_submission"]["instructions"]
-        )
 
 
 # @pair mcp-adapter:product-contract
@@ -3055,17 +3074,15 @@ def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
     # excerpt. Each purpose must still be visible in the 180-character excerpts
     # used by the trial's discovery calls, not hidden behind a common workflow.
     assert instructions is not None
-    assert len(instructions) <= 96
+    assert len(instructions) <= 128
     purposes = {
         "get_actor": "Return the current actor",
         "answer_question": "Get lightweight guidance and personal Page context",
-        "start_ask": "Start a durable Ask report only when the user requests saving",
-        "start_create": "Start a Create Plan to create pages, tasks, or workspace structure",
-        "start_organize": "Start an Organize Plan to update existing records",
+        "start_plan": "Start one Plan for workspace changes",
         "get_plan": "Return current Plan state",
         "get_plan_contract": "Load exact schemas for selected allowed actions",
         "upload_local_files": "Upload explicit readable nonempty regular files",
-        "submit_plan": "Save an explicitly requested Ask answer or a Create/Organize proposal",
+        "submit_plan": "Save an explicitly requested answer or a mutation proposal",
         "search": "Search within the current Plan",
     }
     for name, purpose in purposes.items():
@@ -3073,7 +3090,7 @@ def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
         assert description.startswith(purpose)
         assert purpose in f"{instructions}\n{description}"[:180]
 
-    for name in ("start_ask", "start_create", "start_organize"):
+    for name in ("start_plan",):
         tool = tools[name]
         assert tool.annotations.idempotent_hint is False
         assert "Each call creates a new report" in tool.description
@@ -3083,11 +3100,10 @@ def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
             "recovery read without repeating the successful start" in tool.description
         )
 
-    assert "submit the already-agreed answer" in tools["start_ask"].description
-    for name in ("start_create", "start_organize"):
+    for name in ("start_plan",):
         assert "never executes workspace changes" in tools[name].description
-    assert "Remote updates do not require a file" in tools["start_organize"].description
-    assert "get_plan_contract(actions=[...])" in tools["start_organize"].description
+    assert "Instructions and uploads are optional individually" in tools["start_plan"].description
+    assert "selected schemas" in tools["start_plan"].description
     assert "complete_task" not in tools
     for name in ("upload_local_files",):
         assert "complete file evidence" in tools[name].description
@@ -3165,7 +3181,7 @@ def test_read_descriptions_localize_result_recovery_without_changing_catalog_sch
     assert "Reuse attached Form schemas" in tools["get_entity"].description
     assert "not complete inspection" in tools["get_file"].description
     assert (
-        "include_original=true delivers only bounded supported image/audio"
+        "include_original=true delivers small supported images/audio inline"
         in tools["get_file"].description
     )
 

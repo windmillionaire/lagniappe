@@ -10,6 +10,7 @@ from .pages import pages
 from .process import process
 from .manual import manual
 from .reference import reference
+from .help import help_pages
 from .filters import filters
 from .assets import assets
 from .testing import testing
@@ -30,6 +31,7 @@ __all__ = [
     "process",
     "manual",
     "reference",
+    "help_pages",
     "filters",
     "assets",
     "testing",

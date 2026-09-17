@@ -1,4 +1,4 @@
-"""Input-file preparation for Organize reports."""
+"""Input-file preparation for AI reports."""
 
 from lagniappe.core.definitions import LARGE_ASSET_BYTES
 
@@ -13,7 +13,7 @@ OVERSIZED_REPORT_SUMMARY = "File too large to summarize."
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/planner.py::generate_report
 # @reason summary presence is exercised through organize summary and completion tests
 def _has_report_file_summary(file):
     return bool(str(getattr(file, "summary", None) or "").strip())
@@ -21,7 +21,7 @@ def _has_report_file_summary(file):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/planner.py::generate_report
 # @reason warning projection is exercised through the report prepass and result
 def _report_file_summary_warning(file):
     summarize = getattr(getattr(file, "properties", None), "summarize", None)
@@ -83,6 +83,7 @@ def _set_oversized_report_summary(file):
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_saves_missing_summaries
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_falls_back_for_large_files
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_unreadable_pdf_is_saved_skipped_and_reported
+# @matrix ai-report : issue persistence
 # @matrix ai-report : active-request fallback large-file quota search-opt-in summary-prepass unreadable-pdf
 def summarize_report_input_files(
     report,

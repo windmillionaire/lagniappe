@@ -1,6 +1,59 @@
 """Node-backed checks for task-settings and task-form lifecycle behavior."""
 
 
+# @matrix tasks : attach-form model-task-link retained-draft manual-form-choice
+def test_model_task_selection_replaces_form_and_preserves_later_manual_choice(run_node):
+    run_node(r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const context = {
+  FormElement: class { constructor(attributes) { Object.assign(this, attributes); } },
+};
+vm.createContext(context);
+const source = fs.readFileSync("src/script/widgets/taskSettings.mjs", "utf8")
+  .replace(/^import .*;\n/gm, "")
+  .replace(/export class /g, "class ");
+vm.runInContext(source + "\nglobalThis.BaseTaskSettings = BaseTaskSettings;", context);
+const widget = new context.BaseTaskSettings({component: {elt: {querySelector: () => null}}});
+const selected = new Set();
+const formControl = {
+  details: {}, readonly: false,
+  get active() { return selected.size > 0; },
+  clear() { selected.clear(); this.details = {}; },
+  addOption(option) { selected.add(option.id); this.details = option; },
+};
+widget.buttons.selectForm = formControl;
+function choose(name, option) {
+  widget._formUpdatedListener({detail: {name, options: option ? {[option.id]: option} : {}}});
+}
+const first = {id: "first-form"};
+const second = {id: "second-form"};
+choose("project", {id: "first-model", kind: "model", form: first});
+assert.deepEqual([...selected], [first.id]);
+choose("project", {id: "second-model", kind: "model", form: second});
+assert.deepEqual([...selected], [second.id], "The retained form must be replaced, not added alongside the new form");
+choose("project", {id: "second-model", kind: "model", form: second});
+assert.deepEqual([...selected], [second.id]);
+
+const manual = {id: "manual-form"};
+formControl.clear();
+formControl.addOption(manual);
+choose("form", manual);
+choose("project", {id: "plain-project", kind: "project"});
+choose("project", {id: "formless-model", kind: "model"});
+choose("project", null);
+choose("category", {id: "category", form: first});
+assert.deepEqual([...selected], [manual.id], "A later manual choice remains until a model with a form is selected");
+
+formControl.readonly = true;
+choose("project", {id: "first-model", kind: "model", form: first});
+assert.deepEqual([...selected], [manual.id]);
+delete widget.buttons.selectForm;
+choose("project", {id: "first-model", kind: "model", form: first});
+''')
+
+
 # @matrix tasks : active-widget complete uncomplete update-state
 def test_closed_task_errors_persist_while_waiting_and_retrying(run_node):
     run_node(r'''

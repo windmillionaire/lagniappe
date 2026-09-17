@@ -10,9 +10,9 @@ Use the focused guides alongside this overview:
 | Guide | Covers |
 | --- | --- |
 | [AI_CONTEXT.md](AI_CONTEXT.md) | Prompt construction, model calls, tools, context growth, validation, and observability. |
-| [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Ask, Create, Organize, Autofill, file summary, and reviewed report execution. |
-| [AI_EMAIL.md](AI_EMAIL.md) | Resend setup, signed inbound email, workflow routing, and feedback. |
-| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | Bearer credentials, shared read tools, uploads, and provider-free Organize proposals. |
+| [AI_WORKFLOWS.md](AI_WORKFLOWS.md) | Unified reports, Autofill, file summary, and reviewed report execution. |
+| [AI_EMAIL.md](AI_EMAIL.md) | Resend setup, signed inbound email, unified intake, and feedback. |
+| [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | Bearer credentials, shared read tools, uploads, and provider-free answers and proposals. |
 | [BACKEND_JOBS.md](BACKEND_JOBS.md) | Durable job records, locks, leases, retries, recovery, and browser status. |
 
 ## End-to-end path
@@ -45,11 +45,10 @@ target determines whether that outcome succeeded.
 
 External clients can enter the report pipeline without invoking the configured
 provider. The external-agent API creates a draft report, exposes the shared
-read-tool registry, and validates a tool-specific Ask, Create, or Organize
-contract. Ask publishes a completed read-only answer. Create and Organize
-publish at the normal ready-for-review boundary and can enter the same
-deterministic execution adapter only after the creator approves the saved
-report in an authenticated browser session.
+read-tool registry, and validates one proposal contract. Empty actions publish a
+completed answer; nonempty actions publish at the ready-for-review boundary.
+Questions need no saved report unless the external client is asked to save.
+Mutations always require a proposal and authenticated browser approval.
 
 ## Safety boundaries
 
@@ -62,9 +61,9 @@ report in an authenticated browser session.
   deterministic execution rechecks current resource permissions action by
   action.
 - Report output uses typed action contracts, deterministic normalization,
-  repair, and review-only fallback for unsafe actions.
+  and validation feedback in the same conversation.
 - Model-authored prose uses Markdown contracts. Interactive editor text,
-  static task-form content, Ask answers, and created Page documents are
+  static task-form content, answers, and created Page documents are
   converted and sanitized by application-owned policies before executable HTML
   is returned or stored; raw model HTML is rejected.
 - Report application is a separate user-approved operation with its own
@@ -85,7 +84,7 @@ report in an authenticated browser session.
 | Prompt structure and preview | `tools/ai/prompt.py` and workflow builders. |
 | Provider lifecycle | `tools/ai/core.py`. |
 | Function declarations and execution | `tools/ai/functions.py`, `function_definitions/`. |
-| Workflow context and stages | `ask.py`, `create.py`, `organize.py`, `autofill.py`, `email_router.py`. |
+| Workflow context and stages | `planner.py`, `autofill.py`. |
 | Proposal schema and validation | `tools/ai/reporting/contracts/`, `proposals/`, `completion/`. |
 | Durable request values | `properties/deferred_job_request.py`, `deferred_job_dispatch.py`, `deferred_job_lifecycle.py`. |
 | Job orchestration | `tools/deferred_jobs/` and `tools/database/deferred_jobs.py`. |
@@ -98,7 +97,7 @@ report in an authenticated browser session.
 Use precise names because the systems have different ownership:
 
 1. A deferred-job checkpoint stores prepared adapter output before final apply.
-2. `AIReport.upload_manifest` records per-file Organize ingestion progress.
+2. `AIReport.upload_manifest` records per-file report ingestion progress.
 3. `AIReport.result` is the action-by-action execution and undo ledger after a
    proposal is approved.
 
@@ -112,8 +111,9 @@ destination. Repeating the same request is idempotent; reusing the UUID for
 different work is rejected.
 
 The worker reloads the actor and inputs at claim time and again before apply.
-Provider-backed adapters declare their required AI tier. Ask needs `AI.ASK`;
-generation, organization, autofill, and file summary need `AI.CREATE`.
+The report planner requires `AI.ASK` and restricts output to answers/evidence
+without `AI.CREATE`. Applying a prepared mutation proposal rechecks `AI.CREATE`.
+Other provider-backed generation and autofill adapters retain their required tiers.
 Reviewed report execution has no provider entitlement because it calls no
 model; its deterministic action handlers enforce current domain authorization
 instead.

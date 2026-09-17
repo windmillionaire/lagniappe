@@ -8,7 +8,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import re
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 from .catalog import (
     ACTOR_SCHEMA,
@@ -35,13 +35,13 @@ from .limits import (
 )
 from .rest import RESTClient
 from .schema import compact_json, json_size, validate_schema_document, validate_value
-from .url_security import quote_path_segment, validate_api_url, validate_human_url
+from .url_security import (
+    quote_path_segment, validate_api_url, validate_human_url, validate_storage_url,
+)
 
 
 PLAN_ROUTES = {
-    "start_ask": ("POST", "plans", "ask"),
-    "start_create": ("POST", "plans", "create"),
-    "start_organize": ("POST", "plans", "organize"),
+    "start_plan": ("POST", "plans", None),
     "get_plan": ("GET", "plans/{plan_id}", None),
     "get_plan_contract": ("GET", "plans/{plan_id}/contract", None),
     "upload_sessions": ("POST", "plans/{plan_id}/uploads", None),
@@ -153,6 +153,41 @@ def _reject_private_model_data(value: Any, *, bearer: str) -> None:
             )
 
 
+# @testable true
+# @pair mcp-adapter:product-contract
+# @tests tests_unit/test_033_mcp_adapter.py::test_original_download_capability_is_scoped_to_requested_file_result
+def validate_file_result(value: Any, *, arguments: dict, bearer: str) -> None:
+    """Permit one explicitly requested, validated original download capability."""
+    screened = deepcopy(value)
+    delivery = screened.get("delivery") if isinstance(screened, dict) else None
+    if isinstance(delivery, dict) and delivery.get("kind") == "download":
+        original = screened.get("original_file")
+        if (
+            arguments.get("include_original") is not True
+            or not isinstance(original, dict)
+            or original.get("supported") is not True
+            or original.get("attached") is not False
+            or not isinstance(original.get("download_url"), str)
+        ):
+            raise TransportError(
+                "invalid_download", "Original download delivery is invalid."
+            )
+        url = original.pop("download_url")
+        if bearer in url or bearer in unquote(url):
+            raise TransportError(
+                "unsafe_transport_extension",
+                "Original download contains private authentication data.",
+            )
+        validate_storage_url(url, upload=False)
+        expires = original.get("expires_in")
+        signed_expires = dict(parse_qsl(urlsplit(url).query))["X-Goog-Expires"]
+        if type(expires) is not int or expires != int(signed_expires):
+            raise TransportError(
+                "invalid_download", "Original download expiration is inconsistent."
+            )
+    _reject_private_model_data(screened, bearer=bearer)
+
+
 @dataclass(frozen=True, slots=True)
 class MediaContent:
     """One bounded original-file payload for an MCP content block."""
@@ -255,7 +290,10 @@ class LagniappeAdapter:
         except asyncio.CancelledError:
             raise
 
-        _reject_private_model_data(result.value, bearer=self.config.api_key)
+        if name == "get_file":
+            validate_file_result(result.value, arguments=value, bearer=self.config.api_key)
+        else:
+            _reject_private_model_data(result.value, bearer=self.config.api_key)
         _reject_private_model_data(
             tuple(item.data for item in result.media),
             bearer=self.config.api_key,
@@ -277,12 +315,12 @@ class LagniappeAdapter:
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _start_plan(self, kind: str, arguments: dict[str, Any]) -> AdapterResult:
-        method, route, tool = PLAN_ROUTES[kind]
-        body = {"tool": tool, "instructions": arguments["instructions"]}
+        method, route, _ = PLAN_ROUTES[kind]
+        body = {"instructions": arguments.get("instructions", "")}
         if "name" in arguments:
             body["name"] = arguments["name"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
-        plan = self._safe_plan(value, expected_tool=tool)
+        plan = self._safe_plan(value)
         return await self._with_lifecycle_context(
             plan, plan_id=plan["id"], actions=arguments.get("actions")
         )
@@ -294,62 +332,38 @@ class LagniappeAdapter:
         value: dict[str, Any],
         *,
         plan_id: str,
-        organize_guidelines: bool = False,
         actions: list[str] | None = None,
     ) -> AdapterResult:
         """Bundle a read without turning a successful mutation into a retry."""
-        tool = "get_guidelines" if organize_guidelines else "get_plan_contract"
+        tool = "get_plan_contract"
         arguments = {"plan_id": plan_id}
-        if organize_guidelines:
-            arguments["task"] = "organize"
-        elif actions is not None:
+        if actions is not None:
             arguments.update(actions=actions, view="full")
         try:
-            if organize_guidelines:
-                definition = self.tools.get(tool)
-                if definition is None:
+            result = await self._get_contract_projection(
+                plan_id, actions=actions, view="full" if actions is not None else "summary",
+            )
+            if "upload_inventory" in value:
+                # A second caller can change the Plan between successful
+                # finalization and this read. Keep the completed upload's
+                # receipt, but do not bundle contradictory working context.
+                finalized_files = value["upload_inventory"]
+                inventory = result.value["upload_inventory"]
+                if (
+                    not isinstance(inventory, dict)
+                    or inventory.get("status") != "finalized"
+                    or inventory.get("authoritative") is not True
+                    or type(inventory.get("count")) is not int
+                    or inventory["count"] != len(finalized_files)
+                    or inventory.get("files") != finalized_files
+                    or result.value["required_file_refs"]
+                    != [item["ref"] for item in finalized_files]
+                ):
                     raise TransportError(
-                        "missing_guidelines", "Guidelines unavailable."
+                        "context_changed",
+                        "Upload context no longer matches finalization.",
                     )
-                validate_value(definition.input_schema, arguments, phase="input")
-                result = await self._read_tool(definition, arguments)
-                if not isinstance(result.value, dict) or "error" in result.value:
-                    raise TransportError(
-                        "invalid_guidelines", "Guidelines unavailable."
-                    )
-                context = {"guidelines": result.value}
-            else:
-                result = await self._get_contract_projection(
-                    plan_id,
-                    actions=actions,
-                    view="full" if actions is not None else "summary",
-                )
-                expected_tool = value.get("tool") or value["plan"]["tool"]
-                if result.value["tool"] != expected_tool:
-                    raise TransportError(
-                        "invalid_response", "Context does not match the Plan tool."
-                    )
-                if "upload_inventory" in value:
-                    # A second caller can change the Plan between successful
-                    # finalization and this read. Keep the completed upload's
-                    # receipt, but do not bundle contradictory working context.
-                    finalized_files = value["upload_inventory"]
-                    inventory = result.value["upload_inventory"]
-                    if (
-                        not isinstance(inventory, dict)
-                        or inventory.get("status") != "finalized"
-                        or inventory.get("authoritative") is not True
-                        or type(inventory.get("count")) is not int
-                        or inventory["count"] != len(finalized_files)
-                        or inventory.get("files") != finalized_files
-                        or result.value["required_file_refs"]
-                        != [item["ref"] for item in finalized_files]
-                    ):
-                        raise TransportError(
-                            "context_changed",
-                            "Upload context no longer matches finalization.",
-                        )
-                context = {"contract": result.value}
+            context = {"contract": result.value}
             enriched = AdapterResult({**value, "context": context})
             _reject_private_model_data(enriched.value, bearer=self.config.api_key)
             self._enforce_result_limits(enriched)
@@ -409,11 +423,9 @@ class LagniappeAdapter:
                             if actions is not None
                             else {}
                         ),
-                        **({"view": view} if view != "full" else {}),
+                        "view": view,
                     }
                 )
-                if actions is not None or view != "full"
-                else ""
             ),
         )
         if not isinstance(value, dict):
@@ -459,35 +471,14 @@ class LagniappeAdapter:
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _get_contract_projection(
-        self, plan_id: str, *, actions=None, view="full"
+        self, plan_id: str, *, actions=None, view="summary"
     ) -> AdapterResult:
         contract = await self._load_contract(plan_id, actions=actions, view=view)
         submission = contract.pop("submission_format")
-        # These contract-v6 clauses describe REST client orchestration. Keep
-        # their domain/review semantics, but present the MCP-owned equivalent
-        # rather than instructing the model to repeat the adapter's reads.
-        workflow_rules = [
-            rule.replace(
-                "When an answer is ready, fetch the latest contract and submit it "
-                "without waiting for separate save confirmation.",
-                "Only when the user asks to save the answer, call submit_plan.",
-            ).replace(
-                "Fetch this contract after finalizing uploads and immediately "
-                "before constructing the proposal.",
-                "Use the current contract supplied in upload completion's "
-                "context.contract for current file references and permissions. "
-                "If proposal_schema is null, use get_plan_contract with the "
-                "selected actions before constructing the proposal. If that context "
-                "is unavailable or relevant state changes, use get_plan_contract. "
-                "submit_plan performs the final fresh-contract check.",
-            )
-            for rule in contract.get("workflow_rules", [])
-        ]
-        if "workflow_rules" in contract:
-            contract["workflow_rules"] = workflow_rules
         contract["mcp_submission"] = {
             "contract_version": submission["contract_version"],
             "proposal": {},
+            "file_usage": [],
             "proposal_schema": "$.proposal_schema",
             "instructions": MCP_SUBMISSION_INSTRUCTIONS,
         }
@@ -513,6 +504,8 @@ class LagniappeAdapter:
         )
         submission = contract["submission_format"]
         body = deepcopy(submission["body"])
+        validate_value(contract["file_usage_schema"], arguments["file_usage"], phase="file_usage")
+        body["file_usage"] = deepcopy(arguments["file_usage"])
         body["proposal"] = deepcopy(arguments["proposal"])
         for field in ("name", "instructions"):
             if field in arguments:
@@ -531,7 +524,7 @@ class LagniappeAdapter:
 
         plan_id = arguments["plan_id"]
         contract = await self._load_contract(plan_id)
-        if contract["tool"] != "organize" or contract["uploads_supported"] is not True:
+        if contract["uploads_supported"] is not True:
             raise AdapterError(
                 "uploads_not_supported", "This Plan does not accept file uploads."
             )
@@ -587,6 +580,9 @@ class LagniappeAdapter:
     # @tests tests_unit/test_033_mcp_adapter.py::test_requested_unsupported_original_is_a_bounded_tool_error
     # @tests tests_unit/test_033_mcp_adapter.py::test_requested_missing_original_is_a_bounded_tool_error
     # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_mime_must_match_upstream_file_metadata
+    # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_fallback_preserves_source_without_fetching_binary
+    # @tests tests_unit/test_033_mcp_adapter.py::test_oversized_original_media_falls_back_only_for_size_limit
+    # @tests tests_unit/test_033_mcp_adapter.py::test_original_media_delivery_matches_the_emitted_content_index
     async def _project_file_result(
         self,
         raw_value: Any,
@@ -629,10 +625,17 @@ class LagniappeAdapter:
                 for field in ("supported", "attached", "reason")
                 if field in original
             }
+            value["original_file"]["attached"] = False
             if requested and original.get("supported") is False:
                 raise TransportError(
-                    "unsupported_media",
-                    "The requested original is not available as supported MCP media.",
+                    "original_unavailable",
+                    "Original content is unavailable for this file.",
+                )
+            if not requested and original.get("supported") is True:
+                value["original_file"]["reason"] = (
+                    "Call get_file with include_original=true to read the original. "
+                    "Small supported images/audio are delivered inline; other originals "
+                    "use a five-minute download URL for your file or browsing tools."
                 )
             if requested:
                 if not isinstance(download_url, str):
@@ -640,41 +643,45 @@ class LagniappeAdapter:
                         "original_unavailable",
                         "The requested original did not include a safe download.",
                     )
-                data, mime_type = await self.rest.download_media(
-                    download_url,
-                    cap=MAX_MEDIA_RAW_BYTES,
-                )
-                # ``mimetype`` is upstream metadata used to validate the
-                # downloaded bytes, but it is intentionally not part of the
-                # projected MCP result.  Read it from the validated REST value
-                # rather than the allowlisted result projection.
-                declared_mime = raw_value.get("mimetype")
-                if (
-                    isinstance(declared_mime, str)
-                    and declared_mime
-                    and declared_mime != mime_type
-                ):
-                    raise TransportError(
-                        "mime_mismatch",
-                        "Original media type contradicts file metadata.",
-                    )
-                if mime_type in SUPPORTED_IMAGE_MIMES:
-                    kind = "image"
-                elif mime_type in SUPPORTED_AUDIO_MIMES:
-                    kind = "audio"
-                else:
-                    raise TransportError(
-                        "unsupported_media",
-                        "Original MIME type is not supported by this MCP adapter.",
-                    )
-                value["delivery"] = {
-                    "kind": kind,
-                    "mime_type": mime_type,
-                    "size_bytes": len(data),
-                    "content_index": 1,
+                declared_mime = raw_value.get("mimetype") or "application/octet-stream"
+                value["original_file"] = {
+                    "supported": True,
+                    "attached": False,
+                    "download_url": download_url,
+                    "expires_in": original.get("expires_in"),
                 }
-                media = (MediaContent(kind, mime_type, data),)
-        _reject_private_model_data(value, bearer=self.config.api_key)
+                value["delivery"] = {
+                    "kind": "download",
+                    "mime_type": declared_mime,
+                }
+                validate_file_result(value, arguments=arguments, bearer=self.config.api_key)
+                if (
+                    declared_mime in SUPPORTED_IMAGE_MIMES | SUPPORTED_AUDIO_MIMES
+                    and raw_value.get("large") is not True
+                ):
+                    try:
+                        data, mime_type = await self.rest.download_media(
+                            download_url, cap=MAX_MEDIA_RAW_BYTES,
+                        )
+                    except TransportError as error:
+                        if error.code != "media_too_large":
+                            raise
+                    else:
+                        if declared_mime != mime_type:
+                            raise TransportError(
+                                "mime_mismatch",
+                                "Original media type contradicts file metadata.",
+                            )
+                        kind = "image" if mime_type in SUPPORTED_IMAGE_MIMES else "audio"
+                        value["original_file"] = {"supported": True, "attached": True}
+                        value["delivery"] = {
+                            "kind": kind,
+                            "mime_type": mime_type,
+                            "size_bytes": len(data),
+                            "content_index": 1,
+                        }
+                        media = (MediaContent(kind, mime_type, data),)
+        validate_file_result(value, arguments=arguments, bearer=self.config.api_key)
         return AdapterResult(value, media)
 
     # @testable false
@@ -684,7 +691,6 @@ class LagniappeAdapter:
         value: Any,
         *,
         expected_plan_id: str | None = None,
-        expected_tool: str | None = None,
     ) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise TransportError(
@@ -698,10 +704,6 @@ class LagniappeAdapter:
         ):
             raise TransportError(
                 "invalid_response", "Plan response identity does not match the request."
-            )
-        if expected_tool is not None and result.get("tool") != expected_tool:
-            raise TransportError(
-                "invalid_response", "Plan response tool does not match the request."
             )
         encoded = quote_path_segment(plan_id)
         for field, suffix in {

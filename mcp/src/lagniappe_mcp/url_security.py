@@ -184,10 +184,13 @@ def validate_api_url(
                     key == "view"
                     and item in {"full", "summary", "schema"}
                     or key == "actions"
-                    and 1 <= len(item.split(",")) <= 100
-                    and all(
-                        re.fullmatch(r"[a-z][a-z0-9_]{0,63}", action)
-                        for action in item.split(",")
+                    and (
+                        item == ""
+                        or 1 <= len(item.split(",")) <= 100
+                        and all(
+                            re.fullmatch(r"[a-z][a-z0-9_]{0,63}", action)
+                            for action in item.split(",")
+                        )
                     )
                 )
                 for key, item in pairs

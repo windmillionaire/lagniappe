@@ -27,15 +27,26 @@ export class BaseTaskSettings extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
 	 * @matrix tasks : attach-form create model-task-link
+	 * @matrix tasks : retained-draft manual-form-choice
 	 */
 	_formUpdatedListener(e) {
 		const project = e.detail.options
 			? Object.values(e.detail.options)[0]
 			: null;
-		const formSelected = this.buttons.selectForm?.active;
-		if (project?.form && !formSelected) {
-			this.buttons.selectForm.addOption(project.form);
+		const formControl = this.buttons.selectForm;
+		if (
+			e.detail.name === "project" &&
+			project?.form &&
+			formControl &&
+			!formControl.readonly
+		) {
+			if (formControl.details?.id !== project.form.id) {
+				formControl.clear();
+				formControl.addOption(project.form);
+			}
 		} else if (e.detail.name === "form") {
 			const options = Object.keys(e.detail.options);
 			if (options.length === 0) return;

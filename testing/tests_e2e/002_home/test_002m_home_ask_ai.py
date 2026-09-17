@@ -45,15 +45,12 @@ def _start_ask_report(user, question):
     home = user.go(SitePages.HOME)
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
-    form.locator("[data-role='tool-switcher']").get_by_role(
-        "button", name="Ask"
-    ).click()
     form.locator("textarea[name='instructions']").fill(question)
 
     with expect_successful_response(
         user.page,
         method="POST",
-        path="/tools/ask",
+        path="/tools/ai",
     ) as response_info:
         form.get_by_role("button", name="Start").click()
 
@@ -67,13 +64,12 @@ def _start_ask_report(user, question):
     item = report_list.list.locator(f"li[data-key='{report_key}']")
     expect(item).to_be_visible()
     expect(item.locator("[data-role='report-stage']")).to_have_text(
-        "Answer pending"
+        "Proposal pending"
     )
     expect(item).to_have_attribute("data-operation", operation)
 
     report = Entities.fetch_one(report_key, request=Fetch.direct())
     job = Entities.fetch_one(operation, request=Fetch.direct())
-    assert report.tool == "ask"
     assert report.instructions == question
     assert report.status == "pending"
     assert report.pending is True
@@ -176,9 +172,14 @@ def _run_ask_job(page, report, job, ai_results, *, quota_fallback):
     ai_results.record("deferred_job_attempts", attempt_records)
     assert saved_job.status == DeferredJobStatus.SUCCEEDED.value, attempt_records
     assert saved_job.checkpoint == {
+        "schema_version": 1,
+        "stage": "ready_to_apply",
         "proposal": response,
+        "file_usage": [],
         "status": saved_report.status,
     }
+    # These questions use existing workspace files; empty DB properties read as None.
+    assert not saved_report.file_usage
     assert saved_report.status in {"ready", "complete"}
     assert not saved_report.pending
     return response, saved_report

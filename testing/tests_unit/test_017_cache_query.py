@@ -845,7 +845,7 @@ def test_exact_name_search_is_bounded_permission_and_parent_scoped(monkeypatch):
 
     assert [result["name"] for result in results] == ["Recovery"]
     assert captured["query"]._query_string == (
-        "(@name:recovery*) (@kind:{ page }) (@requires:{ category-hash }) "
+        "(@name:recovery*) (-@kind:{ help }) (@kind:{ page }) (@requires:{ category-hash }) "
         "(@requires:{ models | actor-hash }) "
         "(ismissing(@restricted_to_page) | @restricted_to_page:{ grouphash }) "
         "(ismissing(@restricted_to_page_form) | @restricted_to_page_form:{ grouphash }) "
@@ -1004,7 +1004,9 @@ def test_json_parent_lookup_skips_empty_parent_query():
 # @matrix cache : flush-db rebuild
 @pytest.mark.unit
 def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
+    from lagniappe.core.tools.cache import help as help_cache
     calls = []
+    monkeypatch.setattr(help_cache, "ensure_help", lambda: calls.append(("help",)))
 
     class FakeCache:
         INDEX = "search-idx"
@@ -1031,13 +1033,16 @@ def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
         ("flush", "search-idx"),
         ("create", "search-idx"),
         ("create", "filter-idx"),
+        ("help",),
     ]
 
 
 # @matrix cache : prefix-isolation rebuild
 @pytest.mark.unit
 def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatch):
+    from lagniappe.core.tools.cache import help as help_cache
     calls = []
+    monkeypatch.setattr(help_cache, "ensure_help", lambda: calls.append(("help",)))
 
     class FakeCache:
         INDEX = "test-search-idx"
@@ -1077,6 +1082,7 @@ def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatc
         ("drop", "test-filter-idx"),
         ("create", "test-search-idx"),
         ("create", "test-filter-idx"),
+        ("help",),
     ]
 
 

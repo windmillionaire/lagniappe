@@ -10,7 +10,7 @@ from lagniappe.core.definitions import (
     DeferredJobPhase,
     DeferredJobStatus,
     DeferredJobType,
-    Fetch,
+    Fetch, FetchReason,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai
@@ -508,64 +508,25 @@ def _needs_review_report(user):
 def test_tools_create_form_has_expected_controls(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
-
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
-
     expect(form).to_be_visible()
-    expect(form.locator("[data-role='title']")).to_have_text("AI Tools")
-    help_button = form.locator("[lp-help='ai_tools']")
-    expect(help_button).to_be_visible()
-    help_button.click()
-    expect(user.page.get_by_text("What This Panel Does")).to_be_visible()
-    expect(user.page.get_by_text("Available Tools")).to_be_visible()
-    expect(user.page.get_by_text("Ask a question about your workspace")).to_be_visible()
-    Modal(user.page).close()
-    expect(form.locator("[lp-close='tools']")).to_be_visible()
-    switcher = form.locator("[data-role='tool-switcher']")
-    expect(switcher).to_contain_text("Organize")
-    expect(switcher).to_contain_text("Ask")
-    expect(switcher).to_contain_text("Create")
-    expect(form.locator("h3", has_text="Context")).not_to_be_attached()
-    dropzone = form.locator("[data-role='dropzone']")
-    expect(dropzone).to_contain_text("Drop files")
+    expect(form.locator("[data-role='title']")).to_have_text("Create a Plan")
+    expect(form.locator("[data-role='tool-switcher']")).to_have_count(0)
+    expect(form.locator("[data-role='dropzone']")).to_be_visible()
     instructions = form.locator("textarea[name='instructions']")
-    expect(instructions).to_be_visible()
-    explain_button = form.locator(Buttons.EXPLAIN)
-    expect(explain_button.locator(":scope > span:not([data-icon])")).to_have_text(
-        "Initial Prompt"
-    )
-    expect(explain_button).not_to_be_visible()
-    instructions.fill("Sort this into the right place.")
-    expect(explain_button).to_be_visible()
-    expect(explain_button).to_have_accessible_name("Initial Prompt")
-    with user.page.expect_response("**/tools/organize"):
-        explain_button.click()
-    expect(user.page.locator("#modal")).to_contain_text(
-        "planning updates to existing records."
-    )
+    expect(instructions).to_have_attribute("placeholder", "Ask a question or describe what you want done…")
+    explain = form.locator(Buttons.EXPLAIN)
+    expect(explain).not_to_be_visible()
+    form.get_by_role("button", name="Start").click()
+    expect(form).to_contain_text("Add files or instructions")
+    instructions.fill("Create a task and move its file.")
+    expect(explain).to_be_visible()
+    with user.page.expect_response("**/tools/ai"):
+        explain.click()
+    expect(user.page.locator("#modal")).to_contain_text("get_guidelines")
+    expect(user.page.locator("#modal")).to_contain_text("create_task")
     Modal(user.page).close()
-    switcher.get_by_role("button", name="Ask").click()
-    expect(dropzone).not_to_be_visible()
-    expect(instructions).to_have_attribute(
-        "placeholder", "Ask a question about your workspace..."
-    )
-    with user.page.expect_response("**/tools/ask"):
-        explain_button.click()
-    expect(user.page.get_by_text("Answer the user's question directly")).to_be_visible()
-    Modal(user.page).close()
-    switcher.get_by_role("button", name="Create").click()
-    expect(dropzone).not_to_be_visible()
-    expect(instructions).to_have_attribute(
-        "placeholder", "Describe what you want Lagniappe to create..."
-    )
-    with user.page.expect_response("**/tools/create"):
-        explain_button.click()
-    expect(user.page.get_by_text("Create Report Output Requirements")).to_be_visible()
-    Modal(user.page).close()
-    switcher.get_by_role("button", name="Organize").click()
-    expect(dropzone).to_be_visible()
-    expect(form.get_by_role("button", name="Start")).to_be_visible()
 
 
 # @matrix ai-access : authentication route-gate
@@ -587,10 +548,10 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         creator=owner,
     )
 
-    for tier, expected_statuses, visible_tools in (
-        (AI.NONE, (403, 403, 403), ()),
-        (AI.ASK, (403, 200, 403), ("Ask",)),
-        (AI.CREATE, (200, 200, 200), ("Organize", "Ask", "Create")),
+    for tier, expected_statuses in (
+        (AI.NONE, (403,)),
+        (AI.ASK, (200,)),
+        (AI.CREATE, (200,)),
     ):
         entity = Entities.USER.load(user.email)
         if entity.ai_access != tier.name:
@@ -641,14 +602,12 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
             toggle.click()
             form = user.locate(home.CREATE_TOOL_REPORT_FORM)
             expect(form).to_be_visible()
-            switcher = form.locator("[data-role='tool-switcher']")
-            for tool in ("Organize", "Ask", "Create"):
-                button = switcher.get_by_role("button", name=tool, exact=True)
-                expect(button).to_have_count(1 if tool in visible_tools else 0)
+            expect(form.locator("[data-role='tool-switcher']")).to_have_count(0)
+            expect(form.locator("[data-role='dropzone']")).to_be_visible()
 
         statuses = []
         for path, expected_status in zip(
-            ("/tools/organize", "/tools/ask", "/tools/create"),
+            ("/tools/ai",),
             expected_statuses,
             strict=True,
         ):
@@ -747,7 +706,7 @@ def test_create_tool_starts_pending_report(get_user, cold_list):
     user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
     report_panel = user.locate(home.TOOL_REPORT_LIST)
     expect(report_panel).to_have_attribute("loaded", "")
-    for category in ("active", "ask", "executed"):
+    for category in ("active", "answers", "executed"):
         report_panel.locator(
             f"[data-role='report-filter'][data-filter='{category}']"
         ).click()
@@ -763,16 +722,13 @@ def test_create_tool_starts_pending_report(get_user, cold_list):
 
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
-    form.locator("[data-role='tool-switcher']").get_by_role(
-        "button", name="Create"
-    ).click()
     form.locator("textarea[name='instructions']").fill(instructions)
 
-    with user.page.expect_response("**/tools/create"):
+    with user.page.expect_response("**/tools/ai"):
         form.get_by_role("button", name="Start").click()
 
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
-    report_name = f"Create: {instructions[:80]}..."
+    report_name = f"{instructions[:80]}..."
     item = report_list.new_item(report_name, flash=False)
     expect(report_panel.locator("[data-filter='active']")).to_have_attribute(
         "aria-pressed", "true"
@@ -788,7 +744,6 @@ def test_create_tool_starts_pending_report(get_user, cold_list):
 
     report = Entities.fetch_one(item.get_attribute("data-key"), request=Fetch.direct())
     assert report.name == report_name
-    assert report.tool == "create"
     assert report.instructions == instructions
     assert report.input_files == []
     assert report.status == "pending"
@@ -815,7 +770,7 @@ def test_lazy_report_list_reconciles_active_job_status(get_user):
     job = Entities.DEFERRED_JOB.create(
         {
             "actor": owner,
-            "job_type": DeferredJobType.REPORT_ORGANIZE.value,
+            "job_type": DeferredJobType.REPORT_AI.value,
             "idempotency_key": f"recovering-report-{suffix}",
             "status": DeferredJobStatus.RETRY_WAIT.value,
             "dispatch_state": "dispatched",
@@ -850,7 +805,6 @@ def test_lazy_report_list_reconciles_active_job_status(get_user):
 
 
 # @matrix ai-report : remote-update async create text-only
-# @template home/tools.html::tool_switcher
 # @template home/tools.html::create_report
 def test_text_only_organize_plans_updates(get_user):
     user = get_user(Users.OWNER)
@@ -861,15 +815,14 @@ def test_text_only_organize_plans_updates(get_user):
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
     form.locator("textarea[name='instructions']").fill(question)
 
-    with user.page.expect_response("**/tools/organize"):
+    with user.page.expect_response("**/tools/ai"):
         form.get_by_role("button", name="Start").click()
 
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
-    item = report_list.new_item("Organize: " + question, flash=False)
+    item = report_list.new_item(question, flash=False)
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
 
     report = Entities.fetch_one(item.get_attribute("data-key"), request=Fetch.direct())
-    assert report.tool == "organize"
     assert report.instructions == question
     assert report.input_files == []
 
@@ -895,7 +848,7 @@ def test_open_pending_report_converges_with_notification(get_user, surface):
     job = Entities.DEFERRED_JOB.create(
         {
             "actor": owner,
-            "job_type": DeferredJobType.REPORT_ORGANIZE.value,
+            "job_type": DeferredJobType.REPORT_AI.value,
             "idempotency_key": f"report-convergence-{suffix}",
             "status": "running",
             "dispatch_state": "dispatched",
@@ -989,13 +942,13 @@ def test_organize_rejects_zero_byte_folder_placeholder(get_user, browser_failure
     with browser_failures.expect_http_error(
         user,
         status=422,
-        path="/tools/organize",
+        path="/tools/ai",
     ):
         result = user.page.evaluate(
             """async () => {
                 const body = new FormData();
                 body.append("tool-files", new File([], "documents"));
-                const response = await fetch("/tools/organize", {
+                const response = await fetch("/tools/ai", {
                     method: "POST",
                     credentials: "include",
                     headers: {
@@ -1017,21 +970,17 @@ def _create_uploaded_report_item(user):
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
     expect(form).to_be_visible()
-    form.locator("textarea[name='instructions']").fill(
-        f"test organize instructions {_suffix()}"
-    )
+    form.locator("textarea[name='instructions']").fill("")
     Uploads.plain_text_file.set(form)
 
-    with user.page.expect_response("**/tools/organize"):
+    with user.page.expect_response("**/tools/ai") as response_info:
         form.get_by_role("button", name="Start").click()
 
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
     assert report_list.is_loaded
-    item = report_list.list.locator(
-        "li[data-name='Organize: sample_notes.txt'][data-pending='true']"
-    )
+    key = re.search(r'data-key="([^"]+)"', response_info.value.json()["html"]).group(1)
+    item = report_list.list.locator(f"li[data-key='{key}']")
     expect(item).to_be_visible()
-    item = report_list.list.locator(f"li[data-key='{item.get_attribute('data-key')}']")
     report = Entities.fetch_one(item.get_attribute("data-key"), request=Fetch.direct())
     return item, report
 
@@ -1104,10 +1053,10 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     user = get_user(Users.OWNER)
     item, report = _create_uploaded_report_item(user)
     expect(item.locator("[data-role='title']")).to_have_text(
-        "Organize: sample_notes.txt"
+        "sample_notes.txt"
     )
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
-    expect(item).to_contain_text("Analyzing files...")
+    expect(item).to_contain_text("Thinking...")
     expect(item.locator("[lp-delete]")).to_be_visible()
 
     report_key = item.get_attribute("data-key")
@@ -1152,9 +1101,8 @@ def test_report_list_item_refreshes_stage_labels(get_user):
         timeout=30_000,
     )
     expect(item).to_contain_text("Ready from deferred refresh.")
-    expect(item).not_to_contain_text("Analyzing files...")
+    expect(item).not_to_contain_text("Thinking...")
 
-    report.tool = "organize"
     report.status = "ready"
     report.proposal = {
         "summary": "Executable proposal.",
@@ -1167,7 +1115,6 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     item = reload_item()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal ready")
 
-    report.tool = "create"
     report.status = "complete"
     report.proposal = {
         "summary": "Executed proposal.",
@@ -1178,7 +1125,6 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     user.locate("[data-role='report-filter'][data-filter='executed']").click()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal executed")
 
-    report.tool = "ask"
     report.proposal = {
         "summary": "Answer summary.",
         "answer_html": "<p>Answer body.</p>",
@@ -1472,7 +1418,7 @@ def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
     expect(
         user.page.get_by_role("heading", name="Suggested Actions")
     ).not_to_be_visible()
-    expect(user.page.get_by_role("button", name="Revise Response")).not_to_be_attached()
+    expect(user.page.get_by_role("button", name="Revise Response")).to_be_visible()
     answer = report_page.answer
     expect(answer.get_by_role("link", name="Dance-Punk")).to_have_attribute(
         "href", "/tasks/dance-punk"
@@ -1514,7 +1460,7 @@ def test_report_revision_is_only_available_before_completion(
         Entities.save(report)
 
         user.go(Report.for_entity(user, report))
-        button_name = "Revise Response" if tool == "ask" else "Revise Plan"
+        button_name = "Revise Plan"
         expect(user.page.get_by_role("button", name=button_name)).to_be_visible()
 
         report.status = "complete"
@@ -2008,3 +1954,37 @@ def test_report_detail_skips_schema_section_and_dependent_submission_updates(get
         field for field in saved_form.schema if field["id"] == "select-status"
     )
     assert {"value": "paid", "label": "Paid"} not in status_field["options"]
+
+
+# @source lagniappe/core/entities/ai_report.py::AIReport.available
+# @source lagniappe/core/tools/ai/report_history.py::delete_report_record
+# @matrix ai-report : unavailable delete file-cleanup
+# @template home/tools.html::report_item
+@pytest.mark.parametrize("malformed", [False, True])
+def test_incompatible_reports_render_and_delete_without_touching_workspace(get_user, malformed):
+    user = get_user(Users.OWNER)
+    _item, report = _create_uploaded_report_item(user)
+    file = ai.finalize_report_upload_manifest(report, _owner(user))[0]
+    page = Entities.fetch_one(_owner(user).page.urlsafe_key, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    # Keep the file in the workspace independently of its report ownership.
+    file.page = page
+    Entities.save(file)
+    if malformed:
+        report.proposal = ["unrecognized"]
+        report.result = "bad"
+        report.deferred_job = ["bad"]
+    else:
+        report.db.pop("format_version", None)
+    Entities.save(report)
+    home = user.go(SitePages.HOME)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    item = user.locate(home.TOOL_REPORT_LIST).locator(f"li[data-key='{report.urlsafe_key}']")
+    expect(item).to_contain_text("this plan is no longer available")
+    expect(item).not_to_have_attribute("data-operation", re.compile(".+"))
+    item.locator("[data-role='title']").click()
+    expect(user.page.get_by_text("this plan is no longer available", exact=True)).to_be_visible()
+    expect(user.page.get_by_role("button", name="Execute Proposal")).to_have_count(0)
+    result = browser_fetch(user, f"/tools/reports/{report.urlsafe_key}", method="DELETE")
+    assert result["status"] == 200
+    assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
+    assert Entities.fetch_one(file.urlsafe_key, request=Fetch.root()) is not None

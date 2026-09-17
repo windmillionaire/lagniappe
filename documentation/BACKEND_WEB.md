@@ -66,6 +66,7 @@ Blueprint registration lives in `web/start/blueprints.py`.
 | `process` | `/process` | Authenticated background callbacks. |
 | `manual` | `/manual` | User manual. |
 | `reference` | `/reference` | Help fragments loaded into modals. |
+| `help` | `/help` | Authenticated articles from the shared reference corpus. |
 | `filters` | `/filters` | Filter management. |
 | `assets` | `/assets` | Documents, images, and form submissions. |
 | `testing` | `/testing` | Test-environment routes. |
@@ -151,6 +152,47 @@ and finally a selectable URL. It does not load the authenticated lifecycle or
 a third-party sharing library.
 
 ## Jinja environment
+
+### Canonical application help
+
+`lagniappe/reference/<topic_id>.md` is the authored source for reference modals,
+help articles, overlapping manual sections, and AI help. Filenames are stable
+lowercase snake_case IDs. There are no aliases: `create_form` is canonical and
+`form_creation` no longer resolves. Update callers directly when removing a topic.
+
+Each file starts with YAML front matter containing `title`, optional `related`
+(canonical IDs), and optional `manual_section` (an existing chapter key). Begin
+the body with a standalone summary paragraph, then use level-two or deeper
+headings. Describe what the user does, what happens next, and how the interface
+shows it. Name the actual button, message, badge, or disabled state. Avoid vague
+instructions such as "make sure it saved" or "check completion" without saying
+where and what to look for. Explain automatic behavior directly instead of asking
+users to oversee it. Verify control names and behavior against the implementation.
+Use `/help/<topic_id>` links for related guidance. The loader validates metadata
+and help/manual links; Jinja and live installation values do not belong in bodies.
+
+`reference.topics()` loads an immutable source catalog without Flask or Redis.
+`topic_html()` uses the existing Markdown/SafeHTML policies, adjusts embedded
+headings, and maps help links to chapter anchors inside the manual. `topic_sections()`
+groups that body into sanitized introduction and detail fragments for template wrappers;
+those visual wrappers are never included in search or AI Markdown. Manual chapters
+include `manual_topic()` for full bodies or `manual_summary()` for derived
+introductions. Broader narrative and long installation/client procedures remain
+in their existing chapters. Embed each topic in its `manual_section` exactly once.
+
+`/reference/section/<topic_id>` returns the shared modal; `/help/<topic_id>`
+returns a signed-in article whose Close link returns Home. Both use exact IDs
+and return 404 for unknown topics. General administrator guidance is readable
+by every signed-in user. The dedicated Configuration and Initial Prompt viewers
+keep their authorization and live payloads. Static explanations never include
+those payloads. `topic_context()` supplies configured email and permitted external
+connection details at request time; anonymous manual readers receive no such context.
+
+Packaged Markdown is runtime data and must remain included in deployments.
+Focused validation lives in `test_035_help.py` and `test_009e_help.py`; run normal
+template contracts and traceability checks after rendering changes.
+
+### Template configuration
 
 `web/start/jinja.py` configures the template environment.
 

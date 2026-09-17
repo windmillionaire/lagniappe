@@ -160,7 +160,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
 # @tests tests_unit/test_013_task_properties.py::test_task_description
 # @matrix project task : column
 class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
-    """Entity description. HTML tags are stripped on set.
+    """Entity description. HTML tags are stripped; text whitespace is preserved.
 
     Set:
         value (str): Description text. HTML tags are stripped before storage.
@@ -183,14 +183,16 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_description
     # @tests tests_unit/test_013_task_properties.py::test_task_description
+    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_description_preserves_whitespace
     # @matrix project task : description html-stripping
+    # @matrix description : html-stripping whitespace
     @property
     def value(self):
         return super().value
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, strip_tags(value))
+        DBProperty.value.fset(self, strip_tags(value, preserve_whitespace=True))
 
     @property
     def kind(self):

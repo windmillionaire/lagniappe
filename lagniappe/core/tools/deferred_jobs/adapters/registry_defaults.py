@@ -5,9 +5,7 @@ from .email import EmailIngestAdapter
 from .files import FileExtractAdapter, FileSummarizeAdapter
 from .form_change import FormChangeAdapter
 from .reports import (
-    AskReportAdapter,
-    CreateReportAdapter,
-    OrganizeReportAdapter,
+    AIReportAdapter,
     ReportExecutionAdapter,
 )
 
@@ -18,9 +16,7 @@ def register_adapters(registry):
     """Register the clean-cutover deferred workflow cohort."""
     for adapter in (
         EmailIngestAdapter(),
-        OrganizeReportAdapter(),
-        AskReportAdapter(),
-        CreateReportAdapter(),
+        AIReportAdapter(),
         ReportExecutionAdapter(),
         AutofillAdapter(),
         FileExtractAdapter(),

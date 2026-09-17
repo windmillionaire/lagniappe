@@ -77,7 +77,7 @@ def test_publication_notification_commits_with_plan_and_survives_replay(publicat
     now = datetime.now(timezone.utc)
     row = DatastoreEntity(key=store.key("activity", "plan", parent=user.key))
     row.update({
-        "type": "report", "origin": "api", "tool": tool,
+        "type": "report", "origin": "api", "format_version": 1,
         "user": user.key, "parent": user.key,
         "agent_manifest": json.dumps({"source": "remote_mcp"}),
         "process": json.dumps({"report": {"status": "draft"}}),
@@ -128,7 +128,7 @@ def test_publication_notification_commits_with_plan_and_survives_replay(publicat
     notification = store.get(notification_key)
     assert notification["parent"] == user.key
     assert notification["target"] == report.key
-    assert notification["body"] == f"{tool.title()} report is ready."
+    assert notification["body"] == "AI report is ready."
     assert notification["pending"] is False
     assert store.get(aggregate_key)["ordinary_count"] == 1
     assert json.loads(store.get(row.key)["agent_manifest"])["publication_notification"] == marker
@@ -159,7 +159,7 @@ def test_publication_delivery_retries_cache_and_email_without_recreating_dismiss
     now = datetime.now(timezone.utc)
     user = user_row("creator", now)
     report_row = DatastoreEntity(key=store.key("activity", "plan"))
-    report_row.update({"type": "report", "tool": "create", "name": "Published plan"})
+    report_row.update({"type": "report", "format_version": 1, "name": "Published plan"})
     report = Entities.REPORT(report_row)
     key = notification_database.ordinary_notification_key(user, "published-plan")
     row = notification_database.prepare_ordinary_notification(

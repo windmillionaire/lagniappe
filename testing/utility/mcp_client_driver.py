@@ -8,12 +8,14 @@ real API credential only through the child environment.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import sys
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 from contextlib import asynccontextmanager
@@ -259,9 +261,10 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         ask_start = await _call(
             client,
-            "start_ask",
+            "start_plan",
             {
                 "name": "MCP live Ask",
+                "actions": [],
                 "instructions": (
                     f"Which workspace Page is named {specification['search_name']}?"
                 ),
@@ -280,10 +283,25 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         ask_contract_value = ask["context"]["contract"]
+        validate_value(ask_contract_value["proposal_schema"], {
+            "summary": "Saved answer", "confidence": 1.0, "answer_markdown": "The answer.", "actions": [],
+        }, phase="proposal")
+        try:
+            validate_value(ask_contract_value["proposal_schema"], {
+                "summary": "Changes", "confidence": 1.0,
+                "actions": [{"type": "create_task", "data": {
+                    "name": "Unexpected task", "page": specification["page_ref"],
+                }}],
+            }, phase="proposal")
+        except SchemaError as error:
+            assert error.details["validator"] == "maxItems"
+            assert error.details["path"] == "$.actions"
+        else:
+            raise AssertionError("The saved-answer schema accepted a mutation")
         ask_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": ask["id"],
                 "contract_version": ask_contract_value["contract_version"],
                 "proposal": {
@@ -309,7 +327,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         create_start = await _call(
             client,
-            "start_create",
+            "start_plan",
             {
                 "name": "MCP live Create",
                 "instructions": "Prepare a browser-reviewable field guide Page.",
@@ -339,7 +357,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         create_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": create["id"],
                 "contract_version": create_contract_value["contract_version"],
                 "proposal": create_proposal,
@@ -370,7 +388,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         replacement_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": create["id"],
                 "contract_version": create_contract_value["contract_version"],
                 "proposal": replacement,
@@ -391,7 +409,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         update_start = await _call(
             client,
-            "start_organize",
+            "start_plan",
             {
                 "name": "MCP live existing-record update",
                 "instructions": "Propose renaming the existing test Page, without files.",
@@ -409,7 +427,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         update_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [],
                 "plan_id": update["id"],
                 "contract_version": _structured(update_contract)["contract_version"],
                 "proposal": {
@@ -438,7 +456,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
 
         organize_start = await _call(
             client,
-            "start_organize",
+            "start_plan",
             {
                 "name": "MCP live Organize",
                 "instructions": "Attach and summarize the supplied image file.",
@@ -446,7 +464,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         )
         organize = _structured(organize_start)
         organize_guidelines = await _call(
-            client, "get_guidelines", {"plan_id": organize["id"], "task": "organize"}
+            client, "get_guidelines", {"plan_id": organize["id"], "task": "filing"}
         )
         organize_contract_before = await _call(
             client, "get_plan_contract", {"plan_id": organize["id"]}
@@ -533,7 +551,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
         organize_receipt = await _call(
             client,
             "submit_plan",
-            {
+            {"file_usage": [{"file": file_ref, "usage": "organize"}],
                 "plan_id": organize["id"],
                 "contract_version": organize_contract_value["contract_version"],
                 "proposal": organize_proposal,
@@ -579,6 +597,63 @@ async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], 
     return result, diagnostics_text
 
 
+# @testable true
+# @pair mcp-adapter:product-contract
+# @tests tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_mcp_original_pdf_download_uses_existing_api_and_storage
+async def _original_file(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Consume download credentials in memory; persist only source evidence."""
+    async with _connection() as client:
+        arguments = {"id": specification["file_ref"]}
+        metadata = await _call(client, "get_file", arguments)
+        if specification.get("denied"):
+            return {"denied": await _call(client, "get_file", {
+                **arguments, "include_original": True,
+            })}, ""
+        _structured(metadata)
+        original = _structured(await _call(client, "get_file", {
+            **arguments, "include_original": True,
+        }))
+        url = original["original_file"]["download_url"]
+        content, mime = await client.rest.download_media(url, cap=4 * 1024 * 1024)
+        parsed = urlsplit(url)
+        query = dict(parse_qsl(parsed.query))
+        signature = query["X-Goog-Signature"]
+        query["X-Goog-Signature"] = ("b" if signature[0] == "a" else "a") + signature[1:]
+        invalid_urls = {
+            "tampered_signature": urlunsplit(parsed._replace(query=urlencode(query))),
+            "different_object": urlunsplit(parsed._replace(path=parsed.path + "-other")),
+            "expired": os.environ["LAGNIAPPE_MCP_EXPIRED_ORIGINAL"],
+        }
+        rejected = {}
+        for name, invalid_url in invalid_urls.items():
+            try:
+                await client.rest.download_media(invalid_url, cap=4 * 1024 * 1024)
+            except AdapterError as error:
+                rejected[name] = {"code": error.code, "status": error.status}
+            else:
+                raise RuntimeError("Storage accepted an invalid original capability")
+        refreshed = _structured(await _call(client, "get_file", {
+            **arguments, "include_original": True,
+        }))
+        fresh_content, _ = await client.rest.download_media(
+            refreshed["original_file"]["download_url"], cap=4 * 1024 * 1024,
+        )
+        return {
+            "metadata": metadata,
+            "original": {
+                "filename": original["filename"], "mimetype": original["mimetype"],
+                "delivery": original["delivery"],
+                "supported": original["original_file"]["supported"],
+                "attached": original["original_file"]["attached"],
+                "expires_in": original["original_file"]["expires_in"],
+            },
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "size_bytes": len(content), "mime_type": mime,
+            "rejected": rejected,
+            "refreshed_sha256": hashlib.sha256(fresh_content).hexdigest(),
+        }, ""
+
+
 def _sensitive_material(
     specification: dict[str, Any], *, extra_paths: tuple[str, ...] = ()
 ) -> list[tuple[str, str]]:
@@ -589,6 +664,7 @@ def _sensitive_material(
             (
                 os.environ.get("LAGNIAPPE_API_KEY"),
                 os.environ.get("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE"),
+                os.environ.get("LAGNIAPPE_MCP_EXPIRED_ORIGINAL"),
                 revoke.get("csrf_token"),
                 *(revoke.get("cookies") or {}).values(),
             ),
@@ -759,6 +835,8 @@ def main(arguments: list[str]) -> int:
             result, diagnostics = asyncio.run(_workflow(specification))
         elif mode == "foreign":
             result, diagnostics = asyncio.run(_foreign_plan(specification))
+        elif mode == "original_file":
+            result, diagnostics = asyncio.run(_original_file(specification))
         else:
             raise ValueError("unknown MCP E2E driver mode")
         sensitive = _sensitive_material(specification)

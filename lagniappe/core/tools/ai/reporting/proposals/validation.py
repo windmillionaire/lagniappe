@@ -91,6 +91,7 @@ def validate_proposal(
     allow_legacy_schema=False,
     prepare_schema_changes=False,
     validate_table_values=False,
+    require_response=False,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
@@ -109,6 +110,19 @@ def validate_proposal(
     required_file_refs = normalized["required_file_refs"]
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Report proposal must be a JSON object.")
+    if require_response:
+        summary = proposal.get("summary")
+        confidence = proposal.get("confidence")
+        if not isinstance(summary, str) or not summary.strip():
+            raise exceptions.AIException("Report summary must be a non-empty string.")
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+            raise exceptions.AIException("Report confidence must be a number from 0 to 1.")
+    if "answer_markdown" in proposal:
+        if not isinstance(proposal["answer_markdown"], str):
+            raise exceptions.AIException("answer_markdown must be a string.")
+        proposal["answer_html"] = render_ai_markdown(proposal["answer_markdown"])
+        if not preserve_document_markdown:
+            proposal.pop("answer_markdown")
     proposal = normalize_report_markdown(
         proposal,
         preserve_markdown=preserve_document_markdown,

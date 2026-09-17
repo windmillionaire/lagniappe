@@ -10,12 +10,16 @@ from ...definitions.default import DefaultEnum
 from ...restrictions import Restriction
 
 SEARCH_SCORE_FIELD = "search_score"
+HELP_PREFIX = f"{CONFIG.PREFIX}help:"
 
 
 class Keys(Enum):
     """Redis key templates for indexes, hashes, and imports."""
 
     SEARCH_INDEX = f"{CONFIG.PREFIX}INDEX"
+    SEARCH_INDEX_LOCK = f"{CONFIG.PREFIX}INDEX:UPGRADE"
+    HELP_READY = f"{CONFIG.PREFIX}HELP:READY:{{}}"
+    HELP_LOCK = f"{CONFIG.PREFIX}HELP:POPULATE:{{}}"
     JSON_INDEX = f"{CONFIG.PREFIX}JSON_INDEX"
     RESTRICTION_PENDING = f"{CONFIG.PREFIX}RESTRICTION_PENDING"
     ENTITY_HASHES = f"{CONFIG.PREFIX}HASHES"

@@ -2,7 +2,7 @@
 
 import pytest
 
-from lagniappe.core.tools.ai import organize
+from lagniappe.core.tools.ai.reporting.proposals import selection
 from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.ai.reporting.execution import undo as report_undo
 from testing.utility.ai_report_fakes import _fetch_one_from, _test_user
@@ -47,7 +47,7 @@ def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependenc
         ],
     }
 
-    skipped = organize.toggle_proposal_action_indexes(
+    skipped = selection.toggle_proposal_action_indexes(
         proposal,
         0,
         [0],

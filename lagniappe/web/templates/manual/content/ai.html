@@ -1,3 +1,4 @@
+{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, code, concept, nav_buttons, link %}
 <div class="space-y-6">
   {% call card() %}
@@ -11,148 +12,23 @@
       permission context.
     </p>
   {% endcall %}
-  {{ heading("What AI Can Do", icon="generate", kind="form") }}
   {% call card() %}
-    <ul class="text-base-medium space-y-2">
-      <li>Generate draft form schemas from descriptions.</li>
-      <li>Autofill page or task forms from existing context, files, images, or user instructions.</li>
-      <li>Generate editable document text.</li>
-      <li>Generate page or document images.</li>
-      <li>Summarize uploaded files for review or search.</li>
-      <li>Create draft categories, projects, model tasks, pages, and schedules.</li>
-      <li>Use permission-checked internal search tools when a prompt is configured to allow them.</li>
-      <li>Answer questions using only the records, files, and tasks the current user can access.</li>
-      <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
-    </ul>
+    {{ manual_topic("ai_tools") }}
   {% endcall %}
-  {{ heading("Plans & Reports", icon="generate", kind="form") }}
   {% call card() %}
-    <p class="text-base-medium mb-3">
-      On the homepage, combine the Active, Executed, and Ask filters to choose
-      which saved reports to show. Active includes proposals that are ready,
-      still processing, or need attention. Executed contains completed
-      Create and Organize proposals. Ask contains questions and answers.
-      Each count includes reports hidden by the current filters.
-    </p>
-    <p class="text-base-medium">
-      Select Executed alone to delete all displayed executed proposals after
-      one confirmation. This removes their reports, undo history, and
-      report-only uploads. Created pages, tasks, and other workspace changes
-      remain. Your browser remembers your filter choices.
-    </p>
+    {{ manual_topic("ai_email") }}
   {% endcall %}
-  {{ heading("Per-User AI Access", icon="user", kind="user") }}
   {% call card() %}
-    <p class="text-base-medium mb-3">
-      An Administrator chooses a separate AI level for each ordinary user;
-      only the primary Owner edits another Administrator's account. This level
-      controls features that call Lagniappe's configured model provider: None
-      disables those calls, Ask allows workspace questions and saved answers,
-      and Create also enables generation, autofill, summarization, Organize, and
-      Create. Create includes Ask.
-    </p>
-    <p class="text-base-medium">
-      This setting is independent from user groups and permissions, so a user
-      can have broad workspace permissions without AI access, or AI access that
-      still operates only within a narrow set of permitted records.
-    </p>
-    <p class="text-base-medium mt-3">
-      External-agent API plans use the user's own AI client and tokens, so they
-      are not controlled by this provider entitlement. Working with an already
-      saved report is also provider-free. API plans and report execution still
-      use the signed-in user's normal workspace permissions.
-    </p>
+    {{ manual_topic("external_ai") }}
   {% endcall %}
-  {% if CONFIG.AI_ENABLED and CONFIG.AI_EMAIL_PUBLIC.enabled %}
-    {{ heading("AI Reports by Email", icon="email", kind="form") }}
-    {% call card() %}
-      {% if current_user.is_authenticated %}
-        <div data-role="ai-email-account-details">
-          <p class="text-base-medium mb-3">
-            Send from the exact email address registered to your Lagniappe account.
-            The subject and message become the report instructions. You receive an
-            acceptance email and a result email linking back to the saved report.
-          </p>
-          <ul class="text-base-medium space-y-2">
-            <li><strong>AI (recommended):</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — questions, requests, and attachments are routed automatically.</li>
-            <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 attachments are optional.</li>
-            {% if current_user.access(AI.CREATE) %}
-              <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>
-              <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one attachment is required; message text is optional.</li>
-            {% endif %}
-          </ul>
-          <p class="text-base-medium mt-3">
-            Each attachment may be up to 30 MiB, with a 50 MiB total. Pasted or
-            inline-only files are accepted; recognizable signature and quoted-reply
-            images are ignored. Replies above the Lagniappe marker create a new
-            report. Automated/list mail is ignored.
-            Resend temporarily processes received content and provides short-lived
-            attachment downloads to the server.
-          </p>
-          {% call callout("tip", False) %}
-            Email submission only creates the same saved report as the homepage.
-            Create and Organize proposals never apply themselves; sign in to review
-            and run them.
-          {% endcall %}
-          <p class="text-base-medium mt-3 text-sm">
-            The From address selects the account for a rate-limited report; email
-            sender identity is not a login. Opening the report or running any
-            proposal still requires normal authentication and permissions.
-          </p>
-        </div>
-      {% else %}
-        <div data-role="public-ai-email-description">
-          <p class="text-base-medium mb-3">
-            Registered users can email questions, requests, or attachments to
-            Lagniappe. The app routes each message to Ask, Create, or Organize,
-            saves the result as an AI report, and emails a link back.
-          </p>
-          <ul class="text-base-medium space-y-2">
-            <li><strong>Ask</strong> answers questions using permitted workspace context.</li>
-            <li><strong>Create</strong> drafts proposed workspace content from a request.</li>
-            <li><strong>Organize</strong> analyzes attached files into a proposed set of workspace changes.</li>
-          </ul>
-          <p class="text-base-medium mt-3">
-            Proposed changes never apply themselves. The recipient must sign in
-            with normal permissions to review and run them. Live inbound
-            addresses are shown only to signed-in users of this installation.
-          </p>
-        </div>
-      {% endif %}
-    {% endcall %}
-  {% endif %}
+  {% call card() %}
+    {{ manual_topic("prompt") }}
+  {% endcall %}
   {% call card() %}
     <details data-role="external-ai-help">
-      <summary class="cursor-pointer text-page-default font-semibold">Use an external AI agent: MCP or skill</summary>
+      <summary class="cursor-pointer text-page-default font-semibold">Client-specific connection setup</summary>
       <div class="space-y-3 mt-3 text-base-medium">
-        <p>An installation can disable AI entirely, or allow built-in AI while
-          disabling external agents. External access covers both MCP and the API/skill.</p>
-        <p><strong>MCP:</strong> add the installation's MCP server URL to a compatible
-          agent, then sign in to Lagniappe and allow the connection. The server exposes
-          workspace tools directly. No local Lagniappe package is required.</p>
-        <p><strong>Skill:</strong> for an agent that can make HTTP requests, create an API
-          key under <strong>My Page / User Settings / External agent API</strong>.
-          Ask the agent to fetch the skill below
-          using that key and install it for itself. Keep the key in the agent's secret
-          settings; do not paste it into shared prompts or files.</p>
         {% set show_connection_details = current_user.is_authenticated and not current_user.is_public and CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED %}
-        {% if show_connection_details %}
-          <div data-role="external-ai-account-details" class="space-y-2">
-            {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
-              <p>Connection name: <code>{{ CONFIG.MCP_NAME }}</code></p>
-              <p>MCP server: <code>{{ CONFIG.MCP_RESOURCE }}</code></p>
-            {% else %}
-              <p>Ask the installation Owner for the MCP server address once setup is complete.</p>
-            {% endif %}
-            {% set site_origin = ('https://' ~ CONFIG.CUSTOM_DOMAIN) if CONFIG.CUSTOM_DOMAIN else CONFIG.APP_URL %}
-            <p>Skill URL (requires the API key): <code>{{ site_origin.rstrip('/') }}/api/v1/client-skill.md</code></p>
-          </div>
-        {% else %}
-          <p data-role="external-ai-generic-details">Ask the installation Owner whether
-            external access is enabled and for its MCP server address. The skill URL is
-            <code>https://YOUR-LAGNIAPPE-SITE/api/v1/client-skill.md</code>; replace the
-            example host with the installation's website address.</p>
-        {% endif %}
         {% if not show_connection_details or (CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE) %}
           {% set mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
           {% set mcp_name = CONFIG.MCP_NAME if show_connection_details else 'lagniappe-remote' %}

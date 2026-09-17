@@ -24,6 +24,11 @@ consumers use the property object itself.
 Do not use truthiness to decide whether a field was loaded or submitted. Use
 `is_set`, `value`, and the property's normalization contract.
 
+Entity descriptions and file summaries strip HTML tags while preserving internal
+line breaks, blank lines, and spacing from textarea input. File summaries also
+trim surrounding whitespace. The shared `strip_tags()` helper still collapses
+whitespace by default; multiline properties opt into `preserve_whitespace=True`.
+
 ## Context mixins
 
 Mixins provide a projection and mark the property as eligible for that context.

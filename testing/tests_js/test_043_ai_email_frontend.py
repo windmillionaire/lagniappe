@@ -60,15 +60,6 @@ widget.emailCopyButton = {
 };
 
 (async () => {
-  widget.updateEmailAddress("create");
-  if (widget.emailAddress.textContent !== "ai@inbound.example.com") {
-    throw new Error("Tool selection replaced the shared AI address");
-  }
-  widget.updateEmailAddress("organize");
-  if (widget.emailAddress.textContent !== "ai@inbound.example.com") {
-    throw new Error("Shared AI address should remain visible");
-  }
-
   await widget.copyEmailAddress();
   if (clipboardText !== "ai@inbound.example.com" ||
       widget.emailCopyButton.textContent !== "Copied") {
@@ -90,7 +81,6 @@ widget.emailCopyButton = {
   absent.emailSubmissions = null;
   absent.emailAddress = null;
   absent.emailCopyButton = null;
-  absent.updateEmailAddress("ask");
   await absent.copyEmailAddress();
 })().catch((error) => {
   console.error(error);

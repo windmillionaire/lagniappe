@@ -35,8 +35,8 @@ def _notification_copy(target, body):
     body = str(body or "").strip()
     target_name = str(getattr(target, "name", None) or "").strip()
 
-    if isinstance(target, Entities.REPORT) and target.tool in {"ask", "organize"}:
-        label = target.tool.title()
+    if isinstance(target, Entities.REPORT):
+        label = "AI"
         title = target_name or f"{label} report"
         if body in {
             f"{label} report is ready.",

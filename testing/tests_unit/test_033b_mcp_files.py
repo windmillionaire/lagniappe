@@ -47,7 +47,6 @@ def _compact_protocol_chunks(monkeypatch: pytest.MonkeyPatch) -> None:
 def _contract(*, current_files: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     files = list(current_files or [])
     return {
-        "tool": "organize",
         "uploads_supported": True,
         "limits": {
             "max_files": 5,

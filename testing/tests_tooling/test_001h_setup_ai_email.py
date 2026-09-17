@@ -5,7 +5,6 @@ import copy
 import pytest
 
 from config.ai_email import (
-    AI_EMAIL_LIMITS,
     AIEmailConfigurationError,
     ai_email_public_config,
     normalize_ai_email_config,
@@ -17,16 +16,9 @@ pytestmark = pytest.mark.tooling
 
 def _valid_config():
     return {
-        "version": 1,
         "provider": "resend",
         "enabled": False,
         "domain": "INBOUND.Exämple.COM.",
-        "aliases": {
-            "ai": "ai",
-            "ask": "ASK",
-            "create": "create",
-            "organize": "organize",
-        },
         "resend": {
             "domainId": "domain-1",
             "webhookId": "webhook-1",
@@ -36,7 +28,6 @@ def _valid_config():
             "senderEmail": "noreply@example.com",
             "senderName": "Lagniappe",
         },
-        "limits": dict(AI_EMAIL_LIMITS),
     }
 
 
@@ -45,11 +36,7 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     normalized = normalize_ai_email_config(_valid_config())
 
     assert normalized["domain"] == "inbound.xn--exmple-cua.com"
-    assert normalized["version"] == 1
-    legacy_schema_one = _valid_config()
-    legacy_schema_one["aliases"].pop("ai")
-    assert normalize_ai_email_config(legacy_schema_one)["aliases"]["ai"] == "ai"
-    assert normalized["aliases"]["ask"] == "ask"
+    assert set(normalized) == {"provider", "enabled", "domain", "resend"}
     assert ai_email_public_config(normalized) == {
         "enabled": False,
         "addresses": {},
@@ -61,9 +48,6 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
         "enabled": True,
         "addresses": {
             "ai": "ai@inbound.xn--exmple-cua.com",
-            "ask": "ask@inbound.xn--exmple-cua.com",
-            "create": "create@inbound.xn--exmple-cua.com",
-            "organize": "organize@inbound.xn--exmple-cua.com",
         },
     }
 
@@ -72,8 +56,6 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
 def test_ai_email_config_rejects_security_weakening_values():
     mutations = (
         lambda value: value.update(unknown=True),
-        lambda value: value["limits"].update(maxBodyBytes=999999),
-        lambda value: value["aliases"].update(create="ASK"),
         lambda value: value["resend"].update(sendingApiKey="re_full"),
         lambda value: value.update(enabled="yes"),
     )
@@ -494,6 +476,7 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
         "enable-webhook",
     ]
     saved = settings.APP["AI_EMAIL_CONFIG"]
+    assert set(saved) == {"provider", "enabled", "domain", "resend"}
     assert saved["enabled"] is True
     assert saved["resend"]["sendingApiKey"] == "re_send"
     assert saved["resend"]["senderEmail"] == "noreply@example.com"
@@ -504,9 +487,6 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
         "\n".join(
             (
                 "  Ai:       ai@inbound.app.example.com",
-                "  Ask:      ask@inbound.app.example.com",
-                "  Create:   create@inbound.app.example.com",
-                "  Organize:  organize@inbound.app.example.com",
             )
         )
         in output
@@ -649,3 +629,26 @@ def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
     disabled = settings.APP["AI_EMAIL_CONFIG"]
     assert disabled["enabled"] is False
     assert disabled["resend"]["webhookSecret"] == existing["resend"]["webhookSecret"]
+
+
+# @matrix ai-email : aliases config limits normalization public-projection
+@pytest.mark.parametrize("version", [1, 2, 999])
+def test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings(version):
+    saved = _valid_config()
+    saved.update(
+        enabled=True,
+        version=version,
+        aliases={"ai": "assistant", "ask": "q", "create": "new", "organize": "file"},
+        limits={"maxFiles": 999999},
+    )
+    supplied = copy.deepcopy(saved)
+
+    result = normalize_ai_email_config(supplied)
+
+    assert supplied == saved
+    assert set(result) == {"provider", "enabled", "domain", "resend"}
+    assert result["resend"] == saved["resend"]
+    assert result["enabled"] is True
+    assert ai_email_public_config(result)["addresses"] == {
+        "ai": "ai@inbound.xn--exmple-cua.com",
+    }

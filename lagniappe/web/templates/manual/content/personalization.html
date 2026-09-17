@@ -1,49 +1,38 @@
+{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, code, step, link, nav_buttons %}
 <div class="space-y-6">
   {% call card() %}
-    <p class="text-base-medium">
-      After installation, most personalization happens from the Administrator
-      <strong>Admin</strong> page in <strong>Settings</strong>: site images,
-      deployment preferences, and
-      links out to the service-provider dashboards. A custom domain still uses
-      the setup script because it has to coordinate App Engine, DNS, and auth
-      settings.
-    </p>
+    {{ manual_topic("user_settings") }}
   {% endcall %}
-  {{ heading("Site Image", icon="personalization", kind="project") }}
   {% call card() %}
-    <p class="text-base-medium mb-3">
-      Uploading a site image generates favicons, Apple Touch icons, and PWA
-      manifest icons. Upload the image from the <strong>Admin</strong> page under
-      <strong>Settings</strong>, then <strong>Site Image</strong>. The app
-      stores a preview of the generated images right away, but the generated
-      static files still need to be restored into the deployed app.
-    </p>
-    {{ code("./setup.sh update") }}
+    {{ manual_topic("site_settings") }}
   {% endcall %}
-  {{ heading("Deployment Settings") }}
   {% call card() %}
-    <p class="text-base-medium mb-3">
-      The <strong>Admin</strong> page also has a <strong>Settings</strong>,
-      <strong>Deployment</strong> section for the App Engine settings Lagniappe
-      writes into its deployment files. The default uses basic scaling, which
-      lets a quiet app idle down. If you would rather keep the app warm and
-      avoid most cold starts, you can switch to automatic scaling, usually at a
-      higher cost.
-    </p>
-    <p class="text-base-medium mb-3">
-      This section also controls instance class, worker count, and instance
-      counts, without hand-editing YAML for ordinary changes. Saving deployment
-      settings in the app does not redeploy immediately; it saves the choices
-      with the instance. To apply them to the local deployment files and deploy,
-      run:
-    </p>
-    {{ code("./setup.sh update") }}
-    {% call callout("warning", False) %}
-      Deployment settings affect cost and performance. Change one thing at a
-      time, deploy, then check App Engine logs, response times, and billing
-      before making another change.
-    {% endcall %}
+    {{ manual_topic("site_image") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_deployment") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_ai_models") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("document_settings") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_public_pages") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_maintenance") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_configuration") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_service_providers") }}
+  {% endcall %}
+  {% call card() %}
+    {{ manual_topic("site_installation_access") }}
   {% endcall %}
   {{ heading("Custom Domain") }}
   {% call card() %}

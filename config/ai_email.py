@@ -5,8 +5,8 @@ import re
 import unicodedata
 
 
-AI_EMAIL_CONFIG_VERSION = 1
 AI_EMAIL_PROVIDER = "resend"
+AI_EMAIL_ALIAS = "ai"
 AI_EMAIL_LIMITS = {
     "maxBodyBytes": 65536,
     "maxFiles": 20,
@@ -15,15 +15,16 @@ AI_EMAIL_LIMITS = {
     "hourlyPerUser": 30,
     "dailyPerUser": 200,
 }
-AI_EMAIL_TOOLS = ("ai", "ask", "create", "organize")
-
 _TOP_LEVEL_KEYS = {
-    "version",
     "provider",
     "enabled",
     "domain",
-    "aliases",
     "resend",
+    # Generated settings may contain policy metadata. It is not configuration:
+    # runtime routing and limits come exclusively from the constants above.
+    # Never inspect its version, interpret aliases, or rewrite the input.
+    "version",
+    "aliases",
     "limits",
     # Accepted only so a checkout deployed between the transport proof and the
     # production handoff can read its saved configuration. Normalization drops
@@ -42,7 +43,6 @@ _RESEND_KEYS = {
     # telemetry, but is not the report authorization boundary.
     "trustedAuthservIds",
 }
-_ALIAS_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9])?$")
 _EMAIL_LOCAL_PATTERN = re.compile(r'^[^\s@<>(),;:\\"\[\]\x00-\x1f\x7f]+$')
 
 
@@ -132,29 +132,6 @@ def normalize_email_domain(value, name="AI email domain"):
     return ascii_domain
 
 
-# @testable true
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @pair ai-email:aliases
-def _normalize_aliases(value):
-    aliases = _mapping(value, "AI_EMAIL_CONFIG.aliases")
-    _reject_unknown_keys(aliases, set(AI_EMAIL_TOOLS), "AI_EMAIL_CONFIG.aliases")
-    normalized = {}
-    for tool in AI_EMAIL_TOOLS:
-        raw_alias = aliases.get(tool)
-        if tool == "ai" and raw_alias in (None, ""):
-            raw_alias = "ai"
-        alias = str(raw_alias or "").strip().casefold()
-        if not _ALIAS_PATTERN.fullmatch(alias) or "+" in alias:
-            raise AIEmailConfigurationError(
-                f"AI_EMAIL_CONFIG.aliases.{tool} is invalid."
-            )
-        normalized[tool] = alias
-    if len(set(normalized.values())) != len(normalized):
-        raise AIEmailConfigurationError("AI email aliases must be unique.")
-    return normalized
-
-
 # @testable false
 # @covered-by config/ai_email.py::normalize_ai_email_config
 # @reason provider schema details are exercised through the public normalizer
@@ -202,17 +179,16 @@ def _normalize_resend(value):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @matrix ai-email : config limits normalization secrets validation
+# @matrix ai-email : aliases config limits normalization secrets validation
 # @pair config:ai-email
 def normalize_ai_email_config(value):
-    """Return canonical schema-1 configuration, or ``None`` when absent."""
+    """Validate installation choices without reading or rewriting code policy."""
     if value in (None, ""):
         return None
     config = _mapping(value, "AI_EMAIL_CONFIG")
     _reject_unknown_keys(config, _TOP_LEVEL_KEYS, "AI_EMAIL_CONFIG")
-    if config.get("version") != AI_EMAIL_CONFIG_VERSION:
-        raise AIEmailConfigurationError("AI_EMAIL_CONFIG.version must be 1.")
     if config.get("provider") != AI_EMAIL_PROVIDER:
         raise AIEmailConfigurationError("AI_EMAIL_CONFIG.provider must be 'resend'.")
     enabled = config.get("enabled")
@@ -220,27 +196,18 @@ def normalize_ai_email_config(value):
         raise AIEmailConfigurationError(
             "AI_EMAIL_CONFIG.enabled must be true or false."
         )
-    aliases = _normalize_aliases(config.get("aliases"))
-    limits = _mapping(config.get("limits"), "AI_EMAIL_CONFIG.limits")
-    _reject_unknown_keys(limits, set(AI_EMAIL_LIMITS), "AI_EMAIL_CONFIG.limits")
-    if limits != AI_EMAIL_LIMITS:
-        raise AIEmailConfigurationError(
-            "AI_EMAIL_CONFIG.limits must match the locked schema-1 envelope."
-        )
     return {
-        "version": AI_EMAIL_CONFIG_VERSION,
         "provider": AI_EMAIL_PROVIDER,
         "enabled": enabled,
         "domain": normalize_email_domain(config.get("domain")),
-        "aliases": aliases,
         "resend": _normalize_resend(config.get("resend")),
-        "limits": dict(AI_EMAIL_LIMITS),
     }
 
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @matrix ai-email : config public-projection secrets
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings
+# @matrix ai-email : aliases config public-projection secrets
 def ai_email_public_config(value):
     """Expose only enabled addresses; never return provider state or secrets."""
     config = normalize_ai_email_config(value)
@@ -249,16 +216,14 @@ def ai_email_public_config(value):
     return {
         "enabled": True,
         "addresses": {
-            tool: f"{config['aliases'][tool]}@{config['domain']}"
-            for tool in AI_EMAIL_TOOLS
+            "ai": f"{AI_EMAIL_ALIAS}@{config['domain']}",
         },
     }
 
 
 __all__ = [
-    "AI_EMAIL_CONFIG_VERSION",
+    "AI_EMAIL_ALIAS",
     "AI_EMAIL_LIMITS",
-    "AI_EMAIL_TOOLS",
     "AIEmailConfigurationError",
     "ai_email_public_config",
     "normalize_ai_email_config",

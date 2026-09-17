@@ -23,9 +23,7 @@ DEFERRED_JOB_QUOTA_RETRY_JITTER_SECONDS = 30
 class DeferredJobType(Enum):
     """Domain executors supported by the shared deferred-job runner."""
 
-    REPORT_ORGANIZE = "report-organize"
-    REPORT_ASK = "report-ask"
-    REPORT_CREATE = "report-create"
+    REPORT_AI = "report-ai"
     EMAIL_INGEST = "email-ingest"
     REPORT_EXECUTION = "report-execution"
     AUTOFILL = "autofill"

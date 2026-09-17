@@ -66,6 +66,15 @@ class Files:
     title = "Files"
 
 
+class Help:
+    """Facet for general application reference topics."""
+
+    name = "help"
+    icon = "help"
+    kind = "help"
+    title = "Help"
+
+
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::search_page
 # @covered-by src/script/views/results.mjs::Results.init
@@ -81,6 +90,7 @@ class SearchFacets(Enum):
     PAGES = Pages
     PROJECTS = Projects
     TASKS = Tasks
+    HELP = Help
     FILES = Files
     FORMS = Forms
     USERS = Users

@@ -73,6 +73,27 @@ TASK_LIST_METADATA = _object(
 )
 
 OUTPUT_SCHEMAS = {
+    "get_help": _object("topics", properties={
+        "topics": {"type": "array", "maxItems": 3, "items": _object(
+            "id", "title", "url", "markdown", "summary", "related",
+            properties={
+                "id": {"type": "string"}, "title": {"type": "string"},
+                "url": {"type": "string"}, "markdown": {"type": "string"},
+                "summary": {"type": "string"},
+                "related": {"type": "array", "items": {"type": "string"}},
+                "context": {
+                    "type": "object",
+                    "properties": {
+                        "email_address": {"type": "string"},
+                        "skill_url": {"type": "string"},
+                        "mcp_url": {"type": "string"},
+                        "connection_name": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        )},
+    }),
     "preview_form_schema_update": _object(properties={"instances": ENTITY_LIST, "baseline": {"type": "string"}, "scope_fingerprint": {"type": "string"}, "has_more": {"type": "boolean"}, "next_cursor": {"type": ["string", "null"]}}),
     "search_entities": ENTITY_LIST,
     "get_entity": ENTITY,
@@ -185,6 +206,7 @@ OUTPUT_SCHEMAS = {
             "content_bytes": {"type": "integer"},
             "section_count": {"type": "integer"},
             "filters": {"type": "object"},
+            "action_schema": {"type": "object"},
         },
     ),
     "get_schema": _object(
@@ -262,6 +284,7 @@ OUTPUT_SCHEMAS = {
 
 
 RESULT_PATHS = {
+    "get_help": {"primary_collection": "$.topics", "pagination": None},
     "preview_form_schema_update": {"primary_collection": "$.instances", "pagination": {"has_more": "$.has_more", "next_cursor": "$.next_cursor", "returned": "$.returned", "total": "$.affected"}},
     "search_entities": {"primary_collection": "$", "pagination": None},
     "get_entity": {"primary_entity": "$", "pagination": None},

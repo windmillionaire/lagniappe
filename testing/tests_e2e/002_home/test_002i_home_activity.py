@@ -409,14 +409,14 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
         {
             "parent": user.entity,
             "user": user.entity,
-            "name": "Organize: 3 files",
-            "tool": "organize",
+            "name": "File three receipts",
+            "format_version": 1,
             "status": "ready",
             "pending": False,
             "summary": report_summary,
         }
     )
-    report_body = _unique("Organize report is ready")
+    report_body = _unique("Plan is ready")
     Entities.save(report)
     _save_notification(user, report_body, target=report)
     assert notification.pending is True
@@ -449,13 +449,8 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     expect(report_target).to_have_attribute(
         "href", f"/tools/reports/{report.urlsafe_key}"
     )
-    expect(report_target).to_have_text("Organize 3 files")
-    expect(report_target.locator("[data-role='report-tool']")).to_have_css(
-        "font-weight", "400"
-    )
-    expect(report_target.locator("[data-role='report-title']")).to_have_css(
-        "font-weight", "600"
-    )
+    expect(report_target).to_have_text("File three receipts")
+    expect(report_target).to_have_css("font-weight", "600")
     expect(report_option.locator("[data-role='report-summary']")).to_have_text(
         report_summary
     )

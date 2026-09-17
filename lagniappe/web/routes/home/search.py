@@ -272,6 +272,7 @@ def search_bar():
         q,
         current_user.properties.restrictions.search,
         current_user.properties.restrictions.belongs_to,
+        include_help=True,
     )
 
     return responses.search_results(q, results, total)
@@ -307,6 +308,7 @@ def _search_page_results(q, page, kinds):
         current_user.properties.restrictions.belongs_to,
         kinds=kinds,
         page=page + 1,
+        include_help=True,
     )
 
 

@@ -41,7 +41,7 @@ def _case(monkeypatch, value, recurring=False):
         apply_task_schedule(task, {"kind": "recurring", "interval": 2, "unit": "week"})
     report = TestEntities.get("REPORT", {
         "name": "Due date review", "hash": "calendar-report", "parent": actor,
-        "user": actor, "tool": "organize", "origin": "api", "status": "ready",
+        "user": actor, "instructions": "Change the task due date", "origin": "api", "status": "ready",
         "proposal": _proposal(value),
     })
     report.origin = "api"
@@ -63,10 +63,10 @@ def _case(monkeypatch, value, recurring=False):
 ])
 def test_due_date_contract_validates_calendar_dates(value, valid):
     actor = _test_user("due-contract-owner")
-    report = SimpleNamespace(tool="organize", origin="api", input_files=[])
+    report = SimpleNamespace(available=True, origin="api", input_files=[])
     proposal = _proposal(value)
     errors = external_api.submission_validation_errors(
-        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal},
+        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []},
         report, actor,
     )
     if valid:
@@ -94,8 +94,8 @@ def test_due_date_action_requires_exact_task_and_explicit_value(data):
     proposal = _proposal(None)
     proposal["actions"][0]["data"] = data
     assert external_api.submission_validation_errors(
-        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal},
-        SimpleNamespace(tool="organize", origin="api", input_files=[]), actor,
+        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []},
+        SimpleNamespace(available=True, origin="api", input_files=[]), actor,
     )
     with pytest.raises(exceptions.AIException):
         validate_proposal(proposal)
@@ -216,7 +216,7 @@ def test_remote_due_date_plan_submits_without_changing_task(monkeypatch):
     )
     assert set(contract["proposal_schema"]["$defs"]) == {"set_task_due_date"}
     external_api.submit_plan(report, actor, proposal,
-                             contract_version=contract["contract_version"])
+                             contract_version=contract["contract_version"], file_usage=[])
     assert report.status == "ready"
     assert task.due_date == before
     assert report.proposal["actions"][0]["data"] == {

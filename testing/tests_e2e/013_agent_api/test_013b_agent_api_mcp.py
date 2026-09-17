@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 import hashlib
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -15,9 +17,12 @@ from uuid import uuid4
 import pytest
 import requests
 from playwright.sync_api import expect
+from werkzeug.datastructures import FileStorage
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import notifications as notification_database
 from runner import mcp_environment
 from testing.definitions import Pages, SitePages, Users
@@ -31,62 +36,32 @@ DRIVER = Path("testing/utility/mcp_client_driver.py")
 LIFECYCLE_TOOLS = (
     "answer_question",
     "get_actor",
-    "start_ask",
-    "start_create",
-    "start_organize",
+    "start_plan",
     "get_plan",
     "get_plan_contract",
     "upload_local_files",
     "submit_plan",
 )
-# Contract v8 updates the declared version bounds in lifecycle results.
-# Reviewed conversational contracts: plan-free context, optional brief revisions,
-# execution receipts, and compact/selected schemas in starter/upload context.
-# Optional Create/Organize action selection uses the contract reader's identifier schema;
-# Shared lifecycle recovery retains selected actions and the requested view.
-# Action totals/type counts are optional in plan and receipt envelopes.
-LIFECYCLE_SCHEMA_SHA256 = {
-    "answer_question": (
-        "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-        "f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d",
-    ),
-    "get_actor": (
-        "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-        "6ab4edef619a8f1857fa1a097319ba5b7d81d1358bd59644e762cb91a257805e",
-    ),
-    "start_ask": (
-        "2c41ac72c1efd4aec4a9bda14694e47f627d577fbb92d1018dc0aa211d86bd2e",
-        "0df96d8dd0fba9462f6e917a1691913d5e3c1415e3784ad5cd04209babf70c8e",
-    ),
-    "start_create": (
-        "6ad98deac652b8e18d90e813977bfa39667d284bc0ed00171b5c4ae0a96e8c20",
-        "0df96d8dd0fba9462f6e917a1691913d5e3c1415e3784ad5cd04209babf70c8e",
-    ),
-    "start_organize": (
-        "6ad98deac652b8e18d90e813977bfa39667d284bc0ed00171b5c4ae0a96e8c20",
-        "0df96d8dd0fba9462f6e917a1691913d5e3c1415e3784ad5cd04209babf70c8e",
-    ),
-    "get_plan": (
-        "79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9",
-        "af9b90b27c3a2d949bb3e23bcc338ec6232c864eea58c8c0cebdf7586c501f27",
-    ),
-    "get_plan_contract": (
-        "5b95dc7a76a81e9dea530ba2519c92c1de410e59d6e1e7f115068c604c961553",
-        "12d01bad44fc99bd72931d32e8383817bfbd617a61f1475edcfb1619bea1fff2",
-    ),
-    "upload_local_files": (
-        "716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259",
-        "63d2a4845bf9054d0a3203ab72937f4e9c1a63156c9ad88ff4a4494fe50dd674",
-    ),
-    "submit_plan": (
-        "18e44236fd78c5fa56314d6df698b339be168781d967947a7ac9efcfee57a9ef",
-        "afbba8f57cbd320062c5ccf455f3833397099bedb42e9e124a21f4c952e418cc",
-    ),
-}
+# Reviewed contract v9 lifecycle schema snapshots.
+LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
+                     'f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d'),
+ 'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
+               '5467240ac9b25c0e3e6a0fb035a1385501dba9f6470747ae83af4ad808b6f66f'),
+ 'start_plan': ('f4cedf6cee6e3bdc4ffb2db00cf8c2c43d43955db8a5f84fbae7cf3faba2fa3c',
+                '428e748fbf112bf8d0c1d2f4893492e49ca77fc516d25ef7132ab60613dcf2db'),
+ 'get_plan': ('79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9',
+              'd35d3bcb3f25b7456d1b803360865c9ac7ede5119704cc5535d362db491db65e'),
+ 'get_plan_contract': ('337cb97fa06d416268081a87b7a7f90574031467337bbc6806554a989ca0dde3',
+                       'bc3bb5fb26553b8c255203c990f27033cc1a7ddc99e7e38ad497e258641f6ade'),
+ 'upload_local_files': ('716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259',
+                        '34056eeb18367efa3876377151d620de5317d20da685b6537cd87561a72239cb'),
+ 'submit_plan': ('e96a342d76b63829e1d3e608b14befaa396c987206ba713adf9505641e13be0d',
+                 '7ddf8bc188ac86f8af37134627d8b21a24a4e4e1ad3dc35f590358c351ef7b59')}
 PLAN_KEYS = {
     "id",
     "status",
-    "tool",
+    "output_kind",
+    "file_usage",
     "name",
     "instructions",
     "files",
@@ -121,6 +96,122 @@ MCP_BOUNDARY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8A"
     "AQUBAScY42YAAAAASUVORK5CYII="
 )
+
+
+# @pair mcp-adapter:product-contract
+# @pair agent-api:tool-dispatch
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
+# @source lagniappe/web/routes/api/main.py::execute_tool
+def test_mcp_original_pdf_download_uses_existing_api_and_storage(
+    get_user,
+    tmp_path,
+    monkeypatch,
+    setup_test_server,
+):
+    from google.cloud.storage import _signing
+
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
+    for cookie in setup_test_server.browser_cookies:
+        if cookie["name"] == "__Host-lagniappe-e2e":
+            monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", cookie["value"])
+    _prepare_package_environment()
+    suffix = uuid4().hex
+    owner = get_user(
+        UserDefinition(
+            name=f"Original PDF Owner {suffix}",
+            email=f"pdf-owner-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=get_user(Users.OWNER),
+    )
+    intruder = get_user(
+        UserDefinition(
+            name=f"Original PDF Intruder {suffix}",
+            email=f"pdf-intruder-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=get_user(Users.OWNER),
+    )
+    owner.go(SitePages.HOME)
+    intruder.go(SitePages.HOME)
+    source = Path("testing/files/sample_document.pdf").read_bytes()
+    file = Entities.FILE.create(
+        upload=FileStorage(
+            stream=BytesIO(source),
+            filename="source.pdf",
+            content_type="application/pdf",
+        ),
+        data={},
+        report_user=owner.entity,
+    )
+    file.summary = "A deliberately incomplete summary; read the original source."
+    file.save()
+    try:
+        owner_token, intruder_token = _issue_key(owner), _issue_key(intruder)
+        # Sign with a past issuance time, keeping a valid five-minute duration.
+        # This exercises actual Storage expiration without a five-minute wait.
+        with monkeypatch.context() as past:
+            past.setattr(
+                _signing,
+                "_NOW",
+                lambda _tz: datetime.now(timezone.utc) - timedelta(minutes=10),
+            )
+            expired = storage_assets.get_signed_url(
+                file.properties.file.value.path, expires_in=300
+            )
+        monkeypatch.setenv("LAGNIAPPE_MCP_EXPIRED_ORIGINAL", expired)
+        specification = {"file_ref": f"hash:{file.hash}"}
+        result = _run_driver(
+            tmp_path,
+            monkeypatch,
+            mode="original_file",
+            token=owner_token,
+            specification=specification,
+        )
+        metadata = _structured(result["metadata"])
+        assert metadata["summary"] == file.summary
+        assert "content" not in metadata
+        assert metadata["delivery"] == {"kind": "none"}
+        assert "download_url" not in metadata["original_file"]
+        assert result["original"] == {
+            "filename": "source.pdf",
+            "mimetype": "application/pdf",
+            "delivery": {"kind": "download", "mime_type": "application/pdf"},
+            "supported": True,
+            "attached": False,
+            "expires_in": 300,
+        }
+        assert (
+            result["sha256"]
+            == result["refreshed_sha256"]
+            == hashlib.sha256(source).hexdigest()
+        )
+        assert result["size_bytes"] == len(source)
+        assert result["mime_type"] == "application/pdf"
+        assert set(result["rejected"]) == {
+            "tampered_signature",
+            "different_object",
+            "expired",
+        }
+        for name, rejection in result["rejected"].items():
+            assert rejection["code"] == "download_failed"
+            # Storage may classify an expired signature as a bad request.
+            assert rejection["status"] in ({400, 403} if name == "expired" else {403})
+        denied = _run_driver(
+            tmp_path,
+            monkeypatch,
+            mode="original_file",
+            token=intruder_token,
+            specification={**specification, "denied": True},
+        )
+        assert (
+            _error(denied["denied"], code="tool_error", status=422)["message"]
+            == "Access denied"
+        )
+    finally:
+        _revoke_if_active(owner)
+        _revoke_if_active(intruder)
+        Entities.delete(file)
 
 
 def _canonical_sha256(value) -> str:
@@ -295,9 +386,18 @@ def _assert_safe_plan(
 ) -> dict:
     value = _structured(result)
     assert isinstance(value, dict)
-    expected_keys = PLAN_KEYS | {"original_brief"} | ({"execution", "action_summary"} if tool != "ask" else set()) | ({"context"} if context else set())
+    expected_keys = (
+        PLAN_KEYS
+        | {"original_brief"}
+        | (
+            {"execution", "action_summary"}
+            if value["output_kind"] == "proposal"
+            else set()
+        )
+        | ({"context"} if context else set())
+    )
     assert set(value) in (expected_keys, expected_keys - {"proposal"})
-    assert value["tool"] == tool
+    assert "tool" not in value
     assert value["status"] == status
     _assert_no_private_transport(value)
     if context:
@@ -310,15 +410,16 @@ def _assert_safe_plan(
 def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
     _assert_no_private_transport(contract)
     assert "submission_format" not in contract
-    assert contract["tool"] == tool
+    assert "tool" not in contract
     submission = contract["mcp_submission"]
     assert set(submission) == {
         "contract_version",
         "proposal",
         "proposal_schema",
+        "file_usage",
         "instructions",
     }
-    assert submission["contract_version"] == contract["contract_version"] == 8
+    assert submission["contract_version"] == contract["contract_version"] == 9
     assert submission["proposal"] == {}
     assert submission["proposal_schema"] == "$.proposal_schema"
     assert submission["instructions"].startswith("Call submit_plan")
@@ -327,16 +428,15 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
     workflow = "\n".join(contract["workflow_rules"])
     assert "fetch the latest contract and submit it" not in workflow
     assert "Fetch this contract after finalizing uploads" not in workflow
-    if tool == "ask":
-        assert "only after the user requests saving" in workflow
-    elif tool == "organize" and contract["required_file_refs"]:
-        assert "context.contract" in workflow
-        assert "submit_plan performs the final fresh-contract check" in workflow
+    assert "user requests saving an answer or workspace changes" in workflow
+    assert "file_usage" in workflow
 
 
 def _assert_safe_receipt(result: dict, *, status: str) -> dict:
     value = _structured(result)
-    assert isinstance(value, dict) and set(value) == RECEIPT_KEYS | ({"action_summary"} if status == "ready" else set())
+    assert isinstance(value, dict) and set(value) == RECEIPT_KEYS | (
+        {"action_summary"} if status == "ready" else set()
+    )
     assert value["status"] == status
     assert not PRIVATE_TRANSPORT_FIELDS.intersection(value)
     _assert_human_url(value["preview_url"], preview=True)
@@ -415,6 +515,8 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
         "supported",
         "attached",
         "reason",
+        "download_url",
+        "expires_in",
     }
     assert get_file["properties"]["original_file"]["additionalProperties"] is False
     assert get_file["properties"]["delivery"]["additionalProperties"] is False
@@ -478,9 +580,13 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         if cookie["name"] == "__Host-lagniappe-e2e":
             monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", cookie["value"])
     with monkeypatch.context() as guarded:
-        guarded.setattr(requests, "request", lambda *args, **kwargs: pytest.fail(
-            "A foreign-origin request reached the network boundary"
-        ))
+        guarded.setattr(
+            requests,
+            "request",
+            lambda *args, **kwargs: pytest.fail(
+                "A foreign-origin request reached the network boundary"
+            ),
+        )
         with pytest.raises(ValueError, match="different origin"):
             _request("GET", "https://storage.googleapis.com/object", token="test-only")
     _prepare_package_environment()
@@ -567,7 +673,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
                 "/api/v1/plans",
                 token=owner_token,
                 body={
-                    "tool": "organize",
                     "name": "MCP upload declaration parity",
                     "instructions": "Validate rejected upload declarations.",
                 },
@@ -626,8 +731,12 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert submission["url"] == (
             f"{expected_api_origin}/api/v1/plans/{invalid_plan['id']}/submit"
         )
-        assert submission["contract_version"] == forwarded["contract_version"] == 8
-        assert submission["body"] == {"contract_version": 8, "proposal": {}}
+        assert submission["contract_version"] == forwarded["contract_version"] == 9
+        assert submission["body"] == {
+            "contract_version": 9,
+            "proposal": {},
+            "file_usage": [],
+        }
         assert set(submission) == {"method", "url", "contract_version", "body", "rule"}
         assert "credential-thief.invalid" not in json.dumps(forwarded)
 
@@ -635,9 +744,12 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             cookie["name"]: cookie["value"] for cookie in owner.page.context.cookies()
         }
         csrf_token = owner.page.locator("#token").input_value()
-        notification_counts = notification_database.ensure_notification_aggregate(owner.entity)
+        notification_counts = notification_database.ensure_notification_aggregate(
+            owner.entity
+        )
         starting_notifications = (
-            notification_counts["ordinary_count"] + notification_counts["unread_message_count"]
+            notification_counts["ordinary_count"]
+            + notification_counts["unread_message_count"]
         )
         workflow = _run_driver(
             tmp_path,
@@ -660,9 +772,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert actor["user"]["hash"] == owner.entity.hash
         assert actor["user"]["name"] == owner.name
         assert actor["capabilities"] == {
-            "ask": True,
-            "create": True,
-            "organize": True,
+            "plans": True,
         }
         assert actor["credential"]["active"] is True
         assert _structured(workflow["answer_context"])["report_created"] is False
@@ -670,10 +780,15 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert schema_values["entity"]["hash"] == f"hash:{readable_page.entity.hash}"
         if schema_values["form"]:
             assert isinstance(schema_values["values"], dict)
-            assert set(schema_values["values"]) <= {field["id"] for field in schema_values["schema"]}
+            assert set(schema_values["values"]) <= {
+                field["id"] for field in schema_values["schema"]
+            }
         else:
             assert schema_values["values"] is None
-        assert any(item.get("hash") == f"hash:{readable_page.entity.hash}" for item in _structured(workflow["plan_free_search"]))
+        assert any(
+            item.get("hash") == f"hash:{readable_page.entity.hash}"
+            for item in _structured(workflow["plan_free_search"])
+        )
 
         ask_start = _assert_safe_plan(
             workflow["ask"]["start"], tool="ask", status="draft", context="contract"
@@ -693,6 +808,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         }
         ask_contract = ask_start["context"]["contract"]
         _assert_mcp_contract(ask_contract, tool="ask")
+        assert ask_contract["schema_scope"] == "selected"
+        assert ask_contract["schema_actions"] == []
+        assert ask_contract["proposal_schema"]["properties"]["actions"] == {"type": "array", "maxItems": 0}
         assert ask_contract["required_file_refs"] == []
         ask_receipt = _assert_safe_receipt(
             workflow["ask"]["receipt"], status="complete"
@@ -713,13 +831,19 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         _assert_mcp_contract(create_contract, tool="create")
         assert "create_page" in create_contract["permissions"]["allowed_actions"]
         assert create_contract["schema_scope"] == "selected"
-        assert set(create_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
+        assert set(create_contract["proposal_schema"]["$defs"]) == {
+            "create_page",
+            "create_task",
+        }
         selected_contract = _structured(workflow["create"]["selected_contract"])
         assert selected_contract["schema_scope"] == "selected"
         assert "workflow_rules" not in selected_contract
         assert "submission_format" not in selected_contract
-        assert selected_contract["mcp_submission"]["contract_version"] == 8
-        assert set(selected_contract["proposal_schema"]["$defs"]) == {"create_page", "create_task"}
+        assert selected_contract["mcp_submission"]["contract_version"] == 9
+        assert set(selected_contract["proposal_schema"]["$defs"]) == {
+            "create_page",
+            "create_task",
+        }
         create_receipt = _assert_safe_receipt(
             workflow["create"]["receipt"], status="ready"
         )
@@ -743,7 +867,10 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "Create the revised field guide Page."
         )
         assert replacement_get["name"] == "MCP revised Create"
-        assert replacement_get["instructions"] == "Prepare the revised field guide Page for browser review."
+        assert (
+            replacement_get["instructions"]
+            == "Prepare the revised field guide Page for browser review."
+        )
         assert replacement_get["original_brief"]["name"] == "MCP live Create"
         assert (
             "Revised before browser review."
@@ -758,7 +885,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         update_context = update_start["context"]["contract"]
         assert update_context["proposal_schema"] is None
-        assert not update_context["guidance_requirements"]["required_before_analysis"]
+        assert "required_before_analysis" not in update_context["guidance_requirements"]
         update_contract = _structured(workflow["update"]["contract"])
         _assert_mcp_contract(update_contract, tool="organize")
         assert update_contract["required_file_refs"] == []
@@ -766,7 +893,8 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "rename_entity",
             "complete_task",
         }
-        assert "create_task" not in update_contract["permissions"]["allowed_actions"]
+        assert "create_task" in update_contract["permissions"]["allowed_actions"]
+        assert "create_page" in update_contract["permissions"]["allowed_actions"]
         _assert_safe_receipt(workflow["update"]["receipt"], status="ready")
         update_get = _assert_safe_plan(
             workflow["update"]["get"], tool="organize", status="ready"
@@ -788,9 +916,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         assert organize_start["context"]["contract"]["proposal_schema"] is None
         guidelines = _structured(workflow["organize"]["guidelines"])
-        assert guidelines["task"] == "organize"
+        assert guidelines["task"] == "filing"
         assert (
-            "final form submissions and updates in the same proposal"
+            "Author final form values using exact target schema ids"
             in guidelines["guidelines"]
         )
         assert (
@@ -820,7 +948,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert "workflow_rules" not in organize_selected
         assert "upload_inventory" not in organize_selected
         assert set(organize_selected["proposal_schema"]["$defs"]) == {
-            "create_task", "attach_file", "summarize_file"
+            "create_task",
+            "attach_file",
+            "summarize_file",
         }
         assert organize_contract["required_file_refs"] == [
             organize_contract["upload_inventory"]["files"][0]["ref"]
@@ -905,7 +1035,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             )
             expect(target).to_have_count(1)
             expect(target).to_be_visible()
-        expect(panel).to_contain_text("Create report is ready.")
+        expect(panel).to_contain_text("AI report is ready.")
 
         review_response = owner.page.goto(
             create_receipt["review_url"], wait_until="load"

@@ -94,6 +94,16 @@ button[data-role="history-fill"] .icon[data-icon="historyFill"] {
 	--icon-size: var(--icon-base-glyph-size);
 }
 
+/* @style dropdown.icon */
+.dropdown-option .icon[data-icon="help"] {
+	--icon-size: var(--icon-xs-glyph-size);
+}
+
+/* @style dropdown.icon */
+.dropdown-option-flow > p:first-child .icon {
+	--icon-offset-y: -1px;
+}
+
 .icon[data-icon="menu"] {
 	--icon-box-size: var(--icon-sm-box-size);
 	--icon-size: var(--icon-base-glyph-size);

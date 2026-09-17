@@ -132,7 +132,7 @@ def test_deferred_job_request_properties_own_identity_and_payload_validation(
     monkeypatch,
 ):
     spec = SimpleNamespace(
-        job_type=DeferredJobType.REPORT_ASK,
+        job_type=DeferredJobType.REPORT_AI,
         actor=SimpleNamespace(urlsafe_key="actor-key"),
     )
     monkeypatch.setattr(
@@ -142,7 +142,7 @@ def test_deferred_job_request_properties_own_identity_and_payload_validation(
     )
     assert (
         deferred_job_request.IdempotencyKey.generate(spec)
-        == hashlib.sha256(b"report-ask:actor-key:nonce").hexdigest()
+        == hashlib.sha256(b"report-ai:actor-key:nonce").hexdigest()
     )
 
     entity = SimpleNamespace(

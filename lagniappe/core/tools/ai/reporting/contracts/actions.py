@@ -1,6 +1,7 @@
 """AI report action vocabulary and data contracts."""
 
 READ_ONLY_CONTEXT_TOOLS = (
+    "get_help",
     "list_workspace_resources",
     "get_guidelines",
     "search_entities",

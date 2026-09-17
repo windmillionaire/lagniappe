@@ -12,18 +12,14 @@ tools plus an ordinary HTTP client. No local MCP package or helper is required.
 The direct REST API and its downloadable skill remain available separately.
 
 Questions and task retrieval use `answer_question` guidance and plan-free read
-tools. `start_ask` is reserved for a user-requested saved answer. Create/Organize
-retain browser approval; their compact contracts advertise all allowed actions
-and load selected schemas through `get_plan_contract`. `get_plan` returns
-permission-rechecked execution receipts, and submission can revise the current
-title/brief while retaining the original. See the API guide for exact shapes.
-
-Create is for new content; Organize handles existing-record updates as well as
-uploaded files. Remote updates need no file, unlike UI Organize. The Organize
-starter returns a compact contract, with selected action schemas fetched on
-demand. `complete_task` and `set_task_due_date` are reviewed Organize plan actions.
-For due-date edits, supply an exact Task and a calendar date, or null to clear it.
-When files are uploaded, every file still needs inspection, summary and placement.
+tools. `start_plan` creates a durable Plan for requested workspace changes or
+an explicitly saved answer. One compact contract advertises all allowed actions;
+load selected schemas with get_plan_contract or get_guidelines. Reuse the same
+plan for mixed requests and revisions until execution begins. Mutations require
+browser approval. Files and instructions are individually optional, but publishing
+requires at least one. Classify uploads with file_usage; only organize files need
+summary and attachment actions, while evidence files support answers directly.
+The app and MCP service use contract version 9 with no previous starter aliases.
 
 The adapter validates the full current proposal contract before submitting,
 including actions the proposal does not use. Its bounded remote-schema subset

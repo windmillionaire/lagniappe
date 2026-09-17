@@ -178,9 +178,9 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     organize_delivery = capture(
         "organize",
         organize,
-        "Organize report is ready.",
+        "AI report is ready.",
     )
-    ask_delivery = capture("ask", ask, "Ask report is ready.")
+    ask_delivery = capture("ask", ask, "AI report is ready.")
     autofill_delivery = capture("autofill", page, "Page autofill is ready.")
     summarize_delivery = capture(
         "summarize",
@@ -244,8 +244,8 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
         assert title in text_body
         assert title in html_body
     for redundant_copy in (
-        "Organize report is ready.",
-        "Ask report is ready.",
+        "AI report is ready.",
+        "AI report is ready.",
         "Page autofill is ready.",
         f"File summary complete for {file.name}",
     ):

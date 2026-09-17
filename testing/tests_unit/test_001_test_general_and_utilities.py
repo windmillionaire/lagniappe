@@ -1580,6 +1580,16 @@ def test_strip_tags():
     assert html_tools.strip_tags("<p></p>") == ""
     assert html_tools.strip_tags("<p> </p>") == ""
 
+    multiline = "  First line\n\n  Indented\ttext  with spaces\nLast line\n"
+    assert html_tools.strip_tags(multiline) == (
+        "First line Indented text with spaces Last line"
+    )
+    assert html_tools.strip_tags(multiline, preserve_whitespace=True) == multiline
+    assert html_tools.strip_tags(
+        f"<p>{multiline}</p><script>discard()</script>", preserve_whitespace=True
+    ) == multiline
+    assert html_tools.strip_tags(None, preserve_whitespace=True) is None
+
 
 # @pair utility:timing
 def test_timed_config_disabled(monkeypatch, capsys):

@@ -513,8 +513,7 @@ def _valid_chunk_size(value: object, *, file_size: int) -> bool:
 def _preflight_requested_count(contract: Mapping[str, Any], file_items: object) -> None:
     """Reject an oversized batch before consuming one descriptor per item."""
     if (
-        contract.get("tool") != "organize"
-        or contract.get("uploads_supported") is not True
+        contract.get("uploads_supported") is not True
     ):
         raise _file_error(
             "uploads_not_supported", "This Plan does not support local file uploads."
@@ -559,8 +558,7 @@ def _preflight_contract(
     contract: Mapping[str, Any], files: Sequence[OpenedFile]
 ) -> tuple[int, int]:
     if (
-        contract.get("tool") != "organize"
-        or contract.get("uploads_supported") is not True
+        contract.get("uploads_supported") is not True
     ):
         raise _file_error(
             "uploads_not_supported", "This Plan does not support local file uploads."

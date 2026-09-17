@@ -21,8 +21,6 @@ TARGETS = ("page", "task", "page_action", "task_action")
 
 
 def _proposal(data):
-    # Creation references belong to file-backed Organize, whose wider action
-    # contract these row-shape tests intentionally exercise.
     return {
         "summary": "Update reproduction details",
         "confidence": 1,
@@ -49,12 +47,12 @@ def _proposal(data):
 )
 def test_update_rows_require_one_target_in_contract_and_runtime(targets):
     actor = _test_user("field-contract-owner")
-    report = SimpleNamespace(tool="organize", origin="web", input_files=[object()])
+    report = SimpleNamespace(available=True, origin="web", input_files=[])
     row = {"schema_id": "textarea-notes", "new_value": "Updated notes"}
     row.update({target: "new-page" if target.startswith("page") else "new-task"
                 for target in targets})
     proposal = _proposal({"updates": [row]})
-    envelope = {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal}
+    envelope = {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []}
 
     contract = schema.external_report_proposal_response_schema(
         allowed_actions=("update_form_values",),
@@ -88,7 +86,7 @@ def test_update_rows_require_one_target_in_contract_and_runtime(targets):
 @pytest.mark.unit
 def test_top_level_update_target_is_only_valid_for_internal_pending_planning():
     actor = _test_user("pending-contract-owner")
-    report = SimpleNamespace(tool="organize", origin="web", input_files=[object()])
+    report = SimpleNamespace(available=True, origin="web", input_files=[])
     pending = _proposal({"task": "new-task"})
     assert validate_proposal(
         deepcopy(pending), allow_empty_submission_updates=True,
@@ -104,7 +102,7 @@ def test_top_level_update_target_is_only_valid_for_internal_pending_planning():
         validate_proposal(deepcopy(rejected))
     for proposal in (pending, rejected):
         errors = external_api.submission_validation_errors(
-            {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal},
+            {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []},
             report, actor,
         )
         assert any(error["path"] == "$.proposal.actions[2].data.task"
@@ -124,11 +122,11 @@ def test_selected_update_guidance_example_satisfies_external_contract():
     )["guidelines"]
     example, _remainder = json.JSONDecoder().raw_decode(guidance.split("Example data: ")[1])
     assert external_api.submission_validation_errors(
-        {"contract_version": external_api.CONTRACT_VERSION, "proposal": _proposal(example)},
-        SimpleNamespace(tool="organize", origin="web", input_files=[object()]), actor,
+        {"contract_version": external_api.CONTRACT_VERSION, "proposal": _proposal(example), "file_usage": []},
+        SimpleNamespace(available=True, origin="web", input_files=[]), actor,
     ) == []
     assert "Put the target inside every data.updates row" in guidance
-    assert "legacy pending checkpoints only" in guidance
+    assert "Top-level data.page/data.task are not valid proposal targets" in guidance
     patches = get_guidelines.execute_external_get_guidelines(
         {"task": "form_autofill", "actions": ["update_form_values"],
          "field_types": ["table", "textarea"]}, actor,
@@ -197,11 +195,11 @@ def test_mcp_reproduction_batch_submits_then_updates_three_tasks(monkeypatch):
         ],
     }
     assert external_api.submission_validation_errors(
-        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal},
+        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []},
         report, actor,
     ) == []
     external_api.submit_plan(report, actor, proposal,
-                             contract_version=external_api.CONTRACT_VERSION)
+                             contract_version=external_api.CONTRACT_VERSION, file_usage=[])
     assert report.status == "ready"
     assert all(task.submission["textarea-notes"] == "Original report" for task in tasks)
 

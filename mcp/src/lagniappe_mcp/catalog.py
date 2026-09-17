@@ -98,7 +98,6 @@ SAFE_PLAN_SCHEMA = {
     "required": [
         "id",
         "status",
-        "tool",
         "name",
         "instructions",
         "files",
@@ -120,9 +119,10 @@ SAFE_PLAN_SCHEMA = {
                 "undo_failed",
             ]
         },
-        "tool": {"enum": ["ask", "create", "organize"]},
         "name": {"type": "string"},
         "instructions": {"type": "string"},
+        "output_kind": {"enum": ["answer", "proposal", None]},
+        "file_usage": {"type": "array", "items": {"type": "object"}},
         "files": {
             "type": "array",
             "maxItems": MAX_UPLOAD_FILES,
@@ -198,11 +198,9 @@ ACTOR_SCHEMA = {
         },
         "capabilities": {
             "type": "object",
-            "required": ["ask", "create", "organize"],
+            "required": ["plans"],
             "properties": {
-                "ask": {"type": "boolean"},
-                "create": {"type": "boolean"},
-                "organize": {"type": "boolean"},
+                "plans": {"type": "boolean"},
             },
             "additionalProperties": False,
         },
@@ -245,7 +243,6 @@ SAFE_CONTRACT_SCHEMA = {
     "type": "object",
     "required": [
         "contract_version",
-        "tool",
         "current_date",
         "timezone",
         "personal_page",
@@ -268,11 +265,11 @@ SAFE_CONTRACT_SCHEMA = {
             "minimum": CONTRACT_VERSION_MIN,
             "maximum": CONTRACT_VERSION_MAX,
         },
-        "tool": {"enum": ["ask", "create", "organize"]},
         "current_date": {"type": "string", "format": "date"},
         "timezone": {"type": "string"},
         "personal_page": {"type": "object"},
         "proposal_schema": {"type": ["object", "null"]},
+        "file_usage_schema": {"type": "object"},
         "schema_scope": {"enum": ["full", "selected", "summary"]},
         "schema_actions": {"type": "array", "items": {"type": "string"}},
         "schema_instructions": {"type": "string"},
@@ -293,10 +290,12 @@ SAFE_CONTRACT_SCHEMA = {
                 "proposal",
                 "proposal_schema",
                 "instructions",
+                "file_usage",
             ],
             "properties": {
                 "contract_version": {"type": "integer"},
                 "proposal": {"type": "object"},
+                "file_usage": {"type": "array"},
                 "proposal_schema": {
                     "const": "$.proposal_schema",
                     "description": "Path relative to this contract object, not the enclosing lifecycle result.",
@@ -310,7 +309,7 @@ SAFE_CONTRACT_SCHEMA = {
 }
 
 SCHEMA_CONTRACT_KEYS = (
-    "contract_version", "tool", "proposal_schema", "schema_scope",
+    "contract_version", "proposal_schema", "file_usage_schema", "schema_scope",
     "schema_actions", "schema_instructions", "mcp_submission",
 )
 SAFE_SCHEMA_CONTRACT_SCHEMA = {
@@ -353,7 +352,7 @@ REST_CONTRACT_SCHEMA = {
                 },
                 "body": {
                     "type": "object",
-                    "required": ["contract_version", "proposal"],
+                    "required": ["contract_version", "proposal", "file_usage"],
                     "properties": {
                         "contract_version": {
                             "type": "integer",
@@ -361,6 +360,7 @@ REST_CONTRACT_SCHEMA = {
                             "maximum": CONTRACT_VERSION_MAX,
                         },
                         "proposal": {"type": "object", "maxProperties": 0},
+                        "file_usage": {"type": "array", "maxItems": 0},
                     },
                     "additionalProperties": False,
                 },
@@ -403,7 +403,6 @@ UPLOAD_RESULT_SCHEMA = {
 
 ACTION_SELECTION_SCHEMA = {
     "type": "array",
-    "minItems": 1,
     "maxItems": 100,
     "items": {"type": "string", "maxLength": 100, "pattern": "^[a-z][a-z0-9_]*$"},
 }
@@ -412,18 +411,16 @@ LIFECYCLE_CONTEXT_SCHEMA = {
     "type": "object",
     "properties": {
         "contract": SAFE_CONTRACT_SCHEMA,
-        "guidelines": {"type": "object"},
         "recovery": {
             "type": "object",
             "required": ["tool", "arguments", "message"],
             "properties": {
-                "tool": {"enum": ["get_plan_contract", "get_guidelines"]},
+                "tool": {"const": "get_plan_contract"},
                 "arguments": {
                     "type": "object",
                     "required": ["plan_id"],
                     "properties": {
                         "plan_id": {"type": "string"},
-                        "task": {"const": "organize"},
                         "actions": ACTION_SELECTION_SCHEMA,
                         "view": {"enum": ["full", "summary", "schema"]},
                     },
@@ -436,7 +433,6 @@ LIFECYCLE_CONTEXT_SCHEMA = {
     },
     "oneOf": [
         {"required": ["contract"]},
-        {"required": ["guidelines"]},
         {"required": ["recovery"]},
     ],
     "additionalProperties": False,
@@ -464,19 +460,17 @@ ENRICHED_UPLOAD_RESULT_SCHEMA = {
 def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
     return {
         "type": "object",
-        "required": ["instructions"],
+        "required": [],
         "properties": {
             "instructions": {
                 "type": "string",
-                "minLength": 1,
-                "pattern": r"\S",
             },
             "name": {"type": "string", "maxLength": 120},
             **(
                 {
                     "actions": {
                         **ACTION_SELECTION_SCHEMA,
-                        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Omit for a summary without schemas.",
+                        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Use [] for a saved answer without changes. Omit for a summary without schemas.",
                     }
                 }
                 if selected_actions
@@ -504,7 +498,7 @@ def _plan_id_input() -> dict[str, Any]:
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_get_file_schema_projects_every_transport_extension
 def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
-    """Project signed REST transport fields out of the get_file result."""
+    """Expose a scoped original download alongside bounded inline media."""
     result = validate_schema_document(rest_schema)
     rest_properties = result.setdefault("properties", {})
     if not isinstance(rest_properties, dict):
@@ -535,14 +529,17 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
         original["required"] = [
             field for field in required_original if field in safe_original_fields
         ]
-    # REST deliberately permits transport extensions here. MCP exposes only
-    # stable descriptive fields and consumes every signed field privately.
+    original["properties"].update({
+        "download_url": {"type": "string", "minLength": 1, "maxLength": 8192},
+        "expires_in": {"type": "integer", "minimum": 1, "maximum": 300},
+    })
+    # Only the explicit download variant may expose a signed read capability.
     original["additionalProperties"] = False
     properties["delivery"] = {
         "type": "object",
         "required": ["kind"],
         "properties": {
-            "kind": {"enum": ["none", "image", "audio"]},
+            "kind": {"enum": ["none", "image", "audio", "download"]},
             "mime_type": {"type": "string"},
             "size_bytes": {"type": "integer", "minimum": 0},
             "content_index": {"type": "integer", "minimum": 1},
@@ -559,7 +556,17 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
                         ]
                     }
                 },
-                "else": {"required": ["mime_type", "size_bytes", "content_index"]},
+                "else": {
+                    "if": {"properties": {"kind": {"const": "download"}}},
+                    "then": {
+                        "required": ["mime_type"],
+                        "not": {"anyOf": [
+                            {"required": ["size_bytes"]},
+                            {"required": ["content_index"]},
+                        ]},
+                    },
+                    "else": {"required": ["mime_type", "size_bytes", "content_index"]},
+                },
             }
         ],
         "additionalProperties": False,
@@ -570,6 +577,19 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
     required[:] = [field for field in required if field in properties]
     if "delivery" not in required:
         required.append("delivery")
+    result.setdefault("allOf", []).append({
+        "if": {"properties": {"delivery": {"properties": {"kind": {"const": "download"}}}}},
+        "then": {
+            "required": ["original_file"],
+            "properties": {"original_file": {
+                "required": ["supported", "attached", "download_url", "expires_in"],
+                "properties": {"supported": {"const": True}, "attached": {"const": False}},
+            }},
+        },
+        "else": {"properties": {"original_file": {"not": {"anyOf": [
+            {"required": ["download_url"]}, {"required": ["expires_in"]},
+        ]}}}},
+    })
     # REST permits evolving entity metadata, but this boundary cannot safely
     # infer whether an arbitrary new field is descriptive or a signed transport
     # capability. New fields therefore require an explicit adapter release.
@@ -681,7 +701,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     return (
         ToolDefinition(
             "answer_question",
-            "Get lightweight guidance and personal Page context for answering or retrieving tasks without saving a report. The client model answers using plan-free read tools; this does not call a server model or create a Plan. Answer in chat first and offer to save afterward. Only when the user wants to save, use start_ask then submit_plan. Reuse this context during the conversation.",
+            "Get lightweight guidance and personal Page context for answering or retrieving tasks without saving a report. The client model answers using plan-free read tools; this does not call a server model or create a Plan. Answer in chat first and offer to save afterward. Only when the user wants to save, use start_plan then submit_plan. Reuse this context during the conversation.",
             {"type": "object", "properties": {}, "additionalProperties": False},
             {
                 "type": "object",
@@ -713,27 +733,11 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
             READ_ANNOTATIONS,
         ),
         ToolDefinition(
-            "start_ask",
-            f"Start a durable Ask report only when the user requests saving an answer. For ordinary questions and task lookups use answer_question and plan-free reads first. {common_start} Returns context.contract; submit the already-agreed answer without regenerating it.",
-            _plan_input_schema(),
-            START_RESULT_SCHEMA,
-            "start_ask",
-            START_ANNOTATIONS,
-        ),
-        ToolDefinition(
-            "start_create",
-            f"Start a Create Plan to create pages, tasks, or workspace structure without uploads. Use start_organize to update existing records, including completing tasks or patching submissions. {common_start} Pass actions=[\"create_task\"] or other known action names to receive their exact permitted schemas with the initial context.contract. Omit actions for a summary of permissions and allowed actions. Reuse supplied schemas; get_plan_contract can load additional schemas later on this same Plan. {review_only}",
+            "start_plan",
+            f"Start one Plan for workspace changes, file organization, or an explicitly requested saved answer. For ordinary questions use answer_question and plan-free reads without saving. Instructions and uploads are optional individually; publishing needs at least one. {common_start} Pass actions=[\"create_task\"] or other known actions for selected schemas, or omit for compact context. Continue the same Plan for mixed requests and revisions. {review_only}",
             _plan_input_schema(selected_actions=True),
             START_RESULT_SCHEMA,
-            "start_create",
-            START_ANNOTATIONS,
-        ),
-        ToolDefinition(
-            "start_organize",
-            f"Start an Organize Plan to update existing records (complete tasks, patch submissions, rename or move records) or inspect and place uploaded files. Remote updates do not require a file. {common_start} Pass actions=[\"complete_task\"] or other known action names for exact permitted schemas in context.contract. Omit actions for a summary; get_plan_contract(actions=[...]) can load additional schemas on this same Plan. Discover exact targets with read tools before proposing updates. For uploads, read get_guidelines(task=organize), inspect complete evidence, and summarize and place every finalized file. {review_only}",
-            _plan_input_schema(selected_actions=True),
-            START_RESULT_SCHEMA,
-            "start_organize",
+            "start_plan",
             START_ANNOTATIONS,
         ),
         ToolDefinition(
@@ -746,7 +750,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan_contract",
-            "Load exact schemas for selected allowed actions. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. submit_plan independently validates against the full current contract.",
+            "Load exact schemas for selected allowed actions; actions=[] returns a saved-answer schema with no changes. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. submit_plan independently validates against the full current contract.",
             {
                 **_plan_id_input(),
                 "properties": {
@@ -761,7 +765,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "upload_local_files",
-            "Upload explicit readable nonempty regular files to the existing Organize Plan, then finalize the batch. Returns the finalized inventory and context.contract; reuse them. If context is unavailable, follow its recovery read without repeating the successful upload. Inspect complete file evidence before filing; summaries and clipped excerpts are not complete inspection. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
+            "Upload explicit readable nonempty regular files to the existing Plan, then finalize the batch. Returns the finalized inventory and context.contract; reuse them. If context is unavailable, follow its recovery read without repeating the successful upload. Inspect complete file evidence before filing; summaries and clipped excerpts are not complete inspection. Relative paths resolve from the adapter working directory and symlinks follow normal operating-system resolution. Paths appear in the MCP request transcript but never in results or upstream requests.",
             {
                 "type": "object",
                 "required": ["plan_id", "files"],
@@ -793,14 +797,15 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "submit_plan",
-            "Save an explicitly requested Ask answer or a Create/Organize proposal to the existing plan_id. Reuse for revisions: optional name and instructions update the current brief atomically with the complete proposal; original_brief is retained. Never executes workspace changes. Validates against the fresh full contract; no separate final contract read is needed. Give preview_url for authenticated review, never claim a proposal was applied.",
+            "Save an explicitly requested answer or a mutation proposal to the existing plan_id. Reuse for revisions: optional name and instructions update the current brief atomically with the complete proposal; original_brief is retained. Never executes workspace changes. Validates against the fresh full contract; no separate final contract read is needed. Give preview_url for authenticated review, never claim a proposal was applied.",
             {
                 "type": "object",
-                "required": ["plan_id", "contract_version", "proposal"],
+                "required": ["plan_id", "contract_version", "proposal", "file_usage"],
                 "properties": {
                     "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
                     "contract_version": {"type": "integer"},
                     "proposal": {"type": "object"},
+                    "file_usage": {"type": "array", "items": {"type": "object"}},
                     "name": {"type": "string", "minLength": 1, "maxLength": 120},
                     "instructions": {
                         "type": "string",
@@ -920,8 +925,14 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
         if name == "get_file":
             description = (
                 description
-                + " MCP projects signed transport fields out of the result. "
-                "include_original=true delivers only bounded supported image/audio content. "
+                + " MCP include_original=true delivers small supported images/audio inline. "
+                "Other originals, including PDFs and oversized media, return "
+                "delivery.kind=download with original_file.download_url and expires_in. "
+                "Use your HTTP/file or browsing tools to fetch and read that original; "
+                "a URL or summary alone is not source inspection. Fetch with HTTPS GET "
+                "without added Authorization, cookies, or redirects. On expiry, request "
+                "get_file again with the same id. Keep temporary URLs out of answers, "
+                "reports, and logs; use the ordinary file URL for citations. "
                 "Inspect complete file evidence once; a summary or clipped excerpt "
                 "is not complete inspection. Independent file reads can run in parallel. "
                 + MCP_RESULT_INSTRUCTIONS

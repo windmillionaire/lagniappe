@@ -10,6 +10,7 @@ from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.tools import cache, dates
 from lagniappe.core.tools.files.html import SafeHTML
+from lagniappe.reference import get_topic, topics, topic_html, topic_sections, topic_context
 
 from . import formatters, styles
 
@@ -183,6 +184,11 @@ def initialize(app):
     app.jinja_env.globals.update(
         {
             "CONFIG": CONFIG,
+            "help_topic": get_topic,
+            "help_topics": topics,
+            "help_html": topic_html,
+            "help_sections": topic_sections,
+            "help_context": topic_context,
             "render_icon": render_icon,
             "styles": styles.STYLES,
             "fonts": styles.FONTS,

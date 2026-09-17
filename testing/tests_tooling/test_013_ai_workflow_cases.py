@@ -32,7 +32,7 @@ def _fixture_files(case):
 def test_workflow_cases_have_requests_rubrics_and_substantive_fixtures():
     cases = _case_directories()
     assert cases
-    required_fixture_counts = {"06": 1, "07": 1, "08": 5, "12": 3, "13": 1}
+    required_fixture_counts = {"06": 1, "07": 1, "08": 5, "12": 3, "13": 1, "U2": 1}
     found_fixture_cases = set()
     for case in cases:
         for filename in ("PROMPT.md", "RUBRIC.md"):
@@ -71,7 +71,12 @@ def test_latest_results_resolve_cases_and_match_current_input_bytes():
         }
         assert current_inputs["fixtures"] == expected_fixtures, case.name
 
-        number = int(case.name.split("-", 1)[0])
+        prefix = case.name.split("-", 1)[0]
+        if prefix in {"U1", "U2"}:
+            for arm in ("codex-remote", "on-site"):
+                assert entry["latest_results"][arm]["reviewed"] is True, case.name
+            continue
+        number = int(prefix)
         if 1 <= number <= 11:
             assert entry["latest_results"]["mcp"]["reviewed"] is True, case.name
         if number in {12, 13}:

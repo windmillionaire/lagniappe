@@ -61,7 +61,7 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
     monkeypatch.setattr(agent_auth, "authenticate_credential", lambda token: (actor, {"active": True, "generation": 1}))
     client = app.test_client()
     headers = {"Authorization": "Bearer test-schema-conversion"}
-    created = client.post("/api/v1/plans", json={"tool": "organize", "instructions": "Convert Notes to a todo list and Count to a number."}, headers=headers)
+    created = client.post("/api/v1/plans", json={"instructions": "Convert Notes to a todo list and Count to a number."}, headers=headers)
     assert created.status_code == 201, created.text
     plan_id = created.json["id"]
     preview_args = {"id": f"hash:{form.entity.hash}", "operations": operations, "include_values": True, "limit": 2}
@@ -97,9 +97,9 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
     if origin == "api":
         incomplete = deepcopy(proposal)
         incomplete["actions"][0]["data"]["conversions"].pop()
-        refused = client.post(f"/api/v1/plans/{plan_id}/submit", headers=headers, json={"contract_version": external_api.CONTRACT_VERSION, "proposal": incomplete})
+        refused = client.post(f"/api/v1/plans/{plan_id}/submit", headers=headers, json={"file_usage": [], "contract_version": external_api.CONTRACT_VERSION, "proposal": incomplete})
         assert refused.status_code == 422, refused.text
-        submitted = client.post(f"/api/v1/plans/{plan_id}/submit", headers=headers, json={"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal})
+        submitted = client.post(f"/api/v1/plans/{plan_id}/submit", headers=headers, json={"file_usage": [], "contract_version": external_api.CONTRACT_VERSION, "proposal": proposal})
         assert submitted.status_code == 200, submitted.text
         assert submitted.json["action_summary"] == {"total": 2, "by_type": {"update_form_schema": 1, "rename_entity": 1}, "maximum": 100}
     else:

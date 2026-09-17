@@ -11,11 +11,13 @@ MAX_SEARCH_LIMIT = 25
 SEARCH_KIND_ALIASES = {
     facet.value.kind: facet.value.kind
     for facet in SearchFacets
+    if facet.value.kind != "help"
 }
 SEARCH_KIND_ALIASES.update(
     {
         facet.value.name: facet.value.kind
         for facet in SearchFacets
+        if facet.value.kind != "help"
     }
 )
 SEARCH_KIND_ALIASES["model"] = "model"

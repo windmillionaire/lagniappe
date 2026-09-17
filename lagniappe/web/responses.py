@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from flask import (
+    abort,
     Response,
     g,
     get_template_attribute,
@@ -692,7 +693,7 @@ def new_tool_report(report):
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
+# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @covered-by lagniappe/web/routes/tools/main.py::run_report
 # @reason deferred report acknowledgement is route plumbing verified through create and execution workflows
 def deferred_tool_report(report, notification, job=None):
@@ -718,6 +719,8 @@ def deferred_tool_report(report, notification, job=None):
 # @covered-by lagniappe/web/routes/tools/main.py::report
 # @reason report route coverage owns status hydration and full-page rendering
 def tool_report(report):
+    if not report.available:
+        return render_template("tools/report.html", report=report), 200
     render_operation_statuses((report,), current_user)
     from lagniappe.core.tools.ai.reporting.schema_updates import report_impact, migration_started
 
@@ -1148,8 +1151,17 @@ def manual_content(section):
     return response
 
 
+# @testable true
+# @tests tests_e2e/009_search/test_009e_help.py::test_help_article_navigation_and_canonical_ids
+# @pair help:navigation
 def reference_topic(section):
-    return smartypants(render_template(f"reference/{section}.html")), 200
+    from lagniappe.reference import get_topic
+
+    try:
+        topic = get_topic(section)
+    except KeyError:
+        abort(404)
+    return render_template("reference/topic.html", topic=topic), 200
 
 
 # @testable true

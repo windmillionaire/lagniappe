@@ -2,6 +2,11 @@
 Context usage and file handling guidelines.
 """
 
+PERSONAL_PAGE_GUIDELINES = (
+    "personal_page is the authenticated user's guaranteed editable Page. "
+    "Use its hash for Tasks on their own Page; it does not appear in workspace search."
+)
+
 LAGNIAPPE_WORKSPACE_CONCEPTS = """
 ### Lagniappe Workspace Concepts
 

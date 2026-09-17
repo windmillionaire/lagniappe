@@ -8,11 +8,9 @@ from lagniappe.core.tools.ai.guidelines import (
     REPORT_DOCUMENT_GUIDELINES,
     FORM_AUTOFILL_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
-    ORGANIZE_ACTION_GUIDELINES,
-    ORGANIZE_WORKFLOW,
+    FILE_ORGANIZATION_GUIDELINES,
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
-    REPORT_OUTPUT_REQUIREMENTS,
     REPORT_TASK_SCHEDULING_GUIDELINES,
     SCHEMA_TYPE_GUIDELINES,
     SCHEMA_EVOLUTION_GUIDELINES,
@@ -75,13 +73,13 @@ generic filler. Mark a field required only when its answer is necessary.
 ACTION_GUIDELINES = {
     "set_task_due_date": "Set an exact editable, incomplete Task's calendar due date with data.task and data.due_date (YYYY-MM-DD in the acting user's timezone, or null to clear). Resolve relative wording to a date using the plan's current date/timezone. Preserve recurrence rules, completion state, and form values. This uses the Task editor's calendar-date behavior. Browser review, fresh permissions, retry, and undo apply.",
     "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry; undo stops if content has since changed.",
-    "complete_task": "Check off one exact existing Task via data.task. No name-based matching, replacement submission, or historical completed_on override. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
+    "complete_task": "Check off one exact existing Task via data.task at the current execution time. No name-based matching, replacement submission, or historical completed_on override. For a source-dated completed occurrence, use create_task with completed=true, completed_on, and the exact task reference when reusing a Task. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
     "create_form": "Create forms before actions that reference them; use the matching page_form or task_form bundle.",
     "create_category": "Create a category only for a durable collection; reference an earlier default page-form action only when the collection is homogeneous.",
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
     "create_model_task": "Create a model task after its Project and optional task Form; model tasks describe reusable work types.",
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
-    "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import. For dated history, first create the current completion, then another create_task with task_action pointing to that earlier action and an older completed_on date. Example: current id=visit, completed=true, completed_on=2026-09-12; older task_action=visit, completed=true, completed_on=2026-09-05 (both also supply name and page/page_action). These are two actions for one Task plus one older history occurrence; the older event leaves the current completion intact.",
+    "create_task": "Use an editable Page or earlier page action, a stable work name, and task Forms only. For one source-dated completed occurrence, use one create_task with completed=true and completed_on from the source; supply the exact task reference to reuse an existing Task, plus the required name and page/page_action. Do not invent a second completion for today. To check off existing work now while preserving its details, use complete_task. Only when evidence contains multiple occurrences, create the latest dated completion first, then another create_task with task_action pointing to that earlier action and the older completed_on date. Both actions supply name and page/page_action; the older occurrence leaves the latest completion intact.",
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
     "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
     "update_form_schema": "Preview exact-ID schema operations, explain destructive changes, and place the update before actions that use it. The user reviews the plan.",
@@ -89,14 +87,14 @@ ACTION_GUIDELINES = {
         "Put the target inside every data.updates row, alongside schema_id and "
         "new_value. Each row requires exactly one of page, task, page_action, or "
         "task_action; action references identify earlier creation actions. "
-        "Top-level data.page/data.task are for legacy pending checkpoints only, "
-        "not external executable proposals. Include only grounded field changes. "
+        "Top-level data.page/data.task are not valid proposal targets. "
+        "Include only grounded field changes. "
         'Example data: {"updates":[{"task":"hash:012345abcdef",'
         '"schema_id":"textarea-notes","new_value":"Updated notes"}]}.'
     ),
     "attach_file": "Attach the exact report file ref to data.entity (an editable existing Page, Task or task history) or data.entity_action (an earlier create_page/create_task action). This links the file; it does not convert it into document text. Use the completed occurrence as the target for its evidence.",
-    "move_page": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
-    "move_task": "Use exact editable source and destination references; Organize should normally prefer needs_review for cleanup moves.",
+    "move_page": "Use exact editable source and destination references; propose only requested moves.",
+    "move_task": "Use exact editable source and destination references; propose only requested moves.",
     "move_file": "Use an exact file and editable source/destination; preserve evidence attachments required by the plan.",
     "rename_entity": "Use one exact editable target and a concise stable name supported by the request.",
     "suggest_page_deletion": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
@@ -107,8 +105,8 @@ ACTION_GUIDELINES = {
 
 
 GUIDELINE_BUNDLES = {
-    "organize": {
-        "description": "Complete Organize proposals from evidence and workspace context.",
+    "filing": {
+        "description": "Plan file organization from evidence and workspace context.",
         "instructions": (
             "Settle targets and structure, then author all final form submissions "
             "and updates in the same proposal. Use the current action contract. "
@@ -116,7 +114,7 @@ GUIDELINE_BUNDLES = {
         ),
         "sections": (
             LAGNIAPPE_WORKSPACE_CONCEPTS,
-            ORGANIZE_WORKFLOW,
+            FILE_ORGANIZATION_GUIDELINES,
             SUMMARY_GENERATION_GUIDELINES,
         ),
     },
@@ -165,7 +163,7 @@ GUIDELINE_BUNDLES = {
     },
     "report_actions": {
         "description": "Detailed report action and output contract.",
-        "sections": (ORGANIZE_ACTION_GUIDELINES, REPORT_OUTPUT_REQUIREMENTS),
+        "sections": (),
     },
 }
 
@@ -219,8 +217,8 @@ GET_GUIDELINES = types.FunctionDeclaration(
     name="get_guidelines",
     description=(
         "Return detailed prompt guidelines for one report-planning subtask. Use this "
-        "tool with task=organize when the caller has not already received its "
-        "Organize workflow. Use the other tasks for detailed rules about "
+        "tool with task=filing when the caller needs file organization guidance. "
+        "Use the other tasks for detailed rules about "
         "generated structure, form schemas, form submissions, page documents, file "
         "summaries, or action data. Request one bundle per call. Independent bundles "
         "may be requested in parallel when the client supports it."
@@ -249,7 +247,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
                     "enum": sorted(ACTION_GUIDELINES),
                 },
                 "description": (
-                    "For task=report_actions, return only rules for the selected "
+                    "For task=report_actions, require a nonempty selection and return exact schemas and rules for "
                     "proposal action types. For task=form_autofill, select "
                     "[update_form_values] for patch guidance instead of full autofill."
                 ),
@@ -313,6 +311,8 @@ def _guidelines_result(args, *, external):
     )
     if error:
         return error
+    if task == "report_actions" and not actions:
+        return {"error": "report_actions requires a nonempty actions array."}
     if actions is not None and task == "form_autofill":
         if actions != ["update_form_values"]:
             return {"error": "form_autofill actions must be [update_form_values]."}
@@ -333,19 +333,15 @@ def _guidelines_result(args, *, external):
     for section in bundle["sections"]:
         if section == SCHEMA_TYPE_GUIDELINES and field_types is not None:
             section = _schema_type_guidance(field_types)
-        if task == "report_actions" and actions is not None:
-            if section == ORGANIZE_ACTION_GUIDELINES:
-                section = _selected_action_guidance(actions)
-            elif section == REPORT_OUTPUT_REQUIREMENTS:
-                section = (
-                    "### Output Boundary\n\nUse the action fields and final JSON "
-                    "shape defined by the current workflow response schema."
-                )
         sections.append(section)
+    if task == "report_actions":
+        sections.extend((
+            _selected_action_guidance(actions),
+            "### Output Boundary\n\nUse the action fields and final JSON "
+            "shape defined by the current report response schema.",
+        ))
 
-    if external and task == "report_actions" and (
-        actions is None or "create_task" in actions
-    ):
+    if task == "report_actions" and "create_task" in actions:
         sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
 
     guidelines = "\n\n".join(section.strip() for section in sections)
@@ -368,7 +364,7 @@ def _guidelines_result(args, *, external):
             "the proposal. Read tools never execute the proposal."
         )
     content = f"{instructions}\n\n{guidelines}"
-    return {
+    result = {
         "task": task,
         "description": bundle["description"],
         "guidelines": content,
@@ -379,6 +375,15 @@ def _guidelines_result(args, *, external):
             **({"actions": actions} if actions is not None else {}),
         },
     }
+    if task == "report_actions":
+        from ..reporting.contracts.schema import report_proposal_response_schema, external_report_proposal_response_schema
+
+        schema = (
+            external_report_proposal_response_schema(allowed_actions=actions, include_submission_fields=True, require_file_summary_terms=True)
+            if external else report_proposal_response_schema(actions, include_submission_fields=True)
+        )
+        result["action_schema"] = {**schema["properties"]["actions"]["items"], **({"$defs": schema["$defs"]} if "$defs" in schema else {})}
+    return result
 
 
 # @testable false

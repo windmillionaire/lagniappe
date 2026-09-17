@@ -408,8 +408,14 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
         font.family.replaceAll('"', '') === 'Source Sans 3' && font.status === 'loaded'
     )""")
     preload = owner.page.locator("link[rel='preload'][as='font']")
-    expect(preload).to_have_count(1)
-    expect(preload).to_have_attribute("href", re.compile(r"/fonts/source-sans-latin\."))
+    expect(preload).to_have_count(2)
+    for family in ("source-sans-latin", "bitter-latin"):
+        font = owner.page.locator(
+            f'link[rel="preload"][as="font"][href^="/fonts/{family}."]'
+        )
+        expect(font).to_have_count(1)
+        expect(font).to_have_attribute("type", "font/woff2")
+        expect(font).to_have_attribute("crossorigin", "")
     expect(run.locator("[data-role='ai-run-report']")).to_have_attribute(
         "href", f"/tools/reports/{report.urlsafe_key}"
     )
@@ -492,27 +498,27 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
         user.page.locator("button[data-section='forms']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
     expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("What Forms Are For")
+    expect(content).to_contain_text("Creating Forms")
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.locator("button[data-section='tasks']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
     expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("Tasks Live on Pages")
+    expect(content).to_contain_text("Tasks track work on a page")
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/forms"):
         user.page.go_back()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
     expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("What Forms Are For")
+    expect(content).to_contain_text("Creating Forms")
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.go_forward()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
     expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("Tasks Live on Pages")
+    expect(content).to_contain_text("Tasks track work on a page")
 
 
 # @pair manual:section-navigation
@@ -676,13 +682,13 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
 
     assert response.ok
     content = anonymous.locate("[data-role='manual-content']")
-    expect(content).to_contain_text("AI Reports by Email")
-    public_description = content.locator("[data-role='public-ai-email-description']")
+    expect(content).to_contain_text("AI Email")
+    public_description = content.locator("[data-role='help-body'][data-topic='ai_email']")
     expect(public_description).to_be_visible()
     expect(public_description).to_contain_text(
-        "Registered users can email questions, requests, or attachments"
+        "unified AI address"
     )
-    expect(content.locator("[data-role='ai-email-account-details']")).to_have_count(0)
+    expect(content.locator("[data-role='help-context']")).to_have_count(0)
     expect(public_description).not_to_contain_text("@")
 
     ajax = anonymous.page.evaluate(
@@ -697,8 +703,8 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     )
     assert ajax["ok"] is True
     assert ajax["status"] == 200
-    assert 'data-role="public-ai-email-description"' in ajax["text"]
-    assert 'data-role="ai-email-account-details"' not in ajax["text"]
+    assert 'data-topic="ai_email"' in ajax["text"]
+    assert 'data-role="help-context"' not in ajax["text"]
     assert "@" not in ajax["text"]
     assert auth_bootstrap_paths == []
 
@@ -710,12 +716,12 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
 
     assert response.ok
     content = owner.locate("[data-role='manual-content']")
-    account_details = content.locator("[data-role='ai-email-account-details']")
-    expect(account_details).to_be_visible()
-    expect(account_details).to_contain_text("AI (recommended)")
-    expect(account_details).to_contain_text("Create")
-    expect(account_details).to_contain_text("Organize")
-    expect(content.locator("[data-role='public-ai-email-description']")).to_have_count(
-        0
+    account_details = content.locator("[data-role='help-context']")
+    if CONFIG.AI_EMAIL_PUBLIC["enabled"]:
+        expect(account_details).to_be_visible()
+        expect(account_details).to_contain_text(CONFIG.AI_EMAIL_PUBLIC["addresses"]["ai"])
+    else:
+        expect(account_details).to_have_count(0)
+    expect(content.locator("[data-role='help-body'][data-topic='ai_email']")).to_contain_text(
+        "single AI address"
     )
-    expect(account_details).to_contain_text("@")

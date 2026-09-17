@@ -12,14 +12,15 @@ evidence, without being given its source name or a tool sequence.
   central Lagniappe-hosted service/control plane.
 - Ground those claims in the actual Page and include a usable source link.
   Equivalent concise wording is fine; general knowledge alone is insufficient.
-- Save the Ask answer in the website and return its report link. No proposal,
-  entity change, or extra abandoned report is needed.
+- External agents answer in the conversation without creating a Plan: this prompt
+  does not request saving. The on-site panel saves an answer with empty actions.
+  No workspace change or abandoned report is needed.
 
 ## Targeted round 3 observation
 
 Check whether individual tool purposes are clear in the client's discovery
 output, with fewer broad/clipped catalog reads. Preserve the grounded answer
-and saved report. Count discovery separately; a faster search does not prove a
+and entry-point saving behavior. Count discovery separately; a faster search does not prove a
 shorter complete workflow. Do not require loading every search hit merely to
 recheck permissions already applied by search.
 

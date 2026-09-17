@@ -26,6 +26,9 @@ def delete_cache():
         cache.flush()
     cache.create_index()
     filter_cache.create_index()
+    from .help import ensure_help
+
+    ensure_help()
 
 
 # @testable true

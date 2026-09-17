@@ -13,7 +13,7 @@ from lagniappe.core.definitions import (
     FieldType,
     FilterOptions,
 )
-from lagniappe.core.tools.ai import ask
+from lagniappe.core.tools.ai import planner
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai.function_definitions import workspace_filter
 from lagniappe.core.tools.filters import ai_query
@@ -555,5 +555,5 @@ def test_filter_tools_are_registered_for_ask():
         ai_functions.HANDLERS["query_workspace_filter"]
         is workspace_filter.execute_query_workspace_filter
     )
-    assert "get_filter_schema" in ask.ASK_READ_ONLY_CONTEXT_TOOLS
-    assert "query_workspace_filter" in ask.ASK_READ_ONLY_CONTEXT_TOOLS
+    assert "get_filter_schema" in planner.REPORT_READ_TOOLS
+    assert "query_workspace_filter" in planner.REPORT_READ_TOOLS

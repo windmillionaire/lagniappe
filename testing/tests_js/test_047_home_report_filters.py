@@ -20,7 +20,7 @@ vm.runInContext(base + source + "\nglobalThis.ToolReportList = ToolReportList; g
 
 function fixture() {
   const items = [];
-  const buttons = ["active", "executed", "ask"].map(filter => ({
+  const buttons = ["active", "executed", "answers"].map(filter => ({
     dataset: { filter }, count: {},
     setAttribute(name, value) { this[name] = value; },
     querySelector() { return this.count; },
@@ -43,7 +43,7 @@ function fixture() {
   const widget = new context.ToolReportList({ target, component, view, name: "ToolReportList", visible: true });
   component.active = widget;
   function add(key, tool, status) {
-    const item = { dataset: { key, tool, status }, remove() { items.splice(items.indexOf(this), 1); } };
+    const item = { dataset: { key, outputKind: tool, status }, remove() { items.splice(items.indexOf(this), 1); } };
     items.push(item);
     return item;
   }
@@ -58,15 +58,15 @@ def test_report_categories_and_saved_filter_selection(run_node):
         REPORT_HARNESS
         + r"""
 for (const status of ["pending", "ready", "failed", "revising", "running", "undoing", "undone", "undo_failed", "draft", "complete"]) {
-  assert.equal(context.category({ tool: "ask", status }), "ask");
-  for (const tool of ["create", "organize"]) {
-    assert.equal(context.category({ tool, status }), status === "complete" ? "executed" : "active");
+  assert.equal(context.category({ outputKind: "answer", status }), "answers");
+  for (const tool of ["proposal", "proposal"]) {
+    assert.equal(context.category({ outputKind: tool, status }), status === "complete" ? "executed" : "active");
   }
 }
-assert.equal(context.category({ tool: "unknown", status: "complete" }), "active");
+assert.equal(context.category({ outputKind: "unknown", status: "complete" }), "active");
 for (const invalid of [null, "executed", {}, ["obsolete"]]) {
   stored = invalid;
-  assert.deepEqual([...fixture().widget.filters], ["active", "ask"]);
+  assert.deepEqual([...fixture().widget.filters], ["active", "answers"]);
 }
 stored = [];
 assert.deepEqual([...fixture().widget.filters], []);
@@ -83,16 +83,16 @@ def test_report_filters_count_hidden_categories_and_empty_selections(run_node):
         REPORT_HARNESS
         + r"""
 const f = fixture();
-const ready = f.add("ready", "create", "ready");
-const executed = f.add("done", "organize", "complete");
-const answer = f.add("answer", "ask", "complete");
+const ready = f.add("ready", "proposal", "ready");
+const executed = f.add("done", "proposal", "complete");
+const answer = f.add("answer", "answer", "complete");
 f.widget.postreconcile();
 assert.equal(ready.hidden, false);
 assert.equal(executed.hidden, true);
 assert.equal(answer.hidden, false);
 assert.deepEqual(f.buttons.map(button => button.count.textContent), [1, 1, 1]);
 assert.equal(f.clear.hidden, true);
-for (const selection of [[], ["active"], ["executed"], ["ask"], ["active", "executed"], ["executed", "ask"], ["active", "ask"], ["active", "executed", "ask"]]) {
+for (const selection of [[], ["active"], ["executed"], ["answers"], ["active", "executed"], ["executed", "answers"], ["active", "answers"], ["active", "executed", "answers"]]) {
   f.widget.filters = new Set(selection);
   f.widget._renderFilters();
   assert.equal(f.clear.hidden, !(selection.length === 1 && selection[0] === "executed"));
@@ -113,18 +113,18 @@ ready.dataset.status = "complete";
 f.widget.postreconcile();
 assert.equal(ready.hidden, false);
 assert.deepEqual(f.buttons.map(button => button.count.textContent), [0, 1, 1]);
-const created = { dataset: { key: "new", tool: "ask", status: "pending" } };
+const created = { dataset: { key: "new", outputKind: "answer", status: "pending" } };
 f.widget.created({ html: { querySelectorAll: () => [created] } });
 f.widget.postreconcile();
 assert.equal(created.hidden, false);
-assert.deepEqual([...f.widget.filters], ["executed", "ask"]);
+assert.deepEqual([...f.widget.filters], ["executed", "answers"]);
 f.widget.filters = new Set(["executed"]);
 f.widget.created({ html: { querySelectorAll: () => [created] } });
 f.widget.postreconcile();
 assert.equal(f.items.filter(item => item.dataset.key === "new").length, 1);
 assert.equal(created.hidden, false);
-assert.deepEqual([...f.widget.filters], ["executed", "ask"]);
-assert.deepEqual([...stored], ["executed", "ask"]);
+assert.deepEqual([...f.widget.filters], ["executed", "answers"]);
+assert.deepEqual([...stored], ["executed", "answers"]);
 """
     )
 
@@ -137,9 +137,9 @@ def test_bulk_delete_recovers_from_partial_and_network_failures(run_node):
 (async () => {
   const f = fixture();
   f.widget.filters = new Set(["executed"]);
-  f.add("deleted", "create", "complete");
-  f.add("failed", "organize", "complete");
-  f.add("new-arrival", "create", "complete");
+  f.add("deleted", "proposal", "complete");
+  f.add("failed", "proposal", "complete");
+  f.add("new-arrival", "proposal", "complete");
   const spinner = { dataset: { visible: "false" } };
   const confirm = { querySelector: () => spinner }, error = {};
   const modal = { modal: { querySelector: (selector) => selector.includes("error") ? error : confirm }, async remove() { this.modal = null; } };

@@ -16,98 +16,129 @@ from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import references as ai_references
+from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
 from lagniappe.core.tools.database import get as database_get
-from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
+from testing.utility.ai_report_fakes import _fetch_one_from, _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
+
+
+# @pair agent-api:origin-validation
+@pytest.mark.unit
+def test_external_entity_links_use_the_site_origin_without_rewriting_evidence():
+    raw = {
+        "result": [
+            {
+                "hash": "hash:02464143dc09",
+                "url": "/files/file-key",
+                "summary": "See [source](/files/file-key).",
+                "content": "/pages/quoted-path",
+                "original_file": {
+                    "download_url": "https://storage.googleapis.com/bucket/source?X-Goog-Signature=test",
+                    "expires_in": 300,
+                },
+                "page": {"hash": "hash:fbfffc2428c2", "url": "/pages/page-key"},
+            },
+            {"hash": "hash:17cd85e4590c", "url": "/projects/project-key/tasks/task-key?completed=false"},
+            {"hash": "hash:8790b2c252e5", "url": "https://demo.example/forms/form-key"},
+            {"hash": "hash:c4e3bd9028c8", "url": "//other.example/categories/category-key"},
+        ],
+        "form_value": {"url": "/user-entered-link"},
+        "empty": {"hash": "hash:02464143dc09", "url": None},
+    }
+    snapshot = json.dumps(raw, sort_keys=True)
+
+    result, status = external_api.absolute_entity_links(
+        (raw, 201), origin="https://demo.example/"
+    )
+
+    assert status == 201
+    file, task, form, category = result["result"]
+    assert file["url"] == "https://demo.example/files/file-key"
+    assert file["page"]["url"] == "https://demo.example/pages/page-key"
+    assert task["url"] == "https://demo.example/projects/project-key/tasks/task-key?completed=false"
+    assert form == raw["result"][2]
+    assert category == raw["result"][3]
+    assert file["summary"] == raw["result"][0]["summary"]
+    assert file["content"] == raw["result"][0]["content"]
+    assert file["original_file"] == raw["result"][0]["original_file"]
+    assert result["form_value"] == raw["form_value"]
+    assert result["empty"] == raw["empty"]
+    assert json.dumps(raw, sort_keys=True) == snapshot
 
 
 # @source lagniappe/core/tools/ai/external_api.py::plan_contract
 # @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/external_api.py::submit_plan
-# @matrix agent-api ai-report : remote-update transport-boundary proposal-contract proposal-validation ready-state
+# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @source lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
+# @matrix agent-api ai-report : proposal-contract proposal-validation remote-update
+# @pair ai-report:deterministic-run
+# @pair files:move-file
 @pytest.mark.unit
-def test_remote_organize_update_contract_and_submission(monkeypatch):
-    from lagniappe.core.tools.ai.reporting.contracts.workflows import (
-        is_organize_update,
+@pytest.mark.parametrize("origin", ["web", "api", "email"])
+def test_fileless_organize_creates_task_and_moves_existing_file(monkeypatch, origin):
+    from lagniappe.core.tools.ai.function_definitions.get_guidelines import (
+        execute_external_get_guidelines,
     )
 
     _patch_fake_keys(monkeypatch)
-    actor = _test_user("update-actor")
+    actor = _test_user("organize-owner")
+    page = TestEntities.get("PAGE", {"name": "Property Taxes", "hash": "propertypage"})
+    file = TestEntities.get("FILE", {
+        "name": "Property Taxes", "filename": "property-taxes.pdf",
+        "mimetype": "application/pdf", "hash": "taxrecord001",
+    })
+    file.page = page
+    entities = {entity.urlsafe_key: entity for entity in (page, file)}
     saved = []
-    monkeypatch.setattr(
-        external_api.Entities, "save", lambda *items: saved.extend(items)
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(external_api.Entities, "fetch", lambda *ids, request: [entities[key] for key in ids])
+    monkeypatch.setattr(external_api.Entities, "fetch_one", _fetch_one_from(entities))
+    monkeypatch.setattr(external_api.cache, "get_details_by_hash", lambda hashes: {
+        entity.hash: {"id": entity.urlsafe_key, "name": entity.name, "kind": entity.entity_kind}
+        for entity in entities.values() if entity.hash in hashes
+    })
+    report = external_api.create_plan(actor, instructions="Create a Property Taxes task and move its file there.")
+    report.origin = origin
+    contract = external_api.plan_contract(
+        report, actor, actions=["create_task", "move_file"], submit_url="https://example.test/submit"
     )
-    report = external_api.create_plan(actor, instructions="Complete the CLI task")
-    task = TestEntities.get("TASK", {"name": "CLI", "hash": "updatetask01"})
-    task.page = actor.page
-    monkeypatch.setattr(
-        external_api.cache,
-        "get_details_by_hash",
-        lambda hashes: {
-            "updatetask01": {"id": task.urlsafe_key, "name": task.name, "kind": "task"}
-        },
-    )
-    monkeypatch.setattr(external_api.Entities, "fetch", lambda *ids, request: [task])
-    kwargs = {"submit_url": "https://example.test/submit"}
-    summary = external_api.plan_contract(report, actor, view="summary", **kwargs)
-    selected = external_api.plan_contract(
-        report, actor, actions=["complete_task", "update_form_values"], **kwargs
-    )
-    assert summary["proposal_schema"] is None
-    assert "complete_task" in summary["permissions"]["allowed_actions"]
-    assert "create_task" not in summary["permissions"]["allowed_actions"]
-    assert "summarize_file" not in summary["permissions"]["allowed_actions"]
-    assert not summary["guidance_requirements"]["required_before_analysis"]
-    assert "append_page_document" in summary["permissions"]["allowed_actions"]
-    assert "page_document" in {
-        item["request"]["task"]
-        for item in summary["guidance_requirements"]["conditional"]
-    }
-    assert summary["file_checklist"] == summary["required_file_refs"] == []
-    assert summary["uploads_supported"]
-    assert set(selected["proposal_schema"]["$defs"]) == {
-        "complete_task",
-        "update_form_values",
-    }
-    assert "### Task Scheduling" not in "\n".join(selected["workflow_rules"])
+    assert set(contract["proposal_schema"]["$defs"]) == {"create_task", "move_file"}
+    assert {"create_task", "move_file", "create_page", "create_project", "attach_file"} <= set(contract["permissions"]["allowed_actions"])
+    guidance = execute_external_get_guidelines({"task": "report_actions", "actions": ["create_task", "move_file"]}, actor)
+    assert "error" not in guidance
+    assert "action_schema" in guidance
     proposal = {
-        "summary": "Propose completing CLI",
+        "summary": "Create a Property Taxes task and move the existing tax record into it.",
         "confidence": 1,
         "actions": [
-            {
-                "id": "finish",
-                "type": "complete_task",
-                "data": {"task": "hash:updatetask01"},
-            }
+            {"id": "tax-task", "type": "create_task", "data": {
+                "name": "Property Taxes", "page": "hash:propertypage",
+            }},
+            {"id": "move-tax-file", "type": "move_file", "depends_on": ["tax-task"], "data": {
+                "file": "hash:taxrecord001", "from_page": "hash:propertypage", "to_task_action": "tax-task",
+            }},
         ],
     }
-    envelope = {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal}
+    envelope = {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []}
     assert external_api.submission_validation_errors(envelope, report, actor) == []
-    external_api.submit_plan(
-        report, actor, proposal, contract_version=external_api.CONTRACT_VERSION
-    )
+    external_api.submit_plan(report, actor, proposal, contract_version=external_api.CONTRACT_VERSION, file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     assert report.status == "ready"
-    assert report.proposal["actions"][0]["data"]["task"] == task.urlsafe_key
-    assert not task.completed  # Submission is only a plan, never execution.
-    assert saved[-1] is report
-    with pytest.raises(exceptions.AIException, match="at least one action"):
-        external_api.validate_external_proposal(
-            {**proposal, "actions": []}, report, actor
-        )
-    for origin, expected in (("api", True), ("email", True), ("web", True)):
-        report.origin = origin
-        assert is_organize_update(report) is expected
-    report.origin = "api"
-    report.input_files = [_test_file("uploaded.txt", "text/plain")]
-    file_contract = external_api.plan_contract(report, actor, view="summary", **kwargs)
-    assert not is_organize_update(report)
-    assert "summarize_file" in file_contract["permissions"]["allowed_actions"]
-    assert len(file_contract["file_checklist"]) == 1
-    assert file_contract["guidance_requirements"]["required_before_analysis"] == [
-        {"task": "organize"}
-    ]
+    assert file.page is page  # Reviewing the proposal does not move the file.
+    assert not any(entity.entity_kind == "task" for entity in saved)
+
+    result = report_runner.run_report(report, actor)
+
+    assert result["status"] == "complete"
+    assert [action["status"] for action in result["actions"]] == ["complete", "complete"]
+    task = next(entity for entity in saved if entity.entity_kind == "task")
+    assert task.name == "Property Taxes"
+    assert task.page is page
+    assert file.db.get("page") is None
+    assert file.db["task"] == task.key
+    assert result["actions"][1]["moved"]["to"]["id"] == task.urlsafe_key
 
 
 def _contract_actor():
@@ -135,11 +166,11 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
     assert "exact `input_schema`" in skill
     assert "follow its returned `contract_url`" in skill
     assert "instead of reconstructing those lifecycle" in skill
-    assert "Choose Ask for a read-only answer" in skill
+    assert "For a read-only answer" in skill
     assert "untrusted evidence" in skill
-    assert "ready for authenticated website review" in skill
+    assert "workspace changes require authenticated browser" in skill
     assert "can be edited and resubmitted" in skill
-    assert "authenticated website" in skill
+    assert "browser" in skill
     assert "create_page" not in skill
     assert "Bearer <" not in skill
 
@@ -172,7 +203,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     assert report.origin == "api"
     assert report.status == "draft"
     assert report.pending is False
-    assert report.tool == "organize"
+    assert report.output_kind is None
     assert report.instructions == "Put these records into project pages."
     assert report.agent_manifest["version"] == 1
     assert report.agent_manifest["contract_version"] == external_api.CONTRACT_VERSION
@@ -276,7 +307,7 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         {
             "type": "report",
             "origin": "api",
-            "tool": "organize",
+            "format_version": 1,
             "process": json.dumps({"report": {"status": "draft"}}),
             "agent_manifest": json.dumps({"contract_version": 1}),
         }
@@ -549,7 +580,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
         {
             "type": "report",
             "origin": "api",
-            "tool": "organize",
+            "format_version": 1,
             "process": json.dumps({"report": {"status": "draft"}}),
             "agent_manifest": json.dumps({"contract_version": 1}),
         }
@@ -675,7 +706,7 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
         {
             "type": "report",
             "origin": "api",
-            "tool": "create",
+            "format_version": 1,
             "process": json.dumps({"report": {"status": "ready"}}),
             "proposal": json.dumps({"summary": "API proposal"}),
         }
@@ -846,7 +877,7 @@ def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch)
             "parent": user,
             "user": user,
             "name": "External browser mutation",
-            "tool": "organize",
+            "format_version": 1,
             "origin": "api",
             "status": "ready",
             "input_files": [file],
@@ -953,7 +984,7 @@ def test_external_proposal_schema_has_named_discriminated_actions():
 def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     actor = _contract_actor()
     report = SimpleNamespace(
-        tool="organize",
+        available=True, file_usage=[], instructions="File the uploads",
         input_files=[SimpleNamespace(hash="aaaaaaaaaaaa")],
     )
     monkeypatch.setattr(
@@ -986,257 +1017,29 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         submit_url="https://example.test/api/v1/plans/report-key/submit",
     )
 
-    assert set(contract) == {
-        "schema_scope",
-        "schema_actions",
-        "schema_instructions",
-        "contract_version",
-        "tool",
-        "current_date",
-        "timezone",
-        "personal_page",
-        "submission_format",
-        "proposal_schema",
-        "permissions",
-        "required_file_refs",
-        "upload_inventory",
-        "file_checklist",
-        "guidance_requirements",
-        "uploads_supported",
-        "workflow_rules",
-        "reference_rules",
-        "limits",
-        "payload_sizes",
-    }
+    assert "tool" not in contract
     assert contract["contract_version"] == external_api.CONTRACT_VERSION
-    assert "version" not in contract
-    assert contract["current_date"] == "2026-08-31"
-    assert contract["timezone"] == "UTC"
-    assert contract["personal_page"] == {
-        "kind": "page",
-        "hash": "hash:personalpage",
-        "name": "Personal Page",
-        "url": "/pages/personal-page",
-        "can_view": True,
-        "can_edit": True,
-    }
-    assert contract["workflow_rules"][0].startswith(
-        "personal_page is the authenticated user's guaranteed editable Page"
-    )
-    assert contract["submission_format"] == {
-        "method": "POST",
-        "url": "https://example.test/api/v1/plans/report-key/submit",
-        "contract_version": external_api.CONTRACT_VERSION,
-        "body": {
-            "contract_version": external_api.CONTRACT_VERSION,
-            "proposal": {},
-        },
-        "rule": (
-            "Replace the empty proposal template with an object matching "
-            "proposal_schema, then send the wrapper body with the stated "
-            "method and URL; do not post the proposal object as the top-level "
-            "request body."
-        ),
-    }
-    assert contract["proposal_schema"] == {
-        "allowed": ("create_page", "move_page", "summarize_file"),
-        "require_file_summary_terms": True,
-    }
-    assert contract["permissions"] == {
-        "allowed": ("create_page", "move_page", "summarize_file")
-    }
+    assert contract["proposal_schema"] is None
+    full = external_api.plan_contract(report, actor, submit_url="https://example.test/submit", view="full")
+    assert full["proposal_schema"] == {"allowed": ("create_page", "move_page", "summarize_file"), "require_file_summary_terms": True}
+    assert contract["permissions"] == {"allowed": ("create_page", "move_page", "summarize_file")}
     assert contract["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
     assert contract["upload_inventory"]["count"] == 1
     assert contract["upload_inventory"]["authoritative"] is True
     assert contract["upload_inventory"]["status"] == "finalized"
-    assert contract["file_checklist"] == [
-        {
-            "file": "hash:aaaaaaaaaaaa",
-            "inspect_complete_content": "required",
-            "duplicate_check": "required",
-            "destination_decision": "required",
-            "placement_action": "required",
-            "attachment": "at_least_one",
-            "summary": "exactly_one",
-        }
-    ]
-    duplicate_rule = next(
-        rule
-        for rule in contract["workflow_rules"]
-        if rule.startswith("file_checklist.duplicate_check")
-    )
-    assert "an evidence comparison, not a required tool call" in duplicate_rule
-    assert "complete batch and already-read destination/task evidence" in duplicate_rule
-    assert "one comparison may cover related files" in duplicate_rule
-    assert "unresolved identity or occurrence question" in duplicate_rule
-    assert "not once per filename" in duplicate_rule
-    assert "does not establish a duplicate" in duplicate_rule
-    assert contract["guidance_requirements"]["required_before_analysis"] == [
-        {"task": "organize"}
-    ]
-    guidance_by_task = {
-        item["request"]["task"]: item
-        for item in contract["guidance_requirements"]["conditional"]
-    }
-    assert guidance_by_task["form_autofill"]["request"] == {"task": "form_autofill"}
-    assert guidance_by_task["form_autofill"]["derived_request_arguments"] == {
-        "field_types": {
-            "type": "array",
-            "items": {"type": "string"},
-            "source": "unique type values from the exact target schemas",
-        }
-    }
-    assert guidance_by_task["report_actions"]["request"] == {"task": "report_actions"}
-    assert guidance_by_task["report_actions"]["derived_request_arguments"] == {
-        "actions": {
-            "type": "array",
-            "items": {"type": "string"},
-            "source": "unique selected proposal action types",
-        }
-    }
-    assert "actual arrays" in contract["guidance_requirements"]["derived_request_rule"]
-    guidelines_schema = ai_functions.tool_catalog(names=["get_guidelines"])[0][
-        "input_schema"
-    ]
-    derived_samples = {
-        "field_types": ["input"],
-        "actions": ["create_page"],
-    }
-    for task, item in guidance_by_task.items():
-        assert task in guidelines_schema["properties"]["task"]["enum"]
-        result, parts = ai_functions.execute_registered_tool(
-            "get_guidelines",
-            item["request"],
-            actor,
-        )
-        assert result["task"] == task
+    assert contract["current_date"] == "2026-08-31"
+    assert contract["timezone"] == "UTC"
+    assert contract["personal_page"]["hash"] == "hash:personalpage"
+    assert contract["submission_format"]["body"] == {"contract_version": external_api.CONTRACT_VERSION, "proposal": {}, "file_usage": []}
+    assert contract["file_usage_schema"]["items"]["properties"]["usage"]["enum"] == ["evidence", "organize"]
+    for item in contract["guidance_requirements"]["conditional"]:
+        arguments = dict(item["request"])
+        if arguments["task"] == "report_actions":
+            arguments["actions"] = ["create_page"]
+        result, parts = ai_functions.execute_registered_tool("get_guidelines", arguments, actor)
+        assert result["task"] == arguments["task"]
         assert parts == []
-        for argument, descriptor in item.get("derived_request_arguments", {}).items():
-            live_argument = guidelines_schema["properties"][argument]
-            assert descriptor["type"] == live_argument["type"] == "array"
-            assert descriptor["items"]["type"] == live_argument["items"]["type"]
-            selected, selected_parts = ai_functions.execute_registered_tool(
-                "get_guidelines",
-                {**item["request"], argument: derived_samples[argument]},
-                actor,
-            )
-            assert selected["filters"][argument] == derived_samples[argument]
-            assert selected_parts == []
-    assert contract["payload_sizes"]["proposal_schema_bytes"] > 0
-    assert contract["payload_sizes"]["contract_without_payload_sizes_bytes"] > 0
-    assert any(
-        "Upload and finalize at least one file" in rule
-        for rule in contract["workflow_rules"]
-    )
-    assert any(
-        "get_guidelines with task=organize" in rule
-        for rule in contract["workflow_rules"]
-    )
-    assert any("two phases" in rule for rule in contract["workflow_rules"])
-    assert any("will not call a model" in rule for rule in contract["workflow_rules"])
-    assert any(
-        "exactly one summarize_file" in rule for rule in contract["workflow_rules"]
-    )
-    assert any("never applies" in rule for rule in contract["workflow_rules"])
-    assert any(
-        "ready Organize proposal remains conversationally revisable" in rule
-        for rule in contract["workflow_rules"]
-    )
-    assert any(
-        "exact id of an earlier action" in rule
-        and "never takes a workspace hash" in rule
-        for rule in contract["reference_rules"]
-    )
-    assert any(
-        "data.submission is the Form field-value object" in rule
-        and "not an existing submission reference" in rule
-        for rule in contract["reference_rules"]
-    )
-    assert contract["limits"]["max_tool_calls"] == external_api.MAX_PLAN_TOOL_CALLS
-
-
-# @pairs agent-api:create-revision agent-api:organize-revision agent-api:proposal-contract ai-report:proposal-contract
-# @pair ai-report:task-page
-@pytest.mark.unit
-def test_external_plan_contracts_distinguish_ask_and_create(monkeypatch):
-    actor = _contract_actor()
-    monkeypatch.setattr(
-        external_api.dates,
-        "user_today",
-        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
-    )
-
-    ask_contract = external_api.plan_contract(
-        SimpleNamespace(tool="ask", input_files=[]),
-        actor,
-        submit_url="https://example.test/api/v1/plans/ask/submit",
-    )
-
-    assert ask_contract["tool"] == "ask"
-    assert ask_contract["uploads_supported"] is False
-    assert "execution_supported" not in ask_contract
-    assert ask_contract["required_file_refs"] == []
-    assert "propertyOrdering" not in ask_contract["proposal_schema"]
-    assert "answer_markdown" in ask_contract["proposal_schema"]["properties"]
-    assert ask_contract["proposal_schema"]["properties"]["actions"]["maxItems"] == 0
-    assert any(
-        "separate Create or Organize plan" in rule
-        for rule in ask_contract["workflow_rules"]
-    )
-    assert any(
-        "only after the user requests saving" in rule
-        for rule in ask_contract["workflow_rules"]
-    )
-    assert any(
-        "remain available after an Ask submission" in rule
-        for rule in ask_contract["workflow_rules"]
-    )
-
-    monkeypatch.setattr(
-        external_api,
-        "allowed_report_actions",
-        lambda user: ("create_page", "create_task", "move_page", "needs_review"),
-    )
-    monkeypatch.setattr(
-        external_api,
-        "report_action_permission_context",
-        lambda user, allowed: {"allowed_actions": list(allowed)},
-    )
-    create_contract = external_api.plan_contract(
-        SimpleNamespace(tool="create", input_files=[]),
-        actor,
-        submit_url="https://example.test/api/v1/plans/create/submit",
-    )
-
-    assert create_contract["tool"] == "create"
-    assert create_contract["uploads_supported"] is False
-    assert "execution_supported" not in create_contract
-    assert create_contract["permissions"]["allowed_actions"] == [
-        "create_page",
-        "create_task",
-        "needs_review",
-    ]
-    action_items = create_contract["proposal_schema"]["properties"]["actions"]["items"]
-    assert set(action_items["discriminator"]["mapping"]) == {
-        "create_page",
-        "create_task",
-        "needs_review",
-    }
-    create_page = create_contract["proposal_schema"]["$defs"]["create_page"]
-    assert "document_markdown" in create_page["properties"]["data"]["properties"]
-    assert any(
-        "ready Create proposal remains conversationally revisable" in rule
-        for rule in create_contract["workflow_rules"]
-    )
-    assert any(
-        "authenticated website" in rule and "no execution operation" in rule
-        for rule in create_contract["workflow_rules"]
-    )
-    assert any(
-        "Every create_task action requires its editable destination Page" in rule
-        and "page_name is display context only" in rule
-        for rule in create_contract["reference_rules"]
-    )
+    assert full["payload_sizes"]["proposal_schema_bytes"] > 0
 
 
 # @pair agent-api:answer-context
@@ -1258,6 +1061,7 @@ def test_answer_context_is_plan_free(monkeypatch):
 
 # @pair agent-api:proposal-contract
 # @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 @pytest.mark.unit
 def test_contract_selection_preserves_permissions_and_full_validation(monkeypatch):
     actor = _contract_actor()
@@ -1271,9 +1075,9 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
         "report_action_permission_context",
         lambda _, allowed: {"allowed_actions": list(allowed)},
     )
-    report = SimpleNamespace(tool="create", input_files=[])
+    report = SimpleNamespace(available=True, file_usage=[], instructions="Create", input_files=[])
     kwargs = {"submit_url": "https://example.test/api/v1/plans/create/submit"}
-    full = external_api.plan_contract(report, actor, **kwargs)
+    full = external_api.plan_contract(report, actor, view="full", **kwargs)
     selected = external_api.plan_contract(
         report, actor, actions=["create_task"], **kwargs
     )
@@ -1289,6 +1093,18 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
     assert "workflow_rules" not in compact
     assert "personal_page" not in compact
     assert len(json.dumps(compact)) < len(json.dumps(selected)) * .7
+    answer = external_api.plan_contract(report, actor, actions=[], **kwargs)
+    assert answer["schema_scope"] == "selected"
+    assert answer["schema_actions"] == []
+    assert answer["permissions"] == full["permissions"]
+    answer_schema = answer["proposal_schema"]
+    assert answer_schema["properties"]["actions"] == {"type": "array", "maxItems": 0}
+    assert "$defs" not in answer_schema
+    assert len(json.dumps(answer_schema)) < len(json.dumps(selected["proposal_schema"]))
+    assert external_api.plan_contract(report, actor, actions=[], view="schema", **kwargs)["proposal_schema"] == answer_schema
+    filing = next(rule for rule in answer["guidance_requirements"]["conditional"] if rule["request"]["task"] == "filing")
+    assert filing["when"] == {"file_usage_any": ["organize"]}
+    assert "required_before_analysis" not in answer["guidance_requirements"]
     assert (
         selected["payload_sizes"]["contract_without_payload_sizes_bytes"]
         < full["payload_sizes"]["contract_without_payload_sizes_bytes"]
@@ -1328,7 +1144,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
 
     monkeypatch.setattr(external_api.Entities, "fetch", fetch)
     report = SimpleNamespace(
-        tool="create",
+        available=True, file_usage=[], instructions="Create",
         status="complete",
         result={
             "status": "complete",
@@ -1384,16 +1200,8 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
     assert '"visible-key"' not in json.dumps(result)
     assert not result["has_more"]
     assert "Secret" not in json.dumps(result) and "private" not in json.dumps(result)
-    report.tool = "ask"
+    report.result = None
     assert external_api.public_execution_receipt(report, object()) is None
-
-
-# @matrix agent-api : ask create organize tool-selection
-@pytest.mark.unit
-def test_external_plan_tool_selection_is_provider_independent():
-    assert external_api.normalize_plan_tool(" Ask ") == "ask"
-    with pytest.raises(exceptions.ValidationError, match="ask, create, or organize"):
-        external_api.normalize_plan_tool("email")
 
 
 # @source lagniappe/core/tools/ai/functions.py::tool_catalog
@@ -1521,7 +1329,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
 ):
     actor = object()
     report = SimpleNamespace(
-        tool="organize",
+        available=True, file_usage=[], instructions="File the uploads",
         input_files=[SimpleNamespace(hash="aaaaaaaaaaaa")],
     )
     captured = {}
@@ -1541,7 +1349,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         "issues": [],
         "actions": [],
     }
-    assert external_api.validate_external_proposal(proposal, report, actor) is proposal
+    assert external_api.validate_external_proposal(proposal, report, actor, file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],) == proposal
     assert captured["allowed_actions"] == ("create_page", "summarize_file")
     assert captured["allow_pending_submissions"] is False
     assert captured["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
@@ -1553,7 +1361,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
             {**proposal, "confidence": "certain"},
             report,
             actor,
-        )
+        file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
     inaccessible = {
         **proposal,
@@ -1580,27 +1388,27 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         lambda *identifiers, request: [denied],
     )
     with pytest.raises(exceptions.AIException, match="inaccessible"):
-        external_api.validate_external_proposal(inaccessible, report, actor)
+        external_api.validate_external_proposal(inaccessible, report, actor, file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
 
 # @matrix agent-api : envelope schema field-path bounded-validation
 @pytest.mark.unit
 def test_external_submission_validation_collects_independent_field_errors():
-    report = SimpleNamespace(tool="ask")
+    report = SimpleNamespace(available=True, file_usage=[], instructions="Answer", input_files=[])
     errors = external_api.submission_validation_errors(
         {
-            "contract_version": external_api.CONTRACT_VERSION,
+            "contract_version": external_api.CONTRACT_VERSION, "file_usage": [],
             "proposal": {"actions": []},
         },
         report,
-        object(),
+        _test_user("actor"),
     )
     by_path = {error["path"]: error for error in errors}
     assert by_path["$.proposal.summary"]["code"] == "required"
     assert by_path["$.proposal.confidence"]["code"] == "required"
 
     valid_wrapper = {
-        "contract_version": external_api.CONTRACT_VERSION,
+        "contract_version": external_api.CONTRACT_VERSION, "file_usage": [],
         "proposal": {"summary": "An answer", "confidence": 1, "actions": []},
     }
     for field, values in (
@@ -1609,7 +1417,7 @@ def test_external_submission_validation_collects_independent_field_errors():
     ):
         for value in values:
             brief_errors = external_api.submission_validation_errors(
-                {**valid_wrapper, field: value}, report, object()
+                {**valid_wrapper, field: value}, report, _test_user("actor")
             )
             assert any(
                 error["path"] == f"$.{field}" and error["code"] == "invalid_brief"
@@ -1617,7 +1425,7 @@ def test_external_submission_validation_collects_independent_field_errors():
             )
     assert external_api.submission_validation_errors(
         {**valid_wrapper, "name": "Revised title", "instructions": "Agreed scope"},
-        report, object(),
+        report, _test_user("actor"),
     ) == []
 
     missing_wrapper = external_api.submission_validation_errors(
@@ -1626,8 +1434,8 @@ def test_external_submission_validation_collects_independent_field_errors():
             "confidence": 0.8,
             "actions": [],
         },
-        SimpleNamespace(tool="organize"),
-        object(),
+        SimpleNamespace(available=True, file_usage=[], instructions="File", input_files=[]),
+        _test_user("actor"),
     )
     paths = {error["path"] for error in missing_wrapper}
     assert "$.contract_version" in paths
@@ -1641,8 +1449,8 @@ def test_external_submission_validation_collects_independent_field_errors():
     }
     bounded = external_api.submission_validation_errors(
         noisy_wrapper,
-        SimpleNamespace(tool="organize"),
-        object(),
+        SimpleNamespace(available=True, file_usage=[], instructions="File", input_files=[]),
+        _test_user("actor"),
     )
     assert len(bounded) == external_api.MAX_VALIDATION_ERRORS
     assert bounded[-1]["code"] == "validation_errors_truncated"
@@ -1656,11 +1464,11 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         "summary": "Create one page.",
         "confidence": 1,
         "issues": [],
-        "actions": [],
+        "actions": [{"id": "one", "type": "needs_review", "data": {"reason": "Review"}}],
     }
     saved = []
     report = SimpleNamespace(
-        tool="organize",
+        available=True, file_usage=[], output_kind="proposal",
         status="draft",
         name="Original title",
         instructions="Original brief",
@@ -1675,10 +1483,10 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     )
 
     class Process:
-        def set_proposal(self, value, status="ready"):
+        def set_proposal(self, value):
             report.proposal = value
             report.summary = value["summary"]
-            report.status = status
+            report.status = "ready" if value.get("actions") else "complete"
 
     report.properties = SimpleNamespace(process=Process())
     monkeypatch.setattr(
@@ -1695,19 +1503,19 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         object(),
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     repeated = external_api.submit_plan(
         report,
         object(),
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     revised = external_api.submit_plan(
         report,
         object(),
         {**proposal, "summary": "Create a different page."},
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
     assert submitted is repeated is revised is report
     assert report.status == "ready"
@@ -1721,7 +1529,7 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         contract_version=external_api.CONTRACT_VERSION,
         name="Expanded title",
         instructions="Expanded brief",
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     assert report.name == "Expanded title" and report.instructions == "Expanded brief"
     assert report.agent_manifest["original_brief"] == {
         "name": "Original title",
@@ -1735,7 +1543,7 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
         contract_version=external_api.CONTRACT_VERSION,
         name="Expanded title",
         instructions="Expanded brief",
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     assert len(saved) == 3
     report.status = "running"
     with pytest.raises(exceptions.ValidationError, match="draft"):
@@ -1745,7 +1553,7 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
             report.proposal,
             contract_version=external_api.CONTRACT_VERSION,
             name="Too late",
-        )
+        file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     assert report.name == "Expanded title"
 
 
@@ -1759,7 +1567,7 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
         "actions": [],
     }
     report = SimpleNamespace(
-        tool="ask",
+        available=True, file_usage=[], instructions="Answer", output_kind="answer",
         status="draft",
         pending=False,
         proposal=None,
@@ -1772,10 +1580,10 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
     )
 
     class Process:
-        def set_proposal(self, value, status="ready"):
+        def set_proposal(self, value):
             report.proposal = value
             report.summary = value["summary"]
-            report.status = status
+            report.status = "ready" if value.get("actions") else "complete"
 
     report.properties = SimpleNamespace(process=Process())
     saved = []
@@ -1785,26 +1593,26 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
 
     submitted = external_api.submit_plan(
         report,
-        object(),
+        _test_user("actor"),
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     repeated = external_api.submit_plan(
         report,
-        object(),
+        _test_user("actor"),
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     revised = external_api.submit_plan(
         report,
-        object(),
+        _test_user("actor"),
         {
             **proposal,
             "summary": "The page now has one open task.",
             "answer_markdown": "## Updated result\n\nThere is **one** open task.",
         },
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
     assert submitted is repeated is revised is report
     assert report.status == "complete"
@@ -1824,7 +1632,8 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
         "get_details_by_hash",
         lambda hashes: {"8328b23bef92": {"id": "canonical-cypress-page-key"}},
     )
-    report = SimpleNamespace(tool="ask")
+    monkeypatch.setattr(external_api.Entities, "fetch", lambda *args, **kwargs: [SimpleNamespace(hash="8328b23bef92", allowed=lambda *a, **k: True)])
+    report = SimpleNamespace(available=True, file_usage=[], instructions="Answer", input_files=[])
     proposal = {
         "summary": "Cypress Hive has an open follow-up task.",
         "answer_markdown": (
@@ -1837,8 +1646,8 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
     normalized = external_api.validate_external_proposal(
         proposal,
         report,
-        object(),
-    )
+        _test_user("actor"),
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
     assert normalized["answer_markdown"].startswith("Review [Cypress Hive]")
     assert 'href="/pages/canonical-cypress-page-key"' in normalized["answer_html"]
@@ -1847,12 +1656,12 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
 
     proposal["answer_markdown"] = "The internal reference is hash:8328b23bef92."
     with pytest.raises(exceptions.AIException, match="human names and URLs"):
-        external_api.validate_external_proposal(proposal, report, object())
+        external_api.validate_external_proposal(proposal, report, _test_user("actor"), file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
     proposal.pop("answer_markdown")
     proposal["answer_html"] = "<script>alert('unsafe')</script><p>Result</p>"
     with pytest.raises(exceptions.AIException, match="unsupported fields: answer_html"):
-        external_api.validate_external_proposal(proposal, report, object())
+        external_api.validate_external_proposal(proposal, report, _test_user("actor"), file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
 
 # @pairs agent-api:create ai-report:proposal-publication
@@ -1880,7 +1689,7 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
         ],
     }
     report = SimpleNamespace(
-        tool="create",
+        available=True, file_usage=[], instructions="Create",
         status="draft",
         pending=False,
         proposal=None,
@@ -1893,10 +1702,10 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
     )
 
     class Process:
-        def set_proposal(self, value, status="ready"):
+        def set_proposal(self, value):
             report.proposal = value
             report.summary = value["summary"]
-            report.status = status
+            report.status = "ready" if value.get("actions") else "complete"
 
     report.properties = SimpleNamespace(process=Process())
     monkeypatch.setattr(
@@ -1914,7 +1723,7 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
         actor,
         proposal,
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
     initial_document = report.proposal["actions"][0]["data"]["document"]
     assert 'href="https://example.com/reference"' in initial_document
     assert 'rel="noopener noreferrer"' in initial_document
@@ -1937,7 +1746,7 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
             ],
         },
         contract_version=external_api.CONTRACT_VERSION,
-    )
+    file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
     assert submitted is revised is report
     assert report.status == "ready"
@@ -1967,7 +1776,7 @@ def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypat
         lambda *identifiers, request: [entity],
     )
     report = SimpleNamespace(
-        tool="create",
+        available=True, file_usage=[], instructions="Create",
         agent_manifest={
             "public_references": {
                 entity.urlsafe_key: "hash:abcdef123456",
@@ -2037,7 +1846,7 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
         "user_today",
         lambda _user=None: datetime(2026, 9, 2, tzinfo=timezone.utc),
     )
-    report = SimpleNamespace(tool="organize", input_files=files, upload_manifest=None)
+    report = SimpleNamespace(available=True, file_usage=[], instructions="File the uploads", input_files=files, upload_manifest=None)
     contract = external_api.plan_contract(
         report,
         actor,
@@ -2349,3 +2158,34 @@ def test_external_upload_finalization_binds_report_user(monkeypatch):
     assert deleted_generations == [
         ("private/files/stable-file.attempt-aaaaaaaa", "private", 17)
     ]
+
+
+# @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external_api.py::submit_plan
+# @matrix ai-report agent-api : answer-only proposal-validation file-placement
+@pytest.mark.unit
+def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("evidence-owner")
+    actor.access = lambda _required: False  # External generation uses the client's model.
+    monkeypatch.setattr(external_api.Entities, "save", lambda *entities: None)
+    report = external_api.create_plan(actor, instructions="What does the receipt say?")
+    file = TestEntities.get("FILE", {"hash": "evidencefile", "filename": "receipt.txt"})
+    report.input_files = [file]
+    monkeypatch.setattr(external_api.cache, "get_details_by_hash", lambda hashes: {"evidencefile": {"id": file.urlsafe_key, "kind": "file"}})
+    usage = [{"file": "hash:evidencefile", "usage": "evidence"}]
+    answer = {"summary": "Receipt read", "answer_markdown": "The purchase was recorded.", "confidence": 1, "issues": [], "actions": []}
+    external_api.submit_plan(report, actor, answer, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)
+    assert report.status == "complete" and report.output_kind == "answer"
+    assert report.file_usage == usage
+    assert "answer_html" not in answer  # Validation must not mutate the client input.
+    with pytest.raises(exceptions.AIException):
+        external_api.validate_external_proposal(answer, report, actor, file_usage=[{**usage[0], "usage": "organize"}])
+    with pytest.raises(exceptions.AIException, match="without instructions"):
+        external_api.validate_external_proposal(answer, report, actor, file_usage=usage, instructions="")
+    proposal = {**answer, "actions": [{"id": "review", "type": "needs_review", "data": {"note": "Choose the destination"}}]}
+    external_api.submit_plan(report, actor, proposal, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)
+    assert report.status == "ready" and report.output_kind == "proposal"
+    report.result = {"actions": [{"status": "complete"}]}
+    with pytest.raises(exceptions.ValidationError, match="execution has begun"):
+        external_api.submit_plan(report, actor, answer, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)

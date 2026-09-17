@@ -134,6 +134,14 @@ Authentication settings and their public/secret boundaries are documented in
 
 ## AI settings
 
+AI email installation settings contain the provider, enabled flag, receiving
+domain, and Resend resources/credentials. Its single `ai` alias and locked limits
+are owned by `config/ai_email.py`; they are not operator settings. Runtime
+normalization ignores saved policy metadata without editing the generated file,
+and source upgrades do not convert a workflow-specific email configuration
+version. Only installer workflows generate installation settings. See
+[AI_EMAIL.md](AI_EMAIL.md).
+
 Deployed defaults include `AI_MODEL`, `AI_UTILITY_MODEL`, `AI_IMAGE_MODEL`, and
 `AI_LOCATION`. The Datastore `site/ai` row is the live authority for new
 generations and the Administrator form; deployed values are the fallback.

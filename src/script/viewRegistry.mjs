@@ -10,6 +10,7 @@ export const VIEW_REGISTRY = Object.freeze({
 	page: { entry: "page", source: "./views/page.mjs" },
 	home: { entry: "home", source: "./views/home.mjs" },
 	manual: { entry: "manual", source: "./views/manual.mjs" },
+	help: { entry: "help", source: "./views/base/shell.mjs" },
 	user: { entry: "user", source: "./views/user.mjs" },
 	form: { entry: "index", source: "./views/base/index.mjs" },
 	category: { entry: "index", source: "./views/base/index.mjs" },

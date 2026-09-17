@@ -10,6 +10,7 @@ export const STARTUP_BUDGETS = Object.freeze({
 
 export const SHELL_VIEW_ENTRIES = Object.freeze([
 	"manual",
+	"help",
 	"results",
 	"analytics",
 ]);

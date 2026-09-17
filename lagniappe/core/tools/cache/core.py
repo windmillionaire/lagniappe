@@ -13,7 +13,7 @@ from lagniappe import CONFIG
 from lagniappe.core.exceptions import capture
 from ..auth.restrictions import RESTRICTION_SOURCES
 
-from .keys import SEARCH_SCORE_FIELD, Keys, Search
+from .keys import HELP_PREFIX, SEARCH_SCORE_FIELD, Keys, Search
 
 
 # @testable true
@@ -83,7 +83,9 @@ class Cache:
         """Create the RediSearch full-text index if it doesn't exist."""
         try:
             self.redis.ft(self.INDEX).info()
-        except ResponseError:
+        except ResponseError as error:
+            if not any(message in str(error).lower() for message in ("unknown index", "no such index", "index not found")):
+                raise
             schema = (
                 TextField("name", weight=4, sortable=True),
                 TextField("desc", weight=1, sortable=True),
@@ -91,6 +93,7 @@ class Cache:
                 TextField("values", weight=0.25, sortable=True),
                 TagField("details_key", sortable=True, no_index=True),
                 TagField("kind"),
+                TagField("help_version"),
                 TagField("type"),
                 TagField("requires", index_empty=True),
                 *(TagField(f"restricted_to_{source}", index_missing=True)
@@ -98,13 +101,14 @@ class Cache:
             )
             definition = IndexDefinition(
                 index_type=IndexType.HASH,
-                prefix=[kind.value.format("") for kind in Search if kind.value],
+                prefix=[kind.value.format("") for kind in Search if kind.value] + [HELP_PREFIX],
                 score_field=SEARCH_SCORE_FIELD,
             )
             try:
                 self.redis.ft(self.INDEX).create_index(schema, definition=definition)
-            except ResponseError:
-                pass
+            except ResponseError as error:
+                if "index already exists" not in str(error).lower():
+                    raise
 
     # @testable false
     # @covered-by lagniappe/core/tools/cache/utility.py::delete_cache
@@ -401,3 +405,6 @@ def initialize():
 
     cache.create_index()
     filter_cache.create_index()
+    from .help import ensure_help
+
+    ensure_help()

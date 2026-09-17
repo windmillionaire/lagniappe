@@ -7,6 +7,9 @@ from ..properties import ai_report_proposal
 from ..properties import ai_report_result
 from ..tools.auth.context import current_context_user
 
+REPORT_FORMAT_VERSION = 1
+UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
+
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
@@ -26,6 +29,7 @@ class AIReport(Entity):
                 "upload_manifest",
                 "agent_manifest",
                 "inbound_manifest",
+                "file_usage",
                 "process",
                 "proposal",
                 "result",
@@ -40,7 +44,8 @@ class AIReport(Entity):
             {
                 "parent": activity.AttachedParent,
                 "user": activity.AttachedUser,
-                "tool": activity.Tool,
+                "format_version": ai_report_input.FormatVersion,
+                "file_usage": ai_report_input.FileUsage,
                 "instructions": activity.Instructions,
                 "input_files": activity.InputFiles,
                 "upload_manifest": ai_report_input.UploadManifest,
@@ -59,6 +64,54 @@ class AIReport(Entity):
             }
         )
         return properties
+
+    # @testable true
+    # @tests tests_unit/test_020b_ai_planner.py::test_report_availability_rejects_old_and_malformed_records
+    # @matrix ai-report : validation status unavailable
+    @property
+    def available(self):
+        if self.format_version != REPORT_FORMAT_VERSION:
+            return False
+        try:
+            process = self.properties.process.section
+            if not isinstance(process, dict) or not isinstance(self.status, str):
+                return False
+            proposal = self.proposal
+            if proposal is not None and (
+                not isinstance(proposal, dict)
+                or not isinstance(proposal.get("actions"), list)
+                or not isinstance(proposal.get("summary"), str)
+                or any(
+                    not isinstance(action, dict)
+                    or not isinstance(action.get("type"), str)
+                    or not isinstance(action.get("data"), dict)
+                    for action in proposal["actions"]
+                )
+            ):
+                return False
+            result = self.result
+            if result is not None and (
+                not isinstance(result, dict)
+                or not isinstance(result.get("actions", []), list)
+                or any(
+                    not isinstance(action, dict) for action in result.get("actions", [])
+                )
+            ):
+                return False
+            return isinstance(self.file_usage or [], list) and isinstance(
+                self.deferred_job or {}, dict
+            )
+        except (ValueError, TypeError, AttributeError, KeyError):
+            return False
+
+    # @testable false
+    # @covered-by lagniappe/core/entities/ai_report.py::AIReport.available
+    # @reason output classification uses only supported report data
+    @property
+    def output_kind(self):
+        if not self.available or not self.proposal:
+            return None
+        return "proposal" if self.proposal["actions"] else "answer"
 
     @property
     def required(self):
@@ -90,8 +143,9 @@ class AIReport(Entity):
         report.kind = cls.entity_kind
         report.parent = parent
         report.user = user
-        report.name = data.get("name") or "Organize report"
-        report.tool = data.get("tool") or "organize"
+        report.name = data.get("name") or "AI report"
+        report.format_version = REPORT_FORMAT_VERSION
+        report.file_usage = data.get("file_usage")
         report.instructions = data.get("instructions")
         report.input_files = data.get("input_files", [])
         report.upload_manifest = data.get("upload_manifest")

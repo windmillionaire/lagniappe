@@ -67,25 +67,24 @@ def test_ai_report_create_and_file_cleanup(monkeypatch):
     assert report.kind == "report"
     assert report.parent is user
     assert report.user is user
-    assert report.tool == "organize"
+    assert report.format_version == 1
     assert report.instructions == "Sort the uploaded scan."
     assert report.input_files == [file]
     assert report.upload_manifest == upload_manifest
     assert report.status == "pending"
     assert report.pending is True
-    assert report.note == "Analyzing files..."
+    assert report.note == "Thinking..."
 
     ask_report = AIReport.create(
         {
             "parent": user,
             "user": user,
             "name": "Ask report",
-            "tool": "ask",
             "instructions": "Has Leo been vaccinated for pertussis?",
         }
     )
     assert ask_report.kind == "report"
-    assert ask_report.tool == "ask"
+    assert ask_report.format_version == 1
     assert ask_report.input_files == []
     assert ask_report.note == "Thinking..."
     ask_report.proposal = {
@@ -110,7 +109,7 @@ def test_ai_report_create_and_file_cleanup(monkeypatch):
             "instructions": "Draft a new workspace structure.",
         }
     )
-    assert create_report.note == "Planning creation..."
+    assert create_report.note == "Thinking..."
 
     assert [f for f in report.input_files if not f.has_references] == [file]
     file.db["page"] = "existing-page"
@@ -192,7 +191,7 @@ def test_ai_report_process_state_stores_report_metadata(monkeypatch):
     assert report.proposal == proposal
 
     report.properties.process.revision_failed("Model returned no text content.")
-    assert report.status == "ready"
+    assert report.status == "complete"
     assert report.pending is False
     assert report.proposal == proposal
     assert report.summary == proposal["summary"]
@@ -210,7 +209,6 @@ def test_ai_report_process_state_stores_report_metadata(monkeypatch):
     )
     ask_report.properties.process.set_proposal(
         {"summary": "Answer only.", "actions": []},
-        status="complete",
     )
     ask_report.properties.process.revise()
     ask_report.properties.process.revision_failed("Model returned no text content.")

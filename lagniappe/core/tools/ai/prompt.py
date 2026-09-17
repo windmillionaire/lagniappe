@@ -20,13 +20,7 @@ HEADING_RE = re.compile(r"^(#{2,6})\s+(.+?)\s*$", re.MULTILINE)
 PROMPT_OBSERVABILITY_CONTRACTS = {
     "form conversion": ("forms", "conversion", "form-conversion", 1),
     "file summary": ("files", "summary", "file-summary", 1),
-    "organize submission completion": (
-        "organize",
-        "submission-completion",
-        "organize-submission-completion",
-        1,
-    ),
-    "organize report": ("organize", "planning", "organize-report", 2),
+    "ai report": ("reports", "planning", "ai-report", 1),
     "category generation": ("categories", "generation", "category-generation", 1),
     "image aspect ratio": ("images", "aspect-ratio", "image-aspect-ratio", 1),
     "autofill": ("autofill", "generation", "form-autofill", 4),
@@ -34,21 +28,6 @@ PROMPT_OBSERVABILITY_CONTRACTS = {
     "document text": ("documents", "generation", "document-text", 1),
     "project generation": ("projects", "generation", "project-generation", 1),
     "form generation": ("forms", "generation", "form-generation", 1),
-    "create report": ("create", "planning", "create-report", 1),
-    "ask report": ("ask", "answer", "ask-report", 1),
-    "organize report repair": (
-        "organize",
-        "model-repair",
-        "organize-report-repair",
-        1,
-    ),
-    "create report repair": (
-        "create",
-        "model-repair",
-        "create-report-repair",
-        1,
-    ),
-    "ask report repair": ("ask", "model-repair", "ask-report-repair", 1),
 }
 
 TOOL_CALL_PLANNING = """
@@ -59,6 +38,9 @@ TOOL_CALL_PLANNING = """
   applicable `get_guidelines` bundle.
 - Defer a call only when its arguments depend on an earlier tool result. Do not
   add unnecessary calls merely to form a batch.
+- When get_help is available, consult it for questions about Lagniappe features
+  and cite the returned topic URLs. General help does not establish the user's
+  permission to act on a particular record.
 """
 
 

@@ -1,0 +1,5 @@
+{% from "reference/macros.html" import modal %}
+{% from "help/macros.html" import body %}
+{% call modal(topic.title) %}
+  {{ body(topic, embedded=True) }}
+{% endcall %}

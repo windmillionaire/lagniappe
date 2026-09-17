@@ -463,3 +463,7 @@ def test_file_summary_strips_tags():
     file.summary = '<strong>Tax summary</strong><script>alert("xss")</script>'
 
     assert file.summary == "Tax summary"
+
+    file.summary = "<p>First line\n\n  Indented\ttext  with spaces\nLast line</p>"
+    assert file.summary == "First line\n\n  Indented\ttext  with spaces\nLast line"
+    assert file.db["summary"] == file.summary
