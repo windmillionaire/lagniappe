@@ -106,7 +106,8 @@ export class CreateToolReport extends BaseUpload {
 	toggleExplainButton() {
 		if (!this.explainButton) return;
 		const hasText = Boolean(this.context.description?.value?.trim());
-		this.explainButton.dataset.visible = hasText || this.fileAttached ? "true" : "false";
+		this.explainButton.dataset.visible =
+			hasText || this.fileAttached ? "true" : "false";
 	}
 
 	showExplainButton() {

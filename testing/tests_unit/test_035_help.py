@@ -2,7 +2,6 @@
 
 from contextlib import contextmanager
 import json
-from pathlib import Path
 import re
 from types import SimpleNamespace
 
@@ -15,7 +14,7 @@ from lagniappe import reference
 from lagniappe.core.definitions import Restriction
 from lagniappe.core.tools.cache import help as help_cache, query
 from lagniappe.core.tools.cache.core import Cache
-from lagniappe.core.tools.cache.keys import HELP_PREFIX, Keys, Search
+from lagniappe.core.tools.cache.keys import HELP_PREFIX, Keys
 from lagniappe.core.tools.files.html import SafeHTML
 
 pytestmark = pytest.mark.unit

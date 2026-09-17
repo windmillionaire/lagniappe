@@ -11,8 +11,7 @@ const REPORT_FILTERS = ["active", "executed", "answers"];
  */
 function reportCategory(report) {
 	if (report.outputKind === "answer") return "answers";
-	return report.outputKind === "proposal" &&
-		report.status === "complete"
+	return report.outputKind === "proposal" && report.status === "complete"
 		? "executed"
 		: "active";
 }

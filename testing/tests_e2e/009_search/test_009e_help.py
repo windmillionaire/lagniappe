@@ -9,7 +9,6 @@ import pytest
 from playwright.sync_api import expect
 
 from config import SETTINGS
-from lagniappe import CONFIG
 from lagniappe.core.definitions import Restriction
 from lagniappe.core.tools.cache import query
 from lagniappe.core.tools.cache.core import cache
