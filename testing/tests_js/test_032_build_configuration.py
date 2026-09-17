@@ -248,3 +248,56 @@ for (const config of ["build/rollup.config.mjs", "build/rollup.dev.config.mjs"])
 ''',
         module=True,
     )
+
+
+# @source build/publication.mjs::recordBuildArtifacts
+def test_rollup_metadata_uses_package_version_with_stale_settings(run_node):
+    run_node(
+        r'''
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
+// Load style registries from the repository before isolating installer settings.
+await import("./build/utility.mjs");
+const root = process.cwd();
+const fixture = mkdtempSync(join(tmpdir(), "lagniappe-build-version-"));
+const inventory = join(fixture, "inventory.json");
+process.env.LAGNIAPPE_FRONTEND_ARTIFACT_INVENTORY = inventory;
+process.env.LAGNIAPPE_FRONTEND_BUILD_ID = "bversiontest";
+try {
+  mkdirSync(join(fixture, "config/files"), { recursive: true });
+  writeFileSync(join(fixture, "config/files/lagniappe_settings.yaml"), "VERSION: 9.8.7\n");
+  writeFileSync(join(fixture, "package.json"), JSON.stringify({ version: "1.2.3" }));
+  process.chdir(fixture);
+  for (const [config, mode] of [
+    ["rollup.config.mjs", "production"],
+    ["rollup.dev.config.mjs", "development"],
+  ]) {
+    const { default: bundles } = await import(pathToFileURL(join(root, "build", config)));
+    const recorder = bundles.at(-1).plugins.find(
+      plugin => plugin.name === "record-final-build-artifacts",
+    );
+    recorder.writeBundle();
+    const metadata = JSON.parse(readFileSync(inventory, "utf8"));
+    assert.equal(metadata.version, "1.2.3", config);
+    assert.equal(metadata.mode, mode);
+    if (mode === "production") {
+      for (const bundle of bundles) {
+        const replacement = bundle.plugins.find(plugin => plugin.name === "replace");
+        const transformed = replacement.transform.call(
+          {}, 'export const version = "__VERSION__";', "version.js",
+        );
+        assert.equal(transformed.code, 'export const version = "1.2.3";');
+      }
+    }
+  }
+} finally {
+  process.chdir(root);
+  rmSync(fixture, { recursive: true, force: true });
+}
+''',
+        module=True,
+    )

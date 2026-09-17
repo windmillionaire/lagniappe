@@ -22,6 +22,9 @@ Development output is readable and tagged with mode `development`. Production
 output is minified, enforces startup budgets, records mode `production`, and
 may upload hidden JavaScript source maps when `SENTRY_AUTH_TOKEN` is present.
 Both modes emit a fresh build ID and bundle analysis under `reports/`.
+The application version in build metadata comes from `package.json`, even when
+local generated settings still describe an earlier release. Production bundle
+version replacements and Sentry releases use that same package version.
 
 ## Output
 
