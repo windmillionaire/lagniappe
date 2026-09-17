@@ -1,3 +1,4 @@
+{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
 
 {% macro open_source() %}
@@ -88,30 +89,12 @@
   {% endcall %}
   {{ heading("Core Concepts", icon="overview", kind="category") }}
   <div class="grid md:grid-cols-2 gap-4 mb-6">
-    {% call concept("Forms", icon="form", kind="form") %}
-      Forms define structured fields: text, dates, selects, checkboxes, tables,
-      links, locations, signatures, and more. They also act as content types.
-    {% endcall %}
-    {% call concept("Categories", icon="category", kind="category") %}
-      Categories group pages. A category can have a default form, and individual
-      pages can use different forms when a category contains several related types.
-    {% endcall %}
-    {% call concept("Pages", icon="page", kind="page") %}
-      Pages are the main records. A page can have a document, form data, tasks,
-      files, notes, and permissions.
-    {% endcall %}
-    {% call concept("Tasks", icon="tasks", kind="task") %}
-      Tasks live on pages. They can recur, collect form data, keep history, and
-      be assigned without losing the context of the page they belong to.
-    {% endcall %}
-    {% call concept("Projects", icon="project", kind="project") %}
-      Projects collect related work across many pages. They can define task
-      templates and provide an aggregated view of tasks that still live on pages.
-    {% endcall %}
-    {% call concept("Files", icon="file", kind="file") %}
-      Files are stored in your cloud storage bucket. They can be attached to
-      pages or tasks, extracted for search, summarized, or imported from CSV.
-    {% endcall %}
+    {% call concept("Forms", icon="form") %}{{ manual_summary("create_form") }}{% endcall %}
+    {% call concept("Categories", icon="category") %}{{ manual_summary("create_category") }}{% endcall %}
+    {% call concept("Pages", icon="page") %}{{ manual_summary("page_info") }}{% endcall %}
+    {% call concept("Tasks", icon="tasks") %}{{ manual_summary("tasks") }}{% endcall %}
+    {% call concept("Projects", icon="project") %}{{ manual_summary("create_project") }}{% endcall %}
+    {% call concept("Files", icon="file") %}{{ manual_summary("upload_file") }}{% endcall %}
   </div>
   {{ heading("Connected Workspace", icon="sitemap", kind="page") }}
   {% call card() %}

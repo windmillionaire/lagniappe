@@ -48,6 +48,7 @@ OUTCOME_PRIORITY = {
 }
 KNOWN_PROVIDER_STAGES = {"initial", "tool", "structured_final", "validation_repair"}
 KNOWN_TOOL_NAMES = {
+    "get_help",
     "search_entities",
     "get_entity",
     "get_file",

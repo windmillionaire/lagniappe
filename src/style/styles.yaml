@@ -582,6 +582,14 @@ form:
       hooks: [submission-outline]
       css: [src/style/forms.css]
 
+help:
+  content:
+    classes: html-content help-content text-base-dark break-words
+    intent: shared help typography with a leading description and quieter detail sections
+    surfaces: [server]
+    hooks: [help-content]
+    css: [src/style/content.css]
+
 home:
   card:
     item:

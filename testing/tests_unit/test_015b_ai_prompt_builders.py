@@ -189,7 +189,10 @@ def test_prompt_tracks_context_output_examples_and_attachments():
                 "  applicable `get_guidelines` bundle.\n"
                 "- Defer a call only when its arguments depend on an earlier tool "
                 "result. Do not\n"
-                "  add unnecessary calls merely to form a batch."
+                "  add unnecessary calls merely to form a batch.\n"
+                "- When get_help is available, consult it for questions about Lagniappe features\n"
+                "  and cite the returned topic URLs. General help does not establish the user's\n"
+                "  permission to act on a particular record."
             ),
             "role": "tool_call_planning",
         },
@@ -338,6 +341,7 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     assert text_prompt.search is True
     assert text_prompt.tools == [
         "search_entities",
+        "get_help",
         "get_page_file_list",
         "get_page_tasks",
         "get_file",
@@ -356,7 +360,7 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
             "project_info": {"project_name": "Internship Search"},
         },
     )
-    assert project_text_prompt.tools == ["search_entities"]
+    assert project_text_prompt.tools == ["search_entities", "get_help"]
     assert _context_json(project_text_prompt, "Project Info") == {
         "project_name": "Internship Search"
     }

@@ -622,10 +622,6 @@
     width: calc(var(--spacing) * 8);
     height: calc(var(--spacing) * 8);
   }
-  .size-9 {
-    width: calc(var(--spacing) * 9);
-    height: calc(var(--spacing) * 9);
-  }
   .size-16 {
     width: calc(var(--spacing) * 16);
     height: calc(var(--spacing) * 16);
@@ -947,6 +943,9 @@
   }
   .resize-y {
     resize: vertical;
+  }
+  .scroll-mt-6 {
+    scroll-margin-top: calc(var(--spacing) * 6);
   }
   .scroll-mt-20 {
     scroll-margin-top: calc(var(--spacing) * 20);
@@ -1352,12 +1351,6 @@
   }
   .bg-base-bg {
     background-color: var(--color-base-bg);
-  }
-  .bg-base-bg\/50 {
-    background-color: color-mix(in srgb, oklch(0.96 0.005 260) 50%, transparent);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--color-base-bg) 50%, transparent);
-    }
   }
   .bg-base-dark {
     background-color: var(--color-base-dark);
@@ -2982,6 +2975,12 @@ button[data-role="history-fill"] .icon[data-icon="historyFill"] {
 .icon[data-icon="help"] {
   --icon-size: var(--icon-base-glyph-size);
 }
+.dropdown-option .icon[data-icon="help"] {
+  --icon-size: var(--icon-xs-glyph-size);
+}
+.dropdown-option-flow > p:first-child .icon {
+  --icon-offset-y: -1px;
+}
 .icon[data-icon="menu"] {
   --icon-box-size: var(--icon-sm-box-size);
   --icon-size: var(--icon-base-glyph-size);
@@ -4599,6 +4598,16 @@ button[data-role="expand"][data-open="true"] > .icon {
   display: block;
   line-height: 1.5;
 }
+.dropdown-option-flow > p:first-child {
+  display: flex;
+  align-items: flex-start;
+}
+.dropdown-option-flow > p:first-child > span:has(> .icon) {
+  display: inline-flex;
+  align-items: center;
+  block-size: 1lh;
+  flex: none;
+}
 .dropdown-option-flow > span:last-child, .dropdown-option-flow > p:first-child > span:last-child {
   vertical-align: middle;
 }
@@ -4621,6 +4630,46 @@ button[data-role="expand"][data-open="true"] > .icon {
 }
 .dropdown-option-flow .dropdown-option-icon {
   margin-inline-end: 0.25rem;
+}
+.html-content.help-content {
+  display: grid;
+  gap: 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.help-content .help-summary {
+  background: var(--color-page-bg);
+  border: 1px solid var(--color-page-light);
+  border-inline-start: 3px solid var(--color-page-default);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.125rem;
+}
+.help-content .help-summary > p:first-child {
+  color: var(--color-page-dark);
+  font-size: 1rem;
+  font-weight: 500;
+}
+.help-content .help-section {
+  background: white;
+  border: 1px solid color-mix(in srgb, oklch(0.68 0.01 260) 50%, transparent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border: 1px solid color-mix(in srgb, var(--color-base-light) 50%, transparent);
+  }
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.125rem;
+}
+.help-content .help-section :is(h2, h3, h4, h5, h6) {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-block: 1rem 0.75rem;
+}
+.help-content :is(.help-summary, .help-section) > :first-child {
+  margin-block-start: 0;
+}
+.help-content :is(.help-summary, .help-section) > :last-child {
+  margin-block-end: 0;
 }
 [data-role="manual-content"] :not(pre) > code {
   padding: 0.0625rem 0.3125rem;

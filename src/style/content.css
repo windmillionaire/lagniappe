@@ -25,6 +25,20 @@
 }
 
 /* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
+.dropdown-option-flow > p:first-child {
+	display: flex;
+	align-items: flex-start;
+}
+
+/* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
+.dropdown-option-flow > p:first-child > span:has(> .icon) {
+	display: inline-flex;
+	align-items: center;
+	block-size: 1lh;
+	flex: none;
+}
+
+/* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
 .dropdown-option-flow > span:last-child,
 .dropdown-option-flow > p:first-child > span:last-child {
 	vertical-align: middle;
@@ -56,6 +70,61 @@
 /* @style dropdown.icon */
 .dropdown-option-flow .dropdown-option-icon {
 	margin-inline-end: 0.25rem;
+}
+
+/* ==========================================================================
+   HELP CONTENT
+   ========================================================================== */
+
+/* @style help.content */
+.html-content.help-content {
+	display: grid;
+	gap: 1rem;
+	font-family: var(--font-sans);
+	font-size: 0.9375rem;
+	line-height: 1.65;
+}
+
+/* @style help.content */
+.help-content .help-summary {
+	background: var(--color-page-bg);
+	border: 1px solid var(--color-page-light);
+	border-inline-start: 3px solid var(--color-page-default);
+	border-radius: var(--radius-lg);
+	padding: 1rem 1.125rem;
+}
+
+/* @style help.content */
+.help-content .help-summary > p:first-child {
+	color: var(--color-page-dark);
+	font-size: 1rem;
+	font-weight: 500;
+}
+
+/* @style help.content */
+.help-content .help-section {
+	background: white;
+	border: 1px solid color-mix(in srgb, var(--color-base-light) 50%, transparent);
+	border-radius: var(--radius-lg);
+	padding: 1rem 1.125rem;
+}
+
+/* @style help.content */
+.help-content .help-section :is(h2, h3, h4, h5, h6) {
+	font-size: 1rem;
+	font-weight: 600;
+	line-height: 1.4;
+	margin-block: 1rem 0.75rem;
+}
+
+/* @style help.content */
+.help-content :is(.help-summary, .help-section) > :first-child {
+	margin-block-start: 0;
+}
+
+/* @style help.content */
+.help-content :is(.help-summary, .help-section) > :last-child {
+	margin-block-end: 0;
 }
 
 /* ==========================================================================

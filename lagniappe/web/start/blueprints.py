@@ -37,6 +37,7 @@ BLUEPRINT_REGISTRATIONS = (
     BlueprintRegistration("process", "/process"),
     BlueprintRegistration("manual", "/manual"),
     BlueprintRegistration("reference", "/reference"),
+    BlueprintRegistration("help", "/help"),
     BlueprintRegistration("filters", "/filters"),
     BlueprintRegistration("assets", "/assets"),
     BlueprintRegistration("testing", "/testing"),
@@ -97,6 +98,7 @@ CSRF_EXEMPTIONS = (
 def _resolve_bindings(runtime_config):
     from lagniappe.web.routes import assets, categories, files, filters, forms
     from lagniappe.web.routes import home, internal, manual, message_internal
+    from lagniappe.web.routes import help_pages
     from lagniappe.web.routes import messages, pages, process, projects, reference
     from lagniappe.web.routes import tasks, testing, tools, users
     from lagniappe.web.routes.api import api, api_family
@@ -119,6 +121,7 @@ def _resolve_bindings(runtime_config):
         "process": process,
         "manual": manual,
         "reference": reference,
+        "help": help_pages,
         "filters": filters,
         "assets": assets,
         "testing": testing,

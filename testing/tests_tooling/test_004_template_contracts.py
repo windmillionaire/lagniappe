@@ -461,6 +461,7 @@ def test_template_contract_rejects_unsupported_lp_vocabulary(tmp_path):
         tmp_path / "lagniappe/web/templates/things.html",
         """
 {% macro stale_controls() %}
+  <div class="help-summary help-section" data-role="help-body"></div>
   <button lp-star type="button"></button>
   <button lp-control="expand" type="button"></button>
   <button lp-control="menu" lp-show="{{ target }}" type="button"></button>

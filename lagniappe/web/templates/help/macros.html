@@ -1,0 +1,45 @@
+{% macro body(topic, embedded=False, manual=False) %}
+  <div data-role="help-body" data-topic="{{ topic.id }}" class="{{ styles.help.content }}">
+    {% for section in help_sections(topic.id, embedded=embedded, manual=manual) %}
+      <div class="{% if loop.first %}help-summary{% else %}help-section{% endif %}">{{ section|safe_html }}</div>
+    {% endfor %}
+  </div>
+  {% set context = help_context(topic.id, current_user) %}
+  {% if context.email_address %}
+    <p data-role="help-context" class="mt-4 text-sm text-base-dark break-words">
+      AI email for this installation:
+      <a href="mailto:{{ context.email_address }}" class="underline">{{ context.email_address }}</a>
+    </p>
+  {% endif %}
+  {% if context.skill_url %}
+    <div data-role="external-ai-account-details" class="mt-4 space-y-2 text-sm text-base-dark break-words">
+      {% if context.mcp_url %}
+        <p>Connection name: <code>{{ context.connection_name }}</code></p>
+        <p>MCP server: <code>{{ context.mcp_url }}</code></p>
+      {% endif %}
+      <p>Skill URL (requires your API key): <code>{{ context.skill_url }}</code></p>
+    </div>
+  {% endif %}
+  {% if topic.related %}
+    <nav aria-label="Related help" class="mt-5 border-t border-base-light/50 pt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+      {% for related_id in topic.related %}
+        {% set related = help_topic(related_id) %}
+        <a href="{{ '/manual/' ~ related.manual_section ~ '#' ~ related.id if manual and related.manual_section else related.url }}"
+           class="text-page-default underline">{{ related.title }}</a>
+      {% endfor %}
+    </nav>
+  {% endif %}
+{% endmacro %}
+
+{% macro manual_topic(topic_id) %}
+  {% set topic = help_topic(topic_id) %}
+  <section id="{{ topic.id }}" data-role="manual-topic" class="scroll-mt-6 space-y-4">
+    <h2 class="text-xl font-semibold text-base-dark">{{ topic.title }}</h2>
+    {{ body(topic, embedded=True, manual=True) }}
+  </section>
+{% endmacro %}
+
+{% macro manual_summary(topic_id) %}
+  {% set topic = help_topic(topic_id) %}
+  <p>{{ topic.summary }} <a href="/manual/{{ topic.manual_section }}#{{ topic.id }}" class="underline">{{ topic.title }}</a></p>
+{% endmacro %}

@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from flask import (
+    abort,
     Response,
     g,
     get_template_attribute,
@@ -1150,8 +1151,17 @@ def manual_content(section):
     return response
 
 
+# @testable true
+# @tests tests_e2e/009_search/test_009e_help.py::test_help_article_navigation_and_canonical_ids
+# @pair help:navigation
 def reference_topic(section):
-    return smartypants(render_template(f"reference/{section}.html")), 200
+    from lagniappe.reference import get_topic
+
+    try:
+        topic = get_topic(section)
+    except KeyError:
+        abort(404)
+    return render_template("reference/topic.html", topic=topic), 200
 
 
 # @testable true

@@ -12,6 +12,7 @@ from ..auth.restrictions import RESTRICTION_SOURCES
 from .core import cache
 from .details import hydrate_search_results
 from .keys import Search
+from .help import ensure_help, help_clause
 
 HIGHLIGHT_OPEN = "\x02lagniappe-highlight-open\x03"
 HIGHLIGHT_CLOSE = "\x02lagniappe-highlight-close\x03"
@@ -69,7 +70,8 @@ STOPWORDS = frozenset(
 # @pairs cache:self-repair search:stale-row
 def _current_search_results(results):
     """Hydrate results and remove projections whose entity details are gone."""
-    hydrated = hydrate_search_results(results)
+    entities = iter(hydrate_search_results([result for result in results if result.get("kind") != "help"]))
+    hydrated = [result if result.get("kind") == "help" else next(entities) for result in results]
     stale = [result for result in hydrated if not result.get("details")]
     keys = [
         Search[result.get("kind")].value.format(result.get("id"))
@@ -211,6 +213,19 @@ def _add_restricted_to(belongs_to):
 # @covered-by lagniappe/core/tools/cache/query.py::entity_search
 # @reason result formatting belongs to outward search workflows
 def _format_result(doc, snippets=False):
+    if doc.kind == "help":
+        from lagniappe.reference import get_topic
+
+        topic = get_topic(doc.topic_id)
+        result = {
+            "id": topic.id, "kind": "help", "name": topic.title,
+            "details": {"id": topic.id, "kind": "help", "name": topic.title,
+                        "icon": "help", "url": topic.url},
+        }
+        if snippets:
+            _add_snippet(result, doc)
+            result.setdefault("text", escape(topic.summary))
+        return result
     result = {
         "id": doc.id.replace(CONFIG.PREFIX, "").split(":")[1],
         "kind": doc.kind,
@@ -300,6 +315,7 @@ def entity_search(query_string, restrictions, belongs_to):
         return []
 
     term_list = _build_term_list(query_string)
+    term_list.append("(-@kind:{ help })")
 
     if not Restriction.is_unrestricted(restrictions):
         term_list.append(_add_required(restrictions))
@@ -349,7 +365,7 @@ def _add_models(results, project_hashes, restriction_clause):
 # @matrix search : empty-access permissions redis-cloud tag-syntax
 def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
     """Search cached entities filtered by kind and optional form type."""
-    if Restriction.is_denied(restrictions):
+    if kind == "help" or Restriction.is_denied(restrictions):
         return []
 
     term_list = _build_term_list(query_string) if query_string else []
@@ -400,21 +416,31 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 # @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
 # @matrix search permissions : source-clauses pagination restricted-access
 # @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
-def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
+def search(user_query, required, belongs_to, kinds=None, page=1, limit=10, *, include_help=False):
     """Run a full-text search with highlighting, snippets, and pagination."""
-    if Restriction.is_denied(required):
+    allow_help = include_help and (not kinds or "help" in kinds)
+    if Restriction.is_denied(required) and not allow_help:
         return [], 0
 
     term_list = _build_term_list(user_query, expanded=True)
 
-    expanded_kinds = _expand_result_kinds(kinds)
-    if expanded_kinds:
-        term_list.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
-
-    if not Restriction.is_unrestricted(required):
-        term_list.append(_add_required(required))
-
-    term_list.append(_add_restricted_to(belongs_to))
+    expanded_kinds = [kind for kind in _expand_result_kinds(kinds) if kind != "help"]
+    scopes = []
+    if not Restriction.is_denied(required) and (not kinds or expanded_kinds):
+        entity_scope = ["(-@kind:{ help })"]
+        if expanded_kinds:
+            entity_scope.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
+        if not Restriction.is_unrestricted(required):
+            entity_scope.append(_add_required(required))
+        entity_scope.append(_add_restricted_to(belongs_to))
+        scopes.append("(" + " ".join(filter(None, entity_scope)) + ")")
+    if allow_help:
+        scopes.append(help_clause(ensure_help()))
+    if not scopes:
+        return [], 0
+    # Visibility clauses select records; their differing shapes must not boost
+    # entities over help with the same text and a higher document weight.
+    term_list.append("(" + " | ".join(scopes) + ") => { $weight: 0; }")
 
     if term_list:
         redis_query = (
@@ -458,6 +484,7 @@ def exact_name_search(
         return []
 
     term_list = _build_term_list(normalized_name)
+    term_list.append("(-@kind:{ help })")
     expanded_kinds = _expand_result_kinds(kinds)
     if expanded_kinds:
         term_list.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")
@@ -513,7 +540,7 @@ def candidate_search(
     limit = max(1, min(int(limit or 1), CANDIDATE_SEARCH_LIMIT))
     pool_limit = min(CANDIDATE_SEARCH_LIMIT, max(limit * 4, 25))
     term_list = _build_term_list(" ".join(terms), expanded=True)
-    scope = []
+    scope = ["(-@kind:{ help })"]
     expanded_kinds = _expand_result_kinds(kinds)
     if expanded_kinds:
         scope.append(f"(@kind:{{ {' | '.join(expanded_kinds)} }})")

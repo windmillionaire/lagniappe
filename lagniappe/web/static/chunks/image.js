@@ -1,19 +1,19 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload } from './baseUpload.js?v=b751984f';
-import { u as uploadElement, U as UploadMenu } from './upload.js?v=b751984f';
-import { r as request, w as withTransition } from './foundation.js?v=b751984f';
-import './connectivity.js?v=b751984f';
-import { s as setIcon } from './icons.js?v=b751984f';
-import { S as SiteSetting } from './base.js?v=b751984f';
-import './baseForm.js?v=b751984f';
-import './primitives.js?v=b751984f';
-import './styles.js?v=b751984f';
-import './loader.js?v=b751984f';
-import './buttons.js?v=b751984f';
-import './formatting.js?v=b751984f';
-import './dropdown.js?v=b751984f';
-import './combobox.js?v=b751984f';
-import './upstreamUnavailable.js?v=b751984f';
+import { B as BaseUpload } from './baseUpload.js?v=be0bc88b';
+import { u as uploadElement, U as UploadMenu } from './upload.js?v=be0bc88b';
+import { r as request, w as withTransition } from './foundation.js?v=be0bc88b';
+import './connectivity.js?v=be0bc88b';
+import { s as setIcon } from './icons.js?v=be0bc88b';
+import { S as SiteSetting } from './base.js?v=be0bc88b';
+import './baseForm.js?v=be0bc88b';
+import './primitives.js?v=be0bc88b';
+import './styles.js?v=be0bc88b';
+import './loader.js?v=be0bc88b';
+import './buttons.js?v=be0bc88b';
+import './formatting.js?v=be0bc88b';
+import './dropdown.js?v=be0bc88b';
+import './combobox.js?v=be0bc88b';
+import './upstreamUnavailable.js?v=be0bc88b';
 
 const SPLASH_PREFIX = "splash-";
 

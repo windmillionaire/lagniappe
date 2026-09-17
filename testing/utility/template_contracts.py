@@ -62,7 +62,7 @@ FROM_IMPORT_RE = re.compile(
     re.DOTALL,
 )
 CONTRACT_ATTR_RE = re.compile(
-    r"(?P<name>(?:lp|data)-[\w-]+)(?:\s*=\s*(?P<quote>['\"])(?P<value>.*?)(?P=quote))?",
+    r"(?<![\w-])(?P<name>(?:lp|data)-[\w-]+)(?:\s*=\s*(?P<quote>['\"])(?P<value>.*?)(?P=quote))?",
     re.DOTALL,
 )
 CONTRACT_TAG_RE = re.compile(r"<[^>]*?(?:lp|data)-[\w-]+[^>]*>", re.DOTALL)

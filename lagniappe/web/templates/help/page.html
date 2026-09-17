@@ -1,0 +1,25 @@
+{% set view_entry = "help" %}
+{% extends "layouts/base.html" %}
+{% from "help/macros.html" import body %}
+
+{% block title %}{{ topic.title }} — Help{% endblock title %}
+{% block content %}
+  <main lp-view data-kind="help" data-readonly="true" class="group/view max-w-4xl mx-auto">
+    <div class="{{ styles.layout.view.header }}" data-flipped="false">
+      <nav class="{{ styles.layout.view.title }}" data-nav="view">
+        <div class="flex min-w-0 items-center">
+          {{ render_icon("help", "mr-3 shrink-0") }}
+          <h1 data-role="title">{{ topic.title }}</h1>
+        </div>
+        <a href="{{ url_for('home.home_page') }}" class="{{ styles.toggle.container }}" aria-label="Close" title="Close">
+          {{ render_icon("close") }}
+        </a>
+      </nav>
+    </div>
+    <div class="sm:mt-4">
+      <article class="{{ styles.card.primary }} p-4 sm:p-5">
+        {{ body(topic) }}
+      </article>
+    </div>
+  </main>
+{% endblock content %}

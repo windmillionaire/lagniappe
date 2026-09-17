@@ -35,6 +35,7 @@ from .function_definitions import (
     get_task_history,
     get_category_details,
     get_guidelines,
+    get_help,
     get_schema,
     get_form_instances,
     preview_form_schema_update,
@@ -58,6 +59,7 @@ FILE_PART_LIMIT_REASON = (
 
 
 DECLARATIONS = {
+    "get_help": get_help.GET_HELP,
     "search_entities": search.SEARCH_ENTITIES,
     "get_entity": get_entity.GET_ENTITY,
     "get_file": get_file.GET_FILE,
@@ -92,6 +94,7 @@ def build_function_tool(*names):
 
 
 HANDLERS = {
+    "get_help": get_help.execute_get_help,
     "search_entities": search.execute_search,
     "get_entity": get_entity.execute_get_entity,
     "get_file": get_file.execute_get_file,

@@ -74,7 +74,7 @@ def text_generation_prompt(user_prompt, context_data):
 
     prompt.add_context("user_request", user_prompt)
 
-    tools = ["search_entities"]
+    tools = ["search_entities", "get_help"]
 
     if context_data.get("page_info"):
         prompt.add_context("page_info", context_data.get("page_info"))

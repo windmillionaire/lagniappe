@@ -40,9 +40,10 @@
   {% set is_completed_task = details.kind == 'task' and details.completed is sameas true %}
   {% set default_icon = details.icon or details.form_type or details.kind %}
   {% set icon_id = 'selected' if is_completed_task else 'unselected' if details.kind == 'task' else default_icon %}
-  <span class="{{ styles.entity.name.wrapper }}">
+  <span class="{{ styles.entity.name.wrapper }}{% if icon %} inline-flex items-center{% endif %}">
     {%- if icon -%}
-      {{ render_icon((icon_id), "text-kind-default mr-1", details.form_type or details.kind) }}
+      {{ render_icon((icon_id), "text-kind-default mr-1" ~ (" icon-xs" if details.kind == 'help' else ""), details.form_type or details.kind) }}
+      <span class="min-w-0">
     {%- endif -%}
     {%- if not link or not details.get('id') -%}
       <span class="text-kind-default">{{ details.name }}</span>
@@ -61,6 +62,7 @@
          data-role="title"
          class="{{ styles.link.title }}">{{ details.name }}</a>
     {%- endif -%}
+    {% if icon %}</span>{% endif %}
   </span>
 {% endmacro %}
 

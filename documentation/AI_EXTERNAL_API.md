@@ -1,5 +1,16 @@
 # External Agent API
 
+`get_help` is the shared read-only application-reference tool. Supply exactly
+one of `query` (short search keywords) or `topic_id` (an exact canonical ID).
+It returns `topics`, containing up to three complete Markdown articles with IDs,
+titles, summaries, URLs, related IDs and any authorized request-time context.
+Direct lookup reads packaged source without Redis; failed keyword search reports
+temporary unavailability. No Plan or model call is needed. Built-in tools, REST
+and the dynamically loaded MCP catalog expose the same contract. Cite returned
+topic URLs for product explanations; use actual actor/record permissions for
+user-specific access decisions. `search_entities` remains limited to workspace
+records and does not accept the browser's Help facet.
+
 Lagniappe exposes a versioned, REST-first API that lets a user run the same
 permission-bounded read tools as the built-in AI workflows. Ordinary questions
 and task lookups use plan-free reads and are answered in the conversation. Only

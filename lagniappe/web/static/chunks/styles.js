@@ -173,6 +173,9 @@ const STYLES = {
       "grows": "submission-outline w-fit rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm"
     }
   },
+  "help": {
+    "content": "html-content help-content text-base-dark break-words"
+  },
   "home": {
     "card": {
       "item": "flex flex-row items-start justify-between gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item",

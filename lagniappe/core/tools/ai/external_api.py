@@ -138,6 +138,9 @@ execution begins. Start with compact context and request selected action schemas
 through get_guidelines(task="report_actions", actions=[...]) or the plan contract.
 For a saved answer without changes, request the contract with an empty actions
 selection; no action guidance is needed.
+For questions about Lagniappe itself, consult get_help and cite the returned
+topic URLs. General help explains behavior; use the actor context and live
+record permissions to establish what this user can actually do.
 Classify each upload in file_usage as evidence or organize. Evidence-only files
 need no attachment; organize files need an exact destination and a summarize_file
 action with two retrieval terms. Files without instructions must be organized.

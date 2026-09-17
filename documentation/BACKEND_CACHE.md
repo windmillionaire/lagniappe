@@ -100,6 +100,36 @@ fallback retain their existing matching behavior.
 Saved filters use a separate Redis JSON projection keyed by parent and access
 scope. See [BACKEND_FILTERS.md](BACKEND_FILTERS.md).
 
+### Help in the primary index
+
+Canonical Markdown topics project to namespace-prefixed
+`help:<help_version>:<topic_id>` hashes in the primary index. They use `name`,
+`desc`, and `doc` for title, summary, and plain text, with score 0.60. They have
+no Datastore identity or entity-details hash entry. Help display metadata comes
+from the source catalog, bypassing entity hydration and stale-entity pruning.
+
+Browser search opts in with `include_help=True`. Its access scope is the union
+of authorized records and current-version help, applied before Redis pagination.
+That scope clause has zero relevance weight: authorization and version filters
+must not change the relative text scores of records and help.
+The Help facet works even when the user has no workspace grants. Entity discovery,
+exact-name lookup, AI candidates, and relationship selectors exclude help,
+including for Administrators.
+
+`cache/help.py::ensure_help()` fingerprints source bytes, metadata and a projection
+version without rendering. A matching Redis readiness marker skips population.
+Otherwise a version/namespace lock serializes publication, indexing is verified,
+and the marker is set only after success. Startup, full cache rebuilding and
+help-inclusive searches share this path. Failed publication is retryable; direct
+topic reads never require Redis. Versioned keys and query clauses allow old/new
+deployments to coexist. Full cache refresh removes retired generations.
+
+The first upgrade adds the help prefix and `help_version` tag by recreating the
+primary index under a namespace lock, using `FT.DROPINDEX` without deleting
+documents. Workspace hashes survive; search can be briefly unavailable during
+reindexing. Unexpected Redis failures propagate instead of being treated as an
+absent index. Later content revisions only publish a new help generation.
+
 ## Entity revisions and restriction reconciliation
 
 Cached details include `modified` (the MD5 of the durable ISO timestamp), the

@@ -102,7 +102,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     _open_help_and_expect(
         owner,
         installation_access.locator("button[lp-help='site_installation_access']"),
-        "Why there is no Remove IAM button",
+        "The running web application cannot administer human Google Cloud IAM",
     )
 
     open_site_settings_section(settings_panel, "deployment")
@@ -132,7 +132,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     _open_help_and_expect(
         owner,
         providers.locator("button[lp-help='site_service_providers']"),
-        "outside services",
+        "outside dashboards",
     )
 
     open_site_settings_section(settings_panel, "site-image")
@@ -146,7 +146,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     modal = Modal(owner.page).open(
         settings_panel.locator("[data-role='configuration']")
     )
-    expect(modal.element).to_contain_text("Warning")
+    expect(modal.element).to_contain_text("including credentials and other secrets")
     expect(modal.element).to_contain_text("APP_NAME")
     expect(
         modal.element.get_by_role("link", name="Download Settings File")
