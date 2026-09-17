@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Latest reviewed attempt per case/arm, including failures. Raw exports are local-only. Each case keeps one flat baseline and one flat current run; client/transport identity stays in this index and comparison notes.",
+  "description": "Latest reviewed attempt per case/arm, including caveats and failures. Raw captures are local-only. Selected September 16 baselines contain flat mcp__ and on-site__ files; current holds later cleanup attempts separately.",
   "measured_priority": [
     "semantic outcome",
     "model/tool rounds",
@@ -19,24 +19,28 @@
     "confidence": "Single practical pair per case; combined changes and mutable workspace, not randomized attribution or a performance SLA.",
     "mcp_tool_seconds": "Sum recorded durations of unique completed Lagniappe McpToolCall items, including imported app calls/errors; parallel durations may overlap and may exclude approval waits. Not elapsed time or isolated network latency.",
     "confirmed_uploaded_files": "Unique files confirmed in finalization/authoritative Plan inventory, not attempted HTTP requests; zero when no upload was attempted.",
-    "remote_arm": "codex-remote records this remote pilot separately from local mcp history. Per-case transport and mcp_routes identify imported ChatGPT-app exceptions; do not infer every call used direct Codex OAuth."
+    "remote_arm": "codex-remote records this remote pilot separately from local mcp history. Per-case transport and mcp_routes identify imported ChatGPT-app exceptions; do not infer every call used direct Codex OAuth.",
+    "native_usage": "Native totals include each generation once across all attempts, including failed planning and one-time file summaries; deduplicate by correlation_id. thought_tokens is separate from output_tokens and included in total_tokens. Timed-out requests without a usage response can leave provider usage unobserved. Provider/tool rounds differ from Codex orchestration rounds."
   },
   "cases": [
     {
       "id": "01-ask-known-page",
       "current_inputs": {
-        "prompt_sha256": "3d35a44030b9c44e8317dd3c3d8842f70b6e2af6bce60f42863e3c0aa7c001b0",
-        "fixtures": {}
+        "prompt_sha256": "43905c70a05e30dbfa9a4a3145a34625e803d22f014e7cecd366d5a13421d73c",
+        "on_site_prompt_sha256": "c342f6a9230e00fc40b2b19101700f06924e16ab8e2a3b68ddcd71f9593655b9",
+        "fixtures": {
+          ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       },
       "latest_results": {
         "mcp": {
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/01-ask-known-page/artifacts/baseline",
+          "artifacts": "../reports/unified-ai-verification-20260916/previous-library/01-ask-known-page/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "f1e8178b04e1efaab0e500c73c95c0b606687eb3846cc4e30cdcaf8b5c397ef7",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/baseline/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/reports/unified-ai-verification-20260916/previous-library/01-ask-known-page/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -86,97 +90,119 @@
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         },
         "codex-remote": {
-          "run_id": "remote-mcp-pilot-20260905",
+          "run_id": "unified-ai-20260916",
           "reviewed": true,
-          "run_date_utc": "2026-09-05",
-          "artifacts": "cases/01-ask-known-page/artifacts/current",
-          "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "3589eb990d78466caf64c2ec109642100b7a260cab4f7cb487bd95943f1e244b",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/current/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/01-ask-known-page/artifacts/baseline",
+          "artifact_prefix": "mcp__",
+          "artifact_sha256": {
+            "mcp__CODEX_ARCHIVE.jsonl": "a0fdf6c5cc80114a89916dcd6151beacdb23b9b43d1e089ffa53fd699bb33ae8",
+            "mcp__CODEX_SESSION.txt": "cd34f5cc3407cd3e17ac6bc00a2e7953c39ffde47d33cd8184c059a489b72d6b"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
           "client": "Codex",
-          "client_version": "0.153.4",
-          "model": "gpt-5.6-sol",
-          "reasoning": "medium",
-          "adapter_version": "0.1.6",
-          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
-          "server_version": null,
-          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
-          "transport": "direct_remote_mcp_after_imported_app_errors",
+          "client_version": "0.154.0",
+          "model": "gpt-6-astra",
+          "reasoning": "xhigh",
+          "transport": "remote-mcp",
+          "app_version": "20260916t152433",
+          "mcp_revision": "lagniappe-mcp-00023-fl5",
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
           "input_snapshot": {
-            "prompt_sha256": "3d35a44030b9c44e8317dd3c3d8842f70b6e2af6bce60f42863e3c0aa7c001b0",
-            "fixtures": {},
-            "recorded_task_prompts": [
-              {
-                "archive_line": 9,
-                "utf8_sha256": "248fc6d65598b2b6c193192345f1a19edc065a5469964b75f380199dae3e59d7"
-              }
-            ]
+            "prompt_sha256": "2691e304adfb01b35af9aefae4eeb9d8e16efc6c0ed4a16a4b7ba07b6bc36420",
+            "fixtures": {
+              ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
           },
           "inputs_match_current_case": true,
-          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
-          "outcome": "pass_with_caveats",
-          "report_status": "complete",
-          "summary": "Grounded complete Ask with source link; final reply omits the saved-report link.",
+          "outcome": "grounded_answer_with_relative_link_caveat",
           "caveats": [
-            "Imported app start fails instructions pattern validation before four direct MCP calls succeed; full timing includes the approval/detour.",
-            "Final source link is present but the returned saved-answer link is absent."
+            "The final source link is relative (/pages/...). It identifies the correct Page but may not resolve as a website link in an external client.",
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
           ],
           "metrics": {
-            "task_seconds": 80.037,
-            "elapsed_seconds_with_between_turn_gaps": 80.037,
-            "task_turns": 1,
-            "aborted_turns": 0,
-            "model_tool_rounds": 10,
-            "discovery_rounds": 5,
+            "task_seconds": 31.61,
             "usage": {
-              "input_tokens": 365343,
-              "cached_input_tokens": 327168,
-              "output_tokens": 1782,
-              "reasoning_output_tokens": 578,
-              "total_tokens": 367125,
-              "uncached_input_tokens": 38175
+              "input_tokens": 138455,
+              "cached_input_tokens": 114432,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 565,
+              "reasoning_output_tokens": 167,
+              "total_tokens": 139020,
+              "uncached_input_tokens": 24023
             },
-            "mcp_calls": 5,
-            "mcp_failed_calls": 1,
+            "model_tool_rounds": 4,
+            "provider_responses": 5,
+            "mcp_calls": 3,
             "mcp_call_breakdown": {
-              "lagniappe_remote.start_ask": 1,
-              "start_ask": 1,
+              "answer_question": 1,
               "search_entities": 1,
-              "get_entity": 1,
-              "submit_plan": 1
+              "get_entity": 1
             },
-            "mcp_routes": {
-              "codex_apps": 1,
-              "lagniappe-remote": 4
-            },
-            "mcp_other_calls": {},
-            "mcp_tool_seconds": 7.444,
             "api_requests": null,
-            "reported_cost_usd": null,
-            "confirmed_uploaded_files": 0
+            "reported_cost_usd": null
           },
-          "measurement_evidence": {
-            "task_turns": [
-              {
-                "start_line": 9,
-                "answer_line": 81,
-                "end_line": 84,
-                "seconds": 80.037,
-                "aborted": false
-              }
-            ],
-            "additional_user_messages": [],
-            "accepted_submission_lines": [
-              75
-            ],
-            "failed_mcp_call_lines": [
-              35
-            ]
-          }
+          "execution_verified": false,
+          "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "a0fdf6c5cc80114a89916dcd6151beacdb23b9b43d1e089ffa53fd699bb33ae8",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+        },
+        "on-site": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/01-ask-known-page/artifacts/baseline",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_153501.png": "4f35084e1476578b4337839fef5a7e58989f29f0f2ada1e77085b794fa267827",
+            "on-site__proposal-readback.json": "63b28f48a24be6ff3a21f7ee7ea981ea5d26ea3dae92dad68c375f923ef5815e",
+            "on-site__results.json": "ef22e365ed553ee258e1293b7f6f96f909a32508fa6d40b9f73ff92a5e6c62f3"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": "20260916t152433",
+          "mcp_revision": null,
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "0117dfd6ee4182c6b14ba9749855d33147502474f6ab9df096433a20358f954e",
+            "fixtures": {
+              ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass",
+          "caveats": [
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "job_elapsed_seconds": 26,
+            "usage": {
+              "prompt_tokens": 39404,
+              "cached_tokens": 0,
+              "output_tokens": 420,
+              "thought_tokens": 1545,
+              "total_tokens": 41369
+            },
+            "tool_calls": 4,
+            "tool_rounds": 2,
+            "provider_requests": 3,
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false
         }
       },
-      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
+      "prompt_revision_note": "September 16 neutral Desktop prompts copied for reuse. Original measured prompt hashes are recorded separately; transport routing wording and native reminder phrasing can differ.",
+      "baseline_runs": {
+        "codex-remote": "unified-ai-20260916",
+        "on-site": "unified-ai-20260916"
+      }
     },
     {
       "id": "02-ask-books-filter",
@@ -348,15 +374,18 @@
     {
       "id": "03-create-personal-task",
       "current_inputs": {
-        "prompt_sha256": "56041b37aff2e192975b07bba99cb57fcb52f17ebb9d478a13ab6f189c46c350",
-        "fixtures": {}
+        "prompt_sha256": "96386ee06b4201fba967f9d39b983ceaeab1fb8bafd59f67e337a515b61356ec",
+        "on_site_prompt_sha256": "b67af63e7f6ba50281263e85f631c1601cc869b786f2112062a164c3ec48e52b",
+        "fixtures": {
+          ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       },
       "latest_results": {
         "mcp": {
           "run_id": "mcp-round-2",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/03-create-personal-task/artifacts/baseline",
+          "artifacts": "../reports/unified-ai-verification-20260916/previous-library/03-create-personal-task/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "2ae371092d21eee31a82555f68b82288a0ee5ab54734942865c3b6814cf11f79",
           "source_local": "/home/swifty/Desktop/lagniappe-mcp-trial/03-create-personal-task/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl",
@@ -398,89 +427,195 @@
           }
         },
         "codex-remote": {
-          "run_id": "remote-mcp-pilot-20260905",
+          "run_id": "unified-ai-20260916",
           "reviewed": true,
-          "run_date_utc": "2026-09-05",
-          "artifacts": "cases/03-create-personal-task/artifacts/current",
-          "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "323252e3a2b37c9777f2a7ff0406687c81b1ba9014f7b6983dc3b8bdcc9f26c4",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/03-create-personal-task/artifacts/current/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/03-create-personal-task/artifacts/baseline",
+          "artifact_prefix": "mcp__",
+          "artifact_sha256": {
+            "mcp__CODEX_ARCHIVE.jsonl": "97cc51cc8ddcb322cc67ae884118c9f1f1847498e161084d25a2132ed8c6215a",
+            "mcp__CODEX_SESSION.txt": "ea31fd6f38cc2f582314b99c76101d860e13490f92369636c2d82a57f9cd9d7f",
+            "mcp__plan-readback.json": "2d34649ca2447b12b5f97511662c543683d0eab642a34a4ead4cf57d786bd8ae"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
           "client": "Codex",
-          "client_version": "0.153.4",
-          "model": "gpt-5.6-sol",
-          "reasoning": "medium",
-          "adapter_version": "0.1.6",
-          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
-          "server_version": null,
-          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
-          "transport": "direct_remote_mcp",
+          "client_version": "0.154.0",
+          "model": "gpt-6-astra",
+          "reasoning": "xhigh",
+          "transport": "remote-mcp",
+          "app_version": "20260916t152433",
+          "mcp_revision": "lagniappe-mcp-00023-fl5",
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
           "input_snapshot": {
-            "prompt_sha256": "56041b37aff2e192975b07bba99cb57fcb52f17ebb9d478a13ab6f189c46c350",
-            "fixtures": {},
-            "recorded_task_prompts": [
-              {
-                "archive_line": 9,
-                "utf8_sha256": "e51f0bb1ebbd8d48ceb6209fde2129a45010d480a4f8d162774cbf7539e5bb5f"
-              }
-            ]
+            "prompt_sha256": "ed7015af94b5238e36f17ca950f72805bb93185ca3dd67c2b9b34202d8bc473b",
+            "fixtures": {
+              ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
           },
           "inputs_match_current_case": true,
-          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
-          "outcome": "pass",
-          "report_status": "ready",
-          "summary": "One open personal reminder due October 15 at 17:00 America/Los_Angeles, without recurrence.",
-          "caveats": [],
+          "outcome": "pass_proposal_only",
+          "caveats": [
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
           "metrics": {
-            "task_seconds": 39.668,
-            "elapsed_seconds_with_between_turn_gaps": 39.668,
-            "task_turns": 1,
-            "aborted_turns": 0,
-            "model_tool_rounds": 5,
-            "discovery_rounds": 2,
+            "task_seconds": 27.737,
             "usage": {
-              "input_tokens": 192129,
-              "cached_input_tokens": 164608,
-              "output_tokens": 906,
-              "reasoning_output_tokens": 268,
-              "total_tokens": 193035,
-              "uncached_input_tokens": 27521
+              "input_tokens": 188274,
+              "cached_input_tokens": 161792,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 522,
+              "reasoning_output_tokens": 10,
+              "total_tokens": 188796,
+              "uncached_input_tokens": 26482
             },
+            "model_tool_rounds": 5,
+            "provider_responses": 6,
             "mcp_calls": 3,
-            "mcp_failed_calls": 0,
             "mcp_call_breakdown": {
-              "start_create": 1,
+              "start_plan": 1,
               "get_guidelines": 1,
               "submit_plan": 1
             },
-            "mcp_routes": {
-              "lagniappe-remote": 3
-            },
-            "mcp_other_calls": {},
-            "mcp_tool_seconds": 4.351,
             "api_requests": null,
-            "reported_cost_usd": null,
-            "confirmed_uploaded_files": 0
+            "reported_cost_usd": null
           },
-          "measurement_evidence": {
-            "task_turns": [
-              {
-                "start_line": 9,
-                "answer_line": 49,
-                "end_line": 52,
-                "seconds": 39.668,
-                "aborted": false
-              }
-            ],
-            "additional_user_messages": [],
-            "accepted_submission_lines": [
-              43
-            ],
-            "failed_mcp_call_lines": []
-          }
+          "execution_verified": false,
+          "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "97cc51cc8ddcb322cc67ae884118c9f1f1847498e161084d25a2132ed8c6215a",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/03-create-personal-task/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+        },
+        "on-site": {
+          "run_id": "unified-ai-cleanup-20260917",
+          "reviewed": true,
+          "baseline": false,
+          "run_date_utc": "2026-09-17",
+          "artifacts": "cases/03-create-personal-task/artifacts/current",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_171801.png": "aaeabd7f6ea1cbb17054ad28e4218cb2e891468776898acb3f5b837aa7466186",
+            "on-site__results.json": "62f87dbb079ecca25e131a045075380976e1d7a9aefdb51663da2ba0b1b359b8",
+            "on-site__review.json": "5bbf478e21a3b4e20278069deec07c3e40db9620df8791d6126c61281870a627",
+            "on-site__proposal-readback.json": "3bd35d027496f27ecdda1e9d0b86b7e69d943fb7939fd931531e42b677d171ad"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": null,
+          "mcp_revision": null,
+          "code_note": "Cleanup deployed per operator; runtime identity not independently captured. MCP remote empty-action URL guard fix is newer and not deployed.",
+          "input_snapshot": {
+            "prompt_sha256": "f07f5feebdc3797d2851b2e842cdea6e6e393af98852fd1918b334d9cfc007fe",
+            "fixtures": {
+              ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "inputs_match_current_case": false,
+          "outcome": "acceptable_proposal_operator_accepted",
+          "caveats": [
+            "Again chose the related emergency guide; the user explicitly accepts this destination.",
+            "Date-only due_date plus 5 PM description retains the request but does not promise a timed notification.",
+            "The statement that task due dates only support calendar dates overstates the storage restriction; the normal editor is date-only, but create_task accepts an ISO timestamp.",
+            "The answer explicitly offers the personal Page and says planned, showing awareness of that context and fixing premature applied wording.",
+            "237,817 tokens and eight tool rounds improve on 540,981 and seventeen; elapsed time increased from 163 to 225 seconds. No retry or job error."
+          ],
+          "metrics": {
+            "job_elapsed_seconds": 225,
+            "usage": {
+              "prompt_tokens": 220018,
+              "cached_tokens": 54712,
+              "output_tokens": 1007,
+              "thought_tokens": 16792,
+              "total_tokens": 237817
+            },
+            "tool_calls": 17,
+            "tool_rounds": 8,
+            "provider_requests": 9,
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false,
+          "run_date_local": "2026-09-16"
         }
       },
-      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
+      "prompt_revision_note": "September 16 neutral Desktop prompts copied for reuse. Original measured prompt hashes are recorded separately; transport routing wording and native reminder phrasing can differ.",
+      "baseline_runs": {
+        "codex-remote": "unified-ai-20260916",
+        "on-site": "unified-ai-20260916"
+      },
+      "baseline_results": {
+        "on-site": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/03-create-personal-task/artifacts/baseline",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_154010.png": "6b51be6f6b537927bf50963f5a6d08651f0cdbd1ad0f665c2deec5eb02d8a454",
+            "on-site__ahZkZWNvZGVkLWNvcmUtNDM5NzE5LW45clwLEgV1c2VycxiAgIDq2bqICQwLEgRqb2JzIkBjNDQ2YTUyNWM5Y2ZjM2VlYzQ5MjgyNDkyYTBjMDQwY2Q1NWUzNmQwYTNlOTU0NGQxYWI0YjQ3YTc4ZThlNjgxDA.json": "a9cb6b1a51a7166d2fa0df52064e6952fc4c431be17309098a96dfd0112010e1",
+            "on-site__proposal-readback.json": "5ecc9cc4c77ccac4246713360ce1e85fdef9e2943c42ca41c830717d1ac4aee0",
+            "on-site__revision-review.json": "c538cf15bdeb4e833a4882124e349e11bfd10e6681559575c0f9e95abd1c1bc2",
+            "on-site__revision_proposal.json": "93dea9957b0a62501010ee86c900bf33b82a35be90ca4fcde45266e1a664d3c9",
+            "on-site__revision_screenshot.png": "9b6270d9560dca8ebb72738aa40e7baa30a5f05d89d4898c7bb7ae3250296fb9"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": "20260916t152433",
+          "mcp_revision": null,
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "68b36b1c53c671d7c5ebacdcadf025ef6dc278fce4cf6dbc1588c261284a3731",
+            "fixtures": {
+              ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "inputs_match_current_case": false,
+          "outcome": "reasonable_proposal_with_caveats",
+          "caveats": [
+            "October 15 is correct and 5 PM is explicitly preserved in the description. It is not stored as the exact due timestamp. Storage supports timestamps, but the normal Task UI is date-only; do not equate this with a broken task or claim a timed notification was configured.",
+            "The answer says the task is set up while the proposal is still unexecuted; proposed wording would be more accurate.",
+            "Initial run retained separately from the successful revision (18,094 tokens, 2 calls, 1 round, 21 seconds); it is not a fresh-run efficiency baseline.",
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "job_elapsed_seconds": 163,
+            "usage": {
+              "prompt_tokens": 522663,
+              "cached_tokens": 333351,
+              "output_tokens": 1024,
+              "thought_tokens": 17294,
+              "total_tokens": 540981
+            },
+            "tool_calls": 24,
+            "tool_rounds": 17,
+            "provider_requests": 18,
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false,
+          "revision": {
+            "outcome": "pass_revision_review",
+            "usage": {
+              "prompt_tokens": 15986,
+              "cached_tokens": 7059,
+              "output_tokens": 463,
+              "thought_tokens": 1645,
+              "total_tokens": 18094
+            },
+            "job_elapsed_seconds": 21,
+            "artifact": "on-site__revision-review.json",
+            "separate_from_initial_metrics": true
+          }
+        }
+      }
     },
     {
       "id": "04-create-related-records",
@@ -1099,7 +1234,8 @@
     {
       "id": "08-organize-mixed-files",
       "current_inputs": {
-        "prompt_sha256": "be1e33ae7dbb159778041e015c810afeabbefcd3d9e4520ab2013798edbe812b",
+        "prompt_sha256": "20f8f380d4e5e3f840636ba46297d6d2bf36e6c4415410179849e0cb4f4bbe31",
+        "on_site_prompt_sha256": "53533308cec1b1e3095b817d031f1fd7615ff66e801bc2f558f3422938f1460c",
         "fixtures": {
           "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
           "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
@@ -1113,10 +1249,10 @@
           "run_id": "mcp-round-3",
           "reviewed": true,
           "run_date_utc": "2026-09-05",
-          "artifacts": "cases/08-organize-mixed-files/artifacts/baseline",
+          "artifacts": "../reports/unified-ai-verification-20260916/previous-library/08-organize-mixed-files/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "414ee833334d54ed23c1a7bb932022d9682017046b145f503679c24eb318603b",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/baseline/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/reports/unified-ai-verification-20260916/previous-library/08-organize-mixed-files/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -1181,25 +1317,103 @@
           "input_match_evidence": "Recorded task prompt matches baseline exactly and tracked prompt body after whitespace normalization; substantive Desktop fixture hashes match tracked inputs"
         },
         "codex-remote": {
-          "run_id": "remote-mcp-pilot-20260905",
+          "run_id": "unified-ai-20260916",
           "reviewed": true,
-          "run_date_utc": "2026-09-05",
-          "artifacts": "cases/08-organize-mixed-files/artifacts/current",
-          "archive_file": "CODEX_ARCHIVE.jsonl",
-          "archive_sha256": "f8b93ad08615fb30b364623ecdf59d94d8fe5919036b56e661b44a0ff89d3884",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/current/CODEX_ARCHIVE.jsonl",
-          "comparison": "comparisons/remote-mcp-pilot-20260905.md",
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/baseline",
+          "artifact_prefix": "mcp__",
+          "artifact_sha256": {
+            "mcp__CODEX_ARCHIVE.jsonl": "b95bf917e47fbc9b4c98aa715e4df89d5b9f7678d4d835766b80c4a61b55ac02",
+            "mcp__CODEX_SESSION.txt": "cc25253dfad3e5257cd3f0cb1f300938c99bffab29bd40416118ca4f3a95ff23",
+            "mcp__plan-readback.json": "0057ace221d9ee84ded1ddc6291085e118f1858fa79525967f363669b28b34fc"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
           "client": "Codex",
-          "client_version": "0.153.4",
-          "model": "gpt-5.6-sol",
-          "reasoning": "medium",
-          "adapter_version": "0.1.6",
-          "adapter_version_evidence": "Shared adapter release and operator deployment history; exact runtime digest is not embedded in each capture",
-          "server_version": null,
-          "server_version_evidence": "Batch deployment timeline in pilot log; no per-run runtime log lookup performed",
-          "transport": "direct_remote_mcp",
+          "client_version": "0.154.0",
+          "model": "gpt-6-astra",
+          "reasoning": "xhigh",
+          "transport": "remote-mcp",
+          "app_version": "20260916t152433",
+          "mcp_revision": "lagniappe-mcp-00023-fl5",
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
           "input_snapshot": {
-            "prompt_sha256": "be1e33ae7dbb159778041e015c810afeabbefcd3d9e4520ab2013798edbe812b",
+            "prompt_sha256": "d0f85e5e7ee583e0d1c45cf2228755c593df9c963dec877b302cd566c1f30650",
+            "fixtures": {
+              "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
+              "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
+              "heating-service-receipt.md": "0f0ae3653574d583ae1593a4b720e15c846a36f692bfabfa35b34062bf172468",
+              "service-accounting-export.txt": "6d5c75d78703394bb169d8a1af2ff5b0760c0879599339c08029e2ce622ff4d4",
+              "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_proposal_review",
+          "caveats": [
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "task_seconds": 427.665,
+            "usage": {
+              "input_tokens": 976302,
+              "cached_input_tokens": 904832,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 8822,
+              "reasoning_output_tokens": 2612,
+              "total_tokens": 985124,
+              "uncached_input_tokens": 71470
+            },
+            "model_tool_rounds": 16,
+            "provider_responses": 17,
+            "mcp_calls": 23,
+            "mcp_call_breakdown": {
+              "list_workspace_resources": 1,
+              "start_plan": 1,
+              "search_entities": 3,
+              "get_guidelines": 4,
+              "prepare_file_uploads": 1,
+              "get_page_tasks": 1,
+              "get_schema": 3,
+              "get_entity": 3,
+              "get_category_pages": 1,
+              "get_page_file_list": 1,
+              "finalize_file_uploads": 1,
+              "get_task_history": 1,
+              "get_plan_contract": 1,
+              "submit_plan": 1
+            },
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false,
+          "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "b95bf917e47fbc9b4c98aa715e4df89d5b9f7678d4d835766b80c4a61b55ac02",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+        },
+        "on-site": {
+          "run_id": "unified-ai-cleanup-20260917",
+          "reviewed": true,
+          "baseline": false,
+          "run_date_utc": "2026-09-17",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/current",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_175537.png": "38211f614ed2b2fd4a4a78a0a9f18be3403cad1f3b898a76e83e764e7020d2f9",
+            "on-site__proposal.json": "6a0b520523010d0f5abadacab56419ac975a59f84e55821b3e4ad7358dd7a7c8",
+            "on-site__results.json": "c36004982297e4670b3d191d5d012f933688ef1dcb52f899395c5c333c2d88f0",
+            "on-site__review.json": "f0d9ea3c9c190d8d6d7f6f9804fbbe9439ca183159c82349801c8d726b4e3f93"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": null,
+          "mcp_revision": null,
+          "code_note": "Cleanup deployed per operator; runtime build not independently captured. Pending MCP remote empty-action URL fix is separate from this native run.",
+          "input_snapshot": {
+            "prompt_sha256": null,
             "fixtures": {
               "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
               "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
@@ -1207,93 +1421,144 @@
               "service-accounting-export.txt": "6d5c75d78703394bb169d8a1af2ff5b0760c0879599339c08029e2ce622ff4d4",
               "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
             },
-            "recorded_task_prompts": [
-              {
-                "archive_line": 9,
-                "utf8_sha256": "b0992fcab1124e10d748f7b2f5815727ac168fd63fbad88a16c93b8975aab607"
-              }
-            ]
+            "desktop_prompt_sha256": "c820daf54a552503c772048be17a98cef069b8a885474987ade8b4cedebf129d"
           },
-          "inputs_match_current_case": true,
-          "input_match_evidence": "Task text matches canonical request after whitespace normalization; substantive fixture hashes verified. Message hashes retain exact captured UTF-8 text.",
-          "outcome": "needs_fix",
-          "report_status": "ready",
-          "summary": "All five files survive upload and ambiguous-finalization recovery; partial source reading loses Willow Court Rain Garden naming and late evidence.",
+          "inputs_match_current_case": null,
+          "outcome": "pass_proposal_review_with_wording_caveat",
           "caveats": [
-            "Reads only first 240 of 456 log lines, never retrieves the tail; final filing decision is at fixture lines 451–456.",
-            "Uses East Walk Drainage and summarizes through July 14 instead of the final Willow Court Rain Garden/planning decision.",
-            "finalize_file_uploads returns upload_finalization_unknown; get_plan_contract confirms all five finalized files and the same Plan is submitted.",
-            "The archive does not establish the cause of missing finalization confirmation.",
-            "Correct existing completed Boiler occurrence, separate open gasket work and conditional future grant are retained.",
-            "Generic gasket task loses the useful repair Form structure present in local round 3.",
-            "Shorter elapsed time is not an equal-quality improvement."
+            "Answer still describes proposed filing/completion as already applied; the summary correctly calls these filing proposals. Execution was not tested.",
+            "Facilities volunteer is retained in the description as note authorship, without an explicit assignee. Both drainage files use Uncategorized Pages, an acceptable placement choice.",
+            "First planning attempt failed with a provider timeout; automatic retry succeeded. Totals include both planning attempts and the three one-time summary generations, without double counting earlier telemetry snapshots.",
+            "Observed tokens are not complete billing evidence for the timed-out provider request, which returned no usage response.",
+            "Successful retry reports priority service tier; first attempt and initial baseline report standard. No billing or latency attribution inferred.",
+            "File summaries are prepared before native planning and summarize_file is not advertised. This capture does not expose persisted summary/retrieval-term contents for all five files.",
+            "Desktop fixture hashes match the reusable case. The complete submitted prompt and uploaded file bytes are not independently read back in this capture; screenshot title matches the neutral prompt opening."
           ],
           "metrics": {
-            "task_seconds": 184.583,
-            "elapsed_seconds_with_between_turn_gaps": 184.583,
-            "task_turns": 1,
-            "aborted_turns": 0,
-            "model_tool_rounds": 15,
-            "discovery_rounds": 2,
+            "job_elapsed_seconds": 843,
+            "attempts": 2,
             "usage": {
-              "input_tokens": 689846,
-              "cached_input_tokens": 635776,
-              "output_tokens": 6913,
-              "reasoning_output_tokens": 1938,
-              "total_tokens": 696759,
-              "uncached_input_tokens": 54070
+              "prompt_tokens": 353116,
+              "cached_tokens": 70796,
+              "output_tokens": 5011,
+              "thought_tokens": 46728,
+              "total_tokens": 404855,
+              "uncached_prompt_tokens": 282320
             },
-            "mcp_calls": 16,
-            "mcp_failed_calls": 1,
-            "mcp_call_breakdown": {
-              "start_organize": 1,
-              "prepare_file_uploads": 1,
-              "finalize_file_uploads": 1,
-              "get_plan_contract": 1,
-              "search_entities": 5,
-              "get_page_details": 1,
-              "get_entity": 2,
-              "get_task_history": 1,
-              "get_guidelines": 2,
-              "submit_plan": 1
+            "tool_calls": 53,
+            "tool_rounds": 9,
+            "provider_requests": 14,
+            "provider_responses": 13,
+            "successful_planning": {
+              "prompt_tokens": 222962,
+              "cached_tokens": 27503,
+              "output_tokens": 3876,
+              "thought_tokens": 38446,
+              "total_tokens": 265284,
+              "tool_calls": 30,
+              "tool_rounds": 5,
+              "provider_requests": 6,
+              "duration_ms": 457211,
+              "service_tier": "priority"
             },
-            "mcp_routes": {
-              "lagniappe-remote": 16
+            "token_breakdown": {
+              "successful_planning": 265284,
+              "failed_planning": 130681,
+              "one_time_summaries": 8890
             },
-            "mcp_other_calls": {},
-            "mcp_tool_seconds": 35.571,
             "api_requests": null,
-            "reported_cost_usd": null,
-            "confirmed_uploaded_files": 5
+            "reported_cost_usd": null
           },
-          "measurement_evidence": {
-            "task_turns": [
-              {
-                "start_line": 9,
-                "answer_line": 134,
-                "end_line": 137,
-                "seconds": 184.583,
-                "aborted": false
-              }
+          "execution_verified": false,
+          "run_date_local": "2026-09-16",
+          "summary": "Historical completion date fixed; all five files grouped, separate gasket work remains open, and final rain-garden name/planning facts preserved. Automatic retry succeeded.",
+          "report_id": "ahZkZWNvZGVkLWNvcmUtNDM5NzE5LW45cicLEgV1c2VycxiAgIDq2bqICQwLEghhY3Rpdml0eRiAgIDFo-6QCgw",
+          "input_match_evidence": "Desktop prompt/fixture package reused per operator; all five local fixture hashes match. Screenshot opening matches prompt. Full submitted prompt/upload bytes not independently read back.",
+          "follow_up_verification": {
+            "recorded_at_utc": "2026-09-17T02:06:53.118890+00:00",
+            "outcome": "pass_wording_revision_with_unchanged_actions",
+            "report_id": "ahZkZWNvZGVkLWNvcmUtNDM5NzE5LW45cicLEgV1c2VycxiAgIDq2bqICQwLEghhY3Rpdml0eRiAgIDFo-6QCgw",
+            "changed_proposal_fields": [
+              "answer_html",
+              "summary"
             ],
-            "additional_user_messages": [],
-            "accepted_submission_lines": [
-              128
-            ],
-            "failed_mcp_call_lines": [
-              71
-            ]
-          },
-          "outcome_basis": "Recorded case-rubric assessment; operator pilot acceptance is recorded separately and does not rewrite the evidence.",
-          "operator_disposition": {
-            "status": "accepted_with_caveats",
-            "reason": "Broadly useful result accepted for the pilot; isolated nondeterministic model choices do not justify accumulating specific rules.",
-            "required_follow_up": false,
-            "source": "Operator follow-up to September 5 comparison"
+            "actions_equal": true,
+            "action_count": 9,
+            "actions_sha256": "9a1fa53a510f0654bbca3f302cfeb651148c3992ae7936ac1277cdc35c07c5af",
+            "artifact_sha256": {
+              "on-site__wording_revision_review.json": "124d50a0be1935ead86a5d946cb67502e0a9a0a707b6b66e7643f8512b774e10",
+              "on-site__wording_revision_1.png": "c806a0404beec86b05058fb658ed7b9cc7ef8916dd3de74279bff19098440f37",
+              "on-site__wording_revision_2.png": "4c7d0a38e41c6313dfc8876d9c5f0cbd6fe8682c5885097ee37b00faada13349"
+            },
+            "initial_capture_preserved": true,
+            "telemetry_captured": false,
+            "execution_verified": false
           }
         }
       },
-      "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
+      "prompt_revision_note": "September 16 neutral Desktop prompts copied for reuse. Original measured prompt hashes are recorded separately; transport routing wording and native reminder phrasing can differ.",
+      "baseline_runs": {
+        "codex-remote": "unified-ai-20260916",
+        "on-site": "unified-ai-20260916"
+      },
+      "baseline_results": {
+        "on-site": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/08-organize-mixed-files/artifacts/baseline",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_154732.png": "e2052e6a77117549c24ecc6df74ca637650cae44c93b4fea861c1023817d0270",
+            "on-site__execution.json": "83dc196ed0bcc807ce5e66461e5ad39ad0440a1cdca782472110868745614a05",
+            "on-site__proposal-readback.json": "c1ef250bac5b820f48297e3b7beb2bb364eadd32fa1b85ebff5e4b82fb82dd38",
+            "on-site__proposal.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": "20260916t152433",
+          "mcp_revision": null,
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "cf50f354ebee66e1cca85ae60e3d9973bf4c2afe7f346a2ab7bc8c75b377b2bd",
+            "fixtures": {
+              "east-walk-site-log.md": "18208233a75356d67218823795f5be3338534ab6b67cb78ee12dad2d044dc1a9",
+              "equipment-maintenance-note.json": "a03c7ce4cc8b6d2e68995e4270e844f3ba8116468de03d456114680c3950b4f6",
+              "heating-service-receipt.md": "0f0ae3653574d583ae1593a4b720e15c846a36f692bfabfa35b34062bf172468",
+              "service-accounting-export.txt": "6d5c75d78703394bb169d8a1af2ff5b0760c0879599339c08029e2ce622ff4d4",
+              "watershed-grant-decision.json": "d6504d3aba14bd9b2b81aaf8d41c90929b60696265eb4d99f2fcca82d4c31c4d"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "usable_proposal_with_historical_completion_date_issue",
+          "caveats": [
+            "Uses complete_task for an August 19 completed visit. That adapter invokes Task.complete, which sets completed_on to execution time; the August date appears only in notes/reason. Revise to record the dated occurrence before execution.",
+            "Answer describes records as already filed/completed while proposal remains ready. Use proposed wording.",
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "job_elapsed_seconds": 228,
+            "usage": {
+              "prompt_tokens": 393603,
+              "cached_tokens": 217282,
+              "output_tokens": 4010,
+              "thought_tokens": 21391,
+              "total_tokens": 419004
+            },
+            "tool_calls": 30,
+            "tool_rounds": 8,
+            "provider_requests": 12,
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false
+        }
+      }
     },
     {
       "id": "09-create-project",
@@ -2085,6 +2350,341 @@
         }
       },
       "prompt_revision_note": "Remote pilot adds the mcp: routing cue; the natural job text is otherwise unchanged. Both messages in case 05 carry the cue."
+    },
+    {
+      "id": "U1-existing-files-new-tasks",
+      "latest_results": {
+        "codex-remote": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/U1-existing-files-new-tasks/artifacts/baseline",
+          "artifact_prefix": "mcp__",
+          "artifact_sha256": {
+            "mcp__CODEX_ARCHIVE.jsonl": "43dcb81c5c704da7bf04c762b8496b2d65a632fa3be81c8eee3e255d89e5001d",
+            "mcp__CODEX_SESSION.txt": "76ffb98f0c1aad33b85290236c507097b9196218cb79c4c3cb725e20974df40d",
+            "mcp__plan-readback.json": "27d5eea224c7369d8adf9cf51462c152b8dc3902096467b700089c2ee7eef4b5"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Codex",
+          "client_version": "0.154.0",
+          "model": "gpt-6-astra",
+          "reasoning": "xhigh",
+          "transport": "remote-mcp",
+          "app_version": "20260916t152433",
+          "mcp_revision": "lagniappe-mcp-00023-fl5",
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "82ab5393d8f2546aa49b90bcb08148a254b89cf6ee64e587d9e95d19699b2210",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_proposal_review",
+          "caveats": [
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "task_seconds": 79.992,
+            "usage": {
+              "input_tokens": 272589,
+              "cached_input_tokens": 218368,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 1928,
+              "reasoning_output_tokens": 124,
+              "total_tokens": 274517,
+              "uncached_input_tokens": 54221
+            },
+            "model_tool_rounds": 7,
+            "provider_responses": 8,
+            "mcp_calls": 10,
+            "mcp_call_breakdown": {
+              "start_plan": 1,
+              "get_guidelines": 2,
+              "search_entities": 2,
+              "get_page_details": 2,
+              "get_file": 2,
+              "submit_plan": 1
+            },
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false,
+          "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "43dcb81c5c704da7bf04c762b8496b2d65a632fa3be81c8eee3e255d89e5001d",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/U1-existing-files-new-tasks/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+        },
+        "on-site": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/U1-existing-files-new-tasks/artifacts/baseline",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_155206.png": "f0daf582ac24e67c1659ca19fd12fdadf59ea7c92437034a2b9d92fac8342272",
+            "on-site__execution.json": "bf0b4fc49dce46c2c97d84ee5460a937b1d1ec09a101c13a77613caae34ef944",
+            "on-site__proposal-readback.json": "c92bea0d369da95ee287503b30a6b931a8db7d45694763567807a71f8cb948e4",
+            "on-site__proposal.json": "261671987f0c1aae0fdea058cbd70233a222f527f3bcec8dbfc67096e65904b5"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": "20260916t152433",
+          "mcp_revision": null,
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "df6a03c861fff99130b9c5e87f7454b195fea8c3271467ff5689637f7a565a1f",
+            "fixtures": {}
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_proposal_review",
+          "caveats": [
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "job_elapsed_seconds": 88,
+            "usage": {
+              "prompt_tokens": 80998,
+              "cached_tokens": 37859,
+              "output_tokens": 2049,
+              "thought_tokens": 6749,
+              "total_tokens": 89796
+            },
+            "tool_calls": 12,
+            "tool_rounds": 4,
+            "provider_requests": 5,
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false
+        }
+      },
+      "current_inputs": {
+        "prompt_sha256": "4df1a791df78b54533d21e438c034fad130014428febf1f6fa518f22ec40f08b",
+        "on_site_prompt_sha256": "f5f418617226567496d8008067c16d3e5550f313b9df7b38e7a7931cd11c979c",
+        "fixtures": {}
+      },
+      "baseline_runs": {
+        "codex-remote": "unified-ai-20260916",
+        "on-site": "unified-ai-20260916"
+      },
+      "prompt_revision_note": "September 16 neutral Desktop prompts copied for reuse. Original measured prompt hashes are recorded separately; transport routing wording and native reminder phrasing can differ."
+    },
+    {
+      "id": "U2-evidence-only-answer",
+      "latest_results": {
+        "codex-remote": {
+          "run_id": "unified-ai-cleanup-20260917",
+          "reviewed": true,
+          "baseline": false,
+          "run_date_utc": "2026-09-17",
+          "artifacts": "cases/U2-evidence-only-answer/artifacts/current",
+          "artifact_prefix": "mcp__",
+          "artifact_sha256": {
+            "mcp__CODEX_ARCHIVE.jsonl": "5fac10e80a9211803a4839f915c2bcaf894935d837c70f4c5bebe57e0f015913",
+            "mcp__CODEX_SESSION.txt": "ff727006f3d5e3856097dd506cd7254f44d8d14731ac6be1b477f2ea98ae0b7d",
+            "mcp__plan-readback.json": "8b9e0b58256fa9991d500d3184e0aba0e458e2ef4e7b7b4e2ca97779c8a2d793",
+            "mcp__review.json": "bf2138c9d2350e6cbff4b85e8f2d6aa042ffb0af46be5325bd0da5751691240e"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Codex",
+          "client_version": "0.154.0",
+          "model": "gpt-6-astra",
+          "reasoning": "xhigh",
+          "transport": "remote-mcp",
+          "app_version": null,
+          "mcp_revision": null,
+          "code_note": "Cleanup deployed per operator; runtime identity not independently captured. MCP remote empty-action URL guard fix is newer and not deployed.",
+          "input_snapshot": {
+            "prompt_sha256": "d01b40717c0fcde38db4f58ae78436d9f66b8dd9d500caa9bbcb7b8429409bf2",
+            "fixtures": {
+              "coverage-summary.md": "fc83dbcdfb05bb04a0bb01cbd3f035fd4a49dd30868a82575363b34ba6553a6f"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_saved_evidence_answer_with_remote_empty_selection_failure",
+          "caveats": [
+            "Correct saved answer and unchanged evidence with no actions.",
+            "No filing or report-action guidance call.",
+            "start_plan(actions=[]) returned context recovery; both explicit empty-action recovery/schema reads failed remote URL validation. Agent recovered using a full contract.",
+            "Local fix now permits exactly empty actions in the remote URL guard; malformed lists, duplicate query keys and foreign origins remain rejected. Fourteen remote server tests pass. Fix not deployed."
+          ],
+          "metrics": {
+            "task_seconds": 117.283,
+            "usage": {
+              "input_tokens": 453730,
+              "cached_input_tokens": 417152,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 1970,
+              "reasoning_output_tokens": 443,
+              "total_tokens": 455700,
+              "uncached_input_tokens": 36578
+            },
+            "model_tool_rounds": 13,
+            "provider_responses": 14,
+            "mcp_calls": 7,
+            "mcp_failed_calls": 2,
+            "mcp_call_breakdown": {
+              "start_plan": 1,
+              "get_plan_contract": 3,
+              "prepare_file_uploads": 1,
+              "finalize_file_uploads": 1,
+              "submit_plan": 1
+            },
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false,
+          "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "5fac10e80a9211803a4839f915c2bcaf894935d837c70f4c5bebe57e0f015913",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/U2-evidence-only-answer/artifacts/current/mcp__CODEX_ARCHIVE.jsonl",
+          "run_date_local": "2026-09-16"
+        },
+        "on-site": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/U2-evidence-only-answer/artifacts/baseline",
+          "artifact_prefix": "on-site__",
+          "artifact_sha256": {
+            "on-site__Screenshot_20260916_155507.png": "4706de76fd152f90aa96b15777ee969224519cc21ac5023d460500cca78a6196",
+            "on-site__execution.json": "bce5df72171a1d89a154ef459da379fc07e1ea6a4fe14db4e5c5e339986a1430",
+            "on-site__proposal-readback.json": "b498f5066be44ca0000c3bfb60e4d5568924c393ac646ff6267b0766c8483d50"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Native Gemini",
+          "client_version": null,
+          "model": "gemini-3.8-flash",
+          "reasoning": null,
+          "transport": "on-site",
+          "app_version": "20260916t152433",
+          "mcp_revision": null,
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "d13572c516973fc0c59127f875c34f7aef1c18653d900fd2b66185bd9fb5ad9f",
+            "fixtures": {
+              "coverage-summary.md": "fc83dbcdfb05bb04a0bb01cbd3f035fd4a49dd30868a82575363b34ba6553a6f"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_saved_evidence_answer",
+          "caveats": [
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "job_elapsed_seconds": 24,
+            "usage": {
+              "prompt_tokens": 15248,
+              "cached_tokens": 3461,
+              "output_tokens": 366,
+              "thought_tokens": 1485,
+              "total_tokens": 17099
+            },
+            "tool_calls": 1,
+            "tool_rounds": 1,
+            "provider_requests": 3,
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false
+        }
+      },
+      "current_inputs": {
+        "prompt_sha256": "594377d868dfe2aae3519f77682b8b94b15e805879554ce41fe80b12de459ba9",
+        "on_site_prompt_sha256": "b6804214ff77e881e313865ecfb15b3553836953b98c5aad582513e0b8357f69",
+        "fixtures": {
+          "coverage-summary.md": "fc83dbcdfb05bb04a0bb01cbd3f035fd4a49dd30868a82575363b34ba6553a6f"
+        }
+      },
+      "baseline_runs": {
+        "codex-remote": "unified-ai-20260916",
+        "on-site": "unified-ai-20260916"
+      },
+      "prompt_revision_note": "September 16 neutral Desktop prompts copied for reuse. Original measured prompt hashes are recorded separately; transport routing wording and native reminder phrasing can differ.",
+      "baseline_results": {
+        "codex-remote": {
+          "run_id": "unified-ai-20260916",
+          "reviewed": true,
+          "baseline": true,
+          "run_date_utc": "2026-09-16",
+          "artifacts": "cases/U2-evidence-only-answer/artifacts/baseline",
+          "artifact_prefix": "mcp__",
+          "artifact_sha256": {
+            "mcp__CODEX_ARCHIVE.jsonl": "927057c7acbfe36fcbbd3b0f0b563dba6f4251c8260d5f4a7f02977c465c5eb0",
+            "mcp__CODEX_SESSION.txt": "210849d42580ec6291c2c452d5d350484aac8be98231fc10e8c384a567d3a2fb",
+            "mcp__plan-readback.json": "d281d0cddf6f69d52a392764a54db3f800db258d6f40bb92a4a897ee8897e6a8"
+          },
+          "comparison": "comparisons/unified-ai-20260916.md",
+          "client": "Codex",
+          "client_version": "0.154.0",
+          "model": "gpt-6-astra",
+          "reasoning": "xhigh",
+          "transport": "remote-mcp",
+          "app_version": "20260916t152433",
+          "mcp_revision": "lagniappe-mcp-00023-fl5",
+          "code_note": "First unified deployment; predates personal-page, scheduling, dated-completion and evidence-only cleanup.",
+          "input_snapshot": {
+            "prompt_sha256": "d01b40717c0fcde38db4f58ae78436d9f66b8dd9d500caa9bbcb7b8429409bf2",
+            "fixtures": {
+              "coverage-summary.md": "fc83dbcdfb05bb04a0bb01cbd3f035fd4a49dd30868a82575363b34ba6553a6f"
+            }
+          },
+          "inputs_match_current_case": true,
+          "outcome": "pass_saved_evidence_answer",
+          "caveats": [
+            "Successful saved answer included empty-selection rejection and irrelevant filing/skip-schema reads; this initial attempt predates the cleanup.",
+            "Single reviewed proposal/answer run; proposed workspace mutations were not executed."
+          ],
+          "metrics": {
+            "task_seconds": 138.217,
+            "usage": {
+              "input_tokens": 460331,
+              "cached_input_tokens": 426752,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 2420,
+              "reasoning_output_tokens": 586,
+              "total_tokens": 462751,
+              "uncached_input_tokens": 33579
+            },
+            "model_tool_rounds": 12,
+            "provider_responses": 13,
+            "mcp_calls": 7,
+            "mcp_call_breakdown": {
+              "start_plan": 1,
+              "prepare_file_uploads": 1,
+              "finalize_file_uploads": 1,
+              "get_plan_contract": 2,
+              "get_guidelines": 1,
+              "submit_plan": 1
+            },
+            "api_requests": null,
+            "reported_cost_usd": null
+          },
+          "execution_verified": false,
+          "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
+          "archive_sha256": "927057c7acbfe36fcbbd3b0f0b563dba6f4251c8260d5f4a7f02977c465c5eb0",
+          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/U2-evidence-only-answer/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+        }
+      }
     }
-  ]
+  ],
+  "baseline_rollover": {
+    "date": "2026-09-16",
+    "cases": [
+      "01-ask-known-page",
+      "03-create-personal-task",
+      "08-organize-mixed-files",
+      "U1-existing-files-new-tasks",
+      "U2-evidence-only-answer"
+    ],
+    "run_id": "unified-ai-20260916",
+    "older_raw_evidence": "../reports/unified-ai-verification-20260916/previous-library",
+    "desktop_copy": "../reports/unified-ai-verification-20260916/desktop-capture",
+    "unselected_cases": "Unchanged; their existing baseline/current evidence is retained."
+  }
 }

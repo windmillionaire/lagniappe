@@ -751,6 +751,9 @@ def external_report_proposal_response_schema(
         include_submission_fields=include_submission_fields,
     )
     schema = _standard_json_schema(provider_schema)
+    if not action_types:
+        schema["properties"]["actions"] = {"type": "array", "maxItems": 0}
+        return schema
     definitions = {
         action_type: _standard_json_schema(
             _external_report_action_response_schema(

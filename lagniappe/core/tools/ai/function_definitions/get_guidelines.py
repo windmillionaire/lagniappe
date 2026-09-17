@@ -73,13 +73,13 @@ generic filler. Mark a field required only when its answer is necessary.
 ACTION_GUIDELINES = {
     "set_task_due_date": "Set an exact editable, incomplete Task's calendar due date with data.task and data.due_date (YYYY-MM-DD in the acting user's timezone, or null to clear). Resolve relative wording to a date using the plan's current date/timezone. Preserve recurrence rules, completion state, and form values. This uses the Task editor's calendar-date behavior. Browser review, fresh permissions, retry, and undo apply.",
     "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry; undo stops if content has since changed.",
-    "complete_task": "Check off one exact existing Task via data.task. No name-based matching, replacement submission, or historical completed_on override. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
+    "complete_task": "Check off one exact existing Task via data.task at the current execution time. No name-based matching, replacement submission, or historical completed_on override. For a source-dated completed occurrence, use create_task with completed=true, completed_on, and the exact task reference when reusing a Task. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
     "create_form": "Create forms before actions that reference them; use the matching page_form or task_form bundle.",
     "create_category": "Create a category only for a durable collection; reference an earlier default page-form action only when the collection is homogeneous.",
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
     "create_model_task": "Create a model task after its Project and optional task Form; model tasks describe reusable work types.",
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
-    "create_task": "Use an editable Page or earlier page action, a stable work name, task Forms only, and a source-backed completed_on date only for completed evidence. To check off an existing Task while preserving its details use complete_task, not historical-occurrence import. For dated history, first create the current completion, then another create_task with task_action pointing to that earlier action and an older completed_on date. Example: current id=visit, completed=true, completed_on=2026-09-12; older task_action=visit, completed=true, completed_on=2026-09-05 (both also supply name and page/page_action). These are two actions for one Task plus one older history occurrence; the older event leaves the current completion intact.",
+    "create_task": "Use an editable Page or earlier page action, a stable work name, and task Forms only. For one source-dated completed occurrence, use one create_task with completed=true and completed_on from the source; supply the exact task reference to reuse an existing Task, plus the required name and page/page_action. Do not invent a second completion for today. To check off existing work now while preserving its details, use complete_task. Only when evidence contains multiple occurrences, create the latest dated completion first, then another create_task with task_action pointing to that earlier action and the older completed_on date. Both actions supply name and page/page_action; the older occurrence leaves the latest completion intact.",
     "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
     "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
     "update_form_schema": "Preview exact-ID schema operations, explain destructive changes, and place the update before actions that use it. The user reviews the plan.",
@@ -341,9 +341,7 @@ def _guidelines_result(args, *, external):
             "shape defined by the current report response schema.",
         ))
 
-    if external and task == "report_actions" and (
-        actions is None or "create_task" in actions
-    ):
+    if task == "report_actions" and "create_task" in actions:
         sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
 
     guidelines = "\n\n".join(section.strip() for section in sections)

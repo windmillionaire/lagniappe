@@ -47,14 +47,14 @@ LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6
                      'f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d'),
  'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                '5467240ac9b25c0e3e6a0fb035a1385501dba9f6470747ae83af4ad808b6f66f'),
- 'start_plan': ('0014cf592291216761b954c0ae6df873bbdb980062291655baa6662d60275a6b',
-                'e9ea4548368d470c7a090ce079748d51a32c93cbfe7faac54a1f39a804320e0e'),
+ 'start_plan': ('f4cedf6cee6e3bdc4ffb2db00cf8c2c43d43955db8a5f84fbae7cf3faba2fa3c',
+                '428e748fbf112bf8d0c1d2f4893492e49ca77fc516d25ef7132ab60613dcf2db'),
  'get_plan': ('79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9',
               'd35d3bcb3f25b7456d1b803360865c9ac7ede5119704cc5535d362db491db65e'),
- 'get_plan_contract': ('5b95dc7a76a81e9dea530ba2519c92c1de410e59d6e1e7f115068c604c961553',
-                       '2b4ec2cee3402d1fc814eb316784c29fad4a451d2ea1e4e764fd02f6370b799f'),
+ 'get_plan_contract': ('337cb97fa06d416268081a87b7a7f90574031467337bbc6806554a989ca0dde3',
+                       'bc3bb5fb26553b8c255203c990f27033cc1a7ddc99e7e38ad497e258641f6ade'),
  'upload_local_files': ('716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259',
-                        '4860b02b7d870f1c3669cca9456ad56f03fef62451a521e46d9ad9d4253829dd'),
+                        '34056eeb18367efa3876377151d620de5317d20da685b6537cd87561a72239cb'),
  'submit_plan': ('e96a342d76b63829e1d3e608b14befaa396c987206ba713adf9505641e13be0d',
                  '7ddf8bc188ac86f8af37134627d8b21a24a4e4e1ad3dc35f590358c351ef7b59')}
 PLAN_KEYS = {
@@ -808,6 +808,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         }
         ask_contract = ask_start["context"]["contract"]
         _assert_mcp_contract(ask_contract, tool="ask")
+        assert ask_contract["schema_scope"] == "selected"
+        assert ask_contract["schema_actions"] == []
+        assert ask_contract["proposal_schema"]["properties"]["actions"] == {"type": "array", "maxItems": 0}
         assert ask_contract["required_file_refs"] == []
         ask_receipt = _assert_safe_receipt(
             workflow["ask"]["receipt"], status="complete"
@@ -882,7 +885,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         update_context = update_start["context"]["contract"]
         assert update_context["proposal_schema"] is None
-        assert not update_context["guidance_requirements"]["required_before_analysis"]
+        assert "required_before_analysis" not in update_context["guidance_requirements"]
         update_contract = _structured(workflow["update"]["contract"])
         _assert_mcp_contract(update_contract, tool="organize")
         assert update_contract["required_file_refs"] == []

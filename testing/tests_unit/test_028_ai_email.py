@@ -32,13 +32,9 @@ pytestmark = pytest.mark.unit
 def _config():
     return normalize_ai_email_config(
         {
-            "version": 2,
             "provider": "resend",
             "enabled": True,
             "domain": "inbound.example.com",
-            "aliases": {
-                "ai": "ai",
-            },
             "resend": {
                 "domainId": "domain-1",
                 "webhookId": "webhook-1",
@@ -48,7 +44,6 @@ def _config():
                 "senderEmail": "noreply@example.com",
                 "senderName": "Lagniappe",
             },
-            "limits": dict(AI_EMAIL_LIMITS),
         }
     )
 
@@ -341,6 +336,52 @@ def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
     ):
         with pytest.raises(AIEmailRejection, match="Sender"):
             parse_mailbox(malformed)
+
+
+# @matrix ai-email : aliases attachment-contract limits normalization routing rate-limit
+def test_email_policy_ignores_saved_alias_and_limit_overrides(monkeypatch):
+    config = _config()
+    config.update(
+        aliases={"ai": "assistant", "ask": "ask"},
+        limits={"maxFileBytes": 10**12, "hourlyPerUser": 10**12},
+    )
+    raw_message = {
+        "id": "email-policy",
+        "from": "owner@example.com",
+        "to": ["ai@inbound.example.com"],
+        "subject": "Review insurance",
+        "text": "Read the attached note.",
+        "headers": {},
+    }
+    message = normalize_resend_message(raw_message, [], config)
+    assert ai_email.receiving_address(config) == "ai@inbound.example.com"
+    for alias in ("assistant", "ask", "create", "organize"):
+        with pytest.raises(AIEmailRejection) as error:
+            normalize_resend_message(
+                {**raw_message, "to": [f"{alias}@inbound.example.com"]}, [], config
+            )
+        assert error.value.code == "route_invalid"
+
+    checked_limits = []
+
+    def check_limit(scope, actor, limit, window):
+        checked_limits.append((scope, limit, window))
+        return {"allowed": True, "retry_after": 0}
+
+    monkeypatch.setattr("lagniappe.core.tools.cache.rate_limit.check_limit", check_limit)
+    user = SimpleNamespace(access=lambda _required: True, urlsafe_key="user-policy")
+    ai_email._preflight_submission(message, user, config)
+    assert checked_limits == [("ai-email-hour", 30, 3600), ("ai-email-day", 200, 86400)]
+
+    oversized = normalize_resend_message(raw_message, [{
+        "id": "attachment-policy",
+        "filename": "oversized.txt",
+        "content_type": "text/plain",
+        "size": AI_EMAIL_LIMITS["maxFileBytes"] + 1,
+    }], config)
+    with pytest.raises(AIEmailRejection) as error:
+        ai_email._preflight_submission(oversized, user, config)
+    assert error.value.code == "attachment_contract"
 
 
 # @matrix ai-email : attachments content-disposition content-id inline

@@ -47,7 +47,10 @@ FILE_ORGANIZATION_GUIDELINES = """
 - Put actionable obligations, useful source-backed follow-ups, and independently
   tracked occurrences on Tasks; put reference material on its subject Page.
   Distinguish proposed defaults from established facts. Completed occurrences
-  use a stable work name and a supported completed_on date when known. Future-
+  use create_task with completed=true, a stable work name, and a source-backed
+  completed_on date when known; supply task to reuse an exact existing Task.
+  One dated occurrence needs one action, without a second completion for today.
+  complete_task checks off work at execution time, not at a historical date. Future-
   dated work must remain open. A matching completed Task can still be the right
   evidence target; inspect history only when it would resolve a real question.
 - Author final form values using exact target schema ids and assigned evidence.

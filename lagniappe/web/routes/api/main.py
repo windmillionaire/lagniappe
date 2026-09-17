@@ -316,9 +316,10 @@ def handle_unexpected_error(error):
 
 # @testable false
 # @covered-by lagniappe/web/routes/api/main.py::create_plan
+# @covered-by lagniappe/web/routes/api/main.py::_api_origin
 # @reason domain-exception translation is exercised through public API routes
 def _route(handler):
-    """Translate expected domain failures into stable JSON envelopes."""
+    """Qualify record links and translate expected domain failures."""
 
     # @testable false
     # @covered-by lagniappe/web/routes/api/main.py::_route
@@ -326,7 +327,9 @@ def _route(handler):
     @wraps(handler)
     def wrapped(*args, **kwargs):
         try:
-            return handler(*args, **kwargs)
+            return external_api.absolute_entity_links(
+                handler(*args, **kwargs), origin=_api_origin()
+            )
         except APIProblem:
             raise
         except (exceptions.AIException, exceptions.ValidationError) as error:
@@ -1281,7 +1284,8 @@ def openapi_document():
                 "name": "actions",
                 "in": "query",
                 "schema": {"type": "string"},
-                "description": "Comma-separated allowed action names for selected schemas. Omit for all schemas. This is context selection, not a permission change.",
+                "allowEmptyValue": True,
+                "description": "Comma-separated allowed action names for selected schemas. Pass actions= for a saved-answer schema with no changes. Omit for all schemas in full/schema views, or no schema in summary view. This is context selection, not a permission change.",
             },
         ]
     )
@@ -1857,7 +1861,7 @@ def get_plan_contract(plan_id):
         for value in request.args.getlist("actions")
         for name in value.split(",")
         if name.strip()
-    ] or None
+    ] if "actions" in request.args else None
     contract = external_api.plan_contract(
         report,
         g.agent_api_user,

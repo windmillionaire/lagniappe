@@ -85,6 +85,11 @@ installation order, and the evolution of these choices.
   further reads or submissions for that plan.
 - Existing entities are represented as `hash:<12-character-hash>` references.
   URL-safe Datastore keys are rejected in submitted proposals.
+- Structured entity `url` fields are absolute browser links using the configured
+  site origin (the OAuth issuer for remote MCP). This applies to nested records,
+  read tools and Plan context, so clients can cite them outside the website.
+  Use these normal links for citations; original-file download URLs remain
+  temporary credentials. Source text and user-entered links are not rewritten.
 - API responses are `no-store` and include the non-secret
   `X-Lagniappe-Build-ID` marker; no CORS policy is added. Original-file URLs,
   when explicitly requested through `get_file`, are signed for five minutes.
@@ -180,7 +185,9 @@ still applies; this is not a promise that the external model retains nothing.
 Starters bundle current workflow context. MCP clients can pass
 `start_plan(actions=["create_task"])` to receive the selected permitted schemas
 in the initial `context.contract`, together with the current version, permissions
-and workflow guidance. Multiple action names are supported. Startup uses its
+and workflow guidance. Multiple action names are supported; `actions=[]`
+returns a compact saved-answer schema that requires an empty `actions` array.
+Startup uses its
 existing contract read, so no additional client schema fetch is needed. The
 selection does not narrow future proposals or broaden permissions; submission
 still checks the full current contract. Omitting `actions` preserves the summary
@@ -194,7 +201,13 @@ contract summary. It retains all allowed action names and permissions,
 but `proposal_schema` is null and `schema_scope` is `summary`. Fetch
 `get_plan_contract(actions=[...], view="schema")` for the selected schemas without
 repeating that context, or `view=full`
-without actions for all schemas. `submit_plan` privately checks the full current contract
+without actions for all schemas. For an answer without changes, use
+`get_plan_contract(actions=[], view="schema")`; direct REST uses `?actions=&view=schema`.
+Omitting actions and selecting an empty list have different meanings. Empty
+selections must survive the remote workload-identity URL guard as `actions=`;
+test that envelope boundary as well as the direct REST adapter. Evidence-only
+uploads do not require filing or action guidance; filing guidance is conditional
+on organizing files. `submit_plan` privately checks the full current contract
 before saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
@@ -306,9 +319,8 @@ and plan collection. These small discovery responses do not duplicate the
 contract. The OpenAPI `info.description` and operation descriptions carry the
 tool-selection rules, lifecycle, and browser-approval boundary. Every plan
 response returns its opaque identifier as the top-level
-`id`. A plan's tool is immutable for auditability, but a conversational client
-may create another plan with a different tool whenever the user's intent
-changes. Fetch discovery, OpenAPI, and the tool catalog once per client run and
+`id`. Reuse the same plan for questions, changes, file organization, and follow-up
+revisions until execution begins. Fetch discovery, OpenAPI, and the tool catalog once per client run and
 reuse the parsed values in memory. This is run-local reuse, not persistent HTTP
 caching: API responses remain `no-store`, and the current plan contract must
 still be fetched after uploads and immediately before submission.

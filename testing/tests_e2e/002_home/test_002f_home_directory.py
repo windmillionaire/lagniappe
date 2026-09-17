@@ -408,8 +408,14 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
         font.family.replaceAll('"', '') === 'Source Sans 3' && font.status === 'loaded'
     )""")
     preload = owner.page.locator("link[rel='preload'][as='font']")
-    expect(preload).to_have_count(1)
-    expect(preload).to_have_attribute("href", re.compile(r"/fonts/source-sans-latin\."))
+    expect(preload).to_have_count(2)
+    for family in ("source-sans-latin", "bitter-latin"):
+        font = owner.page.locator(
+            f'link[rel="preload"][as="font"][href^="/fonts/{family}."]'
+        )
+        expect(font).to_have_count(1)
+        expect(font).to_have_attribute("type", "font/woff2")
+        expect(font).to_have_attribute("crossorigin", "")
     expect(run.locator("[data-role='ai-run-report']")).to_have_attribute(
         "href", f"/tools/reports/{report.urlsafe_key}"
     )

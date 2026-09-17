@@ -2,11 +2,21 @@
 
 ## Unified reports
 
-The homepage has one AI panel with the existing upload, screenshot-paste,
+The homepage has one **Create a Plan** panel, subtitled “Organize files, create
+structure, or ask a question,” with the existing upload, screenshot-paste,
 prompt-preview, and report-review controls. A prompt and files are individually
 optional; at least one is required. Files alone request filing. Questions can
 use files as evidence without proposing their placement. Mixed questions and
 changes stay in one report, including later revisions before execution.
+On-site plan titles use the request text, a single filename, or a file count
+without an AI prefix. Request-based titles retain the 80-character truncation.
+
+Native planning and revision prompts and the external plan contract share the
+same personal-Page guidance: the supplied `personal_page` is the authenticated
+user's editable Page, and it does not appear in workspace search. Keep that
+instruction in the shared guideline constant rather than only one entry point.
+Selected `create_task` guidance also supplies the same scheduling rules to native
+and external callers, including one-time due dates and recurrence semantics.
 
 `POST /tools/ai` and `/tools/ai/direct-upload` replace the three old routes.
 `REPORT_AI` runs `AIReportAdapter` and `tools/ai/planner.py`. There is no intent
@@ -49,9 +59,10 @@ format_version=1. Leftover old or structurally incompatible reports render
 control and no polling, execution, revision, or undo. Deleting a report preserves
 files that have workspace references.
 
-Email configuration is the only conversion: installer update converts
-AI_EMAIL_CONFIG version 1 to 2 before strict validation, retains the configured
-AI address/domain/provider credentials, and removes Ask/Create/Organize aliases.
+Email routing uses the code-defined `ai` alias. Installation settings retain
+operator choices and provider credentials; workflow changes neither migrate
+their email envelope nor require rewriting generated settings. Runtime ignores
+saved workflow policy metadata and uses code-defined routing and limits.
 There are no old route, MCP starter, or worker aliases. External contract version
 9 requires file_usage and rejects old submission contracts. Upgrade the app and
 MCP service together.
@@ -171,6 +182,10 @@ entities/links. Interrupted undo resumes from its own checkpoints.
 Task actions with completion evidence may reuse exactly one matching editable
 Task; the newest event stays on the live Task and earlier dates become history.
 Ambiguous matches remain separate.
+One source-dated completed occurrence uses one `create_task` with `completed=true`,
+the source's `completed_on`, and an exact `task` reference when reusing a Task.
+It does not require an extra completion for today. `complete_task` uses execution
+time and cannot preserve a historical source date.
 
 `complete_task` is distinct from historical `create_task` occurrences: it calls
 normal Task completion with the executing actor and validates required fields.

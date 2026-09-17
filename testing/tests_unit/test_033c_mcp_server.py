@@ -971,6 +971,10 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
                 "actions=create_page%2Ccreate_task",
                 "view=full&actions=create_task",
                 "view=schema&actions=update_form_values",
+                "actions=",
+                "view=full&actions=",
+                "view=summary&actions=",
+                "view=schema&actions=",
             ):
                 await client.send(
                     httpx.Request(
@@ -983,13 +987,16 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
                 )
                 assert seen[-1].headers["Authorization"] == "Bearer " + proof
                 assert seen[-1].headers[hosted.USER_TOKEN_HEADER] == TOKEN_A
-            assert len(seen) == 7
+            assert len(seen) == 11
             for method, path in (
                 ("GET", "/plans/plan/contract?redirect=https://attacker.test"),
                 ("GET", "/plans/plan/contract?view=summary&view=full"),
                 ("GET", "/plans/plan/contract?view=schema&view=full"),
                 ("GET", "/plans/plan/contract?view=unknown"),
-                ("GET", "/plans/plan/contract?actions="),
+                ("GET", "/plans/plan/contract?actions=,"),
+                ("GET", "/plans/plan/contract?actions=,create_task"),
+                ("GET", "/plans/plan/contract?actions=create_task,"),
+                ("GET", "/plans/plan/contract?actions=&actions=create_task"),
                 ("GET", "/plans/plan/contract?view=schema&actions=../me"),
                 (
                     "GET",
@@ -1004,6 +1011,6 @@ def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
                     await client.send(
                         httpx.Request(method, CONFIG.audience + path), auth=None
                     )
-            assert len(seen) == 7
+            assert len(seen) == 11
 
     asyncio.run(scenario())

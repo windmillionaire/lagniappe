@@ -529,7 +529,10 @@ def test_external_task_contract_explains_references_without_changing_provider_sc
 
 
 # @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
+# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @matrix agent-api ai-report : proposal-contract
+# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_external_contract_reuses_known_guidance_and_exposes_canonical_scheduling(
     monkeypatch,
@@ -581,11 +584,17 @@ def test_external_contract_reuses_known_guidance_and_exposes_canonical_schedulin
         assert "source and destination" in type_source
         assert "nested table column types" in type_source
 
-    public = get_guidelines.execute_external_get_guidelines(
-        {"task": "report_actions", "actions": ["create_task"]}, actor
-    )
-    assert REPORT_TASK_SCHEDULING_GUIDELINES.strip() in public["guidelines"]
-    unrelated = get_guidelines.execute_external_get_guidelines(
-        {"task": "report_actions", "actions": ["create_page"]}, actor
-    )
-    assert "Report Task Scheduling" not in unrelated["guidelines"]
+    for external in (False, True):
+        public, _ = functions.execute_registered_tool(
+            "get_guidelines", {"task": "report_actions", "actions": ["create_task", "complete_task"]},
+            actor, external=external,
+        )
+        assert REPORT_TASK_SCHEDULING_GUIDELINES.strip() in public["guidelines"]
+        assert "one source-dated completed occurrence" in public["guidelines"]
+        assert "Do not invent a second completion for today" in public["guidelines"]
+        assert "current execution time" in public["guidelines"]
+        unrelated, _ = functions.execute_registered_tool(
+            "get_guidelines", {"task": "report_actions", "actions": ["create_page"]},
+            actor, external=external,
+        )
+        assert "Report Task Scheduling" not in unrelated["guidelines"]

@@ -1,6 +1,7 @@
 """Unit tests for runtime application config behavior."""
 
 from enum import Enum
+import copy
 import importlib.util
 from pathlib import Path
 import sys
@@ -20,13 +21,9 @@ class FakeEnvironment(Enum):
 
 def _disabled_ai_email_config():
     return {
-        "version": 2,
         "provider": "resend",
         "enabled": False,
         "domain": "INBOUND.Example.COM.",
-        "aliases": {
-            "ai": "ai",
-        },
         "resend": {
             "domainId": "domain-1",
             "webhookId": "webhook-1",
@@ -35,14 +32,6 @@ def _disabled_ai_email_config():
             "sendingApiKey": "re_send",
             "senderEmail": "noreply@example.com",
             "senderName": "Lagniappe",
-        },
-        "limits": {
-            "maxBodyBytes": 65536,
-            "maxFiles": 20,
-            "maxFileBytes": 31457280,
-            "maxTotalFileBytes": 52428800,
-            "hourlyPerUser": 30,
-            "dailyPerUser": 200,
         },
     }
 
@@ -87,7 +76,15 @@ def test_config_loads_flat_mcp_settings_and_ai_switches(monkeypatch, ai_enabled,
 
 
 # @matrix config : ai-email build-id constants optional-providers public-projection secrets stale-settings
-def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
+@pytest.mark.parametrize("email_policy_version", [None, 1, 2])
+def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch, email_policy_version):
+    email_config = _disabled_ai_email_config()
+    if email_policy_version is not None:
+        email_config.update(
+            version=email_policy_version,
+            aliases={"ai": "ai", "ask": "ask", "create": "create", "organize": "organize"},
+            limits={"maxFiles": 20},
+        )
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
         "CONFIG_SCHEMA_VERSION": 3,
@@ -103,8 +100,9 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
         "APP_ENGINE_LOCATION": "us-central",
         "RESOURCE_REGION": "us-central1",
         "VERSION": "1.0",
-        "AI_EMAIL_CONFIG": _disabled_ai_email_config(),
+        "AI_EMAIL_CONFIG": email_config,
     }
+    original_settings = copy.deepcopy(app_settings)
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
         SETTINGS=types.SimpleNamespace(app_config=app_settings),
@@ -123,6 +121,8 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    assert app_settings == original_settings
+    assert set(module.CONFIG.AI_EMAIL_CONFIG) == {"provider", "enabled", "domain", "resend"}
     assert module.CONFIG.BUILD_ID == "tracked-build"
     assert module.CONFIG.AI_DEBUG is True
     assert module.CONFIG.TASK_QUEUE_ENABLED is True

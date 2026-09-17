@@ -14,12 +14,13 @@
     <div data-role="header" class="{{ styles.form.header.container }}">
       <h2 class="{{ styles.form.header.title }}"
           data-kind="default"
-          data-role="title">AI</h2>
+          data-role="title">Create a Plan</h2>
       <div class="{{ styles.form.header.controls }}" data-role="controls">
         {{ controls.help("ai_tools") }}
         {{ controls.close("tools") }}
       </div>
     </div>
+    <p class="-mt-2 text-sm text-base-medium">Organize files, create structure, or ask a question.</p>
     {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
       {% set addresses = CONFIG.AI_EMAIL_PUBLIC.addresses %}
       <div data-role="email-submissions"

@@ -130,9 +130,9 @@ def create_ai_report_direct():
 def _report_name(instructions):
     text = " ".join((instructions or "").split())
     if not text:
-        return "AI:"
+        return "Plan"
     suffix = "..." if len(text) > 80 else ""
-    return f"AI: {text[:80]}{suffix}"
+    return f"{text[:80]}{suffix}"
 
 
 # @testable false
@@ -221,7 +221,7 @@ def create_ai_report():
         return responses.error("Add files or instructions before creating a report.")
     filenames = [file.filename for file in input_files] + [record["filename"] for record in upload_manifest]
     default_name = _report_name(instructions) if instructions else (
-        f"AI: {filenames[0]}" if len(filenames) == 1 else f"AI: {len(filenames)} files"
+        filenames[0] if len(filenames) == 1 else f"{len(filenames)} files"
     )
     return _start_tool_report(instructions, default_name=default_name, input_files=input_files, upload_manifest=upload_manifest)
 

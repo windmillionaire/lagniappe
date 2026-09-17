@@ -2560,9 +2560,9 @@ class _SelectedStartREST(_WorkflowREST):
         self.requests.append((method, target, body))
         if self.failure:
             raise self.failure
-        query = parse_qs(urlsplit(target).query)
+        query = parse_qs(urlsplit(target).query, keep_blank_values=True)
         selected = query.get("actions", [None])[0]
-        actions = selected.split(",") if selected is not None else self.allowed
+        actions = [name for name in selected.split(",") if name] if selected is not None else self.allowed
         if any(action not in self.allowed for action in actions):
             raise AdapterError(
                 "validation_failed", "private upstream details", status=422
@@ -2571,6 +2571,7 @@ class _SelectedStartREST(_WorkflowREST):
         contract["permissions"] = {"allowed_actions": list(self.allowed)}
         contract["schema_actions"] = actions
         contract["schema_scope"] = "selected" if selected is not None else "full"
+        contract["schema_instructions"] = "Use selected schemas; submission checks current permissions."
         contract["proposal_schema"] = {
             "type": "object",
             "required": ["actions"],
@@ -2587,7 +2588,14 @@ class _SelectedStartREST(_WorkflowREST):
                 }
             },
         }
-        if query.get("view") == ["summary"]:
+        if not actions:
+            contract["proposal_schema"]["properties"]["actions"] = {"type": "array", "maxItems": 0}
+        if query.get("view") == ["schema"]:
+            contract = {key: value for key, value in contract.items() if key in {
+                "contract_version", "proposal_schema", "file_usage_schema", "schema_scope",
+                "schema_actions", "schema_instructions", "submission_format",
+            }}
+        if query.get("view") == ["summary"] and selected is None:
             contract.update(proposal_schema=None, schema_scope="summary")
         return contract, "contract"
 
@@ -2596,7 +2604,7 @@ class _SelectedStartREST(_WorkflowREST):
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 # @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 @pytest.mark.parametrize(
-    "actions", [None, ["create_task"], ["create_task", "create_page"]]
+    "actions", [None, [], ["create_task"], ["create_task", "create_page"]]
 )
 def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
     async def exercise():
@@ -2652,6 +2660,15 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         assert rest.requests[-2] == ("GET", f"plans/{plan_id}/contract?view=full", None)
         assert rest.requests[-1][2]["proposal"] == proposal
         assert sum(target == "plans" for _, target, _ in rest.requests) == 1
+        if not actions:
+            compact = await adapter.execute("get_plan_contract", {
+                "plan_id": plan_id, "actions": [], "view": "schema",
+            })
+            assert compact.value["proposal_schema"] == contract["proposal_schema"]
+            assert compact.value["schema_actions"] == []
+            with pytest.raises(SchemaError):
+                validate_value(compact.value["proposal_schema"], {"actions": [{"type": "create_task"}]}, phase="proposal")
+            return
         rest.allowed = ["create_page"]
         with pytest.raises(SchemaError):
             await adapter.execute(
@@ -2686,7 +2703,6 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
 @pytest.mark.parametrize(
     "actions",
     [
-        [],
         "create_task",
         [None],
         [""],

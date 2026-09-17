@@ -1,6 +1,6 @@
-# Case 08 prompt
+# Case 08 prompt (mcp)
 
-mcp: Please file everything in this folder in Lagniappe. The heating records belong with
+using lagniappe-mcp, Please file everything in this folder. The heating records belong with
 `Boiler`; keep paperwork about the same completed visit together, and keep work
 that still needs doing separate. The drainage records belong together under a
 sensible, stable name. Use what the records actually establish—plans,

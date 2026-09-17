@@ -24,6 +24,50 @@ from testing.utility.ai_report_fakes import _fetch_one_from, _patch_fake_keys, _
 from testing.utility.test_entities import TestEntities
 
 
+# @pair agent-api:origin-validation
+@pytest.mark.unit
+def test_external_entity_links_use_the_site_origin_without_rewriting_evidence():
+    raw = {
+        "result": [
+            {
+                "hash": "hash:02464143dc09",
+                "url": "/files/file-key",
+                "summary": "See [source](/files/file-key).",
+                "content": "/pages/quoted-path",
+                "original_file": {
+                    "download_url": "https://storage.googleapis.com/bucket/source?X-Goog-Signature=test",
+                    "expires_in": 300,
+                },
+                "page": {"hash": "hash:fbfffc2428c2", "url": "/pages/page-key"},
+            },
+            {"hash": "hash:17cd85e4590c", "url": "/projects/project-key/tasks/task-key?completed=false"},
+            {"hash": "hash:8790b2c252e5", "url": "https://demo.example/forms/form-key"},
+            {"hash": "hash:c4e3bd9028c8", "url": "//other.example/categories/category-key"},
+        ],
+        "form_value": {"url": "/user-entered-link"},
+        "empty": {"hash": "hash:02464143dc09", "url": None},
+    }
+    snapshot = json.dumps(raw, sort_keys=True)
+
+    result, status = external_api.absolute_entity_links(
+        (raw, 201), origin="https://demo.example/"
+    )
+
+    assert status == 201
+    file, task, form, category = result["result"]
+    assert file["url"] == "https://demo.example/files/file-key"
+    assert file["page"]["url"] == "https://demo.example/pages/page-key"
+    assert task["url"] == "https://demo.example/projects/project-key/tasks/task-key?completed=false"
+    assert form == raw["result"][2]
+    assert category == raw["result"][3]
+    assert file["summary"] == raw["result"][0]["summary"]
+    assert file["content"] == raw["result"][0]["content"]
+    assert file["original_file"] == raw["result"][0]["original_file"]
+    assert result["form_value"] == raw["form_value"]
+    assert result["empty"] == raw["empty"]
+    assert json.dumps(raw, sort_keys=True) == snapshot
+
+
 # @source lagniappe/core/tools/ai/external_api.py::plan_contract
 # @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/external_api.py::submit_plan
@@ -1017,6 +1061,7 @@ def test_answer_context_is_plan_free(monkeypatch):
 
 # @pair agent-api:proposal-contract
 # @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 @pytest.mark.unit
 def test_contract_selection_preserves_permissions_and_full_validation(monkeypatch):
     actor = _contract_actor()
@@ -1048,6 +1093,18 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
     assert "workflow_rules" not in compact
     assert "personal_page" not in compact
     assert len(json.dumps(compact)) < len(json.dumps(selected)) * .7
+    answer = external_api.plan_contract(report, actor, actions=[], **kwargs)
+    assert answer["schema_scope"] == "selected"
+    assert answer["schema_actions"] == []
+    assert answer["permissions"] == full["permissions"]
+    answer_schema = answer["proposal_schema"]
+    assert answer_schema["properties"]["actions"] == {"type": "array", "maxItems": 0}
+    assert "$defs" not in answer_schema
+    assert len(json.dumps(answer_schema)) < len(json.dumps(selected["proposal_schema"]))
+    assert external_api.plan_contract(report, actor, actions=[], view="schema", **kwargs)["proposal_schema"] == answer_schema
+    filing = next(rule for rule in answer["guidance_requirements"]["conditional"] if rule["request"]["task"] == "filing")
+    assert filing["when"] == {"file_usage_any": ["organize"]}
+    assert "required_before_analysis" not in answer["guidance_requirements"]
     assert (
         selected["payload_sizes"]["contract_without_payload_sizes_bytes"]
         < full["payload_sizes"]["contract_without_payload_sizes_bytes"]

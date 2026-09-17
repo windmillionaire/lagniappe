@@ -63,6 +63,32 @@ def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     assert '"allowed_actions": []' in answer_prompt.build()
 
 
+# @matrix ai-report : permissions
+@pytest.mark.parametrize("feedback", [None, "Put this on my personal Page instead."])
+def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, feedback):
+    from lagniappe.core.tools.ai import external_api
+
+    user = _test_user("personal-context")
+    monkeypatch.setattr(type(user), "access", lambda self, access: True)
+    report = _report(user, format_version=1)
+    prompt = planner.report_prompt(report, user, feedback=feedback).build()
+    contract = external_api.plan_contract(
+        report, user, submit_url="https://example.test/submit"
+    )
+    personal_rule = next(
+        rule for rule in contract["workflow_rules"]
+        if rule.startswith("personal_page is ")
+    )
+    assert "guaranteed editable Page" in personal_rule
+    assert "does not appear in workspace search" in personal_rule
+    assert personal_rule in prompt
+    assert contract["personal_page"]["hash"] == "hash:personal-context-page"
+    assert contract["personal_page"]["hash"] in prompt
+    assert contract["personal_page"]["can_edit"] is True
+    if feedback:
+        assert feedback in prompt
+
+
 # @matrix ai-report : validation file-placement
 def test_file_usage_requires_exact_coverage_and_files_only_filing():
     usage = [{"file": "hash:receipt12345", "usage": "evidence"}]

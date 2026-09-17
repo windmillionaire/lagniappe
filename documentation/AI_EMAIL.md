@@ -26,9 +26,14 @@ then enables and verifies it. Disabling the feature disables the webhook before
 saving local configuration; it does not delete provider domains, DNS records,
 webhooks, or API keys.
 
-`AI_EMAIL_CONFIG` is normalized by `config/ai_email.py`. It fixes the security
-and size limits, rejects unknown security fields, requires one `ai` alias in version 2, and exposes only a public enabled/address
-projection to templates.
+`AI_EMAIL_CONFIG` contains installation choices: provider, enabled flag,
+receiving domain, and Resend resource IDs/credentials. `config/ai_email.py`
+validates those choices and exposes only a public enabled/address projection
+to templates. The single `ai` alias and locked security/size limits are code
+constants, not generated settings. Saved policy metadata (`version`, `aliases`,
+`limits`) has no effect on routing, limits, or startup; normalization does not
+modify its input or write the settings file. New email setup saves only the
+installation fields.
 
 ## Inbound boundary
 
@@ -46,16 +51,17 @@ sign-in, review, and explicit execution.
 
 ## Intake
 
-Only the configured AI address is accepted. Every request goes directly to the
+Only `ai@<receiving-domain>` is accepted. Every request goes directly to the
 unified planner; there is no classifier model or stored workflow selection.
 A subject/body or attachment is required. Files alone request organization;
 questions may use them as evidence. The sender needs AI.ASK for answers and
 AI.CREATE for proposals, with ordinary workspace permissions still enforced.
 
-The installer converts version 1 email configuration before runtime validation,
-preserving the configured AI address, domain, and credentials while dropping
-old aliases. Pause intake and drain old jobs before upgrading; reports and job
-checkpoints are not migrated.
+Changing the workflow does not migrate the installation email settings or
+require a stored email schema version. The installer owns generated-file
+writes; feature implementation and runtime startup must not edit those files.
+Pause intake and drain old jobs before upgrading; reports and job checkpoints
+are not migrated.
 
 ## Durable handoff
 

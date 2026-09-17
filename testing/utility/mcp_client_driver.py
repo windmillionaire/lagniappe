@@ -264,6 +264,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             "start_plan",
             {
                 "name": "MCP live Ask",
+                "actions": [],
                 "instructions": (
                     f"Which workspace Page is named {specification['search_name']}?"
                 ),
@@ -282,6 +283,21 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             },
         )
         ask_contract_value = ask["context"]["contract"]
+        validate_value(ask_contract_value["proposal_schema"], {
+            "summary": "Saved answer", "confidence": 1.0, "answer_markdown": "The answer.", "actions": [],
+        }, phase="proposal")
+        try:
+            validate_value(ask_contract_value["proposal_schema"], {
+                "summary": "Changes", "confidence": 1.0,
+                "actions": [{"type": "create_task", "data": {
+                    "name": "Unexpected task", "page": specification["page_ref"],
+                }}],
+            }, phase="proposal")
+        except SchemaError as error:
+            assert error.details["validator"] == "maxItems"
+            assert error.details["path"] == "$.actions"
+        else:
+            raise AssertionError("The saved-answer schema accepted a mutation")
         ask_receipt = await _call(
             client,
             "submit_plan",

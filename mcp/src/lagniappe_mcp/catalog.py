@@ -403,7 +403,6 @@ UPLOAD_RESULT_SCHEMA = {
 
 ACTION_SELECTION_SCHEMA = {
     "type": "array",
-    "minItems": 1,
     "maxItems": 100,
     "items": {"type": "string", "maxLength": 100, "pattern": "^[a-z][a-z0-9_]*$"},
 }
@@ -471,7 +470,7 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
                 {
                     "actions": {
                         **ACTION_SELECTION_SCHEMA,
-                        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Omit for a summary without schemas.",
+                        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Use [] for a saved answer without changes. Omit for a summary without schemas.",
                     }
                 }
                 if selected_actions
@@ -751,7 +750,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan_contract",
-            "Load exact schemas for selected allowed actions. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. submit_plan independently validates against the full current contract.",
+            "Load exact schemas for selected allowed actions; actions=[] returns a saved-answer schema with no changes. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. submit_plan independently validates against the full current contract.",
             {
                 **_plan_id_input(),
                 "properties": {

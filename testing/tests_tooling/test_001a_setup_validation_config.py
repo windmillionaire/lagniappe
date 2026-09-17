@@ -1976,7 +1976,11 @@ def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch
 def test_update_config_sets_application_version_from_package(monkeypatch):
     from installer import create_config
 
-    settings = types.SimpleNamespace(APP={"VERSION": "1.0"}, NODE={"version": "2.0"})
+    email = {"version": 1, "aliases": {"ai": "ai", "ask": "ask"}}
+    settings = types.SimpleNamespace(
+        APP={"VERSION": "1.0", "AI_EMAIL_CONFIG": email},
+        NODE={"version": "2.0"},
+    )
     calls = []
 
     monkeypatch.setitem(
@@ -1999,6 +2003,8 @@ def test_update_config_sets_application_version_from_package(monkeypatch):
     assert settings.APP["AGENT_ACCESS_ENABLED"] is False
     assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is True
     assert calls == [("defaults", "2.0")]
+    assert settings.APP["AI_EMAIL_CONFIG"] is email
+    assert email == {"version": 1, "aliases": {"ai": "ai", "ask": "ask"}}
 
 
 # @matrix setup : agent-access ai-defaults config-files source-link

@@ -2,6 +2,8 @@
 
 import hashlib
 
+from config.ai_email import AI_EMAIL_LIMITS
+
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     AI,
@@ -77,7 +79,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
             config["resend"]["inboundApiKey"],
             config["resend"]["sendingApiKey"],
         )
-        limits = config["limits"]
+        limits = AI_EMAIL_LIMITS
         input_files = list(report.input_files or [])
         attached = {file.key: file for file in input_files}
         total_bytes = 0

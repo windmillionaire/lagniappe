@@ -511,7 +511,7 @@ def test_tools_create_form_has_expected_controls(get_user):
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
     expect(form).to_be_visible()
-    expect(form.locator("[data-role='title']")).to_have_text("AI")
+    expect(form.locator("[data-role='title']")).to_have_text("Create a Plan")
     expect(form.locator("[data-role='tool-switcher']")).to_have_count(0)
     expect(form.locator("[data-role='dropzone']")).to_be_visible()
     instructions = form.locator("textarea[name='instructions']")
@@ -728,7 +728,7 @@ def test_create_tool_starts_pending_report(get_user, cold_list):
         form.get_by_role("button", name="Start").click()
 
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
-    report_name = f"AI: {instructions[:80]}..."
+    report_name = f"{instructions[:80]}..."
     item = report_list.new_item(report_name, flash=False)
     expect(report_panel.locator("[data-filter='active']")).to_have_attribute(
         "aria-pressed", "true"
@@ -819,7 +819,7 @@ def test_text_only_organize_plans_updates(get_user):
         form.get_by_role("button", name="Start").click()
 
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
-    item = report_list.new_item("AI: " + question, flash=False)
+    item = report_list.new_item(question, flash=False)
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
 
     report = Entities.fetch_one(item.get_attribute("data-key"), request=Fetch.direct())
@@ -1053,7 +1053,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     user = get_user(Users.OWNER)
     item, report = _create_uploaded_report_item(user)
     expect(item.locator("[data-role='title']")).to_have_text(
-        "AI: sample_notes.txt"
+        "sample_notes.txt"
     )
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
     expect(item).to_contain_text("Thinking...")

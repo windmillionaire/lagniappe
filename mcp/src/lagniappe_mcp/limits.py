@@ -51,7 +51,8 @@ MCP_RESULT_INSTRUCTIONS = (
 MCP_SUBMISSION_INSTRUCTIONS = (
     "Call submit_plan with this plan_id, contract_version, file_usage, and a proposal "
     "matching proposal_schema. If it is null (summary view), first fetch "
-    "get_plan_contract with the selected actions for their exact schemas. "
+    "get_plan_contract with the selected actions for their exact schemas; "
+    "use actions=[] for a saved answer without changes. "
     "Optional name/instructions revise the current brief with the proposal. "
     "Keep this plan_id for investigation, submission, "
     "and revisions of the same request; starting again creates another report. "

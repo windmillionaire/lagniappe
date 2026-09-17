@@ -9,7 +9,7 @@ import webbrowser
 import requests
 
 from config.ai_email import (
-    AI_EMAIL_LIMITS,
+    ai_email_public_config,
     normalize_ai_email_config,
     normalize_email_address,
     normalize_email_domain,
@@ -502,7 +502,6 @@ def reconcile_webhook(client, endpoint):
 # @covered-by installer/ai_email.py::configure_ai_email
 # @reason canonical config assembly delegates validation to config.ai_email
 def _setup_config(
-    existing,
     *,
     domain,
     domain_id,
@@ -514,14 +513,9 @@ def _setup_config(
 ):
     return normalize_ai_email_config(
         {
-            "version": 2,
             "provider": "resend",
             "enabled": True,
             "domain": domain,
-            "aliases": (existing or {}).get("aliases")
-            or {
-                "ai": "ai",
-            },
             "resend": {
                 "domainId": domain_id,
                 "webhookId": webhook["id"],
@@ -531,7 +525,6 @@ def _setup_config(
                 "senderEmail": sender_email,
                 "senderName": sender_name,
             },
-            "limits": dict(AI_EMAIL_LIMITS),
         }
     )
 
@@ -707,11 +700,11 @@ def activate_ai_email(candidate=None):
 
     f = FORMATTER.initialize()
     print(f.success(wrap_text("AI email provider configuration is ready.")))
-    for tool in ("ai",):
+    for tool, address in ai_email_public_config(candidate)["addresses"].items():
         print(
             ui.value(
                 f"  {tool.title()}",
-                f"{candidate['aliases'][tool]}@{candidate['domain']}",
+                address,
                 column=12,
                 verbatim=True,
             )
@@ -785,8 +778,8 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
     print(wrap_text(f"\n{ui.heading('AI email submissions')}"))
     print(
         wrap_text(
-            "This configures Resend receiving and the Lagniappe AI, Ask, Create, "
-            "and Organize addresses. It verifies the provider resources and saves "
+            "This configures Resend receiving and the Lagniappe AI address. "
+            "It verifies the provider resources and saves "
             "the application configuration, then offers to deploy and activate it."
         )
     )
@@ -874,7 +867,6 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
     endpoint = f"https://{custom_domain}{WEBHOOK_PATH}"
     webhook = reconcile_webhook(client, endpoint)
     candidate = _setup_config(
-        existing,
         domain=domain,
         domain_id=domain_id,
         webhook=webhook,

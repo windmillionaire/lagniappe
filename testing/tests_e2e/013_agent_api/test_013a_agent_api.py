@@ -408,6 +408,34 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
         )
     )
 
+    # Browser citations must be usable outside the site, including nested
+    # records, without trusting the incoming Host or altering source evidence.
+    monkeypatch.setattr(
+        ai_functions,
+        "execute_registered_tool",
+        lambda *_args, **_kwargs: ({
+            "hash": "hash:02464143dc09",
+            "url": "/files/file-key",
+            "summary": "See [source](/files/file-key).",
+            "original_file": {"supported": True, "attached": False},
+            "page": {"hash": "hash:fbfffc2428c2", "url": "/pages/page-key"},
+        }, []),
+    )
+    for tool_path in (
+        "/api/v1/tools/get_file",
+        "/api/v1/plans/report-key/tools/get_file",
+    ):
+        read = client.post(
+            tool_path,
+            base_url="https://credential-thief.invalid",
+            headers=authorization,
+            json={"arguments": {"id": "hash:02464143dc09"}},
+        )
+        assert read.status_code == 200
+        assert read.json["result"]["url"] == f"{allowed_origin}/files/file-key"
+        assert read.json["result"]["page"]["url"] == f"{allowed_origin}/pages/page-key"
+        assert read.json["result"]["summary"] == "See [source](/files/file-key)."
+
 
 # @matrix agent-api : bearer-only bootstrap contract create-revision organize-revision discovery error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
 # @pairs agent-api:create-revision agent-api:organize-revision agent-api:plan-capability
@@ -831,10 +859,11 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         external_api,
         "plan_contract",
-        lambda current, user, *, submit_url: {
+        lambda current, user, *, submit_url, actions=None: {
             "contract_version": external_api.CONTRACT_VERSION,
             "required_file_refs": [],
             "actor": user.hash,
+            **({"schema_actions": actions} if actions is not None else {}),
             "submission_format": {
                 "method": "POST",
                 "url": submit_url,
@@ -855,6 +884,14 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
             "url": created.json["submit_url"],
         },
     }
+
+    for query, expected in (("actions=", []), ("actions=create_task,create_page", ["create_task", "create_page"])):
+        selected_contract = client.get(
+            f"/api/v1/plans/report-key/contract?{query}",
+            headers={"Authorization": "Bearer valid-key"},
+        )
+        assert selected_contract.status_code == 200
+        assert selected_contract.json["schema_actions"] == expected
 
     monkeypatch.setattr(
         storage_assets,

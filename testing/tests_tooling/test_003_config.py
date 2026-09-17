@@ -1062,17 +1062,12 @@ def test_recovery_validates_and_normalizes_auth_email_smtp():
 # @pair config:ai-email
 def test_recovery_accepts_and_redacts_optional_ai_email_config():
     from config import recovery
-    from config.ai_email import AI_EMAIL_LIMITS
 
     snapshot = _valid_recovery_document()
     snapshot["AI_EMAIL_CONFIG"] = {
-        "version": 2,
         "provider": "resend",
         "enabled": False,
         "domain": "inbound.example.com",
-        "aliases": {
-            "ai": "ai",
-        },
         "resend": {
             "domainId": "domain-1",
             "webhookId": "webhook-1",
@@ -1082,7 +1077,6 @@ def test_recovery_accepts_and_redacts_optional_ai_email_config():
             "senderEmail": "noreply@example.com",
             "senderName": "Lagniappe",
         },
-        "limits": dict(AI_EMAIL_LIMITS),
     }
 
     recovered = recovery.validate_recovery_document(snapshot)

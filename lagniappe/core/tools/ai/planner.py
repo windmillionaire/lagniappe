@@ -7,7 +7,11 @@ from lagniappe.core.definitions import AI
 from lagniappe.core.tools import dates
 
 from .core import ai_model
-from .guidelines import LAGNIAPPE_WORKSPACE_CONCEPTS, FILE_ORGANIZATION_GUIDELINES
+from .guidelines import (
+    LAGNIAPPE_WORKSPACE_CONCEPTS,
+    FILE_ORGANIZATION_GUIDELINES,
+    PERSONAL_PAGE_GUIDELINES,
+)
 from .prompt import Prompt
 from .references import hash_reference, personal_page_reference
 from .reporting.completion.files import _report_file_summary_warning
@@ -107,6 +111,7 @@ def validate_file_usage(
 
 # @testable true
 # @tests tests_unit/test_020b_ai_planner.py::test_report_prompt_uses_shared_tools_and_selected_schemas
+# @tests tests_unit/test_020b_ai_planner.py::test_native_and_external_plans_share_personal_page_guidance
 # @matrix ai-report : prompt permissions tools
 def report_prompt(report, user, feedback=None):
     can_create = user.access(AI.CREATE)
@@ -134,6 +139,7 @@ def report_prompt(report, user, feedback=None):
         "user_instructions", report.instructions or "Organize the uploaded files."
     )
     prompt.add_context("personal_page", personal_page_reference(user))
+    prompt.add_instructions(PERSONAL_PAGE_GUIDELINES)
     prompt.add_context(
         "report_action_permissions", report_action_permission_context(user, allowed)
     )
@@ -171,9 +177,12 @@ this with independent discovery calls; request more action schemas as needed.
 Read category/project, page_form/task_form, schema_evolution, page_document and
 form_autofill guidance when relevant. Preview schema changes before authoring
 their final conversions. Include dependencies and complete final form values.
-Do not execute changes or claim proposed actions already happened. Explain any
-omitted requested work in issues. A question plus changes may return both an
-answer and actions. Only browser approval can execute the proposal.
+Do not execute changes. In both summary and answer_markdown, describe workspace
+changes as proposed and awaiting execution: "The proposal will attach the receipt."
+Keep source facts distinct: a service may already have happened even though its
+workspace record has not been updated. Explain omitted requested work in issues.
+A question plus changes may return both an answer and actions. Only browser
+approval can execute the proposal.
 
 Classify EVERY uploaded file exactly once in file_usage as {file, usage} using
 its exact report_file_ref. A file used only to answer a question is evidence;

@@ -19,7 +19,7 @@ from svix.webhooks import Webhook, WebhookVerificationError
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
-from config.ai_email import normalize_email_address
+from config.ai_email import AI_EMAIL_ALIAS, AI_EMAIL_LIMITS, normalize_email_address
 
 
 RESEND_API_ROOT = "https://api.resend.com"
@@ -641,9 +641,8 @@ def _validate_recipient(recipients, config):
             mailbox = parse_mailbox(value)
         except AIEmailRejection:
             continue
-        for tool, alias in config["aliases"].items():
-            if mailbox.casefold() == f"{alias}@{config['domain']}".casefold():
-                recognized.append(tool)
+        if mailbox.casefold() == receiving_address(config).casefold():
+            recognized.append("ai")
     unique = tuple(dict.fromkeys(recognized))
     if len(unique) != 1:
         raise AIEmailRejection(
@@ -692,7 +691,8 @@ def _normalize_attachment(value):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @matrix ai-email normalization : attachments exact-local html-fallback inline reply-marker routing sender
+# @tests tests_unit/test_028_ai_email.py::test_email_policy_ignores_saved_alias_and_limit_overrides
+# @matrix ai-email normalization : aliases attachments exact-local html-fallback inline normalization reply-marker routing sender
 def normalize_resend_message(message, attachments, config):
     """Validate a Resend response and return only provider-neutral fields."""
     if not isinstance(message, dict):
@@ -768,7 +768,8 @@ def _instructions(subject, body):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_submission_contract_keeps_create_and_organize_report_only
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @matrix ai-email : access attachment-contract body-contract rate-limit
+# @tests tests_unit/test_028_ai_email.py::test_email_policy_ignores_saved_alias_and_limit_overrides
+# @matrix ai-email : access attachment-contract body-contract limits rate-limit
 # @pair ai-email:signature
 def _preflight_submission(message, user, config):
     from lagniappe.core.definitions import AI
@@ -783,7 +784,7 @@ def _preflight_submission(message, user, config):
         )
 
     submitted = tuple(item for item in message.attachments if item.submitted)
-    limits = config["limits"]
+    limits = AI_EMAIL_LIMITS
     if len(submitted) > limits["maxFiles"]:
         raise AIEmailRejection(
             "attachment_contract",
@@ -850,7 +851,7 @@ def report_url(report, config=None):
 # @covered-by lagniappe/core/tools/email/ai.py::_feedback_payload
 # @reason reply-address construction is exercised through outbound feedback
 def receiving_address(config):
-    return f"{config['aliases']['ai']}@{config['domain']}"
+    return f"{AI_EMAIL_ALIAS}@{config['domain']}"
 
 
 # @testable false
