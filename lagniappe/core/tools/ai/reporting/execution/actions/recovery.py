@@ -210,6 +210,8 @@ def _inspect_action_applied(action, report, user, record):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
+    if isinstance(error, exceptions.MutationConflict):
+        return False  # A rejected atomic write must remain retryable.
     if _action.get("type") in {"update_form_schema"}:
         return False
     if _action.get("type") == "append_page_document":

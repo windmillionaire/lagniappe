@@ -217,6 +217,10 @@ def run_report(report, user, ensure_active=None):
                 ),
             ):
                 raise
+            if isinstance(error, exceptions.MutationConflict):
+                # The guarded transaction rejected the entire write batch. Its
+                # staged success receipt is not evidence of an ambiguous write.
+                action_record.pop("expected", None)
             if _is_recoverable_action_error(action, error):
                 if _is_required_file_placement(action):
                     _record_required_file_placement_error(action_record, error)

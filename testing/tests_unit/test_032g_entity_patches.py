@@ -218,6 +218,7 @@ def test_update_review_and_execution_share_exact_references(monkeypatch):
     action = {"type": "update_task", "data": {"entity": task.urlsafe_key, "changes": {
         "form": "$new-form", "submission": {"summary": "Migrated"}, "description": "Short", "due_date": "2026-11-01",
     }}, "_entity_update": {"forged": True}}
+    monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: reference if hasattr(reference, "entity_kind") else {task.urlsafe_key: task, target.urlsafe_key: target}.get(reference))
     outputs = {"new-form": target}
     review_update_action(action, actor, outputs)
     assert "forged" not in action["_entity_update"]
@@ -325,8 +326,8 @@ def test_correction_snapshot_and_approval_reject_changed_source(monkeypatch):
 # @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
 # @matrix entity-patch : integration review dependencies stale-state
 # @matrix ai-report : execute idempotency skip-action validation
-@pytest.mark.parametrize("skip_form", [False, True])
-def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_form):
+@pytest.mark.parametrize("skip_form,conflict_once", [(False, False), (True, False), (False, True)])
+def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_form, conflict_once):
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
     from lagniappe.core.tools.ai.reporting.execution.runner import run_report
     from lagniappe.core.tools.database import utility as database_utility
@@ -340,7 +341,11 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
         return reference if hasattr(reference, "entity_kind") else store.get(reference)
     monkeypatch.setattr(Entities, "fetch_one", fetch)
     writes = []
+    rejected = []
     def save(*items):
+        if conflict_once and not rejected and any(item.entity_kind == "task" for item in items):
+            rejected.append(True)
+            raise MutationConflict("Saved state changed while saving; reload and retry.")
         writes.append(items)
         for item in items:
             store[item.urlsafe_key] = item
@@ -356,6 +361,15 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
     prepare_entity_updates(report.proposal, actor)
     report.proposal["actions"][0]["skip"] = skip_form
     result = run_report(report, actor)
+    if conflict_once:
+        assert result["status"] == "failed"
+        assert report.status == "failed"
+        assert result["actions"][0]["status"] == "complete"
+        assert result["actions"][1]["status"] == "failed"
+        assert not result["actions"][1].get("expected")
+        assert store[task.urlsafe_key].description == "Long original description"
+        assert sum(item.entity_kind == "form" for item in store.values()) == 2
+        result = run_report(report, actor)
     assert result["status"] == "complete", [record.get("error") for record in result["actions"]]
     current = store[task.urlsafe_key]
     if skip_form:
@@ -425,7 +439,14 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
     keys = iter(range(300, 400))
     monkeypatch.setattr(database_utility, "create_key", lambda kind, parent=None: Key("activity", str(next(keys)), project="test-project"))
     def save(*items):
+        # Enforce the database preconditions before accepting any batch writes.
         for item in items:
+            for key, expected in getattr(item, "_form_additional_guards", []):
+                current = next((saved.db for saved in store.values() if saved.key == key), None)
+                if current is None or dict(current) != expected:
+                    raise MutationConflict("Saved state changed while saving; reload and retry.")
+        for item in items:
+            item._form_additional_guards = []
             store[item.urlsafe_key] = item
             item.db.setdefault("hash", "saved-" + item.key.name)
         # Model lists are datastore relationships in production; refresh the fake cache.

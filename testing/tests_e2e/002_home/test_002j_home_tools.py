@@ -1977,11 +1977,11 @@ def test_cancel_report_generation_restores_terminal_view(get_user, revision):
         other_tab = user.page.context.new_page()
         other_tab.goto(user.page.url)
         expect(other_tab.locator(Report.VIEW)).to_have_attribute("data-pending", "true")
-        user.page.get_by_role("button", name="Cancel generation", exact=True).click()
+        user.page.get_by_role("button", name="Cancel", exact=True).click()
         view = user.locate(Report.VIEW)
         expect(view).to_have_attribute("data-pending", "false")
         expect(view).to_have_attribute("data-status", "complete" if revision else "cancelled")
-        expect(view.get_by_role("button", name="Cancel generation", exact=True)).to_have_count(0)
+        expect(view.get_by_role("button", name="Cancel", exact=True)).to_have_count(0)
         if revision:
             expect(view).to_contain_text("Original saved response")
         else:

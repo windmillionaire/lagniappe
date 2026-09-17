@@ -21,7 +21,11 @@
       <script type="module" src="/sentry.js?v={{ CONFIG.BUILD_ID }}"></script>
     {% endif %}
     <script type="module" src="/login.js?v={{ CONFIG.BUILD_ID }}"></script>
-    {% if google %}<script src="https://accounts.google.com/gsi/client" async></script>{% endif %}
+    {% if google %}
+      <!-- Load GIS styles before first paint, including its fallback button. -->
+      <link rel="stylesheet" href="https://accounts.google.com/gsi/style">
+      <script src="https://accounts.google.com/gsi/client" async></script>
+    {% endif %}
     <title>Login</title>
   </head>
   <body id="login"

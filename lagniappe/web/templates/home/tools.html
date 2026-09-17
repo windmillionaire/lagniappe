@@ -195,11 +195,11 @@
       <div class="{{ styles.home.card.actions }} translate-y-0.5">{{ controls.delete(label='Delete ' ~ report.name) }}</div>
     </div>
     <div class="{{ styles.home.ingress.details }}">
-      {{ generation_controls(report) }}
       <p data-role="report-snippet" class="line-clamp-5 break-words font-normal">
         {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
         <span>{{ report.note|format_markdown_text }}</span>
       </p>
+      {{ generation_controls(report) }}
     </div>
   </li>
   {% endif %}
@@ -211,7 +211,7 @@
     <form method="post" action="{{ url_for('tools.cancel_generation', job_key=report.deferred_job.key) }}" data-role="cancel-generation-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" name="operation-id" value="{{ report.deferred_job.idempotency_key }}" />
-      <button type="submit" class="{{ styles.button.submit }}">Cancel generation</button>
+      <button type="submit" class="{{ styles.button.submit }}">Cancel</button>
     </form>
   {% elif report.available and report.origin != 'api' and report.status in ['cancelled', 'failed'] and not report.proposal and not report.deferred_job %}
     <form method="post" action="{{ url_for('tools.retry_generation', key=report.urlsafe_key) }}" data-role="retry-generation-form">

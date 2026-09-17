@@ -347,7 +347,6 @@
           {% if report.pending or report.error or report.status in ["running", "failed"] or (not is_ask and not report.proposal) %}
             <div data-role="report-status" class="flex flex-col gap-1">
               <h2 class="text-base font-semibold text-base-dark">Status</h2>
-              {{ generation_controls(report) }}
               <p data-role="report-status-note" class="text-base-dark">
                 {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
                 {{ report.error or report.note }}
@@ -369,14 +368,9 @@
                   </span>
                   <span aria-hidden="true"> · </span>
                   <span data-role="deferred-elapsed">just now</span>
-                  {% if operation_status %}
-                    <span> · Attempt {{ operation_status.attempt }}</span>
-                    {% if operation_status.remaining_seconds is not none %}<span> · {{ operation_status.remaining_seconds }} seconds remaining</span>{% endif %}
-                    {% if operation_status.retry_reason %}<span> · {{ operation_status.retry_reason }}</span>{% endif %}
-                    {% if operation_status.last_progress_at %}<span> · Last progress {{ operation_status.last_progress_at }}</span>{% endif %}
-                  {% endif %}
                 </p>
               {% endif %}
+              {{ generation_controls(report) }}
             </div>
           {% endif %}
           {% if report.proposal and (is_ask or report.properties.proposal.answer_html) %}

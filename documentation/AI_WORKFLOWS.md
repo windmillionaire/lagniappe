@@ -279,3 +279,12 @@ an action ID, including when approving an older saved proposal. Existing IDs and
 conversion values are preserved. Schema-impact review uses the original action
 positions, matching the skip controls, so opening an ID-less report does not
 mutate it or require regeneration.
+
+Cohesive execution resolves earlier action outputs back to their saved entities
+before preparing each update. Project ordering and relation touches can change
+those records within the same plan; detached preview objects are not execution
+baselines. A rejected atomic write marks execution failed and retains Retry,
+without treating the uncommitted success receipt as an ambiguous write. Already
+completed actions remain resumable and are not recreated. For a report already
+completed with skipped updates, use Revise Plan to propose only the remaining
+changes against the current workspace.
