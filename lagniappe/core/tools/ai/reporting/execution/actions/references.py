@@ -133,8 +133,7 @@ def _resolve_file_endpoint(data, created, endpoint):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason attachment mutation is covered through move and undo tests
+# @reason attachment mutation is covered through move tests
 def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return not file.db.get("task") and endpoint.key == file.db.get("page")
@@ -147,8 +146,7 @@ def _file_attached_to_endpoint(file, endpoint):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason attachment mutation is covered through move and undo tests
+# @reason attachment mutation is covered through move tests
 def _remove_file_from_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         if file.properties.task.key or file.properties.page.key != endpoint.key:
@@ -167,8 +165,7 @@ def _remove_file_from_endpoint(file, endpoint):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason attachment mutation is covered through move and undo tests
+# @reason attachment mutation is covered through move tests
 def _add_file_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return file.move_to(endpoint)
@@ -412,8 +409,7 @@ def _report_file_reference_candidates(reference):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason result entity loading is exercised through public undo tests
+# @reason result entity loading is exercised through public execution tests
 def _load_result_entity(details):
     if not isinstance(details, dict) or not details.get("id"):
         return None
@@ -422,8 +418,7 @@ def _load_result_entity(details):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason polymorphic report references are exercised through run and undo tests
+# @reason polymorphic report references are exercised through run tests
 def _fetch_report_entity(identifier, *, derived_page=False):
     entity = Entities.fetch_one(identifier, request=Fetch.root())
     if entity is None:

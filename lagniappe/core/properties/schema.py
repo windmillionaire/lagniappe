@@ -85,7 +85,6 @@ class SchemaFields(Enum):
         return cls[name].value(definition, entity=entity)
 
     # @testable true
-    # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_validation_preserves_values_and_blocks_completion
     # @matrix ai-report submission : validation failure-isolation
     # @matrix submission : ai preservation
     @classmethod

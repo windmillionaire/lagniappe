@@ -1,2 +1,198 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="0597912b-76c1-4a2e-9d59-50e9be4feb58",e._sentryDebugIdIdentifier="sentry-dbid-0597912b-76c1-4a2e-9d59-50e9be4feb58");}catch(e){}}();import{C as a,f as n}from"./builder.js?v=bee5ee89";import{g as l}from"./foundation.js?v=bee5ee89";import"./connectivity.js?v=bee5ee89";import{p as r}from"./primitives.js?v=bee5ee89";import{S as m}from"./select2.js?v=bee5ee89";import{C as h}from"./base2.js?v=bee5ee89";import"./search.js?v=bee5ee89";import"./styles.js?v=bee5ee89";import"./remote.js?v=bee5ee89";import"./queryLifecycle.js?v=bee5ee89";import"./combobox.js?v=bee5ee89";import"./results.js?v=bee5ee89";import"./icons.js?v=bee5ee89";import"./storage.js?v=bee5ee89";import"./formatting.js?v=bee5ee89";import"./upstreamUnavailable.js?v=bee5ee89";import"./entityMenu.js?v=bee5ee89";import"./dropdown.js?v=bee5ee89";import"./upload.js?v=bee5ee89";import"./buttons.js?v=bee5ee89";import"./modal.js?v=bee5ee89";import"./polling.js?v=bee5ee89";import"./baseForm.js?v=bee5ee89";import"./loader.js?v=bee5ee89";import"./facets.js?v=bee5ee89";import"./submitter.js?v=bee5ee89";class d extends h{constructor(t){super(t),this.key="columns",this.messages={submit:"Add Column"},this._updated=this._updated.bind(this)}init(){this.index!==-1?(this.setTitle("Edit Column"),this.messages.submit="Update Column",this.setting={...this.element.schema.columns?.[this.index]}):(this.setTitle("Create Column"),this.setting={}),super.init(),this.addColumnType(),this.showProgress()}showProgress(){this.setting.title&&(this.complete=!0,this.addColumnName()),super.showProgress()}addColumnName(){if(this.options.has("name"))return;const t=r.input({label:"Column Name",placeholder:"enter column name...",name:"column-name",type:"text",value:this.setting.title||null});this.options.set("name",t),this.focusTarget=t,t.addEventListener("input",s=>{this.setting.title=s.target.value,this.showProgress()})}_updateSetting(t){delete this.setting.location,delete this.setting.input,delete this.setting.type,["out","in"].includes(t)?(this.setting.location=t,this.setting.type="link"):t&&t!=="checkbox"?(this.setting.input=t,this.setting.type="input"):t==="checkbox"&&(this.setting.type="checkbox")}addColumnType(){const t=this.builder.savedField(this.element.schema.id)?.columns?.find(e=>e.id===this.setting.id);if(t){const e=document.createElement("p");e.className="text-sm text-base-medium",e.textContent="Save will convert this column. Values that cannot be converted will be cleared.",this.header.after(e),this.destroyables.push({destroy:()=>e.remove()})}const s=r.select({label:"Column Type",kind:"form",placeholder:"select column type...",name:this.element.schema.id,options:a.TABLE_COLUMNS.filter(e=>!t||this.builder.conversionCatalog?.rules[n(t)]?.[e.type]&&this.builder.conversionCatalog.rules[n(t)][e.type]!=="ai").map(e=>({label:e.name,value:e.type,details:{kind:"form",icon:e.type,name:e.name}}))});this.header.after(s);const i=new m(s),o=this.setting.location||this.setting.input||this.setting.type;o&&i.values.add(o),i.init(),this.columnType=i,this.destroyables.push(i),this.focusTarget=s,this.target.removeEventListener("updated",this._updated),this.target.addEventListener("updated",this._updated)}refreshSavedState(){}_updated(t){const i=Object.values(t.detail.options)[0]?.id;i&&(this._updateSetting(i),this.addColumnName(),this.showProgress())}destroy(){this.target.removeEventListener("updated",this._updated),super.destroy(),this.columnType=null}validate(){if(!this.setting.title)return this.form.showError("Please enter a column name"),!1;if(!this.setting.type)return this.form.showError("Please select a column type"),!1;if(!this.setting.id)do this.setting.id=l("column");while(this.element.schema.columns?.some(t=>t.id===this.setting.id));return!0}}export{d as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { C as CONFIG, f as fieldKind } from './builder.js?v=b564d2b9';
+import { g as generateElementId } from './foundation.js?v=b564d2b9';
+import './connectivity.js?v=b564d2b9';
+import { p as primitives } from './primitives.js?v=b564d2b9';
+import { S as SelectBox } from './select2.js?v=b564d2b9';
+import { C as Condition } from './base2.js?v=b564d2b9';
+import './search.js?v=b564d2b9';
+import './styles.js?v=b564d2b9';
+import './remote.js?v=b564d2b9';
+import './queryLifecycle.js?v=b564d2b9';
+import './combobox.js?v=b564d2b9';
+import './results.js?v=b564d2b9';
+import './icons.js?v=b564d2b9';
+import './storage.js?v=b564d2b9';
+import './formatting.js?v=b564d2b9';
+import './upstreamUnavailable.js?v=b564d2b9';
+import './entityMenu.js?v=b564d2b9';
+import './dropdown.js?v=b564d2b9';
+import './upload.js?v=b564d2b9';
+import './buttons.js?v=b564d2b9';
+import './modal.js?v=b564d2b9';
+import './polling.js?v=b564d2b9';
+import './baseForm.js?v=b564d2b9';
+import './loader.js?v=b564d2b9';
+import './facets.js?v=b564d2b9';
+import './submitter.js?v=b564d2b9';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_table_column_condition_editor
+ * @pair forms:builder-table-column
+ * @matrix forms : stable-identity
+ */
+class Columns extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.key = "columns";
+		this.messages = {
+			submit: "Add Column",
+		};
+		this._updated = this._updated.bind(this);
+	}
+
+	init() {
+		if (this.index !== -1) {
+			this.setTitle("Edit Column");
+			this.messages.submit = "Update Column";
+			this.setting = { ...this.element.schema.columns?.[this.index] };
+		} else {
+			this.setTitle("Create Column");
+			this.setting = {};
+		}
+
+		super.init();
+
+		this.addColumnType();
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		if (this.setting.title) {
+			this.complete = true;
+			this.addColumnName();
+		}
+		super.showProgress();
+	}
+
+	addColumnName() {
+		if (this.options.has("name")) return;
+
+		const columnName = primitives.input({
+			label: "Column Name",
+			placeholder: "enter column name...",
+			name: "column-name",
+			type: "text",
+			value: this.setting.title || null,
+		});
+		this.options.set("name", columnName);
+		this.focusTarget = columnName;
+
+		columnName.addEventListener("input", (e) => {
+			this.setting.title = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	_updateSetting(value) {
+		delete this.setting.location;
+		delete this.setting.input;
+		delete this.setting.type;
+
+		if (["out", "in"].includes(value)) {
+			this.setting.location = value;
+			this.setting.type = "link";
+		} else if (value && value !== "checkbox") {
+			this.setting.input = value;
+			this.setting.type = "input";
+		} else if (value === "checkbox") {
+			this.setting.type = "checkbox";
+		}
+	}
+
+	addColumnType() {
+		const saved = this.builder
+			.savedField(this.element.schema.id)
+			?.columns?.find((column) => column.id === this.setting.id);
+		if (saved) {
+			const notice = document.createElement("p");
+			notice.className = "text-sm text-base-medium";
+			notice.textContent =
+				"Save will convert this column. Values that cannot be converted will be cleared.";
+			this.header.after(notice);
+			this.destroyables.push({ destroy: () => notice.remove() });
+		}
+		const selectElt = primitives.select({
+			label: "Column Type",
+			kind: "form",
+			placeholder: "select column type...",
+			name: this.element.schema.id,
+			options: CONFIG.TABLE_COLUMNS.filter(
+				(input) =>
+					!saved ||
+					(this.builder.conversionCatalog?.rules[fieldKind(saved)]?.[
+						input.type
+					] &&
+						this.builder.conversionCatalog.rules[fieldKind(saved)][
+							input.type
+						] !== "ai"),
+			).map((input) => ({
+				label: input.name,
+				value: input.type,
+				details: { kind: "form", icon: input.type, name: input.name },
+			})),
+		});
+
+		this.header.after(selectElt);
+		const selectBox = new SelectBox(selectElt);
+		const initial =
+			this.setting.location || this.setting.input || this.setting.type;
+		if (initial) {
+			selectBox.values.add(initial);
+		}
+		selectBox.init();
+		this.columnType = selectBox;
+		this.destroyables.push(selectBox);
+		this.focusTarget = selectElt;
+
+		this.target.removeEventListener("updated", this._updated);
+		this.target.addEventListener("updated", this._updated);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @matrix forms : builder-save stable-identity
+	 */
+	refreshSavedState() {}
+
+	_updated(e) {
+		const options = Object.values(e.detail.options);
+		const value = options[0]?.id;
+		if (!value) return;
+		this._updateSetting(value);
+		this.addColumnName();
+		this.showProgress();
+	}
+
+	destroy() {
+		this.target.removeEventListener("updated", this._updated);
+		super.destroy();
+		this.columnType = null;
+	}
+
+	validate() {
+		if (!this.setting.title) {
+			this.form.showError("Please enter a column name");
+			return false;
+		}
+		if (!this.setting.type) {
+			this.form.showError("Please select a column type");
+			return false;
+		}
+		if (!this.setting.id) {
+			do {
+				this.setting.id = generateElementId("column");
+			} while (
+				this.element.schema.columns?.some(
+					(column) => column.id === this.setting.id,
+				)
+			);
+		}
+		return true;
+	}
+}
+
+export { Columns as default };

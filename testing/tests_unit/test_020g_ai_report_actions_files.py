@@ -4,7 +4,6 @@ import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
-from lagniappe.core.tools.ai.reporting.execution import undo as report_undo
 from lagniappe.core.tools.ai.reporting.execution.actions import (
     references as report_references,
 )
@@ -136,9 +135,9 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
 
 
 
-# @matrix ai-report files : deterministic-run manual-cleanup move-file undo
+# @matrix ai-report files : deterministic-run manual-cleanup move-file
 @pytest.mark.unit
-def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeypatch):
+def test_run_report_moves_file_and_records_manual_page_cleanup(monkeypatch):
     user = _test_user("runner-file-move-owner")
     source_page = TestEntities.get(
         "PAGE",
@@ -217,17 +216,6 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
     assert cleanup["note"] == "Manual cleanup suggested."
     assert report.properties.result.grouped_actions[-1]["type"] == "suggest_page_deletion"
 
-    undo = report_undo.undo_report(report, user)
-
-    assert undo["status"] == "complete"
-    assert file.db["page"] == source_page.key
-    assert undo["actions"][0]["type"] == "suggest_page_deletion"
-    assert undo["actions"][0]["note"] == (
-        "Manual cleanup suggestion; nothing was executed."
-    )
-    assert undo["actions"][1]["type"] == "move_file"
-    assert undo["actions"][1]["note"] == "Restored previous file attachment."
-    assert saved
 
 
 

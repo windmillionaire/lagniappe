@@ -91,7 +91,9 @@
   {%- set proposal_tool = report.output_kind != "answer" -%}
   {%- set proposal_actions = report.proposal.actions if report.proposal and report.proposal.actions else [] -%}
   {%- set executable_actions = proposal_actions|rejectattr("type", "equalto", "needs_review")|rejectattr("type", "equalto", "skip")|list -%}
-  {%- if proposal_tool -%}
+  {%- if report.status == "cancelled" -%}
+    Generation cancelled
+  {%- elif proposal_tool -%}
     {%- if report.status == "ready" -%}
       {%- if proposal_actions and not executable_actions -%}
         Needs review
@@ -102,12 +104,6 @@
       Proposal executing
     {%- elif report.status == "complete" -%}
       Proposal executed
-    {%- elif report.status == "undoing" -%}
-      Undoing proposal
-    {%- elif report.status == "undone" -%}
-      Proposal undone
-    {%- elif report.status == "undo_failed" -%}
-      Proposal undo failed
     {%- elif report.status == "failed" -%}
       Proposal failed
     {%- elif report.status == "revising" -%}
@@ -199,11 +195,28 @@
       <div class="{{ styles.home.card.actions }} translate-y-0.5">{{ controls.delete(label='Delete ' ~ report.name) }}</div>
     </div>
     <div class="{{ styles.home.ingress.details }}">
+      {{ generation_controls(report) }}
       <p data-role="report-snippet" class="line-clamp-5 break-words font-normal">
         {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
         <span>{{ report.note|format_markdown_text }}</span>
       </p>
     </div>
   </li>
+  {% endif %}
+{% endmacro %}
+
+
+{% macro generation_controls(report) %}
+  {% if report.available and report.pending and report.status in ['pending', 'revising'] and report.deferred_job %}
+    <form method="post" action="{{ url_for('tools.cancel_generation', job_key=report.deferred_job.key) }}" data-role="cancel-generation-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="operation-id" value="{{ report.deferred_job.idempotency_key }}" />
+      <button type="submit" class="{{ styles.button.submit }}">Cancel generation</button>
+    </form>
+  {% elif report.available and report.origin != 'api' and report.status in ['cancelled', 'failed'] and not report.proposal and not report.deferred_job %}
+    <form method="post" action="{{ url_for('tools.retry_generation', key=report.urlsafe_key) }}" data-role="retry-generation-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="{{ styles.button.submit }}">Retry generation</button>
+    </form>
   {% endif %}
 {% endmacro %}

@@ -280,7 +280,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
-    # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_retries_and_undoes
+    # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_and_retries
     # @matrix task-completion : assignee complete completed-by no-schedule
     # @matrix task-completion : schema-version
     # @matrix submission task-completion : required-fields validation

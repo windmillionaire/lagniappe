@@ -27,7 +27,6 @@ from .reporting.proposals.selection import skip_proposal_actions, toggle_proposa
 from .reporting.proposals.validation import validate_proposal
 from .reporting.execution.ledger import REPORT_LEDGER_VERSION
 from .reporting.execution.runner import run_report
-from .reporting.execution.undo import undo_report
 from .reporting.uploads import (
     cleanup_report_upload_manifest,
     finalize_report_upload_manifest,
@@ -74,7 +73,6 @@ __all__ = [
     "toggle_proposal_action_skip",
     "validate_proposal",
     "run_report",
-    "undo_report",
     "REPORT_LEDGER_VERSION",
     "cleanup_report_upload_manifest",
     "finalize_report_upload_manifest",

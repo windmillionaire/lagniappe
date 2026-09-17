@@ -19,7 +19,7 @@ plan for mixed requests and revisions until execution begins. Mutations require
 browser approval. Files and instructions are individually optional, but publishing
 requires at least one. Classify uploads with file_usage; only organize files need
 summary and attachment actions, while evidence files support answers directly.
-The app and MCP service use contract version 9 with no previous starter aliases.
+The app and MCP service use contract version 10 with no previous starter aliases.
 
 The adapter validates the full current proposal contract before submitting,
 including actions the proposal does not use. Its bounded remote-schema subset

@@ -1,7 +1,7 @@
 """Adapter protocol for deterministic report actions."""
 
 from .checkpoints import _prepare_action_checkpoint
-from .recovery import _inspect_action_applied, _inspect_action_compensated
+from .recovery import _inspect_action_applied
 
 ACTION_APPLIED = "applied"
 ACTION_NOT_APPLIED = "not-applied"
@@ -16,14 +16,12 @@ class ReportActionAdapter:
         self,
         action_type,
         apply_handler,
-        compensate_handler,
         *,
         uses_context=False,
         required=False,
     ):
         self.action_type = action_type
         self.apply_handler = apply_handler
-        self.compensate_handler = compensate_handler
         self.uses_context = uses_context
         self.required = required
 
@@ -55,19 +53,6 @@ class ReportActionAdapter:
             )
         return _normalize_handler_result(self.apply_handler(*arguments))
 
-    # @testable infrastructure
-    def compensate(self, record, report, user):
-        return self.compensate_handler(record, report, user)
-
-    # @testable infrastructure
-    def inspect_compensated(self, record, report, user):
-        return _inspect_action_compensated(record, report, user)
-
-
-# @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @matrix ai-report : create idempotency post-commit-checkpoint recovery
 
 
 # @testable false

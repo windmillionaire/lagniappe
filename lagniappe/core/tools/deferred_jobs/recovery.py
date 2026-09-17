@@ -98,7 +98,10 @@ class DeferredJobRecovery:
                     int(getattr(job, "status_revision", 0) or 0),
                     now,
                     grace_seconds=DEFERRED_JOB_RECONCILE_GRACE_SECONDS,
-                    max_age_seconds=DEFERRED_JOB_MAX_AGE_SECONDS,
+                    max_age_seconds=(
+                        self.adapter(job.job_type).max_lifetime_seconds
+                        or DEFERRED_JOB_MAX_AGE_SECONDS
+                    ),
                     stale_updates={
                         "status": DeferredJobStatus.FAILED.value,
                         "dispatch_state": "delivery_pending",

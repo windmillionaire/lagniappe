@@ -341,18 +341,10 @@ def _schema_section_report(user):
                     },
                     {
                         "id": "update_note",
-                        "type": "update_form_values",
+                        "type": "needs_review",
                         "display_label": "Mark invoice note paid",
                         "depends_on": ["schema"],
-                        "data": {
-                            "updates": [
-                                {
-                                    "page": page.urlsafe_key,
-                                    "schema_id": "input-note",
-                                    "new_value": "paid",
-                                }
-                            ]
-                        },
+                        "data": {"note": "Review the invoice note after the schema change."},
                     },
                 ],
             },
@@ -624,7 +616,7 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         assert statuses == expected_statuses
 
 
-# @matrix ai-report : delete deterministic-run deterministic-undo entitlement-independent skip-action toggle
+# @matrix ai-report : delete deterministic-run entitlement-independent skip-action toggle
 # @pair ai-report:provider-independent-history
 # @pair ai-access:provider-boundary
 # @template home/home.html::main
@@ -681,12 +673,7 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
     )
     assert Entities.fetch_one(task_key, request=Fetch.direct()).name == task_name
 
-    undo = user.page.get_by_role("button", name="Undo Report")
-    expect(undo).to_be_visible()
-    with user.page.expect_response("**/tools/reports/*/undo"):
-        undo.click()
-    expect(user.page.get_by_text("Work undone.")).to_be_visible(timeout=10000)
-    assert Entities.fetch_one(task_key, request=Fetch.root()) is None
+    expect(user.page.get_by_role("button", name="Undo Report")).to_have_count(0)
 
     deleted = browser_fetch(
         user,
@@ -1350,35 +1337,8 @@ def test_email_report_detail_collapses_message_behind_subject_and_sender(get_use
     )
 
 
-# @matrix ai-report : validation result
-# @source lagniappe/core/properties/ai_report_result.py::Result.submission_issues
-def test_report_detail_surfaces_legacy_skipped_submission_error(get_user):
-    user = get_user(Users.OWNER)
-    report, _, _ = _ready_report(user)
-    report.properties.process.complete_execution({
-        "status": "complete",
-        "actions": [{
-            "id": "flights",
-            "type": "update_form_values",
-            "display_label": "Update Flight Details",
-            "status": "complete",
-            "updates": {"applied": [], "skipped": [{
-                "schema_id": "table-flights",
-                "reason": "'str' object has no attribute 'get'",
-            }]},
-        }],
-    })
-    Entities.save(report)
-
-    report_page = user.go(Report.for_entity(user, report))
-
-    expect(report_page.result).to_contain_text("Some submission updates were not applied.")
-    expect(report_page.result).to_contain_text("Update Flight Details (table-flights): 'str' object has no attribute 'get'")
-    expect(report_page.result.get_by_text("Work done.", exact=True)).to_have_count(0)
-
-
-# @matrix ai-report : detail deterministic-undo failed-prefix failure recovery reload retry undo
-def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
+# @matrix ai-report : detail failed-prefix failure recovery reload retry
+def test_failed_report_detail_offers_retry_and_preserves_completed_work(get_user):
     user = get_user(Users.OWNER)
     report, project = _recoverable_failed_report(user)
 
@@ -1393,15 +1353,8 @@ def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
         error.bounding_box()["y"]
         < user.page.get_by_role("button", name="Retry Proposal").bounding_box()["y"]
     )
-    expect(
-        user.page.get_by_role("button", name="Undo Completed Actions")
-    ).to_be_visible()
-
-    with user.page.expect_response("**/tools/reports/*/undo"):
-        user.page.get_by_role("button", name="Undo Completed Actions").click()
-
-    expect(user.page.get_by_text("Work undone.")).to_be_visible(timeout=10000)
-    assert Entities.fetch_one(project.urlsafe_key, request=Fetch.root()) is None
+    expect(user.page.get_by_role("button", name="Undo Completed Actions")).to_have_count(0)
+    assert Entities.fetch_one(project.urlsafe_key, request=Fetch.root()) is not None
 
 
 # @matrix ai-report : answer-html ask detail links no-actions
@@ -1428,7 +1381,7 @@ def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
 
 
 # @matrix ai-report : completed-state ready-state revision route-guard
-def test_report_revision_is_only_available_before_completion(
+def test_report_revision_requires_saved_response_and_allows_corrections(
     get_user, browser_failures
 ):
     user = get_user(Users.OWNER)
@@ -1492,6 +1445,12 @@ def test_report_revision_is_only_available_before_completion(
             )
         assert response["status"] == 422
         assert "Only reports with saved responses can be revised" in response["text"]
+
+        report.result = {"status": "complete", "actions": [{"id": "review", "type": "needs_review", "status": "complete"}]}
+        Entities.save(report)
+        user.page.reload()
+        expect(user.page.get_by_role("button", name=button_name)).to_be_visible()
+
 
 
 # @matrix ai-report : detail needs-review no-execute revision
@@ -1652,7 +1611,7 @@ def test_report_detail_skips_action_dependencies(get_user):
     ]
 
 
-# @matrix ai-report submission : batch-field-patch persistence schema-update
+# @matrix ai-report submission : persistence schema-update
 def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_user):
     user = get_user(Users.OWNER)
     report, _page_form, page = _schema_section_report(user)
@@ -1711,32 +1670,32 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_us
                 },
             },
             {
-                "id": "details",
-                "type": "update_form_values",
-                "depends_on": ["schema"],
-                "data": {
-                    "updates": [
-                        {
-                            "task": task.urlsafe_key,
-                            "schema_id": field_id,
-                            "new_value": value,
-                        }
-                        for field_id, value in expected.items()
-                    ],
-                },
-            },
-            {
                 "id": "done",
                 "type": "complete_task",
-                "depends_on": ["details"],
+                "depends_on": ["schema"],
                 "data": {"task": task.urlsafe_key},
             },
         ],
     }
+    report.proposal["actions"].pop()  # Publish schema changes before planning answer patches.
     Entities.save(form, task, report)
     report.proposal = prepare_schema_updates(report.proposal, _owner(user))
     Entities.save(report)
 
+    report_page = user.go(Report.for_entity(user, report))
+    report_page.execute(timeout=60_000)
+    expect(user.page.get_by_text("Work done.")).to_be_visible()
+
+    from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
+    report = Entities.REPORT.create({
+        "user": _owner(user), "name": "Complete reviewed task details", "status": "ready", "pending": False,
+        "proposal": {"summary": "Save the exact answers and complete the task", "confidence": 1, "actions": [
+            {"id": "details", "type": "update_task", "data": {"entity": task.urlsafe_key, "changes": {"submission": expected}}},
+            {"id": "done", "type": "complete_task", "depends_on": ["details"], "data": {"task": task.urlsafe_key}},
+        ]},
+    })
+    report.proposal = prepare_entity_updates(report.proposal, _owner(user))
+    Entities.save(report)
     report_page = user.go(Report.for_entity(user, report))
     report_page.execute(timeout=60_000)
     expect(user.page.get_by_text("Work done.")).to_be_visible()
@@ -1746,16 +1705,8 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_us
     assert saved.completed is True
     assert saved.submission == expected
     assert len(saved.form.schema) == 4
-    assert [action["status"] for action in receipt["actions"]] == ["complete"] * 3
-    assert len(receipt["actions"][1]["updates"]["applied"]) == 4
-    assert receipt["actions"][1]["updates"]["skipped"] == []
-
-    updated = report_page.result.locator("[data-role='submission-update-target']")
-    expect(updated).to_have_count(1)
-    expect(updated).to_contain_text("Task Updated:")
-    expect(updated.get_by_role("link", name=task.name, exact=True)).to_have_attribute(
-        "href", f"/tasks/{task.urlsafe_key}"
-    )
+    assert [action["status"] for action in receipt["actions"]] == ["complete"] * 2
+    expect(report_page.result).to_contain_text("Completed Task:")
 
 
 # @matrix ai-report : browser-review stale-proposal
@@ -1870,8 +1821,12 @@ def test_report_detail_reviews_schema_action_without_id(get_user):
     assert Entities.fetch_one(page.urlsafe_key, request=Fetch.direct()).submission["input-note"] == "unpaid"
 
 
-# @matrix ai-report : batch-field-patch detail deterministic-run schema-update skip-action
+# @matrix ai-report : detail schema-update skip-action
 # @template tools/report.html::proposal_action_item
+# @source lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector._group_proposal_display_actions
+# @source lagniappe/core/tools/ai/reporting/proposals/selection.py::toggle_proposal_action_indexes
+# @pair form-schema:schema-section
+# @matrix ai-report : exact-indexes schema-section
 def test_report_detail_skips_schema_section_and_dependent_submission_updates(get_user):
     user = get_user(Users.OWNER)
     report, form, page = _schema_section_report(user)
@@ -1988,3 +1943,67 @@ def test_incompatible_reports_render_and_delete_without_touching_workspace(get_u
     assert result["status"] == 200
     assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
     assert Entities.fetch_one(file.urlsafe_key, request=Fetch.root()) is not None
+
+
+# @source lagniappe/web/routes/tools/main.py::cancel_generation
+# @source lagniappe/web/routes/tools/main.py::retry_generation
+# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportAdapter.cleanup
+# @matrix ai-report : cancellation revision reload
+# @template home/tools.html::generation_controls
+@pytest.mark.parametrize("revision", [False, True])
+def test_cancel_report_generation_restores_terminal_view(get_user, revision):
+    user = get_user(Users.OWNER)
+    owner = _owner(user)
+    report = Entities.REPORT.create({
+        "parent": owner, "user": owner, "name": f"Cancel generation {_suffix()}",
+        "instructions": "Review my tasks", "status": "revising" if revision else "pending",
+        "pending": True,
+        "proposal": {"summary": "Original saved response", "actions": []} if revision else None,
+    })
+    job = Entities.DEFERRED_JOB.create({
+        "actor": owner, "job_type": DeferredJobType.REPORT_AI.value,
+        "idempotency_key": f"cancel-generation-{_suffix()}",
+        "inputs": {"report": {"id": report.urlsafe_key, "kind": "report"}},
+        "parameters": {"mode": "revise"} if revision else {},
+        "status": "running", "dispatch_state": "dispatched",
+        "client": {"key": report.urlsafe_key, "destination": "tools:ToolReportList"},
+    })
+    report.deferred_job = {"key": job.urlsafe_key, "idempotency_key": job.idempotency_key}
+    Entities.save(report, job)
+    other_tab = None
+    retry_job = None
+    try:
+        user.go(Report.for_entity(user, report))
+        other_tab = user.page.context.new_page()
+        other_tab.goto(user.page.url)
+        expect(other_tab.locator(Report.VIEW)).to_have_attribute("data-pending", "true")
+        user.page.get_by_role("button", name="Cancel generation", exact=True).click()
+        view = user.locate(Report.VIEW)
+        expect(view).to_have_attribute("data-pending", "false")
+        expect(view).to_have_attribute("data-status", "complete" if revision else "cancelled")
+        expect(view.get_by_role("button", name="Cancel generation", exact=True)).to_have_count(0)
+        if revision:
+            expect(view).to_contain_text("Original saved response")
+        else:
+            expect(view.get_by_role("button", name="Retry generation", exact=True)).to_be_visible()
+        expect(other_tab.locator(Report.VIEW)).to_have_attribute("data-pending", "false")
+        user.page.reload()
+        expect(user.locate(Report.VIEW)).to_have_attribute("data-pending", "false")
+        persisted_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
+        assert persisted_job.status == "cancelled"
+        assert persisted_job.dispatch_state == "complete"
+        assert persisted_job.lease_token is None
+        if not revision:
+            user.page.get_by_role("button", name="Retry generation", exact=True).click()
+            expect(user.locate(Report.VIEW)).to_have_attribute("data-pending", "true")
+            retried = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
+            retry_job = Entities.fetch_one(retried.deferred_job["key"], request=Fetch.direct())
+            assert retry_job.key != job.key
+    finally:
+        if other_tab:
+            other_tab.close()
+        if retry_job:
+            from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+            DeferredJobs.cancel(retry_job)
+            Entities.delete(retry_job)
+        Entities.delete(report, job)

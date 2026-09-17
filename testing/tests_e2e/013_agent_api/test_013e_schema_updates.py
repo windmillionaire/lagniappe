@@ -30,7 +30,6 @@ pytestmark = pytest.mark.e2e
 # @source lagniappe/core/tools/form_changes.py::prepare_target
 # @source lagniappe/core/tools/ai/reporting/schema_updates.py::report_impact
 # @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @source lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
 # @matrix form-migration : preview external-provider-free publication completed-task review
@@ -92,7 +91,6 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
     ]
     proposal = {"summary": "Convert saved Notes and Count. Unconvertible values clear; migration cannot be undone.", "confidence": 1, "issues": [], "actions": [
         {"id": "schema", "type": "update_form_schema", "data": {"form": f"hash:{form.entity.hash}", "operations": operations, "baseline": first["baseline"], "scope_fingerprint": first["scope_fingerprint"], "conversions": candidates}},
-        {"id": "rename", "type": "rename_entity", "depends_on": ["schema"], "data": {"entity": f"hash:{tasks[0].hash}", "name": "Published migration"}},
     ]}
     if origin == "api":
         incomplete = deepcopy(proposal)
@@ -101,7 +99,7 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
         assert refused.status_code == 422, refused.text
         submitted = client.post(f"/api/v1/plans/{plan_id}/submit", headers=headers, json={"file_usage": [], "contract_version": external_api.CONTRACT_VERSION, "proposal": proposal})
         assert submitted.status_code == 200, submitted.text
-        assert submitted.json["action_summary"] == {"total": 2, "by_type": {"update_form_schema": 1, "rename_entity": 1}, "maximum": 100}
+        assert submitted.json["action_summary"] == {"total": 1, "by_type": {"update_form_schema": 1}, "maximum": 100}
     else:
         from lagniappe.core.tools.ai.reporting.proposals.validation import validate_proposal
         report = Entities.fetch_one(plan_id, request=Fetch.direct())
@@ -164,7 +162,6 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
         assert resumed.state.value == "complete", resumed
     final = Entities.fetch_one(plan_id, request=Fetch.direct())
     assert final.status == "complete"
-    assert Entities.fetch_one(tasks[0].key, request=Fetch.direct()).name == "Published migration"
     for task in tasks:
         saved = Entities.fetch_one(task.key, request=Fetch.direct())
         assert saved.generation == 1
@@ -188,5 +185,3 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
     assert answers["original_completion"]["generation"] == 0
     assert answers["original_completion"]["schema_available"] is True
     assert answers["original_completion"]["values"] == {"notes": "Keep 1", "count": "0"}
-    rejected_undo = client.post(f"/tools/reports/{plan_id}/undo", headers=browser_headers)
-    assert "cannot be undone" in rejected_undo.text

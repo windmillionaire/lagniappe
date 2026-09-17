@@ -34,6 +34,8 @@ class DeferredExecutionControl:
         self._details = {}
         self._lost = False
         self._background_error = None
+        self.report_planning = False
+        self.provider_retry_callback = None
 
     @property
     def remaining_seconds(self):
@@ -44,6 +46,10 @@ class DeferredExecutionControl:
 
     def mark_background_error(self, error):
         self._background_error = error
+
+    def claim_provider_retry(self):
+        self.ensure_active()
+        return bool(self.provider_retry_callback and self.provider_retry_callback())
 
     def ensure_active(self):
         if self._background_error is not None:

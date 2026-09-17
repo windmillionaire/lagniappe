@@ -22,6 +22,7 @@ GET_ENTITY = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
+            "view": {"type": "string", "enum": ["default", "edit"]},
             "id": {
                 "type": "string",
                 "description": "The entity hash token from search results.",
@@ -38,6 +39,8 @@ GET_ENTITY = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_get_entity_loads_model_task_form_schema_from_stored_key
 # @matrix ai : attached-form autofill model-task stored-key tool-context
 # @matrix form-schema : attached-form autofill model-task schema stored-key
+# @matrix ai : edit-view exact-answers shared-schema
+# @matrix entity-patch : preservation validation preparation permissions
 def execute_get_entity(args, user):
     identifier = args.get("id")
     if not identifier:
@@ -51,6 +54,8 @@ def execute_get_entity(args, user):
         return {"error": "Access denied"}
 
     _ensure_attached_form(entity)
+    if args.get("view") == "edit":
+        return edit_entity(entity, user)
     entity_data = entity.to_ai(user)
     return entity_data
 
@@ -89,3 +94,33 @@ def _ensure_attached_form(entity):
     form = Entities.fetch_one(form_key, request=Fetch.direct())
     if isinstance(form, Entities.FORM):
         entity.form = form
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
+# @reason edit projection shares authorization with the public entity and task readers
+def edit_entity(entity, user, schemas=None):
+    from copy import deepcopy
+    from ..references import hash_reference
+    from lagniappe.core.tools.entity_patches import PATCH_FIELDS
+    result = entity.to_ai(user)
+    result["description"] = entity.description
+    result["revision"] = str(entity.modified)
+    result["editable_fields"] = sorted(PATCH_FIELDS.get(entity.entity_kind, ())) if entity.allowed(Action.EDIT, user=user) and not (entity.entity_kind == "task" and entity.completed) else []
+    if entity.entity_kind in {"page", "task"}:
+        result["answers"] = deepcopy(entity.submission or {})
+        result["generation"] = entity.generation
+    if entity.entity_kind in {"task", "page", "model"} and entity.form and entity.form.allowed(Action.VIEW, user=user):
+        form = entity.form
+        result.pop(entity.properties.form.ai_key, None)
+        reference = hash_reference(form)
+        result["form"] = {"hash": reference, "name": form.name, "generation": form.generation, "revision": form.version}
+        schema = deepcopy(form.schema)
+        if schemas is None:
+            result["form"]["schema"] = schema
+        else:
+            result.pop("schema", None)
+            schemas[reference] = schema
+    if entity.entity_kind == "project":
+        result["model_tasks"] = [{"hash": hash_reference(model), "name": model.name, "order": model.order, "form": hash_reference(model.form) if model.form and model.form.allowed(Action.VIEW, user=user) else None} for model in entity.model_tasks if model.allowed(Action.VIEW, user=user)]
+    return result

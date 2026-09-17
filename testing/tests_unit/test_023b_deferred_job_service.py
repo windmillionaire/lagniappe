@@ -67,7 +67,7 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(
         assert key == job.key
         current = job
         for name, value in updates.items():
-            if name in {"client", "progress"}:
+            if name in {"client", "progress", "delivery", "error"}:
                 value = json.loads(value)
             setattr(current, name, value)
         current.status_revision = int(getattr(current, "status_revision", 0) or 0) + 1
@@ -82,6 +82,9 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(
     monkeypatch.setattr(Entities, "fetch_one", lambda value, request: value)
     monkeypatch.setattr(Entities, "save", lambda *entities: saved.extend(entities))
 
+    registry.adapter_registry._defaults_loaded = True
+    registry.register(RecordingAdapter())
+    monkeypatch.setattr(registry, "_release", lambda job, token: setattr(job, "dispatch_state", "complete"))
     assert registry.cancel(job) is True
 
     task_id = TaskIdentity.create(job, 3)
@@ -93,7 +96,9 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(
     assert job.status == DeferredJobStatus.CANCELLED.value
     assert job.progress["phase"] == "cancelled"
     assert job.notification.pending is False
-    assert saved == [job, job.notification]
+    assert job in saved and job.notification in saved
+    assert job.delivery == {"cleanup": True, "notification": True}
+    assert job.dispatch_state == "complete"
     assert operation_projection == [job]
 
 

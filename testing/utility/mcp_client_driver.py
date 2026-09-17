@@ -421,7 +421,7 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             "get_plan_contract",
             {
                 "plan_id": update["id"],
-                "actions": ["rename_entity", "complete_task"],
+                "actions": ["update_page", "complete_task"],
             },
         )
         update_receipt = await _call(
@@ -437,10 +437,10 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                     "actions": [
                         {
                             "id": "rename",
-                            "type": "rename_entity",
+                            "type": "update_page",
                             "data": {
                                 "entity": specification["page_ref"],
-                                "name": "Proposed MCP Page name",
+                                "changes": {"name": "Proposed MCP Page name"},
                             },
                         }
                     ],

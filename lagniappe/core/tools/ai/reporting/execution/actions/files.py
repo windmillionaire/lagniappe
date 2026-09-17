@@ -24,10 +24,10 @@ from .results import (
 
 
 # @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
 # @matrix ai-report : deterministic-run move-file readable-file-fallback
-# @matrix files : deterministic-run manual-cleanup move-file readable-file-fallback undo
+# @matrix files : deterministic-run manual-cleanup move-file readable-file-fallback
 def _move_file(action, _report, user, created):
     data = _data(action)
     source = _resolve_file_endpoint(data, created, endpoint="source")

@@ -38,7 +38,7 @@ from .reporting.contracts.schema import (
 from .reporting.proposals.validation import validate_proposal
 
 
-CONTRACT_VERSION = 9
+CONTRACT_VERSION = 10
 MAX_INSTRUCTIONS_BYTES = 65536
 MAX_PROPOSAL_BYTES = 1024 * 1024
 MAX_PROPOSAL_ACTIONS = 100
@@ -209,8 +209,10 @@ def _plan_name(instructions, requested=None):
 # @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @matrix agent-api ai-report : draft report-session
 # @pair agent-api:entitlement-independent
-def create_plan(user, *, instructions="", name=None, remote_mcp=False):
+def create_plan(user, *, instructions="", name=None, remote_mcp=False, revises_plan_id=None):
     """Create a durable draft report without dispatching a provider job."""
+    if revises_plan_id is not None and (not isinstance(revises_plan_id, str) or not revises_plan_id):
+        raise exceptions.ValidationError("revises_plan_id must be a nonempty plan ID.")
     instructions = str(instructions or "").strip()
     if _text_bytes(instructions) > MAX_INSTRUCTIONS_BYTES:
         raise exceptions.ValidationError("Instructions are too large.")
@@ -236,7 +238,13 @@ def create_plan(user, *, instructions="", name=None, remote_mcp=False):
             },
         }
     )
-    Entities.save(report)
+    if revises_plan_id:
+        from .reporting.corrections import link_correction, save_correction
+        source = Entities.fetch_one(revises_plan_id, request=Fetch.direct())
+        link_correction(report, source, user)
+        save_correction(report, source)
+    else:
+        Entities.save(report)
     return report
 
 
@@ -318,7 +326,8 @@ def _guidance_requirements():
                 "actions_any": [
                     "create_page",
                     "create_task",
-                    "update_form_values",
+                    "update_page",
+                    "update_task",
                 ],
                 "form_values_present": True,
             },
@@ -612,6 +621,8 @@ def _schema_errors(value, schema, root, path):
         )
 
     if isinstance(value, dict):
+        if len(value) < int(schema.get("minProperties") or 0):
+            errors.append({"code": "minProperties", "path": path, "message": "Provide at least one changed field."})
         properties = schema.get("properties") or {}
         for field in schema.get("required") or []:
             if field not in value:
@@ -915,6 +926,12 @@ def _reference_values(proposal):
         for row in data.get("conversions", []):
             if isinstance(row, dict) and isinstance(row.get("entity"), str):
                 yield "entity", row["entity"]
+        changes = data.get("changes") or {}
+        for field in ("page", "project", "model", "form", "assigned_to", "categories", "model_tasks"):
+            value = changes.get(field) if isinstance(changes, dict) else None
+            for reference in value if isinstance(value, list) else [value]:
+                if isinstance(reference, str) and reference:
+                    yield field, reference
         for field, value in data.items():
             if field not in REFERENCE_FIELDS:
                 continue
@@ -1074,7 +1091,6 @@ def validate_external_proposal(
     normalized = validate_proposal(
         proposal,
         allowed_actions=allowed,
-        allow_empty_submission_updates=True,
         allow_pending_submissions=False,
         required_file_refs=[
             item["file"] for item in usage if item["usage"] == "organize"
@@ -1084,11 +1100,12 @@ def validate_external_proposal(
         user=user,
         preserve_document_markdown=True,
         resolved_reference_details=resolved_details,
-        validate_table_values=True,
     )
     from .reporting.schema_updates import prepare_schema_updates
 
     prepare_schema_updates(normalized, user)
+    from .reporting.entity_updates import prepare_entity_updates
+    prepare_entity_updates(normalized, user)
     if resolved_references is not None:
         resolved_references.update(
             {
@@ -1181,10 +1198,7 @@ def public_execution_receipt(report, user):
                 if entity
                 else None
             )
-        undo = record.get("undo")
-        if isinstance(undo, dict) and isinstance(undo.get("status"), str):
-            action["undo_status"] = undo["status"][:40]
-        for key in ("updates", "schema_updates"):
+        for key in ("schema_updates",):
             changes = record.get(key)
             if isinstance(changes, dict):
                 # Counts expose partial success without leaking field values,
@@ -1258,6 +1272,7 @@ def public_plan_proposal(report, user=None):
 
     for action in public.get("actions") or []:
         action.pop("_schema_change", None)
+        action.pop("_entity_update", None)
         data = action.get("data") if isinstance(action, dict) else None
         if not isinstance(data, dict):
             continue

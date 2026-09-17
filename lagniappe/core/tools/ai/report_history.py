@@ -13,13 +13,14 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 # @tests tests_unit/test_020i_report_history.py::test_report_delete_preserves_referenced_files_and_fences_cleanup
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @matrix ai-report : delete file-cleanup guarded-delete
-def delete_report_record(report, *, guarded=False):
-    """Reuse ordinary deletion, with a revision fence for bulk/API requests."""
+# @matrix ai-report : category-editor created-entities file-links
+def delete_report_record(report):
+    """Fence every deletion against concurrent execution and correction links."""
     from .reporting.schema_updates import migration_pending
 
     if not report.available:
         snapshot = external_operations.report_snapshot(report)
-        files_to_delete = [file for file in report.input_files if not file.has_references]
+        files_to_delete = [file for file in report.input_files if not file.has_references and not _other_report_references(file, report)]
         outcome = external_operations.delete_plan_if_idle(report, snapshot, report, *files_to_delete)
         if outcome == agent_api_store.PLAN_OPERATION_COMMITTED:
             try:
@@ -29,30 +30,24 @@ def delete_report_record(report, *, guarded=False):
         return outcome
     if migration_pending(report):
         return agent_api_store.PLAN_OPERATION_BUSY
-    guarded = guarded or any((action.get("_schema_change") or {}).get("migration") for action in (getattr(report, "proposal", None) or {}).get("actions", []))
-    if report.origin == "api" and (report.deferred_job or report.status == "undoing"):
+    if report.origin == "api" and report.deferred_job:
         return agent_api_store.PLAN_OPERATION_BUSY
 
-    files_to_delete = [file for file in report.input_files if not file.has_references]
-    if guarded or report.origin == "api":
-        snapshot = external_operations.report_snapshot(report)
-        deferred_job = report.deferred_job
-        upload_manifest = report.upload_manifest
-        outcome = external_operations.delete_plan_if_idle(
-            report, snapshot, report, *files_to_delete
-        )
-        if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
-            return outcome
+    files_to_delete = [file for file in report.input_files if not file.has_references and not _other_report_references(file, report)]
+    snapshot = external_operations.report_snapshot(report)
+    deferred_job = report.deferred_job
+    upload_manifest = report.upload_manifest
+    outcome = external_operations.delete_plan_if_idle(
+        report, snapshot, report, *files_to_delete
+    )
+    if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+        return outcome
 
-        # Cleanup must follow the durable fence: a stale or busy request must
-        # not destroy uploads still owned by the authoritative report.
-        DeferredJobs.cancel(deferred_job)
-        report.upload_manifest = upload_manifest
-        ai.cleanup_report_upload_manifest(report)
-    else:
-        DeferredJobs.cancel(report.deferred_job)
-        ai.cleanup_report_upload_manifest(report)
-        Entities.delete(report, *files_to_delete)
+    # Even an unlinked source can acquire its first correction concurrently.
+    # Fence deletion before cleaning up evidence owned by the current report.
+    DeferredJobs.cancel(deferred_job)
+    report.upload_manifest = upload_manifest
+    ai.cleanup_report_upload_manifest(report)
     return agent_api_store.PLAN_OPERATION_COMMITTED
 
 
@@ -76,7 +71,7 @@ def delete_executed_reports(user, keys):
             ):
                 results["skipped"].append(key)
                 continue
-            outcome = delete_report_record(report, guarded=True)
+            outcome = delete_report_record(report)
             result = (
                 "deleted"
                 if outcome == agent_api_store.PLAN_OPERATION_COMMITTED
@@ -93,3 +88,10 @@ def delete_executed_reports(user, keys):
     if results["deleted"]:
         Entities.touch(user)
     return results
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/report_history.py::delete_report_record
+# @reason shared evidence survives while any linked report still exists
+def _other_report_references(file, report):
+    return any(Entities.fetch_one(reference, request=Fetch.root()) is not None for reference in file.db.get("report_refs", []) if reference != report.urlsafe_key)

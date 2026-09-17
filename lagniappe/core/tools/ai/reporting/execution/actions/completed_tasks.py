@@ -1,13 +1,12 @@
-"""Completed-task reuse, history, recovery, and compensation."""
+"""Completed-task reuse, history, and forward recovery."""
 
 import copy
 import hashlib
 import json
 import re
-from datetime import datetime
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch, MutationIntent
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import dates
 from lagniappe.core.tools.database import get as database_get
@@ -32,16 +31,12 @@ from .results import (
     _submission_result,
     _task_structure_result,
 )
-from .references import (
-    _load_result_entity,
-    _resolve_action_page,
-    _resolve_entity,
-)
+from .references import _resolve_action_page, _resolve_entity
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason before-state serialization is exercised through compensation tests
+# @reason before-state serialization is exercised through forward recovery tests
 def _snapshot_entity(entity):
     return _entity_result(entity) if entity is not None else None
 
@@ -55,7 +50,7 @@ def _checkpoint_datetime(value):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason task checkpoint content is asserted through task recovery and undo
+# @reason task checkpoint content is asserted through task recovery
 def _task_checkpoint_state(task):
     if task is None:
         return None
@@ -86,7 +81,7 @@ def _task_checkpoint_state(task):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason completed-task checkpointing is asserted through retry and undo
+# @reason completed-task checkpointing is asserted through retry
 def _capture_completed_task_before(action, data, user, created):
     page = _resolve_action_page(data, created, user)
     form = _resolve_entity(
@@ -742,134 +737,3 @@ def _parse_completed_task_completed_on(data, *, user=None):
             "Completed task evidence completion date is invalid."
         )
     return completed_on
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason checkpoint resolution is exercised through completed-task undo
-def _checkpoint_entity(details):
-    return _load_result_entity(details) if details else None
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason checkpoint resolution is exercised through completed-task undo
-def _checkpoint_entities(details):
-    return [
-        entity
-        for entity in (_checkpoint_entity(item) for item in details or [])
-        if entity is not None
-    ]
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason date restoration is exercised through completed-task undo
-def _restore_checkpoint_datetime(value):
-    if not value or isinstance(value, datetime):
-        return value
-    return datetime.fromisoformat(value)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason asset restoration is owned by completed-task compensation
-def _restore_task_checkpoint_assets(task, state, histories):
-    previous = copy.deepcopy(state.get("assets") or {})
-    for name, definition in list(task.assets.items()):
-        if previous.get(name) != definition:
-            task.delete_asset(name)
-
-    task._assets = previous
-    task.db["assets"] = json.dumps(previous)
-    for history in histories:
-        for name in list(getattr(history, "assets", {}).keys()):
-            if name in previous:
-                task.copy_asset(history.get_asset(name), name)
-
-
-# @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
-# @matrix ai-report : compensation completed-task reuse
-def _undo_reused_completed_task(action, user):
-    before = action.get("before") or {}
-    state = before.get("task") or {}
-    task = _load_result_entity(before.get("entity"))
-    if task is None:
-        return {"note": "Reused task is missing."}
-    _require_allowed(
-        task.allowed(Action.EDIT, user=user),
-        "You do not have permission to restore this task.",
-    )
-    if task.completed or state.get("completed"):
-        raise exceptions.ValidationError(
-            "Recorded completions cannot be rewritten by undo. Reopen the task to begin a new occurrence."
-        )
-
-    histories = _checkpoint_entities(action.get("created_histories"))
-    _restore_task_checkpoint_assets(task, state, histories)
-    current_relations = [
-        getattr(task, name, None)
-        for name in (
-            "page",
-            "form",
-            "project",
-            "model",
-            "assigned_to",
-            "assigned_by",
-            "completed_by",
-        )
-    ]
-    current_relations.extend(list(task.linked_pages or []))
-    current_relations.extend(list(task.files or []))
-
-    task.name = state.get("name")
-    task.description = state.get("description")
-    task.completed = bool(state.get("completed"))
-    task.completed_on = _restore_checkpoint_datetime(state.get("completed_on"))
-    task.due_date = _restore_checkpoint_datetime(state.get("due_date"))
-    task.submission = copy.deepcopy(state.get("submission"))
-    task.page = _checkpoint_entity(state.get("page"))
-    task.form = _checkpoint_entity(state.get("form"))
-    task.project = _checkpoint_entity(state.get("project"))
-    task.model = _checkpoint_entity(state.get("model"))
-    task.assigned_to = _checkpoint_entity(state.get("assigned_to"))
-    task.assigned_by = _checkpoint_entity(state.get("assigned_by"))
-    task.completed_by = _checkpoint_entity(state.get("completed_by"))
-    task.linked_pages = _checkpoint_entities(state.get("linked_pages"))
-    task.files = _checkpoint_entities(state.get("files"))
-    task.db["history"] = bool(state.get("history", False))
-    task.db["generation"] = state.get("generation", 0) or 0
-
-    restored_relations = [
-        getattr(task, name, None)
-        for name in (
-            "page",
-            "form",
-            "project",
-            "model",
-            "assigned_to",
-            "assigned_by",
-            "completed_by",
-        )
-    ]
-    restored_relations.extend(task.linked_pages or [])
-    restored_relations.extend(task.files or [])
-    relations = _unique_entities([*current_relations, *restored_relations])
-    if relations:
-        task.add_mutation_intents(
-            *(
-                MutationIntent.touch(
-                    relation,
-                    reason="report-task-restored-relation",
-                )
-                for relation in relations
-            )
-        )
-    Entities.save(*_unique_entities([task, *relations]))
-    if histories:
-        Entities.delete(*histories)
-    return {
-        "entity": _entity_result(task),
-        "note": "Restored the task state from before the report action.",
-    }

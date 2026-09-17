@@ -419,7 +419,7 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
         "file_usage",
         "instructions",
     }
-    assert submission["contract_version"] == contract["contract_version"] == 9
+    assert submission["contract_version"] == contract["contract_version"] == 10
     assert submission["proposal"] == {}
     assert submission["proposal_schema"] == "$.proposal_schema"
     assert submission["instructions"].startswith("Call submit_plan")
@@ -731,9 +731,9 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert submission["url"] == (
             f"{expected_api_origin}/api/v1/plans/{invalid_plan['id']}/submit"
         )
-        assert submission["contract_version"] == forwarded["contract_version"] == 9
+        assert submission["contract_version"] == forwarded["contract_version"] == 10
         assert submission["body"] == {
-            "contract_version": 9,
+            "contract_version": 10,
             "proposal": {},
             "file_usage": [],
         }
@@ -839,7 +839,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert selected_contract["schema_scope"] == "selected"
         assert "workflow_rules" not in selected_contract
         assert "submission_format" not in selected_contract
-        assert selected_contract["mcp_submission"]["contract_version"] == 9
+        assert selected_contract["mcp_submission"]["contract_version"] == 10
         assert set(selected_contract["proposal_schema"]["$defs"]) == {
             "create_page",
             "create_task",
@@ -890,7 +890,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         _assert_mcp_contract(update_contract, tool="organize")
         assert update_contract["required_file_refs"] == []
         assert set(update_contract["proposal_schema"]["$defs"]) == {
-            "rename_entity",
+            "update_page",
             "complete_task",
         }
         assert "create_task" in update_contract["permissions"]["allowed_actions"]

@@ -85,26 +85,6 @@ class ReportProcess(ProcessProperty):
         self.pending = None
         self.error = message
 
-    def begin_undo(self, result):
-        """Publish the canonical state for compensation in progress."""
-        self.status = "undoing"
-        self.pending = True
-        self.error = None
-        self.result = result
-
-    def fail_undo(self, message, result):
-        """Publish a failed compensation attempt without discarding its ledger."""
-        self.status = "undo_failed"
-        self.pending = None
-        self.error = message
-        self.result = result
-
-    def complete_undo(self, result):
-        """Return a compensated report to its ready state."""
-        self.status = "ready"
-        self.pending = None
-        self.error = None
-        self.result = result
 
 
 # @testable false

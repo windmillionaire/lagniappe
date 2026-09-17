@@ -660,3 +660,19 @@ def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
         }
     ]
     assert "private_prompt" not in str(payload)
+
+
+# @source lagniappe/core/tools/ai/observability.py::reconcile_generation_records
+# @matrix observability : in-flight deferred-context exception-transparency
+def test_report_telemetry_marks_lost_attempts_interrupted():
+    now = datetime(2026, 9, 17, tzinfo=timezone.utc)
+    base = {"state": "running", "deferred_job_type": "report-ai", "deferred_job_attempt": 1, "telemetry_id": "job", "created": now}
+    assert observability.reconcile_generation_records([base], [{"telemetry_id": "job", "status": "running", "attempt": 1}], now=now) == [base]
+    for job in [{"status": "cancelled"}, {"status": "failed"}, {"status": "complete"}, {"status": "running", "attempt": 2}]:
+        row = observability.reconcile_generation_records([base], [{"telemetry_id": "job", **job}], now=now)[0]
+        assert row["state"] == "interrupted"
+        assert row["success"] is False
+    assert observability.reconcile_generation_records([base], [], now=now + timedelta(minutes=10))[0]["state"] == "interrupted"
+    complete = {**base, "state": "complete", "success": True}
+    assert observability.reconcile_generation_records([complete], [], now=now + timedelta(days=1)) == [complete]
+    assert base["state"] == "running"

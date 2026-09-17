@@ -240,46 +240,6 @@ def _report_conversion_response_schema():
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
-# @reason nested update contract is asserted through the public response schema
-def _report_submission_update_response_schema():
-    """Return the provider schema for one exact submission field update."""
-    action_reference = {
-        "type": "string",
-        "description": (
-            "Exact id of an earlier action in this proposal that creates the "
-            "referenced entity; not a workspace hash or entity id."
-        ),
-    }
-    return {
-        "type": "object",
-        "properties": {
-            "page": {"type": "string"},
-            "page_action": action_reference,
-            "task": {"type": "string"},
-            "task_action": action_reference,
-            "schema_id": {"type": "string"},
-            "field_id": {"type": "string"},
-            # Form fields accept heterogeneous JSON values. Declaring the key
-            # while leaving its value schema open prevents structured-output
-            # providers from collapsing the entire update row to {}.
-            "new_value": {},
-        },
-        "required": ["schema_id", "new_value"],
-        "propertyOrdering": [
-            "page",
-            "page_action",
-            "task",
-            "task_action",
-            "schema_id",
-            "field_id",
-            "new_value",
-        ],
-        "additionalProperties": False,
-    }
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
 # @reason action data variants are asserted through the public response schema
 def _report_action_data_properties():
     """Return the complete field vocabulary used by typed action variants."""
@@ -298,6 +258,7 @@ def _report_action_data_properties():
         "submission."
     )
     return {
+        "changes": {"type": "object"},
         "name": {"type": "string"},
         "description": {"type": "string"},
         "form_type": {"type": "string", "enum": ["page", "task"]},
@@ -347,11 +308,6 @@ def _report_action_data_properties():
         "conversions": {
             "type": "array",
             "items": _report_conversion_response_schema(),
-        },
-        "updates": {
-            "type": "array",
-            "items": _report_submission_update_response_schema(),
-            "minItems": 1,
         },
         "submission": submission,
         "submission_empty_reason": {
@@ -404,12 +360,20 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     }
     if required:
         schema["required"] = required
-    if action_type == "set_task_due_date":
-        schema["properties"]["due_date"] = {
-            "type": "string",
-            "nullable": True,
-            "description": "Calendar date YYYY-MM-DD in the acting user's timezone, or null to clear.",
-        }
+    if action_type in {"update_task", "update_model_task", "update_project", "update_page"}:
+        from lagniappe.core.tools.entity_patches import PATCH_FIELDS
+        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_page": "page"}[action_type]
+        fields = {}
+        for field in sorted(PATCH_FIELDS[kind]):
+            if field in {"categories", "model_tasks"}:
+                fields[field] = {"type": "array", "items": {"type": "string"}}
+            else:
+                fields[field] = {**vocabulary.get(field, {"type": "string"})}
+                if field not in {"name", "page", "submission"}:
+                    fields[field]["nullable"] = True
+        schema["properties"]["changes"] = {"type": "object", "properties": fields, "minProperties": 1, "additionalProperties": False}
+        schema["properties"]["entity"]["description"] = "Exact existing entity reference or $id of an earlier action. Omitted changes preserve values; null explicitly clears a supported field."
+
 
     # Cross-field reference alternatives remain an application validation
     # concern. Gemini requires ``anyOf`` to be the only field at its schema
@@ -649,24 +613,6 @@ def _external_report_action_response_schema(
             _external_required_group_schema(group) for group in required_groups
         ]
 
-    if action_type == "update_form_values" and include_submission_fields:
-        # Top-level targets belong to internal, pending completion requests.
-        # External clients supply executable rows with their own exact targets.
-        for field in ("page", "page_name", "task", "task_name"):
-            data_schema["properties"].pop(field, None)
-        row_schema = data_schema["properties"]["updates"]["items"]
-        targets = ("page", "task", "page_action", "task_action")
-        row_schema["oneOf"] = [{"required": [field]} for field in targets]
-        row_schema["description"] = (
-            "One field patch. Include exactly one target: page/task for an existing "
-            "entity, or page_action/task_action for an earlier creation action. "
-            "Repeat the target in every row, even for fields on the same entity."
-        )
-        for field in targets:
-            row_schema["properties"][field]["minLength"] = 1
-        row_schema["properties"]["schema_id"]["description"] = (
-            "Exact form field id returned by get_schema."
-        )
 
     if action_type == "create_task":
         data_schema["properties"]["schedule"] = external_task_schedule_response_schema()
@@ -685,14 +631,11 @@ def _external_report_action_response_schema(
                 "description": description,
             }
 
-    if action_type == "set_task_due_date":
-        data_schema["properties"]["task"]["description"] = (
-            "Exact hash token of an editable, incomplete Task."
-        )
-        data_schema["properties"]["due_date"].pop("nullable", None)
-        data_schema["properties"]["due_date"].update(
-            type=["string", "null"], format="date"
-        )
+
+    if action_type == "update_task":
+        changes = data_schema["properties"]["changes"]["properties"]
+        changes["due_date"] = {"type": ["string", "null"], "format": "date"}
+        changes["schedule"] = {"anyOf": [external_task_schedule_response_schema(), {"type": "null"}]}
 
     if action_type == "summarize_file":
         terms_schema = data_schema["properties"]["retrieval_terms"]

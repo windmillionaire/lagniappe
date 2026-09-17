@@ -17,6 +17,7 @@ from lagniappe.core.tools.ai.observability import (
     OUTCOME_LABELS,
     aggregate_records,
     operation_diagnostic_payload,
+    reconcile_generation_records,
 )
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
@@ -455,6 +456,7 @@ def index():
     deferred_operations = (
         DeferredJobs.recent(limit=100) if ai_observability_enabled else []
     )
+    ai_records = reconcile_generation_records(ai_records, deferred_operations)
     job_keys_by_telemetry = {
         operation.get("telemetry_id"): operation.get("key")
         for operation in deferred_operations

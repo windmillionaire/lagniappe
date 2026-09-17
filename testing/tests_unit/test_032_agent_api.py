@@ -1156,7 +1156,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
                     "entity": {"id": "visible-key", "name": "Stale title"},
                     "prepared": True,
                     "error": "private diagnostic",
-                    "updates": {"applied": [{"schema_id": "input-private", "value": "secret"}], "skipped": [{"reason": "private diagnostic"}]},
+                    "schema_updates": {"applied": [{"schema_id": "input-private", "value": "secret"}], "skipped": [{"reason": "private diagnostic"}]},
                 },
                 {
                     "id": "second",
@@ -1169,7 +1169,6 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
                     "type": "create_page",
                     "status": "complete",
                     "entity": {"id": "deleted-key", "name": "Deleted name"},
-                    "undo": {"status": "complete"},
                 },
                 {
                     "id": "fourth",
@@ -1189,9 +1188,8 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         "url": "/tasks/visible-key",
     }
     assert result["actions"][1]["entity"] is None
-    assert result["actions"][0]["updates"] == {"applied": 1, "skipped": 1}
+    assert result["actions"][0]["schema_updates"] == {"applied": 1, "skipped": 1}
     assert result["actions"][2]["entity"] is None
-    assert result["actions"][2]["undo_status"] == "complete"
     assert result["actions"][3]["entity"] == {
         "hash": "hash:history12345", "kind": "task_history", "name": None, "url": None
     }
@@ -2189,3 +2187,46 @@ def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
     report.result = {"actions": [{"status": "complete"}]}
     with pytest.raises(exceptions.ValidationError, match="execution has begun"):
         external_api.submit_plan(report, actor, answer, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)
+
+
+# @source lagniappe/core/tools/database/agent_api.py::commit_plan_mutation_if_idle
+# @matrix agent-api ai-report : browser-review cas claim fencing transaction
+@pytest.mark.parametrize("state,lease,expired,expected", [
+    ("running", "active", False, "committed"),
+    ("cancelled", None, False, "lost"),
+    ("running", "replacement", False, "lost"),
+    ("running", "active", True, "lost"),
+])
+def test_generation_publication_checks_job_in_report_transaction(monkeypatch, state, lease, expired, expected):
+    report_key = Key("activity", "report", project="test-project")
+    job_key = Key("jobs", "generation", project="test-project")
+    now = datetime.now(timezone.utc)
+    original = {"type": "report", "process": "pending"}
+    report = DatastoreEntity(key=report_key)
+    report.update({**original, "process": "ready"})
+    rows = {report_key: original, job_key: {
+        "status": state, "lease_token": lease,
+        "deadline_at": now + timedelta(seconds=-1 if expired else 60),
+    }}
+    writes = []
+
+    class Transaction:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def delete(self, key): pass
+        def put(self, row): writes.append(row)
+
+    transaction = Transaction()
+    monkeypatch.setattr(credential_store.DATA, "_datastore_client", SimpleNamespace(
+        transaction=lambda: transaction,
+        get=lambda key, transaction: rows.get(key),
+    ))
+    monkeypatch.setattr(credential_store, "plan_operation_claim_key", lambda key: "claim")
+    monkeypatch.setattr(credential_store.database_utility, "update_site_fingerprints", lambda *rows: [])
+    monkeypatch.setattr(credential_store.database_utility, "_put_mutation", lambda tx, row, mask: writes.append(row))
+    outcome = credential_store.commit_plan_mutation_if_idle(
+        report_key, expected_report=original, writes=[(SimpleNamespace(db=report, key=report_key), None)],
+        active_job=(job_key, "active"), now=now,
+    )
+    assert outcome == expected
+    assert writes == ([report] if expected == "committed" else [])

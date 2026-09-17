@@ -113,16 +113,23 @@ class ReportAdapter(DeferredJobAdapter):
         )
 
         prepare_schema_updates(proposal, context.actor)
+        snapshot = external_operations.report_snapshot(report)
         report.properties.process.set_proposal(proposal)
         report.file_usage = deepcopy(context.checkpoint.get("file_usage") or [])
-        Entities.save(report, context.actor)
+        outcome = external_operations.save_plan_if_idle(
+            report, snapshot,
+            active_job=(context.job.key, context.job.lease_token),
+        )
+        if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+            raise DeferredJobDriftError("Report generation was cancelled or replaced.")
         return {
             "report_key": report.urlsafe_key,
             "status": report.status,
             "action_count": len(proposal.get("actions") or []),
         }
 
-    # @testable infrastructure
+    # @testable true
+    # @matrix ai-report : cancellation revision reload
     def cleanup(self, context, *, terminal):
         if not terminal:
             return
@@ -134,14 +141,24 @@ class ReportAdapter(DeferredJobAdapter):
             return
         context.inputs["report"] = report
         active_job = report.deferred_job or {}
-        if active_job.get("key") and active_job.get("key") != context.job.urlsafe_key:
+        if active_job.get("key") != context.job.urlsafe_key:
             return
+        snapshot = external_operations.report_snapshot(report)
+        if context.job.status == "cancelled" and report.status in {"pending", "revising", "failed"}:
+            if context.parameters.get("mode") == "revise" and report.proposal:
+                report.properties.process.revision_failed("Generation cancelled.")
+            else:
+                report.status = "cancelled"
+                report.pending = False
+                report.error = "Generation cancelled. Retry to start again."
         if active_job.get("key") == context.job.urlsafe_key:
             report.deferred_job = None
         ai.cleanup_report_upload_manifest(report)
         if report.upload_manifest:
             report.upload_manifest = None
-        Entities.save(report, context.actor)
+        outcome = external_operations.save_plan_if_idle(report, snapshot)
+        if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+            raise DeferredJobDriftError("Report changed during generation cleanup.")
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
@@ -156,6 +173,7 @@ class ReportAdapter(DeferredJobAdapter):
         context.inputs["report"] = report
         if (report.deferred_job or {}).get("key") != context.job.urlsafe_key:
             return
+        snapshot = external_operations.report_snapshot(report)
         if context.parameters.get("mode") == "revise" and report.proposal:
             report.properties.process.revision_failed(str(error))
         else:
@@ -165,11 +183,13 @@ class ReportAdapter(DeferredJobAdapter):
                 else None
             )
             report.properties.process.fail(str(error), result=result)
-        Entities.save(report, context.actor)
+        external_operations.save_plan_if_idle(report, snapshot)
 
     # @testable infrastructure
     def terminal_message(self, context, *, succeeded, error=None):
         label = "AI"
+        if context.job.status in {"cancelled", "superseded"}:
+            return "AI report generation cancelled."
         revision = context.parameters.get("mode") == "revise"
         if succeeded:
             return f"{label} report {'revision ' if revision else ''}is ready."
@@ -183,6 +203,8 @@ class ReportAdapter(DeferredJobAdapter):
 class AIReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_AI
     required_ai_access = AI.ASK
+    max_lifetime_seconds = 10 * 60
+    resume_preparation = False
 
     def checkpoint_ready(self, context):
         checkpoint = context.checkpoint or {}
@@ -285,11 +307,15 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def started(self, context):
         report = context.input("report")
+        if getattr(report, "db", {}).get("superseded_by"):
+            raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         external_snapshot = (
             external_operations.report_snapshot(report)
             if getattr(report, "origin", None) == "api"
             else None
         )
+        from lagniappe.core.tools.database.utility import ExactEntityState
+        initial_state = deepcopy(dict(report.db))
         previous = report.deferred_job or {}
         previous_status = (
             previous.get("previous_status")
@@ -325,10 +351,13 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                     "before trying again."
                 )
         else:
+            report._form_additional_guards = [(report.key, ExactEntityState(initial_state))]
             Entities.save(report, context.actor)
 
     def authorize(self, context):
         report = context.input("report")
+        if getattr(report, "db", {}).get("superseded_by"):
+            raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         super().authorize(context)
         if not isinstance(context.actor, Entities.USER):
             raise exceptions.ValidationError("Deferred report user is invalid.")
@@ -343,6 +372,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def validate_apply(self, context):
         report = context.input("report")
+        if getattr(report, "db", {}).get("superseded_by"):
+            raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         active_job = report.deferred_job or {}
         if active_job.get("key") != context.job.urlsafe_key:
             raise exceptions.ValidationError(
@@ -374,6 +405,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         context.ensure_active()
         self.validate_apply(context)
         report = context.input("report")
+        if getattr(report, "db", {}).get("superseded_by"):
+            raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         result = ai.run_report(
             report,
             context.actor,
@@ -391,6 +424,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def failure(self, context, error):
         report = context.input("report")
+        if getattr(report, "db", {}).get("superseded_by"):
+            raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         if not isinstance(report, Entities.REPORT):
             return
         report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
@@ -436,6 +471,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         if not terminal:
             return
         report = context.input("report")
+        if getattr(report, "db", {}).get("superseded_by"):
+            raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         if not isinstance(report, Entities.REPORT):
             return
         report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())

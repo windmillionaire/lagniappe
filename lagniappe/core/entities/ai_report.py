@@ -7,7 +7,7 @@ from ..properties import ai_report_proposal
 from ..properties import ai_report_result
 from ..tools.auth.context import current_context_user
 
-REPORT_FORMAT_VERSION = 1
+REPORT_FORMAT_VERSION = 2
 UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
 
 
@@ -35,6 +35,7 @@ class AIReport(Entity):
                 "result",
                 "error",
                 "deferred_job",
+                "correction",
             }
         )
 

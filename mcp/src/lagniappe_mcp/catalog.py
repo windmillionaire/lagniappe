@@ -107,6 +107,8 @@ SAFE_PLAN_SCHEMA = {
         "review_url",
     ],
     "properties": {
+        "correction": {"type": ["object", "null"]},
+        "superseded_by": {"type": ["string", "null"]},
         "id": {"type": "string"},
         "status": {
             "enum": [
@@ -115,8 +117,6 @@ SAFE_PLAN_SCHEMA = {
                 "running",
                 "complete",
                 "failed",
-                "undoing",
-                "undo_failed",
             ]
         },
         "name": {"type": "string"},
@@ -466,6 +466,7 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
                 "type": "string",
             },
             "name": {"type": "string", "maxLength": 120},
+            "revises_plan_id": {"type": "string", "description": "Creator-owned stopped execution to correct. Read current workspace state; propose only additional changes."},
             **(
                 {
                     "actions": {
@@ -742,7 +743,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan",
-            "Return current Plan state, current/original brief, round-trippable proposal, and bounded execution outcomes with currently viewable result entities. Use the existing plan_id to recover or revise; do not create another Plan. Entity null means unavailable, not proof an action never ran.",
+            "Return current Plan state, current/original brief, round-trippable proposal, and bounded execution outcomes with currently viewable result entities. Before execution, revise the existing plan_id. After execution, start_plan with revises_plan_id creates a linked correction; never replay successful creations. Entity null means unavailable, not proof an action never ran.",
             _plan_id_input(),
             SAFE_PLAN_SCHEMA,
             "get_plan",

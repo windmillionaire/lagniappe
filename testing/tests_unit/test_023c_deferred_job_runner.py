@@ -782,3 +782,36 @@ def test_runner_treats_deleted_active_job_as_cancellation(monkeypatch):
     assert result.error == "Deferred job was cancelled or superseded."
     assert job.status == DeferredJobStatus.RUNNING.value
     assert captured == []
+
+
+# @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
+# @matrix deferred-jobs : cancellation checkpoint reauthorization recovery retry
+@pytest.mark.parametrize("age,attempt,checkpoint,expected", [
+    (601, 1, {}, "failed"),
+    (0, 2, {}, "failed"),
+    (0, 2, {"prepared": True}, "complete"),
+    (120, 1, {}, "complete"),
+])
+def test_report_planning_lifetime_and_interrupted_recovery(monkeypatch, age, attempt, checkpoint, expected):
+    now = datetime.now(timezone.utc)
+    job = RunnerJob(attempt=attempt, checkpoint=checkpoint)
+    job.created = now - timedelta(seconds=age)
+    adapter = RecordingAdapter()
+    adapter.max_lifetime_seconds = 600
+    adapter.resume_preparation = False
+    service = make_runner(monkeypatch, job, adapter)
+    monkeypatch.setattr(exceptions, "capture", lambda *args, **kwargs: None)
+    result = service.run(job.urlsafe_key, now=now)
+    assert result.state.value == expected
+    if expected == "failed":
+        assert "prepare" not in adapter.calls
+        assert "apply" not in adapter.calls
+    if checkpoint:
+        assert "prepare" not in adapter.calls
+        assert "apply" in adapter.calls
+    if age == 120:
+        control = adapter.ai_execution_context.execution_control
+        assert control.deadline_at == job.created + timedelta(seconds=600)
+        assert control.claim_provider_retry() is True
+        assert control.claim_provider_retry() is False
+        assert job.parameters["_provider_retry_used"] is True

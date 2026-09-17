@@ -186,8 +186,9 @@ def _assert_hash_cached(entity):
     assert details[entity.hash]["id"] == entity.urlsafe_key
 
 
-# @matrix ai-report : undo category-editor file-links created-entities
-def test_report_undo_preserves_category_editor_access_and_uploaded_file():
+# @matrix ai-report : delete category-editor file-links created-entities
+# @source lagniappe/core/tools/ai/report_history.py::delete_report_record
+def test_report_deletion_preserves_created_work_and_uploaded_file():
     category = _create_category("undo-editor-category")
     user = Entities.USER.create(
         {"name": _name("undo-editor"), "email": f"undo-{uuid4().hex}@example.test"}
@@ -230,16 +231,13 @@ def test_report_undo_preserves_category_editor_access_and_uploaded_file():
     assert page.allowed(Action.EDIT, user=user)
     assert category.hash in page.requires
 
-    report = Entities.fetch_one(report.key, request=Fetch.direct())
-    ai.undo_report(report, user)
-    assert report.result["undo"]["status"] == "complete", report.error
-    _assert_deleted(page)
-    _assert_deleted(task)
+    from lagniappe.core.tools.ai.report_history import delete_report_record
+    delete_report_record(report)
+    assert Entities.fetch_one(page.key, request=Fetch.direct()) is not None
+    assert Entities.fetch_one(task.key, request=Fetch.direct()) is not None
     remaining_file = Entities.fetch_one(file.key, request=Fetch.direct())
-    assert remaining_file is not None
-    assert remaining_file.page is None
+    assert remaining_file.page.key == page.key
     assert remaining_file.allowed(Action.VIEW, user=user)
-    assert not remaining_file.searchable
 
 
 # @matrix entities : cache database dependent-owner process-state save

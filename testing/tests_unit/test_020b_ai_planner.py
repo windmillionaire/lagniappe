@@ -42,7 +42,7 @@ def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     assert {"get_help", "get_guidelines", "get_task_history", "query_workspace_filter"} <= set(prompt.tools)
     assert len(prompt.tools) == len(set(prompt.tools))
     assert prompt.search
-    assert {"create_page", "create_task", "move_file", "rename_entity"} <= set(
+    assert {"create_page", "create_task", "move_file", "update_page"} <= set(
         prompt.allowed_actions
     )
     assert len(json.dumps(prompt.response_schema)) < 1500
@@ -71,7 +71,7 @@ def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, fee
 
     user = _test_user("personal-context")
     monkeypatch.setattr(type(user), "access", lambda self, access: True)
-    report = _report(user, format_version=1)
+    report = _report(user, format_version=2)
     prompt = planner.report_prompt(report, user, feedback=feedback).build()
     contract = external_api.plan_contract(
         report, user, submit_url="https://example.test/submit"
@@ -151,7 +151,7 @@ def test_generate_report_validates_answers_actions_and_file_usage(monkeypatch):
 def test_report_availability_rejects_old_and_malformed_records():
     user = _test_user("availability-owner")
     report = _report(user)
-    report.format_version = 1
+    report.format_version = 2
     assert report.available
     assert report.output_kind is None
     report.properties.process.set_proposal(
@@ -159,12 +159,14 @@ def test_report_availability_rejects_old_and_malformed_records():
     )
     assert report.output_kind == "answer"
     assert report.status == "complete"
+    report.format_version = 1
+    assert not report.available
     report.format_version = None
     assert not report.available
     assert report.note == "this plan is no longer available"
     report.format_version = 99
     assert not report.available
-    report.format_version = 1
+    report.format_version = 2
     report.proposal = {"summary": "Malformed", "actions": [None]}
     assert not report.available
     assert report.output_kind is None
@@ -188,7 +190,7 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
     assert capabilities["can_create_pages"] is False
     assert capabilities["can_create_forms"] is False
     assert capabilities["can_attach_files_to_pages"] is False
-    assert {"create_task", "complete_task", "set_task_due_date"} <= actions
+    assert {"create_task", "complete_task", "update_task"} <= actions
     assert (
         not {"create_page", "create_form", "create_category", "create_project"}
         & actions
@@ -204,15 +206,15 @@ def test_selected_response_schema_keeps_complete_action_values():
     )
 
     schema = report_proposal_response_schema(
-        ("create_task", "update_form_values"), require_issues=True
+        ("create_task", "update_task"), require_issues=True
     )
     variants = schema["properties"]["actions"]["items"]["anyOf"]
     actions = {
         v["properties"]["type"]["enum"][0]: v["properties"]["data"] for v in variants
     }
-    assert set(actions) == {"create_task", "update_form_values"}
+    assert set(actions) == {"create_task", "update_task"}
     assert "submission" in actions["create_task"]["properties"]
-    assert "updates" in actions["update_form_values"]["properties"]
+    assert "submission" in actions["update_task"]["properties"]["changes"]["properties"]
     assert all(v["additionalProperties"] is False for v in actions.values())
     assert "answer_markdown" in schema["properties"]
     assert "issues" in schema["required"]
@@ -221,70 +223,3 @@ def test_selected_response_schema_keeps_complete_action_values():
     )
     with pytest.raises(ValueError, match="Missing report response schema"):
         report_proposal_response_schema(("invented_action",))
-
-
-# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_complete_form_schema_fields
-# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_complete_unambiguous_add_form_references
-# @matrix ai-report : deterministic-repair form-type schema-field-id schema-update page-form references
-# @matrix form-schema : deterministic-repair form-type schema-update
-def test_mechanical_completion_preserves_meaning_and_rejects_ambiguous_links():
-    from lagniappe.core.tools.ai.reporting.proposals.repair import (
-        complete_proposal_structure,
-    )
-
-    proposal = {
-        "actions": [
-            {
-                "id": "form",
-                "type": "create_form",
-                "data": {
-                    "name": "Details",
-                    "schema": [
-                        {"type": "input", "placeholder": "Enter your notes"},
-                        {"type": "input", "title": "Notes"},
-                    ],
-                },
-            },
-            {
-                "id": "page",
-                "type": "create_page",
-                "data": {"name": "Page", "form_action": "form"},
-            },
-            {"type": "add_form_to_page", "data": {"page_action": "page"}},
-            {
-                "type": "update_form_schema",
-                "data": {
-                    "operations": [
-                        {
-                            "op": "add_field",
-                            "field": {"type": "input", "id": "input-vendor"},
-                        },
-                    ]
-                },
-            },
-        ]
-    }
-    original = deepcopy(proposal)
-    repaired = complete_proposal_structure(proposal)
-    assert proposal == original
-    form = repaired["actions"][0]["data"]
-    assert form["form_type"] == "page"
-    assert [f["id"] for f in form["schema"]] == ["input-notes", "input-notes-2"]
-    assert all(f["input"] == "text" for f in form["schema"])
-    assert repaired["actions"][2]["data"]["form_action"] == "form"
-    assert repaired["actions"][3]["data"]["operations"][0]["field"]["title"] == "Vendor"
-    ambiguous = {
-        "actions": [
-            repaired["actions"][0],
-            {
-                "id": "second",
-                "type": "create_form",
-                "data": {"name": "Other", "form_type": "page"},
-            },
-            original["actions"][2],
-        ]
-    }
-    assert (
-        "form_action"
-        not in complete_proposal_structure(ambiguous)["actions"][2]["data"]
-    )

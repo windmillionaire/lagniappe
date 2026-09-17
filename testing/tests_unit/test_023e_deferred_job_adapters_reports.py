@@ -84,9 +84,10 @@ def test_report_phases_reuse_current_report_without_loading_input_files(
         ),
     )
     monkeypatch.setattr(report_adapters.Entities, "save", save)
+    monkeypatch.setattr(report_adapters.external_operations, "save_plan_if_idle", lambda report, snapshot, **kwargs: save(report) or "committed")
     context = DeferredJobContext(
         job=SimpleNamespace(
-            urlsafe_key="job", idempotency_key="job-input", status_revision=1
+            urlsafe_key="job", idempotency_key="job-input", status_revision=1, status="succeeded"
         ),
         actor=SimpleNamespace(),
         notification=None,
@@ -189,6 +190,8 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
                 self.report.result = result
 
     class FakeReport:
+        db = {}
+        key = "report-key"
         available = True
         input_files = ()
         entity_kind = "report"
@@ -297,6 +300,8 @@ def test_external_report_execution_start_rejects_stale_browser_snapshot(monkeypa
             self.report.pending = True
 
     class FakeReport:
+        db = {}
+        key = "report-key"
         available = True
         input_files = ()
         origin = "api"
@@ -379,6 +384,8 @@ def test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal(
     adapter = report_adapters.ReportExecutionAdapter()
 
     class FakeReport:
+        db = {}
+        key = "report-key"
         available = True
         input_files = ()
         origin = "api"
@@ -462,6 +469,8 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
 
     class FakeReport:
+        db = {}
+        key = "report-key"
         available = True
         input_files = ()
         entity_kind = "report"
@@ -527,6 +536,8 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     events = []
 
     class FakeReport:
+        db = {}
+        key = "report-key"
         available = True
         input_files = ()
 
@@ -596,6 +607,7 @@ def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):
     actor = _test_user("report-owner")
     report = SimpleNamespace(
         urlsafe_key="report",
+        db={},
         available=True,
         instructions="Review tasks",
         input_files=[],
@@ -642,8 +654,15 @@ def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):
     monkeypatch.setattr(
         report_adapters.Entities, "save", lambda *entities: saved.append(entities)
     )
+    def guarded_save(report, snapshot, *, active_job):
+        assert snapshot == {}
+        assert active_job == ("job", "lease")
+        saved.append((report, actor))
+        return "committed"
+
+    monkeypatch.setattr(report_adapters.external_operations, "save_plan_if_idle", guarded_save)
     context = DeferredJobContext(
-        job=SimpleNamespace(attempt=2, urlsafe_key="job"),
+        job=SimpleNamespace(attempt=2, urlsafe_key="job", key="job", lease_token="lease"),
         actor=actor,
         notification=None,
         inputs={"report": report},

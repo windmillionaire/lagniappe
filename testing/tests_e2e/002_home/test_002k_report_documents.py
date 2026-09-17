@@ -1,4 +1,4 @@
-"""Reviewed document appends reach an open editor and undo without a reset."""
+"""Reviewed document appends reach an open editor without replacing existing content."""
 
 from uuid import uuid4
 
@@ -16,13 +16,12 @@ pytestmark = pytest.mark.e2e
 
 
 # @source lagniappe/core/tools/ai/reporting/execution/actions/documents.py::_append_page_document
-# @source lagniappe/core/tools/ai/reporting/execution/actions/documents.py::_undo_page_document
 # @source lagniappe/web/routes/home/sync.py::sync
 # @source lagniappe/core/mixins/assets.py::AssetMixin.copy_asset
-# @matrix ai-report editor sync : document append browser-review persistence source-attribution undo
+# @matrix ai-report editor sync : document append browser-review persistence source-attribution
 # @matrix asset-storage : copy metadata visibility
 # @template tools/report.html::proposal_action_item
-def test_reviewed_document_append_updates_open_editor_and_undo(get_user):
+def test_reviewed_document_append_updates_open_editor(get_user):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)
     actor = Entities.USER.load(owner.email)
@@ -98,12 +97,6 @@ def test_reviewed_document_append_updates_open_editor_and_undo(get_user):
         assert not database_assets.DATA.private_bucket.blob(old_asset.path).exists()
     assert before_document.get() == html
     assert before_snapshot.get() == snapshot
-    with owner.page.expect_response("**/tools/reports/*/undo"):
-        owner.page.get_by_role("button", name="Undo Report").click()
-    expect(owner.page.get_by_text("Work undone.")).to_be_visible(timeout=10000)
-    expect(editor.text_entry).not_to_contain_text(
-        "Added reviewed notes.", timeout=15000
-    )
-    expect(editor.text_entry).to_contain_text("Keep the original notes.")
+    expect(owner.page.get_by_role("button", name="Undo Report")).to_have_count(0)
     collaborator.go(collaborator_page)
-    expect(collaborator_page.editor.text_entry).to_have_text("Keep the original notes.")
+    expect(collaborator_page.editor.text_entry).to_contain_text("Added reviewed notes.")

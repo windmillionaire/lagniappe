@@ -226,11 +226,9 @@ class ProposalDisplayProjector:
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_move_files_under_target_page
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_groups_added_categories_under_page
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_completed_task_events
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_schema_updates_separately
-    # @matrix ai-report categories files : grouped-display
+    # @matrix ai-report files : grouped-display
     # @pairs ai-report:existing-page-category form-schema:schema-section
     def _group_proposal_display_actions(self, actions, action_labels, file_labels):
         by_id = {action["id"]: action for action in actions if action.get("id")}

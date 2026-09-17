@@ -145,6 +145,13 @@ def status_projection(job, *, now):
         "phase": phase,
         "phase_label": phase_label,
         "attempt": int(getattr(job, "attempt", 0) or 0),
+        "remaining_seconds": (
+            max(600 - elapsed_seconds(getattr(job, "created", None), now), 0)
+            if getattr(job, "job_type", None) == DeferredJobType.REPORT_AI.value and not terminal
+            else None
+        ),
+        "last_progress_at": progress.get("updated_at"),
+        "retry_reason": (getattr(job, "parameters", None) or {}).get("_provider_retry_reason"),
         "elapsed_seconds": (
             elapsed_seconds(getattr(job, "created", None), elapsed_until)
             if elapsed_until else 0
@@ -212,6 +219,7 @@ def admin_projection(job, *, now):
                 or getattr(actor, "email", None)
                 or "Unknown user"
             ),
+            "operation_id": getattr(job, "idempotency_key", None),
             "dispatch_state": getattr(job, "dispatch_state", None),
             "job_version": int(getattr(job, "job_version", 0) or 0),
             "start_completed": bool(getattr(job, "start_completed", False)),

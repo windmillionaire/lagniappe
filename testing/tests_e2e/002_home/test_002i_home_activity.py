@@ -410,7 +410,7 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
             "parent": user.entity,
             "user": user.entity,
             "name": "File three receipts",
-            "format_version": 1,
+            "format_version": 2,
             "status": "ready",
             "pending": False,
             "summary": report_summary,

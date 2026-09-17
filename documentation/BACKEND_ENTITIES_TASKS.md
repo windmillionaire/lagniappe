@@ -29,11 +29,19 @@ pass that user explicitly so background execution uses the same calendar day
 for live completions and older history, including across daylight-saving changes.
 Existing imported timestamps are not rewritten.
 
-The reviewed Organize action `set_task_due_date` sets or clears only the due
-date of an editable, incomplete Task. Calendar dates use the Task editor's
-current-local-time behavior and retain recurrence and postponement metadata.
-Its execution ledger records date/scheduling state for retry and guarded undo;
-it never reopens a task or replaces the schedule.
+Reviewed `update_task` patches change only supplied fields. Task identity,
+attachments, dates, recurrence and history remain intact unless an allowed field
+is explicitly changed. A date-only due date uses local midnight in the acting
+user's timezone; `null` clears it. A schedule changes only when explicitly supplied.
+
+Form reassignment requires every target answer field, including empty values.
+The review shows removed answers. The new Form, answers, classification and any
+shortened description commit together under exact source guards. Existing-Form
+answer patches retain unmentioned fields. Completed Tasks cannot be restructured;
+completion and completed-task movement remain separate operations. Model-task
+Form changes apply to future Tasks; updating existing Tasks requires explicit
+`update_task` actions. Schema migrations run in their own reviewed plan before
+planning patches against the resulting schema.
 
 Calendar schedules select valid calendar positions rather than clamping dates.
 A monthly schedule for day 31 skips months without a 31st, and a yearly

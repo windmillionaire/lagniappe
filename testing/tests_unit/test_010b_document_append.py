@@ -247,21 +247,6 @@ def test_append_list_paragraphs_do_not_gain_empty_spacer_paragraphs(list_tag, so
     assert str(items[1]) == "<listItem><paragraph>Next item</paragraph></listItem>"
 
 
-# @matrix editor sync : document append undo tombstones
-def test_undo_emits_tombstones_without_resetting_existing_nodes():
-    baseline, _ = crdt.append_fragment(None, "<p>Keep</p>", "initial")
-    appended, _ = crdt.append_fragment(baseline, "<p>Remove</p>", "append")
-    undone = crdt.undo_fragment(appended, "append")
-    assert crdt.undo_fragment(undone, "append") == undone
-    offline = crdt.load_document(appended)
-    offline["default"].children[0].children[0].insert(4, " draft")
-    merged = crdt.load_document(
-        crdt.merge_documents(undone, crdt.encode_document(offline))
-    )
-    assert str(merged["default"]) == "<paragraph>Keep draft</paragraph>"
-    assert merged["lagniappeReports"]["append"]["state"] == "undone"
-
-
 # @matrix editor sync : document append write-lock
 def test_document_write_lock_is_scoped_and_bounded(monkeypatch):
     calls = []
@@ -440,9 +425,9 @@ def test_skipped_document_append_needs_no_receipt_on_retry(monkeypatch):
     ) == recovery.ACTION_APPLIED
 
 
-# @matrix ai-report editor : document append retry undo conflict
+# @matrix ai-report editor : document append retry conflict
 @pytest.mark.parametrize("existing", [False, True])
-def test_report_append_retry_and_undo_preserve_content(monkeypatch, existing):
+def test_report_append_retry_preserves_content(monkeypatch, existing):
     _patch_fake_keys(monkeypatch)
     user = _test_user("append-owner")
     page = TestEntities.get("PAGE", {"name": "MCP", "hash": "append-page"})
@@ -526,17 +511,3 @@ def test_report_append_retry_and_undo_preserve_content(monkeypatch, existing):
     saved_html = page.properties.document.html
     changed, _ = crdt.append_fragment(snapshot, "<p>Other edit</p>", "other")
     save(page, html=saved_html + "<p>Other edit</p>", ydoc=changed)
-    with pytest.raises(exceptions.ValidationError, match="preserve those edits"):
-        actions._undo_page_document(prepared, report, user)
-    save(page, html=saved_html, ydoc=snapshot)
-    if existing:
-        saved_version = histories.pop("saved-version")
-        with pytest.raises(exceptions.ValidationError, match="version is unavailable"):
-            actions._undo_page_document(prepared, report, user)
-        assert page.properties.document.ydoc == snapshot
-        histories["saved-version"] = saved_version
-    actions._undo_page_document(prepared, report, user)
-    assert page.properties.document.html == ("<p>Keep</p>" if existing else "")
-    assert str(crdt.load_document(page.properties.document.ydoc)["default"]) == (
-        "<paragraph>Keep</paragraph>" if existing else ""
-    )

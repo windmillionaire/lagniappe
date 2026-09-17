@@ -26,9 +26,7 @@ from .references import (
     _resolve_file_entity,
     _resolve_report_file,
 )
-from .forms import _resolve_submission_update_entity, _submission_previous_value
 from .task_completion import _completion_state
-from .task_dates import _due_date_state
 from .documents import prepare_document_append
 from .completed_tasks import (
     _capture_completed_task_before,
@@ -91,13 +89,12 @@ def _allocate_action_output_key(action, created, context):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason action checkpoints are asserted through public compensation behavior
+# @reason action checkpoints are asserted through public forward recovery behavior
 def _capture_action_before(action, report, user, created, context=None):
     action_type = action.get("type")
     data = _data(action)
-    if action_type == "set_task_due_date":
-        task = _resolve_entity(data.get("task"), created, expected=Entities.TASK)
-        return {"entity": _entity_result(task), "due_date_state": _due_date_state(task)}
+    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
+        return {"review": copy.deepcopy(action.get("_entity_update"))}
     if action_type == "complete_task":
         task = _resolve_entity(data.get("task"), created, expected=Entities.TASK)
         return {"entity": _entity_result(task), "completion_state": _completion_state(task), "task": _task_checkpoint_state(task)}
@@ -110,30 +107,8 @@ def _capture_action_before(action, report, user, created, context=None):
         )
     if action_type.startswith("create_"):
         return {"entity_exists": False}
-    if action_type == "add_form_to_page":
-        page = _resolve_entity(
-            _first_data_reference(data, "page"), created, expected=Entities.PAGE
-        )
-        return {
-            "entity": _snapshot_entity(page),
-            "form": _snapshot_entity(page.form),
-        }
-    if action_type == "add_page_category":
-        page = _resolve_entity(
-            _first_data_reference(data, "page"), created, expected=Entities.PAGE
-        )
-        category = _resolve_entity(
-            _first_data_reference(data, "category", "model"),
-            created,
-            expected=Entities.CATEGORY,
-        )
-        return {
-            "entity": _snapshot_entity(page),
-            "target": _snapshot_entity(category),
-            "had_category": category.key in [item.key for item in page.categories],
-        }
-    if action_type in {"move_page", "move_task"}:
-        root = "page" if action_type == "move_page" else "task"
+    if action_type == "move_task":
+        root = "task"
         expected = Entities.PAGE if root == "page" else Entities.TASK
         entity = _resolve_entity(
             _first_data_reference(data, root), created, expected=expected
@@ -152,31 +127,7 @@ def _capture_action_before(action, report, user, created, context=None):
             "source": _snapshot_entity(source),
             "target": _snapshot_entity(target),
         }
-    if action_type == "rename_entity":
-        entity = _resolve_entity(_first_data_reference(data, "entity"), created)
-        return {
-            "entity": _snapshot_entity(entity),
-            "name": entity.name,
-        }
-    if action_type == "update_form_values":
-        previous = []
-        for index, update in enumerate(data.get("updates") or [], 1):
-            if not isinstance(update, dict):
-                continue
-            entity = _resolve_submission_update_entity(update, created)
-            schema_id = update.get("schema_id") or update.get("field_id")
-            before = _submission_previous_value(entity, schema_id)
-            previous.append(
-                {
-                    "index": index,
-                    "entity": _entity_result(entity),
-                    "schema_id": schema_id,
-                    "had_value": before["had_value"],
-                    "previous_value": before["value"],
-                }
-            )
-        return {"updates": previous}
-    if action_type in {"update_form_schema", "extend_form_schema"}:
+    if action_type in {"update_form_schema"}:
         form = _resolve_entity(
             _first_data_reference(data, "form"), created, expected=Entities.FORM
         )
@@ -218,7 +169,7 @@ def _capture_action_before(action, report, user, created, context=None):
 
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
 # @matrix ai-report : completed-task idempotency recovery
 def _prepare_action_checkpoint(action, report, user, created, context, record):
     if action.get("type") == "append_page_document":
@@ -288,8 +239,7 @@ def _assign_preallocated_key(entity, record, context):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @matrix ai-report : attachments batch-field-patch due-date moves result schema-update
+# @matrix ai-report : attachments result
 def _record_action_result(record, action, entity, to_save, metadata, created, context):
     metadata = _default_action_metadata(action, entity, metadata)
     if (
@@ -345,10 +295,11 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
         "completion_state",
         "due_date_state",
         "document_after",
+        "entity_update_after",
     ):
         if key in metadata:
             record[key] = metadata[key]
-    if action.get("type") in {"update_form_schema", "extend_form_schema"} and entity is not None:
+    if action.get("type") in {"update_form_schema"} and entity is not None:
         record["schema_fingerprint"] = _value_fingerprint(entity.schema or [])
     if metadata.get("note"):
         record["note"] = metadata["note"]

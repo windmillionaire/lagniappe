@@ -369,7 +369,8 @@ class TestEntityMixin:
             self.db["public"] = bool(test_spec["public"])
 
         if self.entity_kind == "report":
-            self.format_version = test_spec.get("format_version", 1)
+            from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
+            self.format_version = test_spec.get("format_version", REPORT_FORMAT_VERSION)
             self.file_usage = test_spec.get("file_usage")
             self.status = test_spec.get("status", "pending")
             input_files = test_spec.get("input_files", [])

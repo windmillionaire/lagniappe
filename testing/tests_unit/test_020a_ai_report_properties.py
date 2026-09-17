@@ -67,7 +67,7 @@ def test_ai_report_create_and_file_cleanup(monkeypatch):
     assert report.kind == "report"
     assert report.parent is user
     assert report.user is user
-    assert report.format_version == 1
+    assert report.format_version == 2
     assert report.instructions == "Sort the uploaded scan."
     assert report.input_files == [file]
     assert report.upload_manifest == upload_manifest
@@ -84,7 +84,7 @@ def test_ai_report_create_and_file_cleanup(monkeypatch):
         }
     )
     assert ask_report.kind == "report"
-    assert ask_report.format_version == 1
+    assert ask_report.format_version == 2
     assert ask_report.input_files == []
     assert ask_report.note == "Thinking..."
     ask_report.proposal = {
@@ -564,42 +564,6 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
     ]
 
 
-# @matrix ai-report : details proposal rename
-@pytest.mark.unit
-def test_ai_report_proposal_display_actions_show_rename_entity_details():
-    user = _test_user("proposal-rename-owner")
-    report = TestEntities.get(
-        "REPORT",
-        {
-            "name": "Rename display report",
-            "parent": user,
-            "user": user,
-            "proposal": {
-                "summary": "Rename Orthodontics to Teeth.",
-                "confidence": 0.9,
-                "actions": [
-                    {
-                        "id": "rename_page",
-                        "type": "rename_entity",
-                        "data": {
-                            "entity": {"name": "Orthodontics"},
-                            "name": "Teeth",
-                        },
-                    }
-                ],
-            },
-        },
-    )
-
-    actions = report.properties.proposal.display_actions
-
-    assert actions[0]["display_label"] == "Rename: Teeth"
-    assert actions[0]["details"] == [
-        {"label": "Entity", "value": "Orthodontics", "kind": "default"},
-        {"label": "New Name", "value": "Teeth", "kind": "default"},
-    ]
-
-
 # @matrix ai-report : details proposal submission-empty-reason
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_show_empty_submission_reason():
@@ -769,60 +733,6 @@ def test_ai_report_proposal_display_actions_humanize_generated_action_ids(
         "Page: Family Records (new)"
     ]
     assert actions[0]["support"][0]["value"] == "Richardson"
-
-
-# @matrix ai-report categories : add-category details grouped-display proposal
-@pytest.mark.unit
-def test_ai_report_proposal_display_actions_groups_added_categories_under_page(
-    monkeypatch,
-):
-    _patch_fake_keys(monkeypatch)
-    user = _test_user("proposal-add-category-owner")
-    report = AIReport.create(
-        {
-            "parent": user,
-            "user": user,
-            "name": "Add category proposal",
-            "proposal": {
-                "summary": "Create the page and also file it with family records.",
-                "confidence": 0.9,
-                "actions": [
-                    {
-                        "id": "page",
-                        "type": "create_page",
-                        "data": {"name": "Richardson Records"},
-                    },
-                    {
-                        "id": "add_family_records",
-                        "type": "add_page_category",
-                        "data": {
-                            "page_action": "page",
-                            "category": "family-records-category",
-                            "category_name": "Family Records",
-                        },
-                    },
-                ],
-            },
-        }
-    )
-
-    actions = report.properties.proposal.display_actions
-
-    assert [action["display_label"] for action in actions] == [
-        "Page: Richardson Records (new)"
-    ]
-    assert actions[0]["support"] == [
-        {
-            "label": "Add Category",
-            "value": "Family Records",
-            "kind": "category",
-            "details": [],
-            "support": [],
-            "skip": None,
-            "action_index": 2,
-            "group_action_indexes": [2],
-        }
-    ]
 
 
 # @matrix ai-report categories files : attachment-grouping details existing-page-category proposal
@@ -1072,102 +982,6 @@ def test_ai_report_proposal_display_actions_group_completed_task_events(monkeypa
     assert existing_task_support["support"][0]["value"] == (
         "2023-06-24 jeep registration"
     )
-
-
-# @matrix ai-report form-schema : details proposal schema-section skip-grouping
-@pytest.mark.unit
-def test_ai_report_proposal_display_actions_group_schema_updates_separately(
-    monkeypatch,
-):
-    _patch_fake_keys(monkeypatch)
-    user = _test_user("proposal-schema-update-owner")
-    report = AIReport.create(
-        {
-            "parent": user,
-            "user": user,
-            "name": "Schema update proposal",
-            "proposal": {
-                "summary": "Add the missing invoice status and update rows.",
-                "confidence": 0.9,
-                "actions": [
-                    {
-                        "id": "schema",
-                        "type": "update_form_schema",
-                        "data": {
-                            "form": "invoice-form",
-                            "form_name": "Invoice",
-                            "operations": [
-                                {
-                                    "op": "add_select_option",
-                                    "schema_id": "select-status",
-                                    "option": {
-                                        "value": "paid",
-                                        "label": "Paid",
-                                    },
-                                },
-                                {
-                                    "op": "add_field",
-                                    "field": {
-                                        "id": "input-payment-reference",
-                                        "type": "input",
-                                        "input": "text",
-                                        "title": "Payment Reference",
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    {
-                        "id": "updates",
-                        "type": "update_form_values",
-                        "depends_on": ["schema"],
-                        "data": {
-                            "updates": [
-                                {
-                                    "task": "invoice-task",
-                                    "task_name": "July invoice",
-                                    "schema_id": "select-status",
-                                    "new_value": "paid",
-                                }
-                            ]
-                        },
-                    },
-                ],
-            },
-        }
-    )
-
-    actions = report.properties.proposal.display_actions
-
-    assert [action["type"] for action in actions] == [
-        "schema_update_group",
-        "update_form_values",
-    ]
-    schema_group = actions[0]
-    assert schema_group["display_label"] == "Schema Updates"
-    assert schema_group["skip_dependencies"] is True
-    assert schema_group["action_index"] == 1
-    assert schema_group["group_action_indexes"] == [1]
-    assert schema_group["support"] == [
-        {
-            "label": "Schema Update",
-            "value": "schema",
-            "kind": "form",
-            "details": [
-                {"label": "Form", "value": "Invoice", "kind": "form"},
-                {"label": "Updates", "value": "2 schema changes", "kind": "default"},
-            ],
-            "support": [],
-            "skip": None,
-            "action_index": 1,
-            "group_action_indexes": [1],
-        }
-    ]
-    assert actions[1]["display_label"] == "Update Form Values: updates"
-    assert actions[1]["details"] == [
-        {"label": "Updates", "value": "1 field update", "kind": "default"}
-    ]
-    assert actions[1]["group_action_indexes"] == [1, 2]
 
 
 # @matrix ai-report : proposal action-counts

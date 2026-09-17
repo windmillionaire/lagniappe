@@ -1,8 +1,6294 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="83e0f700-f305-41fc-b946-bc735ae01489",e._sentryDebugIdIdentifier="sentry-dbid-83e0f700-f305-41fc-b946-bc735ae01489");}catch(e){}}();import{SearchBox as Qt}from"./search.js?v=bee5ee89";import{EntityMenu as ei}from"./entityMenu.js?v=bee5ee89";import{u as Et}from"./upload.js?v=bee5ee89";import{r as pe,w as se,c as xe,E as ti,f as ii,g as ni}from"./foundation.js?v=bee5ee89";import{c as tt}from"./connectivity.js?v=bee5ee89";import{Modal as si,OfflineModal as ri,DeleteModal as oi,HelpModal as ai}from"./modal.js?v=bee5ee89";import{PollingCoordinator as li}from"./polling.js?v=bee5ee89";import{STYLES as C}from"./styles.js?v=bee5ee89";import{s as wt}from"./icons.js?v=bee5ee89";import{p as w}from"./primitives.js?v=bee5ee89";import{B as St,R as di}from"./baseForm.js?v=bee5ee89";import{F as ci}from"./facets.js?v=bee5ee89";class ui{constructor(e){this.builder=e,this.polling=new li(e).init(),this.node=document.createElement("span"),this.node.dataset.role="form-change-status",this.node.hidden=!0,e.hidden&&e.blurred&&this.polling.blur(e.blurredAt??Date.now())}show(e){this.change=e,this.unsubscribe?.(),this.node.hidden=!e;for(const r of[this.builder.settings.panel,this.builder.conditions.panel,this.builder.components.panel,this.builder.model.panel,this.builder.formSettings.panel])r&&(r.inert=!!e);this.builder.pendingChange=e;const t=this.builder.header;if(t.saveButton?.setAttribute("aria-disabled",String(!!(e||t._savePromise||!this.builder.draft.dirty))),!e){t.clearMessage();return}const i=document.createElement("span"),s=["failed","expired","cancelled","superseded"].includes(e.status);if(i.textContent=s?"Form update needs attention.":"Schema migration in progress, Save temporarily disabled",this.node.replaceChildren(i),s&&e.error&&(i.textContent+=` ${e.error}`),s&&e.failed_entity){const r=this.node.appendChild(document.createElement("span"));r.textContent=` Affected ${e.failed_entity.kind}: `;const o=r.appendChild(document.createElement("a"));o.href=e.failed_entity.url,o.textContent=e.failed_entity.name}if(t.message("",{persistent:!0}),t.notification.append(this.node),s){const r=this.node.appendChild(document.createElement("span"));r.textContent=" Retry continues unfinished work and keeps answers already updated. Save will be available when the update finishes.";const o=this.node.appendChild(document.createElement("button"));o.type="button",o.className="ml-2 font-semibold underline",o.textContent="Retry",o.addEventListener("click",async()=>{o.disabled=!0;try{const a=new FormData;a.set("action","retry");const l=await pe.post(`/forms/${this.builder.key}/change`,a,{replaceErrorPage:!1});l?.ok?await this.accept(l):i.textContent=l?.error||"Could not update the job. Try again."}finally{o.disabled=!1}})}!s&&e.operation&&(this.unsubscribe=this.polling.subscribe({id:`builder-change:${e.operation}`,type:"operation",key:e.operation,revision:0},{whileBlurred:()=>this.node.isConnected&&!this.node.hidden&&this.node.checkVisibility({checkOpacity:!0,checkVisibilityCSS:!0}),onResult:async()=>{const r=await pe.get(`/forms/${this.builder.key}/change`,null,{replaceErrorPage:!1});!this.builder._destroyed&&r?.ok&&await this.accept(r)}}))}async accept(e){if(e.pending_change){JSON.stringify(e.pending_change)!==JSON.stringify(this.change)&&this.show(e.pending_change);return}if(this.show(null),e.rejected_change){this.builder.draft.saved=structuredClone(e.draft),this.builder.draft.baseline=e.baseline,this.builder.draft.formDirty=!this.builder.draft.equalForm(this.builder.draft.state,e.draft),this.builder.refreshDraftControls(),this.builder.header.message(e.rejected_change.error,{persistent:!0});return}this.builder.draft.acknowledge(this.builder.draft.saved,e),await this.builder.restoreDraft(),this.builder.header.message("Form update finished.")}destroy(){this.unsubscribe?.(),this.polling.destroy(),this.node.remove()}}const hi={modify:()=>import("./modify.js?v=bee5ee89"),html:()=>import("./html.js?v=bee5ee89"),status:()=>import("./status.js?v=bee5ee89"),visibility:()=>import("./visibility.js?v=bee5ee89"),columns:()=>import("./columns.js?v=bee5ee89"),options:()=>import("./options.js?v=bee5ee89")},fi=async(n,e)=>{const t=await hi[e]();return new t.default(n)};class Ct{constructor(e,t=null){this.state=structuredClone(e),this.saved=structuredClone(e),this.baseline=t,this.revision=0,this.past=[],this.future=[],this.group=null,this.formDirty=!1}content(e=this.state){const{selected_id:t,...i}=e;return i}equal(e,t){return this.serialize(this.content(e))===this.serialize(this.content(t))}equalForm(e,t){const{html_fields:i,...s}=this.content(e),{html_fields:r,...o}=this.content(t);return this.serialize(s)===this.serialize(o)}serialize(e){return JSON.stringify(e,(t,i)=>i&&typeof i=="object"&&!Array.isArray(i)?Object.fromEntries(Object.keys(i).sort().map(s=>[s,i[s]])):i)}get dirty(){return this.formDirty||this.serialize(this.state.html_fields)!==this.serialize(this.saved.html_fields)}updateHtml(e,t){return this.state.html_fields[e]===t?!1:(this.state.html_fields[e]=t,this.revision+=1,!0)}record(e,t=null){return this.equal(this.state,e)?(this.state.selected_id=e.selected_id,!1):(this.equalForm(this.state,e)||((!t||this.group!==t)&&(this.past.push(structuredClone(this.state)),this.past.length>100&&this.past.shift()),this.future=[],this.group=t),this.state=structuredClone(e),this.formDirty=!this.equalForm(this.state,this.saved),this.revision+=1,!0)}restoreForm(e){const t=new Set(this.state.schema.filter(i=>i.type==="html").map(i=>i.id));for(const i of e.schema)i.type!=="html"||!t.has(i.id)||(Object.hasOwn(this.state.html_fields,i.id)?e.html_fields[i.id]=this.state.html_fields[i.id]:delete e.html_fields[i.id]);this.state=e,this.formDirty=!this.equalForm(this.state,this.saved),this.group=null,this.revision+=1}undo(){return this.past.length?(this.future.push(structuredClone(this.state)),this.restoreForm(this.past.pop()),!0):!1}redo(){return this.future.length?(this.past.push(structuredClone(this.state)),this.restoreForm(this.future.pop()),!0):!1}acknowledge(e,t){const i=t.image_urls||{},s=l=>{const d=structuredClone(l);for(const[u,c]of Object.entries(d.html_fields||{}))d.html_fields[u]=Object.entries(i).reduce((f,[m,b])=>f.replaceAll(m.startsWith("draft-image:")?m:`draft-image:${m}`,b),c);return d},r=(l,d,u)=>{if(this.serialize(l)===this.serialize(d))return structuredClone(u);if(Array.isArray(l)&&Array.isArray(d)&&Array.isArray(u))return l.map((c,f)=>{const m=c?.id??c?.value,b=m===void 0?d[f]:d.find(S=>(S?.id??S?.value)===m),E=m===void 0?u[f]:u.find(S=>(S?.id??S?.value)===m);return b&&E?r(c,b,E):structuredClone(c)});if(l&&d&&u&&typeof l=="object"&&typeof d=="object"&&typeof u=="object"&&!Array.isArray(l)){const c=structuredClone(l);for(const f of new Set([...Object.keys(d),...Object.keys(u)])){const m=r(l[f],d[f],u[f]);m===void 0?delete c[f]:c[f]=m}return c}return structuredClone(l)},o=this.equal(this.state,e),a=l=>({...r(s(l),s(e),t.draft),selected_id:l.selected_id});return this.past=this.past.map(a),this.future=this.future.map(a),this.state=a(this.state),this.saved={...structuredClone(t.draft),selected_id:null},this.baseline=t.baseline,this.revision+=1,o&&(this.state={...structuredClone(this.saved),selected_id:this.state.selected_id}),this.formDirty=!this.equalForm(this.state,this.saved),this.group=null,o}applyGeneration(e){const t=structuredClone(this.state),i=new Map(t.schema.map(s=>[s.id,s]));if(!Array.isArray(e.operations))throw new Error("Invalid generated changes.");for(const s of e.operations){if(s.op==="add_field"){const o=s.field;if(!o?.id||i.has(o.id))throw new Error("Generated field identity is invalid.");if(!["input","textarea","checkbox","select","radio","table","html","status","signature","link","bookmark","location","todo"].includes(o.type))throw new Error("Unsupported generated field type.");const a=structuredClone(o);a.type==="html"&&(t.html_fields[a.id]=""),t.schema.push(a),i.set(a.id,a);continue}const r=i.get(s.field_id);if(!r)throw new Error("A generated change targets an unknown field.");if(s.op==="update_field"){if(!s.changes||Object.entries(s.changes).some(([o,a])=>!["title","placeholder"].includes(o)||typeof a!="string"))throw new Error("This generated change needs a later migration step.");Object.assign(r,s.changes)}else if(s.op==="update_option"){const o=r.options?.find(a=>a.value===s.value);if(!o||typeof s.label!="string")throw new Error("Invalid generated option label.");o.label=s.label}else if(s.op==="update_column"){const o=r.columns?.find(a=>a.id===s.column_id);if(!o||typeof s.title!="string")throw new Error("Invalid generated column label.");o.title=s.title}else throw new Error("This generated change needs a later migration step.")}for(const[s,r]of Object.entries(e.html_fields||{})){if(i.get(s)?.type!=="html"||typeof r!="string")throw new Error("Invalid generated text content.");t.html_fields[s]=r}return this.record(t)}}const Ie=n=>n.type==="input"?n.input||"text":n.type==="link"?n.location||"out":n.type==="select"&&n.multiple?"multiple":n.type,Dt=(n,e)=>n.some(t=>{if(["html","status"].includes(t.type))return!1;const i=e.find(({id:s})=>s===t.id);return!i||Ie(t)!==Ie(i)||t.options?.some(({value:s})=>!i.options?.some(r=>r.value===s))?!0:t.columns?Dt(t.columns,i.columns||[]):!1}),mi=n=>{let e=0;for(const t of n)for(const i of["visibility","status"])Array.isArray(t[i])&&(t[i]=t[i].filter(s=>{const r=n.find(({id:d})=>d===s.id),o=s.value??s.checked,a=Array.isArray(o)?o:[o],l=r&&(["radio","select"].includes(r.type)?a.every(d=>r.options?.some(u=>u.value===d)):r.type==="checkbox"&&s.type==="checkbox");return l?s.type=r.type:e++,l}));return e};function pi(n,e,t){return(e=yi(e))in n?Object.defineProperty(n,e,{value:t,enumerable:!0,configurable:!0,writable:!0}):n[e]=t,n}function Q(){return Q=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var i in t)({}).hasOwnProperty.call(t,i)&&(n[i]=t[i])}return n},Q.apply(null,arguments)}function kt(n,e){var t=Object.keys(n);if(Object.getOwnPropertySymbols){var i=Object.getOwnPropertySymbols(n);e&&(i=i.filter(function(s){return Object.getOwnPropertyDescriptor(n,s).enumerable})),t.push.apply(t,i)}return t}function K(n){for(var e=1;e<arguments.length;e++){var t=arguments[e]!=null?arguments[e]:{};e%2?kt(Object(t),!0).forEach(function(i){pi(n,i,t[i])}):Object.getOwnPropertyDescriptors?Object.defineProperties(n,Object.getOwnPropertyDescriptors(t)):kt(Object(t)).forEach(function(i){Object.defineProperty(n,i,Object.getOwnPropertyDescriptor(t,i))})}return n}function gi(n,e){if(n==null)return{};var t,i,s=bi(n,e);if(Object.getOwnPropertySymbols){var r=Object.getOwnPropertySymbols(n);for(i=0;i<r.length;i++)t=r[i],e.indexOf(t)===-1&&{}.propertyIsEnumerable.call(n,t)&&(s[t]=n[t])}return s}function bi(n,e){if(n==null)return{};var t={};for(var i in n)if({}.hasOwnProperty.call(n,i)){if(e.indexOf(i)!==-1)continue;t[i]=n[i]}return t}function vi(n,e){if(typeof n!="object"||!n)return n;var t=n[Symbol.toPrimitive];if(t!==void 0){var i=t.call(n,e);if(typeof i!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(e==="string"?String:Number)(n)}function yi(n){var e=vi(n,"string");return typeof e=="symbol"?e:e+""}function it(n){"@babel/helpers - typeof";return it=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},it(n)}var _i="1.15.7";function ee(n){if(typeof window<"u"&&window.navigator)return!!navigator.userAgent.match(n)}var te=ee(/(?:Trident.*rv[ :]?11\.|msie|iemobile|Windows Phone)/i),Te=ee(/Edge/i),xt=ee(/firefox/i),Ae=ee(/safari/i)&&!ee(/chrome/i)&&!ee(/android/i),nt=ee(/iP(ad|od|hone)/i),It=ee(/chrome/i)&&ee(/android/i),Tt={capture:!1,passive:!1};function _(n,e,t){n.addEventListener(e,t,!te&&Tt)}function y(n,e,t){n.removeEventListener(e,t,!te&&Tt)}function Ue(n,e){if(e){if(e[0]===">"&&(e=e.substring(1)),n)try{if(n.matches)return n.matches(e);if(n.msMatchesSelector)return n.msMatchesSelector(e);if(n.webkitMatchesSelector)return n.webkitMatchesSelector(e)}catch{return!1}return!1}}function At(n){return n.host&&n!==document&&n.host.nodeType&&n.host!==n?n.host:n.parentNode}function z(n,e,t,i){if(n){t=t||document;do{if(e!=null&&(e[0]===">"?n.parentNode===t&&Ue(n,e):Ue(n,e))||i&&n===t)return n;if(n===t)break}while(n=At(n))}return null}var Pt=/\s+/g;function U(n,e,t){if(n&&e)if(n.classList)n.classList[t?"add":"remove"](e);else{var i=(" "+n.className+" ").replace(Pt," ").replace(" "+e+" "," ");n.className=(i+(t?" "+e:"")).replace(Pt," ")}}function g(n,e,t){var i=n&&n.style;if(i){if(t===void 0)return document.defaultView&&document.defaultView.getComputedStyle?t=document.defaultView.getComputedStyle(n,""):n.currentStyle&&(t=n.currentStyle),e===void 0?t:t[e];!(e in i)&&e.indexOf("webkit")===-1&&(e="-webkit-"+e),i[e]=t+(typeof t=="string"?"":"px")}}function ge(n,e){var t="";if(typeof n=="string")t=n;else do{var i=g(n,"transform");i&&i!=="none"&&(t=i+" "+t)}while(!e&&(n=n.parentNode));var s=window.DOMMatrix||window.WebKitCSSMatrix||window.CSSMatrix||window.MSCSSMatrix;return s&&new s(t)}function Ot(n,e,t){if(n){var i=n.getElementsByTagName(e),s=0,r=i.length;if(t)for(;s<r;s++)t(i[s],s);return i}return[]}function V(){var n=document.scrollingElement;return n||document.documentElement}function I(n,e,t,i,s){if(!(!n.getBoundingClientRect&&n!==window)){var r,o,a,l,d,u,c;if(n!==window&&n.parentNode&&n!==V()?(r=n.getBoundingClientRect(),o=r.top,a=r.left,l=r.bottom,d=r.right,u=r.height,c=r.width):(o=0,a=0,l=window.innerHeight,d=window.innerWidth,u=window.innerHeight,c=window.innerWidth),(e||t)&&n!==window&&(s=s||n.parentNode,!te))do if(s&&s.getBoundingClientRect&&(g(s,"transform")!=="none"||t&&g(s,"position")!=="static")){var f=s.getBoundingClientRect();o-=f.top+parseInt(g(s,"border-top-width")),a-=f.left+parseInt(g(s,"border-left-width")),l=o+r.height,d=a+r.width;break}while(s=s.parentNode);if(i&&n!==window){var m=ge(s||n),b=m&&m.a,E=m&&m.d;m&&(o/=E,a/=b,c/=b,u/=E,l=o+u,d=a+c)}return{top:o,left:a,bottom:l,right:d,width:c,height:u}}}function Nt(n,e,t){for(var i=re(n,!0),s=I(n)[e];i;){var r=I(i)[t],o=void 0;if(o=s>=r,!o)return i;if(i===V())break;i=re(i,!1)}return!1}function be(n,e,t,i){for(var s=0,r=0,o=n.children;r<o.length;){if(o[r].style.display!=="none"&&o[r]!==p.ghost&&(i||o[r]!==p.dragged)&&z(o[r],t.draggable,n,!1)){if(s===e)return o[r];s++}r++}return null}function st(n,e){for(var t=n.lastElementChild;t&&(t===p.ghost||g(t,"display")==="none"||e&&!Ue(t,e));)t=t.previousElementSibling;return t||null}function $(n,e){var t=0;if(!n||!n.parentNode)return-1;for(;n=n.previousElementSibling;)n.nodeName.toUpperCase()!=="TEMPLATE"&&n!==p.clone&&(!e||Ue(n,e))&&t++;return t}function Ft(n){var e=0,t=0,i=V();if(n)do{var s=ge(n),r=s.a,o=s.d;e+=n.scrollLeft*r,t+=n.scrollTop*o}while(n!==i&&(n=n.parentNode));return[e,t]}function Ei(n,e){for(var t in n)if(n.hasOwnProperty(t)){for(var i in e)if(e.hasOwnProperty(i)&&e[i]===n[t][i])return Number(t)}return-1}function re(n,e){if(!n||!n.getBoundingClientRect)return V();var t=n,i=!1;do if(t.clientWidth<t.scrollWidth||t.clientHeight<t.scrollHeight){var s=g(t);if(t.clientWidth<t.scrollWidth&&(s.overflowX=="auto"||s.overflowX=="scroll")||t.clientHeight<t.scrollHeight&&(s.overflowY=="auto"||s.overflowY=="scroll")){if(!t.getBoundingClientRect||t===document.body)return V();if(i||e)return t;i=!0}}while(t=t.parentNode);return V()}function wi(n,e){if(n&&e)for(var t in e)e.hasOwnProperty(t)&&(n[t]=e[t]);return n}function rt(n,e){return Math.round(n.top)===Math.round(e.top)&&Math.round(n.left)===Math.round(e.left)&&Math.round(n.height)===Math.round(e.height)&&Math.round(n.width)===Math.round(e.width)}var Pe;function Bt(n,e){return function(){if(!Pe){var t=arguments,i=this;t.length===1?n.call(i,t[0]):n.apply(i,t),Pe=setTimeout(function(){Pe=void 0},e)}}}function Si(){clearTimeout(Pe),Pe=void 0}function Lt(n,e,t){n.scrollLeft+=e,n.scrollTop+=t}function Mt(n){var e=window.Polymer,t=window.jQuery||window.Zepto;return e&&e.dom?e.dom(n).cloneNode(!0):t?t(n).clone(!0)[0]:n.cloneNode(!0)}function qt(n,e,t){var i={};return Array.from(n.children).forEach(function(s){var r,o,a,l;if(!(!z(s,e.draggable,n,!1)||s.animated||s===t)){var d=I(s);i.left=Math.min((r=i.left)!==null&&r!==void 0?r:1/0,d.left),i.top=Math.min((o=i.top)!==null&&o!==void 0?o:1/0,d.top),i.right=Math.max((a=i.right)!==null&&a!==void 0?a:-1/0,d.right),i.bottom=Math.max((l=i.bottom)!==null&&l!==void 0?l:-1/0,d.bottom)}}),i.width=i.right-i.left,i.height=i.bottom-i.top,i.x=i.left,i.y=i.top,i}var B="Sortable"+new Date().getTime();function Ci(){var n=[],e;return{captureAnimationState:function(){if(n=[],!!this.options.animation){var i=[].slice.call(this.el.children);i.forEach(function(s){if(!(g(s,"display")==="none"||s===p.ghost)){n.push({target:s,rect:I(s)});var r=K({},n[n.length-1].rect);if(s.thisAnimationDuration){var o=ge(s,!0);o&&(r.top-=o.f,r.left-=o.e)}s.fromRect=r}})}},addAnimationState:function(i){n.push(i)},removeAnimationState:function(i){n.splice(Ei(n,{target:i}),1)},animateAll:function(i){var s=this;if(!this.options.animation){clearTimeout(e),typeof i=="function"&&i();return}var r=!1,o=0;n.forEach(function(a){var l=0,d=a.target,u=d.fromRect,c=I(d),f=d.prevFromRect,m=d.prevToRect,b=a.rect,E=ge(d,!0);E&&(c.top-=E.f,c.left-=E.e),d.toRect=c,d.thisAnimationDuration&&rt(f,c)&&!rt(u,c)&&(b.top-c.top)/(b.left-c.left)===(u.top-c.top)/(u.left-c.left)&&(l=ki(b,f,m,s.options)),rt(c,u)||(d.prevFromRect=u,d.prevToRect=c,l||(l=s.options.animation),s.animate(d,b,c,l)),l&&(r=!0,o=Math.max(o,l),clearTimeout(d.animationResetTimer),d.animationResetTimer=setTimeout(function(){d.animationTime=0,d.prevFromRect=null,d.fromRect=null,d.prevToRect=null,d.thisAnimationDuration=null},l),d.thisAnimationDuration=l)}),clearTimeout(e),r?e=setTimeout(function(){typeof i=="function"&&i()},o):typeof i=="function"&&i(),n=[]},animate:function(i,s,r,o){if(o){g(i,"transition",""),g(i,"transform","");var a=ge(this.el),l=a&&a.a,d=a&&a.d,u=(s.left-r.left)/(l||1),c=(s.top-r.top)/(d||1);i.animatingX=!!u,i.animatingY=!!c,g(i,"transform","translate3d("+u+"px,"+c+"px,0)"),this.forRepaintDummy=Di(i),g(i,"transition","transform "+o+"ms"+(this.options.easing?" "+this.options.easing:"")),g(i,"transform","translate3d(0,0,0)"),typeof i.animated=="number"&&clearTimeout(i.animated),i.animated=setTimeout(function(){g(i,"transition",""),g(i,"transform",""),i.animated=!1,i.animatingX=!1,i.animatingY=!1},o)}}}}function Di(n){return n.offsetWidth}function ki(n,e,t,i){return Math.sqrt(Math.pow(e.top-n.top,2)+Math.pow(e.left-n.left,2))/Math.sqrt(Math.pow(e.top-t.top,2)+Math.pow(e.left-t.left,2))*i.animation}var ve=[],ot={initializeByDefault:!0},Oe={mount:function(e){for(var t in ot)ot.hasOwnProperty(t)&&!(t in e)&&(e[t]=ot[t]);ve.forEach(function(i){if(i.pluginName===e.pluginName)throw"Sortable: Cannot mount plugin ".concat(e.pluginName," more than once")}),ve.push(e)},pluginEvent:function(e,t,i){var s=this;this.eventCanceled=!1,i.cancel=function(){s.eventCanceled=!0};var r=e+"Global";ve.forEach(function(o){t[o.pluginName]&&(t[o.pluginName][r]&&t[o.pluginName][r](K({sortable:t},i)),t.options[o.pluginName]&&t[o.pluginName][e]&&t[o.pluginName][e](K({sortable:t},i)))})},initializePlugins:function(e,t,i,s){ve.forEach(function(a){var l=a.pluginName;if(!(!e.options[l]&&!a.initializeByDefault)){var d=new a(e,t,e.options);d.sortable=e,d.options=e.options,e[l]=d,Q(i,d.defaults)}});for(var r in e.options)if(e.options.hasOwnProperty(r)){var o=this.modifyOption(e,r,e.options[r]);typeof o<"u"&&(e.options[r]=o)}},getEventProperties:function(e,t){var i={};return ve.forEach(function(s){typeof s.eventProperties=="function"&&Q(i,s.eventProperties.call(t[s.pluginName],e))}),i},modifyOption:function(e,t,i){var s;return ve.forEach(function(r){e[r.pluginName]&&r.optionListeners&&typeof r.optionListeners[t]=="function"&&(s=r.optionListeners[t].call(e[r.pluginName],i))}),s}};function xi(n){var e=n.sortable,t=n.rootEl,i=n.name,s=n.targetEl,r=n.cloneEl,o=n.toEl,a=n.fromEl,l=n.oldIndex,d=n.newIndex,u=n.oldDraggableIndex,c=n.newDraggableIndex,f=n.originalEvent,m=n.putSortable,b=n.extraEventProperties;if(e=e||t&&t[B],!!e){var E,S=e.options,M="on"+i.charAt(0).toUpperCase()+i.substr(1);window.CustomEvent&&!te&&!Te?E=new CustomEvent(i,{bubbles:!0,cancelable:!0}):(E=document.createEvent("Event"),E.initEvent(i,!0,!0)),E.to=o||t,E.from=a||t,E.item=s||t,E.clone=r,E.oldIndex=l,E.newIndex=d,E.oldDraggableIndex=u,E.newDraggableIndex=c,E.originalEvent=f,E.pullMode=m?m.lastPutMode:void 0;var A=K(K({},b),Oe.getEventProperties(i,e));for(var q in A)E[q]=A[q];t&&t.dispatchEvent(E),S[M]&&S[M].call(e,E)}}var Ii=["evt"],L=function(e,t){var i=arguments.length>2&&arguments[2]!==void 0?arguments[2]:{},s=i.evt,r=gi(i,Ii);Oe.pluginEvent.bind(p)(e,t,K({dragEl:h,parentEl:x,ghostEl:v,rootEl:D,nextEl:he,lastDownEl:Ge,cloneEl:k,cloneHidden:oe,dragStarted:Fe,putSortable:P,activeSortable:p.active,originalEvent:s,oldIndex:ye,oldDraggableIndex:Ne,newIndex:G,newDraggableIndex:ae,hideGhostForTarget:$t,unhideGhostForTarget:Xt,cloneNowHidden:function(){oe=!0},cloneNowShown:function(){oe=!1},dispatchSortableEvent:function(a){F({sortable:t,name:a,originalEvent:s})}},r))};function F(n){xi(K({putSortable:P,cloneEl:k,targetEl:h,rootEl:D,oldIndex:ye,oldDraggableIndex:Ne,newIndex:G,newDraggableIndex:ae},n))}var h,x,v,D,he,Ge,k,oe,ye,G,Ne,ae,He,P,_e=!1,Ye=!1,$e=[],fe,W,at,lt,Rt,jt,Fe,Ee,Be,Le=!1,Xe=!1,ze,O,dt=[],ct=!1,We=[],Je=typeof document<"u",Ke=nt,Ut=Te||te?"cssFloat":"float",Ti=Je&&!It&&!nt&&"draggable"in document.createElement("div"),Gt=(function(){if(Je){if(te)return!1;var n=document.createElement("x");return n.style.cssText="pointer-events:auto",n.style.pointerEvents==="auto"}})(),Ht=function(e,t){var i=g(e),s=parseInt(i.width)-parseInt(i.paddingLeft)-parseInt(i.paddingRight)-parseInt(i.borderLeftWidth)-parseInt(i.borderRightWidth),r=be(e,0,t),o=be(e,1,t),a=r&&g(r),l=o&&g(o),d=a&&parseInt(a.marginLeft)+parseInt(a.marginRight)+I(r).width,u=l&&parseInt(l.marginLeft)+parseInt(l.marginRight)+I(o).width;if(i.display==="flex")return i.flexDirection==="column"||i.flexDirection==="column-reverse"?"vertical":"horizontal";if(i.display==="grid")return i.gridTemplateColumns.split(" ").length<=1?"vertical":"horizontal";if(r&&a.float&&a.float!=="none"){var c=a.float==="left"?"left":"right";return o&&(l.clear==="both"||l.clear===c)?"vertical":"horizontal"}return r&&(a.display==="block"||a.display==="flex"||a.display==="table"||a.display==="grid"||d>=s&&i[Ut]==="none"||o&&i[Ut]==="none"&&d+u>s)?"vertical":"horizontal"},Ai=function(e,t,i){var s=i?e.left:e.top,r=i?e.right:e.bottom,o=i?e.width:e.height,a=i?t.left:t.top,l=i?t.right:t.bottom,d=i?t.width:t.height;return s===a||r===l||s+o/2===a+d/2},Pi=function(e,t){var i;return $e.some(function(s){var r=s[B].options.emptyInsertThreshold;if(!(!r||st(s))){var o=I(s),a=e>=o.left-r&&e<=o.right+r,l=t>=o.top-r&&t<=o.bottom+r;if(a&&l)return i=s}}),i},Yt=function(e){function t(r,o){return function(a,l,d,u){var c=a.options.group.name&&l.options.group.name&&a.options.group.name===l.options.group.name;if(r==null&&(o||c))return!0;if(r==null||r===!1)return!1;if(o&&r==="clone")return r;if(typeof r=="function")return t(r(a,l,d,u),o)(a,l,d,u);var f=(o?a:l).options.group.name;return r===!0||typeof r=="string"&&r===f||r.join&&r.indexOf(f)>-1}}var i={},s=e.group;(!s||it(s)!="object")&&(s={name:s}),i.name=s.name,i.checkPull=t(s.pull,!0),i.checkPut=t(s.put),i.revertClone=s.revertClone,e.group=i},$t=function(){!Gt&&v&&g(v,"display","none")},Xt=function(){!Gt&&v&&g(v,"display","")};Je&&!It&&document.addEventListener("click",function(n){if(Ye)return n.preventDefault(),n.stopPropagation&&n.stopPropagation(),n.stopImmediatePropagation&&n.stopImmediatePropagation(),Ye=!1,!1},!0);var me=function(e){if(h){e=e.touches?e.touches[0]:e;var t=Pi(e.clientX,e.clientY);if(t){var i={};for(var s in e)e.hasOwnProperty(s)&&(i[s]=e[s]);i.target=i.rootEl=t,i.preventDefault=void 0,i.stopPropagation=void 0,t[B]._onDragOver(i)}}},Oi=function(e){h&&h.parentNode[B]._isOutsideThisEl(e.target)};function p(n,e){if(!(n&&n.nodeType&&n.nodeType===1))throw"Sortable: `el` must be an HTMLElement, not ".concat({}.toString.call(n));this.el=n,this.options=e=Q({},e),n[B]=this;var t={group:null,sort:!0,disabled:!1,store:null,handle:null,draggable:/^[uo]l$/i.test(n.nodeName)?">li":">*",swapThreshold:1,invertSwap:!1,invertedSwapThreshold:null,removeCloneOnHide:!0,direction:function(){return Ht(n,this.options)},ghostClass:"sortable-ghost",chosenClass:"sortable-chosen",dragClass:"sortable-drag",ignore:"a, img",filter:null,preventOnFilter:!0,animation:0,easing:null,setData:function(o,a){o.setData("Text",a.textContent)},dropBubble:!1,dragoverBubble:!1,dataIdAttr:"data-id",delay:0,delayOnTouchOnly:!1,touchStartThreshold:(Number.parseInt?Number:window).parseInt(window.devicePixelRatio,10)||1,forceFallback:!1,fallbackClass:"sortable-fallback",fallbackOnBody:!1,fallbackTolerance:0,fallbackOffset:{x:0,y:0},supportPointer:p.supportPointer!==!1&&"PointerEvent"in window&&(!Ae||nt),emptyInsertThreshold:5};Oe.initializePlugins(this,n,t);for(var i in t)!(i in e)&&(e[i]=t[i]);Yt(e);for(var s in this)s.charAt(0)==="_"&&typeof this[s]=="function"&&(this[s]=this[s].bind(this));this.nativeDraggable=e.forceFallback?!1:Ti,this.nativeDraggable&&(this.options.touchStartThreshold=1),e.supportPointer?_(n,"pointerdown",this._onTapStart):(_(n,"mousedown",this._onTapStart),_(n,"touchstart",this._onTapStart)),this.nativeDraggable&&(_(n,"dragover",this),_(n,"dragenter",this)),$e.push(this.el),e.store&&e.store.get&&this.sort(e.store.get(this)||[]),Q(this,Ci())}p.prototype={constructor:p,_isOutsideThisEl:function(e){!this.el.contains(e)&&e!==this.el&&(Ee=null)},_getDirection:function(e,t){return typeof this.options.direction=="function"?this.options.direction.call(this,e,t,h):this.options.direction},_onTapStart:function(e){if(e.cancelable){var t=this,i=this.el,s=this.options,r=s.preventOnFilter,o=e.type,a=e.touches&&e.touches[0]||e.pointerType&&e.pointerType==="touch"&&e,l=(a||e).target,d=e.target.shadowRoot&&(e.path&&e.path[0]||e.composedPath&&e.composedPath()[0])||l,u=s.filter;if(ji(i),!h&&!(/mousedown|pointerdown/.test(o)&&e.button!==0||s.disabled)&&!d.isContentEditable&&!(!this.nativeDraggable&&Ae&&l&&l.tagName.toUpperCase()==="SELECT")&&(l=z(l,s.draggable,i,!1),!(l&&l.animated)&&Ge!==l)){if(ye=$(l),Ne=$(l,s.draggable),typeof u=="function"){if(u.call(this,e,l,this)){F({sortable:t,rootEl:d,name:"filter",targetEl:l,toEl:i,fromEl:i}),L("filter",t,{evt:e}),r&&e.preventDefault();return}}else if(u&&(u=u.split(",").some(function(c){if(c=z(d,c.trim(),i,!1),c)return F({sortable:t,rootEl:c,name:"filter",targetEl:l,fromEl:i,toEl:i}),L("filter",t,{evt:e}),!0}),u)){r&&e.preventDefault();return}s.handle&&!z(d,s.handle,i,!1)||this._prepareDragStart(e,a,l)}}},_prepareDragStart:function(e,t,i){var s=this,r=s.el,o=s.options,a=r.ownerDocument,l;if(i&&!h&&i.parentNode===r){var d=I(i);if(D=r,h=i,x=h.parentNode,he=h.nextSibling,Ge=i,He=o.group,p.dragged=h,fe={target:h,clientX:(t||e).clientX,clientY:(t||e).clientY},Rt=fe.clientX-d.left,jt=fe.clientY-d.top,this._lastX=(t||e).clientX,this._lastY=(t||e).clientY,h.style["will-change"]="all",l=function(){if(L("delayEnded",s,{evt:e}),p.eventCanceled){s._onDrop();return}s._disableDelayedDragEvents(),!xt&&s.nativeDraggable&&(h.draggable=!0),s._triggerDragStart(e,t),F({sortable:s,name:"choose",originalEvent:e}),U(h,o.chosenClass,!0)},o.ignore.split(",").forEach(function(u){Ot(h,u.trim(),ut)}),_(a,"dragover",me),_(a,"mousemove",me),_(a,"touchmove",me),o.supportPointer?(_(a,"pointerup",s._onDrop),!this.nativeDraggable&&_(a,"pointercancel",s._onDrop)):(_(a,"mouseup",s._onDrop),_(a,"touchend",s._onDrop),_(a,"touchcancel",s._onDrop)),xt&&this.nativeDraggable&&(this.options.touchStartThreshold=4,h.draggable=!0),L("delayStart",this,{evt:e}),o.delay&&(!o.delayOnTouchOnly||t)&&(!this.nativeDraggable||!(Te||te))){if(p.eventCanceled){this._onDrop();return}o.supportPointer?(_(a,"pointerup",s._disableDelayedDrag),_(a,"pointercancel",s._disableDelayedDrag)):(_(a,"mouseup",s._disableDelayedDrag),_(a,"touchend",s._disableDelayedDrag),_(a,"touchcancel",s._disableDelayedDrag)),_(a,"mousemove",s._delayedDragTouchMoveHandler),_(a,"touchmove",s._delayedDragTouchMoveHandler),o.supportPointer&&_(a,"pointermove",s._delayedDragTouchMoveHandler),s._dragStartTimer=setTimeout(l,o.delay)}else l()}},_delayedDragTouchMoveHandler:function(e){var t=e.touches?e.touches[0]:e;Math.max(Math.abs(t.clientX-this._lastX),Math.abs(t.clientY-this._lastY))>=Math.floor(this.options.touchStartThreshold/(this.nativeDraggable&&window.devicePixelRatio||1))&&this._disableDelayedDrag()},_disableDelayedDrag:function(){h&&ut(h),clearTimeout(this._dragStartTimer),this._disableDelayedDragEvents()},_disableDelayedDragEvents:function(){var e=this.el.ownerDocument;y(e,"mouseup",this._disableDelayedDrag),y(e,"touchend",this._disableDelayedDrag),y(e,"touchcancel",this._disableDelayedDrag),y(e,"pointerup",this._disableDelayedDrag),y(e,"pointercancel",this._disableDelayedDrag),y(e,"mousemove",this._delayedDragTouchMoveHandler),y(e,"touchmove",this._delayedDragTouchMoveHandler),y(e,"pointermove",this._delayedDragTouchMoveHandler)},_triggerDragStart:function(e,t){t=t||e.pointerType=="touch"&&e,!this.nativeDraggable||t?this.options.supportPointer?_(document,"pointermove",this._onTouchMove):t?_(document,"touchmove",this._onTouchMove):_(document,"mousemove",this._onTouchMove):(_(h,"dragend",this),_(D,"dragstart",this._onDragStart));try{document.selection?Ze(function(){document.selection.empty()}):window.getSelection().removeAllRanges()}catch{}},_dragStarted:function(e,t){if(_e=!1,D&&h){L("dragStarted",this,{evt:t}),this.nativeDraggable&&_(document,"dragover",Oi);var i=this.options;!e&&U(h,i.dragClass,!1),U(h,i.ghostClass,!0),p.active=this,e&&this._appendGhost(),F({sortable:this,name:"start",originalEvent:t})}else this._nulling()},_emulateDragOver:function(){if(W){this._lastX=W.clientX,this._lastY=W.clientY,$t();for(var e=document.elementFromPoint(W.clientX,W.clientY),t=e;e&&e.shadowRoot&&(e=e.shadowRoot.elementFromPoint(W.clientX,W.clientY),e!==t);)t=e;if(h.parentNode[B]._isOutsideThisEl(e),t)do{if(t[B]){var i=void 0;if(i=t[B]._onDragOver({clientX:W.clientX,clientY:W.clientY,target:e,rootEl:t}),i&&!this.options.dragoverBubble)break}e=t}while(t=At(t));Xt()}},_onTouchMove:function(e){if(fe){var t=this.options,i=t.fallbackTolerance,s=t.fallbackOffset,r=e.touches?e.touches[0]:e,o=v&&ge(v,!0),a=v&&o&&o.a,l=v&&o&&o.d,d=Ke&&O&&Ft(O),u=(r.clientX-fe.clientX+s.x)/(a||1)+(d?d[0]-dt[0]:0)/(a||1),c=(r.clientY-fe.clientY+s.y)/(l||1)+(d?d[1]-dt[1]:0)/(l||1);if(!p.active&&!_e){if(i&&Math.max(Math.abs(r.clientX-this._lastX),Math.abs(r.clientY-this._lastY))<i)return;this._onDragStart(e,!0)}if(v){o?(o.e+=u-(at||0),o.f+=c-(lt||0)):o={a:1,b:0,c:0,d:1,e:u,f:c};var f="matrix(".concat(o.a,",").concat(o.b,",").concat(o.c,",").concat(o.d,",").concat(o.e,",").concat(o.f,")");g(v,"webkitTransform",f),g(v,"mozTransform",f),g(v,"msTransform",f),g(v,"transform",f),at=u,lt=c,W=r}e.cancelable&&e.preventDefault()}},_appendGhost:function(){if(!v){var e=this.options.fallbackOnBody?document.body:D,t=I(h,!0,Ke,!0,e),i=this.options;if(Ke){for(O=e;g(O,"position")==="static"&&g(O,"transform")==="none"&&O!==document;)O=O.parentNode;O!==document.body&&O!==document.documentElement?(O===document&&(O=V()),t.top+=O.scrollTop,t.left+=O.scrollLeft):O=V(),dt=Ft(O)}v=h.cloneNode(!0),U(v,i.ghostClass,!1),U(v,i.fallbackClass,!0),U(v,i.dragClass,!0),g(v,"transition",""),g(v,"transform",""),g(v,"box-sizing","border-box"),g(v,"margin",0),g(v,"top",t.top),g(v,"left",t.left),g(v,"width",t.width),g(v,"height",t.height),g(v,"opacity","0.8"),g(v,"position",Ke?"absolute":"fixed"),g(v,"zIndex","100000"),g(v,"pointerEvents","none"),p.ghost=v,e.appendChild(v),g(v,"transform-origin",Rt/parseInt(v.style.width)*100+"% "+jt/parseInt(v.style.height)*100+"%")}},_onDragStart:function(e,t){var i=this,s=e.dataTransfer,r=i.options;if(L("dragStart",this,{evt:e}),p.eventCanceled){this._onDrop();return}L("setupClone",this),p.eventCanceled||(k=Mt(h),k.removeAttribute("id"),k.draggable=!1,k.style["will-change"]="",this._hideClone(),U(k,this.options.chosenClass,!1),p.clone=k),i.cloneId=Ze(function(){L("clone",i),!p.eventCanceled&&(i.options.removeCloneOnHide||D.insertBefore(k,h),i._hideClone(),F({sortable:i,name:"clone"}))}),!t&&U(h,r.dragClass,!0),t?(Ye=!0,i._loopId=setInterval(i._emulateDragOver,50)):(y(document,"mouseup",i._onDrop),y(document,"touchend",i._onDrop),y(document,"touchcancel",i._onDrop),s&&(s.effectAllowed="move",r.setData&&r.setData.call(i,s,h)),_(document,"drop",i),g(h,"transform","translateZ(0)")),_e=!0,i._dragStartId=Ze(i._dragStarted.bind(i,t,e)),_(document,"selectstart",i),Fe=!0,window.getSelection().removeAllRanges(),Ae&&g(document.body,"user-select","none")},_onDragOver:function(e){var t=this.el,i=e.target,s,r,o,a=this.options,l=a.group,d=p.active,u=He===l,c=a.sort,f=P||d,m,b=this,E=!1;if(ct)return;function S(ke,Vt){L(ke,b,K({evt:e,isOwner:u,axis:m?"vertical":"horizontal",revert:o,dragRect:s,targetRect:r,canSort:c,fromSortable:f,target:i,completed:A,onMove:function(_t,Zt){return Ve(D,t,h,s,_t,I(_t),e,Zt)},changed:q},Vt))}function M(){S("dragOverAnimationCapture"),b.captureAnimationState(),b!==f&&f.captureAnimationState()}function A(ke){return S("dragOverCompleted",{insertion:ke}),ke&&(u?d._hideClone():d._showClone(b),b!==f&&(U(h,P?P.options.ghostClass:d.options.ghostClass,!1),U(h,a.ghostClass,!0)),P!==b&&b!==p.active?P=b:b===p.active&&P&&(P=null),f===b&&(b._ignoreWhileAnimating=i),b.animateAll(function(){S("dragOverAnimationComplete"),b._ignoreWhileAnimating=null}),b!==f&&(f.animateAll(),f._ignoreWhileAnimating=null)),(i===h&&!h.animated||i===t&&!i.animated)&&(Ee=null),!a.dragoverBubble&&!e.rootEl&&i!==document&&(h.parentNode[B]._isOutsideThisEl(e.target),!ke&&me(e)),!a.dragoverBubble&&e.stopPropagation&&e.stopPropagation(),E=!0}function q(){G=$(h),ae=$(h,a.draggable),F({sortable:b,name:"change",toEl:t,newIndex:G,newDraggableIndex:ae,originalEvent:e})}if(e.preventDefault!==void 0&&e.cancelable&&e.preventDefault(),i=z(i,a.draggable,t,!0),S("dragOver"),p.eventCanceled)return E;if(h.contains(e.target)||i.animated&&i.animatingX&&i.animatingY||b._ignoreWhileAnimating===i)return A(!1);if(Ye=!1,d&&!a.disabled&&(u?c||(o=x!==D):P===this||(this.lastPutMode=He.checkPull(this,d,h,e))&&l.checkPut(this,d,h,e))){if(m=this._getDirection(e,i)==="vertical",s=I(h),S("dragOverValid"),p.eventCanceled)return E;if(o)return x=D,M(),this._hideClone(),S("revert"),p.eventCanceled||(he?D.insertBefore(h,he):D.appendChild(h)),A(!0);var R=st(t,a.draggable);if(!R||Li(e,m,this)&&!R.animated){if(R===h)return A(!1);if(R&&t===e.target&&(i=R),i&&(r=I(i)),Ve(D,t,h,s,i,r,e,!!i)!==!1)return M(),R&&R.nextSibling?t.insertBefore(h,R.nextSibling):t.appendChild(h),x=t,q(),A(!0)}else if(R&&Bi(e,m,this)){var de=be(t,0,a,!0);if(de===h)return A(!1);if(i=de,r=I(i),Ve(D,t,h,s,i,r,e,!1)!==!1)return M(),t.insertBefore(h,de),x=t,q(),A(!0)}else if(i.parentNode===t){r=I(i);var J=0,ce,we=h.parentNode!==t,j=!Ai(h.animated&&h.toRect||s,i.animated&&i.toRect||r,m),Se=m?"top":"left",ie=Nt(i,"top","top")||Nt(h,"top","top"),Ce=ie?ie.scrollTop:void 0;Ee!==i&&(ce=r[Se],Le=!1,Xe=!j&&a.invertSwap||we),J=Mi(e,i,r,m,j?1:a.swapThreshold,a.invertedSwapThreshold==null?a.swapThreshold:a.invertedSwapThreshold,Xe,Ee===i);var Z;if(J!==0){var ue=$(h);do ue-=J,Z=x.children[ue];while(Z&&(g(Z,"display")==="none"||Z===v))}if(J===0||Z===i)return A(!1);Ee=i,Be=J;var De=i.nextElementSibling,ne=!1;ne=J===1;var je=Ve(D,t,h,s,i,r,e,ne);if(je!==!1)return(je===1||je===-1)&&(ne=je===1),ct=!0,setTimeout(Fi,30),M(),ne&&!De?t.appendChild(h):i.parentNode.insertBefore(h,ne?De:i),ie&&Lt(ie,0,Ce-ie.scrollTop),x=h.parentNode,ce!==void 0&&!Xe&&(ze=Math.abs(ce-I(i)[Se])),q(),A(!0)}if(t.contains(h))return A(!1)}return!1},_ignoreWhileAnimating:null,_offMoveEvents:function(){y(document,"mousemove",this._onTouchMove),y(document,"touchmove",this._onTouchMove),y(document,"pointermove",this._onTouchMove),y(document,"dragover",me),y(document,"mousemove",me),y(document,"touchmove",me)},_offUpEvents:function(){var e=this.el.ownerDocument;y(e,"mouseup",this._onDrop),y(e,"touchend",this._onDrop),y(e,"pointerup",this._onDrop),y(e,"pointercancel",this._onDrop),y(e,"touchcancel",this._onDrop),y(document,"selectstart",this)},_onDrop:function(e){var t=this.el,i=this.options;if(G=$(h),ae=$(h,i.draggable),L("drop",this,{evt:e}),x=h&&h.parentNode,G=$(h),ae=$(h,i.draggable),p.eventCanceled){this._nulling();return}_e=!1,Xe=!1,Le=!1,clearInterval(this._loopId),clearTimeout(this._dragStartTimer),ht(this.cloneId),ht(this._dragStartId),this.nativeDraggable&&(y(document,"drop",this),y(t,"dragstart",this._onDragStart)),this._offMoveEvents(),this._offUpEvents(),Ae&&g(document.body,"user-select",""),g(h,"transform",""),e&&(Fe&&(e.cancelable&&e.preventDefault(),!i.dropBubble&&e.stopPropagation()),v&&v.parentNode&&v.parentNode.removeChild(v),(D===x||P&&P.lastPutMode!=="clone")&&k&&k.parentNode&&k.parentNode.removeChild(k),h&&(this.nativeDraggable&&y(h,"dragend",this),ut(h),h.style["will-change"]="",Fe&&!_e&&U(h,P?P.options.ghostClass:this.options.ghostClass,!1),U(h,this.options.chosenClass,!1),F({sortable:this,name:"unchoose",toEl:x,newIndex:null,newDraggableIndex:null,originalEvent:e}),D!==x?(G>=0&&(F({rootEl:x,name:"add",toEl:x,fromEl:D,originalEvent:e}),F({sortable:this,name:"remove",toEl:x,originalEvent:e}),F({rootEl:x,name:"sort",toEl:x,fromEl:D,originalEvent:e}),F({sortable:this,name:"sort",toEl:x,originalEvent:e})),P&&P.save()):G!==ye&&G>=0&&(F({sortable:this,name:"update",toEl:x,originalEvent:e}),F({sortable:this,name:"sort",toEl:x,originalEvent:e})),p.active&&((G==null||G===-1)&&(G=ye,ae=Ne),F({sortable:this,name:"end",toEl:x,originalEvent:e}),this.save()))),this._nulling()},_nulling:function(){L("nulling",this),D=h=x=v=he=k=Ge=oe=fe=W=Fe=G=ae=ye=Ne=Ee=Be=P=He=p.dragged=p.ghost=p.clone=p.active=null;var e=this.el;We.forEach(function(t){e.contains(t)&&(t.checked=!0)}),We.length=at=lt=0},handleEvent:function(e){switch(e.type){case"drop":case"dragend":this._onDrop(e);break;case"dragenter":case"dragover":h&&(this._onDragOver(e),Ni(e));break;case"selectstart":e.preventDefault();break}},toArray:function(){for(var e=[],t,i=this.el.children,s=0,r=i.length,o=this.options;s<r;s++)t=i[s],z(t,o.draggable,this.el,!1)&&e.push(t.getAttribute(o.dataIdAttr)||Ri(t));return e},sort:function(e,t){var i={},s=this.el;this.toArray().forEach(function(r,o){var a=s.children[o];z(a,this.options.draggable,s,!1)&&(i[r]=a)},this),t&&this.captureAnimationState(),e.forEach(function(r){i[r]&&(s.removeChild(i[r]),s.appendChild(i[r]))}),t&&this.animateAll()},save:function(){var e=this.options.store;e&&e.set&&e.set(this)},closest:function(e,t){return z(e,t||this.options.draggable,this.el,!1)},option:function(e,t){var i=this.options;if(t===void 0)return i[e];var s=Oe.modifyOption(this,e,t);typeof s<"u"?i[e]=s:i[e]=t,e==="group"&&Yt(i)},destroy:function(){L("destroy",this);var e=this.el;e[B]=null,y(e,"mousedown",this._onTapStart),y(e,"touchstart",this._onTapStart),y(e,"pointerdown",this._onTapStart),this.nativeDraggable&&(y(e,"dragover",this),y(e,"dragenter",this)),Array.prototype.forEach.call(e.querySelectorAll("[draggable]"),function(t){t.removeAttribute("draggable")}),this._onDrop(),this._disableDelayedDragEvents(),$e.splice($e.indexOf(this.el),1),this.el=e=null},_hideClone:function(){if(!oe){if(L("hideClone",this),p.eventCanceled)return;g(k,"display","none"),this.options.removeCloneOnHide&&k.parentNode&&k.parentNode.removeChild(k),oe=!0}},_showClone:function(e){if(e.lastPutMode!=="clone"){this._hideClone();return}if(oe){if(L("showClone",this),p.eventCanceled)return;h.parentNode==D&&!this.options.group.revertClone?D.insertBefore(k,h):he?D.insertBefore(k,he):D.appendChild(k),this.options.group.revertClone&&this.animate(h,k),g(k,"display",""),oe=!1}}};function Ni(n){n.dataTransfer&&(n.dataTransfer.dropEffect="move"),n.cancelable&&n.preventDefault()}function Ve(n,e,t,i,s,r,o,a){var l,d=n[B],u=d.options.onMove,c;return window.CustomEvent&&!te&&!Te?l=new CustomEvent("move",{bubbles:!0,cancelable:!0}):(l=document.createEvent("Event"),l.initEvent("move",!0,!0)),l.to=e,l.from=n,l.dragged=t,l.draggedRect=i,l.related=s||e,l.relatedRect=r||I(e),l.willInsertAfter=a,l.originalEvent=o,n.dispatchEvent(l),u&&(c=u.call(d,l,o)),c}function ut(n){n.draggable=!1}function Fi(){ct=!1}function Bi(n,e,t){var i=I(be(t.el,0,t.options,!0)),s=qt(t.el,t.options,v),r=10;return e?n.clientX<s.left-r||n.clientY<i.top&&n.clientX<i.right:n.clientY<s.top-r||n.clientY<i.bottom&&n.clientX<i.left}function Li(n,e,t){var i=I(st(t.el,t.options.draggable)),s=qt(t.el,t.options,v),r=10;return e?n.clientX>s.right+r||n.clientY>i.bottom&&n.clientX>i.left:n.clientY>s.bottom+r||n.clientX>i.right&&n.clientY>i.top}function Mi(n,e,t,i,s,r,o,a){var l=i?n.clientY:n.clientX,d=i?t.height:t.width,u=i?t.top:t.left,c=i?t.bottom:t.right,f=!1;if(!o){if(a&&ze<d*s){if(!Le&&(Be===1?l>u+d*r/2:l<c-d*r/2)&&(Le=!0),Le)f=!0;else if(Be===1?l<u+ze:l>c-ze)return-Be}else if(l>u+d*(1-s)/2&&l<c-d*(1-s)/2)return qi(e)}return f=f||o,f&&(l<u+d*r/2||l>c-d*r/2)?l>u+d/2?1:-1:0}function qi(n){return $(h)<$(n)?1:-1}function Ri(n){for(var e=n.tagName+n.className+n.src+n.href+n.textContent,t=e.length,i=0;t--;)i+=e.charCodeAt(t);return i.toString(36)}function ji(n){We.length=0;for(var e=n.getElementsByTagName("input"),t=e.length;t--;){var i=e[t];i.checked&&We.push(i)}}function Ze(n){return setTimeout(n,0)}function ht(n){return clearTimeout(n)}Je&&_(document,"touchmove",function(n){(p.active||_e)&&n.cancelable&&n.preventDefault()}),p.utils={on:_,off:y,css:g,find:Ot,is:function(e,t){return!!z(e,t,e,!1)},extend:wi,throttle:Bt,closest:z,toggleClass:U,clone:Mt,index:$,nextTick:Ze,cancelNextTick:ht,detectDirection:Ht,getChild:be,expando:B},p.get=function(n){return n[B]},p.mount=function(){for(var n=arguments.length,e=new Array(n),t=0;t<n;t++)e[t]=arguments[t];e[0].constructor===Array&&(e=e[0]),e.forEach(function(i){if(!i.prototype||!i.prototype.constructor)throw"Sortable: Mounted plugin must be a constructor function, not ".concat({}.toString.call(i));i.utils&&(p.utils=K(K({},p.utils),i.utils)),Oe.mount(i)})},p.create=function(n,e){return new p(n,e)},p.version=_i;var T=[],Me,ft,mt=!1,pt,gt,Qe,qe;function Ui(){function n(){this.defaults={scroll:!0,forceAutoScrollFallback:!1,scrollSensitivity:30,scrollSpeed:10,bubbleScroll:!0};for(var e in this)e.charAt(0)==="_"&&typeof this[e]=="function"&&(this[e]=this[e].bind(this))}return n.prototype={dragStarted:function(t){var i=t.originalEvent;this.sortable.nativeDraggable?_(document,"dragover",this._handleAutoScroll):this.options.supportPointer?_(document,"pointermove",this._handleFallbackAutoScroll):i.touches?_(document,"touchmove",this._handleFallbackAutoScroll):_(document,"mousemove",this._handleFallbackAutoScroll)},dragOverCompleted:function(t){var i=t.originalEvent;!this.options.dragOverBubble&&!i.rootEl&&this._handleAutoScroll(i)},drop:function(){this.sortable.nativeDraggable?y(document,"dragover",this._handleAutoScroll):(y(document,"pointermove",this._handleFallbackAutoScroll),y(document,"touchmove",this._handleFallbackAutoScroll),y(document,"mousemove",this._handleFallbackAutoScroll)),zt(),et(),Si()},nulling:function(){Qe=ft=Me=mt=qe=pt=gt=null,T.length=0},_handleFallbackAutoScroll:function(t){this._handleAutoScroll(t,!0)},_handleAutoScroll:function(t,i){var s=this,r=(t.touches?t.touches[0]:t).clientX,o=(t.touches?t.touches[0]:t).clientY,a=document.elementFromPoint(r,o);if(Qe=t,i||this.options.forceAutoScrollFallback||Te||te||Ae){bt(t,this.options,a,i);var l=re(a,!0);mt&&(!qe||r!==pt||o!==gt)&&(qe&&zt(),qe=setInterval(function(){var d=re(document.elementFromPoint(r,o),!0);d!==l&&(l=d,et()),bt(t,s.options,d,i)},10),pt=r,gt=o)}else{if(!this.options.bubbleScroll||re(a,!0)===V()){et();return}bt(t,this.options,re(a,!1),!1)}}},Q(n,{pluginName:"scroll",initializeByDefault:!0})}function et(){T.forEach(function(n){clearInterval(n.pid)}),T=[]}function zt(){clearInterval(qe)}var bt=Bt(function(n,e,t,i){if(e.scroll){var s=(n.touches?n.touches[0]:n).clientX,r=(n.touches?n.touches[0]:n).clientY,o=e.scrollSensitivity,a=e.scrollSpeed,l=V(),d=!1,u;ft!==t&&(ft=t,et(),Me=e.scroll,u=e.scrollFn,Me===!0&&(Me=re(t,!0)));var c=0,f=Me;do{var m=f,b=I(m),E=b.top,S=b.bottom,M=b.left,A=b.right,q=b.width,R=b.height,de=void 0,J=void 0,ce=m.scrollWidth,we=m.scrollHeight,j=g(m),Se=m.scrollLeft,ie=m.scrollTop;m===l?(de=q<ce&&(j.overflowX==="auto"||j.overflowX==="scroll"||j.overflowX==="visible"),J=R<we&&(j.overflowY==="auto"||j.overflowY==="scroll"||j.overflowY==="visible")):(de=q<ce&&(j.overflowX==="auto"||j.overflowX==="scroll"),J=R<we&&(j.overflowY==="auto"||j.overflowY==="scroll"));var Ce=de&&(Math.abs(A-s)<=o&&Se+q<ce)-(Math.abs(M-s)<=o&&!!Se),Z=J&&(Math.abs(S-r)<=o&&ie+R<we)-(Math.abs(E-r)<=o&&!!ie);if(!T[c])for(var ue=0;ue<=c;ue++)T[ue]||(T[ue]={});(T[c].vx!=Ce||T[c].vy!=Z||T[c].el!==m)&&(T[c].el=m,T[c].vx=Ce,T[c].vy=Z,clearInterval(T[c].pid),(Ce!=0||Z!=0)&&(d=!0,T[c].pid=setInterval(function(){i&&this.layer===0&&p.active._onTouchMove(Qe);var De=T[this.layer].vy?T[this.layer].vy*a:0,ne=T[this.layer].vx?T[this.layer].vx*a:0;typeof u=="function"&&u.call(p.dragged.parentNode[B],ne,De,n,Qe,T[this.layer].el)!=="continue"||Lt(T[this.layer].el,ne,De)}.bind({layer:c}),24))),c++}while(e.bubbleScroll&&f!==l&&(f=re(f,!1)));mt=d}},30),Wt=function(e){var t=e.originalEvent,i=e.putSortable,s=e.dragEl,r=e.activeSortable,o=e.dispatchSortableEvent,a=e.hideGhostForTarget,l=e.unhideGhostForTarget;if(t){var d=i||r;a();var u=t.changedTouches&&t.changedTouches.length?t.changedTouches[0]:t,c=document.elementFromPoint(u.clientX,u.clientY);l(),d&&!d.el.contains(c)&&(o("spill"),this.onSpill({dragEl:s,putSortable:i}))}};function vt(){}vt.prototype={startIndex:null,dragStart:function(e){var t=e.oldDraggableIndex;this.startIndex=t},onSpill:function(e){var t=e.dragEl,i=e.putSortable;this.sortable.captureAnimationState(),i&&i.captureAnimationState();var s=be(this.sortable.el,this.startIndex,this.options);s?this.sortable.el.insertBefore(t,s):this.sortable.el.appendChild(t),this.sortable.animateAll(),i&&i.animateAll()},drop:Wt},Q(vt,{pluginName:"revertOnSpill"});function yt(){}yt.prototype={onSpill:function(e){var t=e.dragEl,i=e.putSortable,s=i||this.sortable;s.captureAnimationState(),t.parentNode&&t.parentNode.removeChild(t),s.animateAll()},drop:Wt},Q(yt,{pluginName:"removeOnSpill"}),p.mount(new Ui),p.mount(yt,vt);const le={FORM_COMPONENTS:[{type:"input",label:"Input"},{type:"link",label:"Link"},{type:"location",label:"Location"},{type:"textarea",label:"Text"},{type:"checkbox",label:"Checkbox"},{type:"radio",label:"Radio Group"},{type:"select",label:"Select"},{type:"table",label:"Table"},{type:"todo",label:"Todo List",icon:"checklist"},{type:"signature",label:"Signature"},{type:"html",label:"Document"},{type:"status",label:"Status"}],PAGE_COMPONENTS:[{type:"input",label:"Input"},{type:"link",label:"Link"},{type:"location",label:"Location"},{type:"textarea",label:"Text"},{type:"bookmark",label:"Bookmark"},{type:"checkbox",label:"Checkbox"},{type:"radio",label:"Radio Group"},{type:"select",label:"Select"},{type:"table",label:"Table"}],INPUTS:[{type:"text",name:"Text"},{type:"tel",name:"Phone Number"},{type:"number",name:"Number"},{type:"email",name:"Email"},{type:"date",name:"Date"},{type:"time",name:"Time"}],TABLE_COLUMNS:[{type:"text",name:"Text"},{type:"tel",name:"Phone Number"},{type:"number",name:"Number"},{type:"email",name:"Email"},{type:"date",name:"Date"},{type:"time",name:"Time"},{type:"out",name:"External Link"},{type:"in",name:"Internal Link"},{type:"checkbox",name:"Checkbox"}],LINKS:[{type:"out",name:"External"},{type:"in",name:"Internal"}],PRESENTATION_DEFAULTS:{bookmark:{title:"Bookmark"},checkbox:{title:"Checkbox"},html:{title:"Rich Text"},input:{title:"Input",input:"text"},link:{title:"Link",location:"out"},location:{title:"Location"},radio:{title:"Radio Group"},select:{title:"Select"},signature:{title:"Signature"},status:{title:"Status"},table:{title:"Table"},todo:{title:"Todo List"},textarea:{title:"Text"}},DEFAULT_SETTINGS:{input:["title","placeholder","visibility","input","required","deleteButton"],link:["title","visibility","required","location","deleteButton"],location:["title","placeholder","visibility","required","deleteButton"],textarea:["title","placeholder","visibility","required","deleteButton"],bookmark:["title","deleteButton"],checkbox:["title","visibility","checked","required","deleteButton"],radio:["title","visibility","options","required","deleteButton"],select:["title","placeholder","visibility","options","multiple","required","deleteButton"],html:["title","visibility","editor","deleteButton"],signature:["title","required","deleteButton"],status:["title","status","deleteButton"],table:["title","columns","visibility","deleteButton"],todo:["title","visibility","deleteButton"]}};class Gi{constructor(e){this.builder=e,this.column=document.getElementById("components-column"),this.panel=document.getElementById("components-panel"),this._click=this._click.bind(this),this._move=this._move.bind(this),this.init()}init(){const e=this.builder.elt.dataset.formType==="page"?le.PAGE_COMPONENTS:le.FORM_COMPONENTS,t=[];e.forEach(({type:i,label:s,icon:r=i})=>{const o=document.createElement("div");o.className=`${C.builder.component}`,o.dataset.type=i;const a=o.appendChild(document.createElement("span"));wt(a,r,"text-form-default");const l=o.appendChild(document.createElement("span"));l.textContent=s;const d=o.appendChild(document.createElement("button"));d.dataset.role="add",d.type="button",d.title=`Add ${s}`,d.setAttribute("aria-label",`Add ${s}`),d.className="ml-auto grid size-6 place-items-center rounded-md text-form-default hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default";const u=d.appendChild(document.createElement("span"));wt(u,"add"),t.push(o)}),this.panel.append(...t),this.sortable=p.create(this.panel,{group:{name:"builder",pull:"clone",put:!1},onMove:this._move,animation:150,sort:!1}),this.column.addEventListener("click",this._click)}_move(e){const t=e.dragged.dataset.type;return this.builder.model.hasUniqueElement(t)?(this.builder.header.message(`Only one ${t} element is allowed per form`),!1):!0}_click(e){const t=e.target.closest("[data-role]");if(t?.dataset.role==="add"){const i=t.closest("[data-type]").dataset.type;if(this.builder.model.hasUniqueElement(i)){this.builder.header.message(`Only one ${i} element is allowed per form`);return}const s=this.builder.createElement({type:i});this.builder.model.sortable.el.appendChild(s),this.builder.updateSchemaOrder(),this.builder.selectElement(s.id)}}destroy(){this.column?.removeEventListener("click",this._click),this.sortable?.destroy(),this.sortable=null}}class Hi{constructor(e){this.builder=e,this.panel=document.getElementById("condition-panel"),this.loading=!1,this.condition=null,this._click=this._click.bind(this),this._draftInput=this._draftInput.bind(this),this.init()}init(){this.panel.addEventListener("click",this._click);for(const e of["input","change","updated"])this.panel.addEventListener(e,this._draftInput)}_draftInput(){this.builder._restoringDraft||!this.condition?.key||(this.builder.draft.revision+=1,this.builder.draft.group=null)}_click(e){const t=e.target.closest("button");if(t?.dataset.role==="save"){if(!this.condition.validate())return;const s=this.condition.index,r=this.condition.element.schema,o=r[this.condition.key]??[];s===-1?o.push(this.condition.setting):o[s]=this.condition.setting,r[this.condition.key]=o,this.condition.element.settings=this.builder.settings.create(r),this.builder.updateSchema(),se(()=>{this.condition.index=-1,this.condition.init(),this.condition.showSuccess(),this.condition.focus(),this.builder.settings.updateItem(),this.builder.model.updateItem()})}else t?.dataset.role==="close"&&this.close()}destroy(){this.panel?.removeEventListener("click",this._click);for(const e of["input","change","updated"])this.panel?.removeEventListener(e,this._draftInput);this.loading=!1,this.condition=null}open(e){this.builder.model.sortable.option("disabled",!0),this.builder.components.sortable.option("disabled",!0),this.builder.model.focusItem(),e.expand&&(this.builder.elt.dataset.expanded="true"),this.panel.replaceChildren(e.target),this.panel.dataset.visible="true",this.condition=e,this.loading=!1}hide(){this.builder.model.sortable.option("disabled",!1),this.builder.components.sortable.option("disabled",!1),this.builder.model.blurItem(),this.panel.dataset.visible="false",this.condition=null}close(){se(()=>{this.hide(),this.builder.elt.dataset.expanded="false"})}}const N=(n,e)=>{const t=document.createElement("div");return t.className=C.builder.settings.section,t.append(...e.filter(Boolean)),t.dataset.setting=n,t},Re=n=>{const e=le.PRESENTATION_DEFAULTS[n.type]||{};return{title:n.title??e.title,input:n.input??e.input,location:n.location??e.location}},X=(n,e,t="form",i=!1)=>{const s=w.toggle({icon:n,styles:{container:C.builder.settings.toggle.container,icon:C.builder.settings.toggle.icon},data:{role:e}});return s.type="button",s.dataset.kind=t,i&&(s.disabled=!0,s.classList.add("opacity-50","pointer-events-none")),s},Jt=(n,e)=>{const t=document.createElement("li");t.className=C.builder.settings.item,t.dataset.index=e;const i=document.createElement("button");i.type="button",i.className=C.builder.settings.open,i.dataset.role="open";const s=i.appendChild(document.createElement("span"));s.textContent=n.name,s.className="font-semibold text-form-dark";const r=i.appendChild(document.createElement("span"));r.className="italic text-base-dark",r.textContent=n.checked?" is ":" has the value ";const o=i.appendChild(document.createElement("span"));o.className="font-semibold text-project-default",o.textContent=n.checked?"checked":n.label;const a=X("x","remove","delete");return t.append(i,a),t},Yi=(n,e,t)=>{const i=document.createElement("li");i.className=C.builder.settings.item,i.dataset.index=e;const s=i.appendChild(document.createElement("button"));s.type="button",s.textContent=n.label,s.className=C.builder.settings.open,s.dataset.role="open";const r=document.createElement("div");return r.className="flex shrink-0 flex-row items-center gap-1",t>1&&(r.appendChild(X("down","moveDown","form",e===t-1)),r.appendChild(X("up","moveUp","form",e===0))),r.appendChild(X("x","remove","delete")),i.append(s,r),i},$i=(n,e,t)=>{const i=document.createElement("li");i.className=C.builder.settings.item,i.dataset.index=e;const s=w.label({icon:n.location||n.input||n.type,label:n.name||n.title,tag:"button",role:"open",styles:{label:C.builder.settings.open,container:"flex flex-row items-center gap-1.5"}});s.type="button";const r=document.createElement("div");return r.className="flex shrink-0 flex-row items-center gap-1",t>1&&(r.appendChild(X("down","moveDown","form",e===t-1)),r.appendChild(X("up","moveUp","form",e===0))),r.appendChild(X("x","remove","delete")),i.append(s,r),i},Xi=n=>{const e=w.input({label:"Title",name:"title",value:Re(n).title});return N("title",[e])},zi=n=>{const e=w.input({label:"Placeholder",name:"placeholder",value:n.placeholder||""});return N("placeholder",[e])},Wi=n=>{const e=document.createElement("div");e.className=C.builder.settings.title;const t=w.label({label:"Visibility",tag:"h3"}),i=X("add","add");if(e.append(t,i),n.visibility){const s=document.createElement("ul");return s.className="flex flex-col gap-1",n.visibility.forEach((r,o)=>{s.appendChild(Jt(r,o))}),N("visibility",[e,s])}return N("visibility",[e])},Ji=n=>{const e=document.createElement("div");e.className=C.builder.settings.title;const t=w.label({label:"Status",tag:"h3"}),i=X("add","add");if(e.append(t,i),n.status){const s=document.createElement("ul");return s.className="flex flex-col gap-1",n.status.forEach((r,o)=>{s.appendChild(Jt(r,o))}),N("status",[e,s])}else return N("status",[e])},Ki=n=>{const e=document.createElement("div");e.className=C.builder.settings.title;const t=w.label({label:"Options",tag:"h3"}),i=X("add","add");if(e.append(t,i),n.options){const s=document.createElement("ul");s.className="flex flex-col gap-1";const r=n.options.length;return n.options.forEach((o,a)=>{s.appendChild(Yi(o,a,r))}),N("options",[e,s])}else return N("options",[e])},Vi=()=>{const n=document.createElement("div");n.className=C.builder.settings.title;const e=w.label({label:"Editor",tag:"h3"}),t=X("edit","edit");return n.append(e,t),N("html",[n])},Zi=n=>{const e=Re(n),t=document.createElement("fieldset");t.className=C.radio.fieldset.column,t.dataset.kind="base";const i=t.appendChild(document.createElement("legend"));return i.textContent="Input Type",i.className=`${C.label.sectionHeading}`,le.INPUTS.forEach(s=>{t.appendChild(w.radio({icon:s.type,label:s.name,name:"input",value:s.type,checked:s.type===e.input}))}),N("input",[t])},Qi=n=>{const e=Re(n),t=document.createElement("fieldset");t.className=C.radio.fieldset.column,t.dataset.kind="form";const i=t.appendChild(document.createElement("legend"));return i.textContent="Link Type",i.className=`${C.label.sectionHeading}`,le.LINKS.forEach(s=>{t.appendChild(w.radio({icon:s.type,label:s.name,name:"location",value:s.type,checked:s.type===e.location}))}),N("location",[t])},en=n=>{const e=document.createElement("div");e.className=C.builder.settings.title;const t=w.label({label:"Columns",tag:"h3"}),i=X("add","add");if(e.append(t,i),n.columns?.length){const s=document.createElement("ul");s.className="flex flex-col gap-1";const r=n.columns.length;return n.columns.forEach((o,a)=>{s.appendChild($i(o,a,r))}),N("columns",[e,s])}else return N("columns",[e])},tn=n=>{const e=w.checkbox({label:"Required",name:"required",checked:!!n.required});return N("required",[e])},nn=n=>{const e=w.checkbox({label:"Multiple",name:"multiple",checked:!!n.multiple});return N("multiple",[e])},sn=n=>{const e=w.checkbox({label:"Default",name:"checked",checked:!!n.checked});return N("checked",[e])},rn=()=>{const n=document.createElement("button");return n.textContent="Replace or Delete",n.dataset.kind="form",n.dataset.role="delete",n.dataset.setting="deleteButton",n.className=`${C.button.submit}`,n},on={title:Xi,placeholder:zi,visibility:Wi,status:Ji,options:Ki,input:Zi,location:Qi,columns:en,required:tn,multiple:nn,checked:sn,editor:Vi,deleteButton:rn};class an{constructor(e){this.builder=e,this.panel=document.getElementById("settings-panel"),this._input=this._input.bind(this),this._change=this._change.bind(this),this._click=this._click.bind(this),this._blur=this._blur.bind(this)}init(){this.panel.addEventListener("input",this._input),this.panel.addEventListener("change",this._change),this.panel.addEventListener("click",this._click),this.panel.addEventListener("blur",this._blur,!0)}destroy(){this.panel.removeEventListener("input",this._input),this.panel.removeEventListener("change",this._change),this.panel.removeEventListener("click",this._click),this.panel.removeEventListener("blur",this._blur,!0)}_input(e){const t=this.builder.selectedElement;e.target.closest("[data-setting=title]")?this._setTitle(t,e.target.value):e.target.closest("[data-setting=placeholder]")&&this._setPlaceholder(t,e.target.value),this.builder.updateSchema(!1,`${t.schema.id}:${e.target.name}`)}_change(e){const t=this.builder.selectedElement;e.target.closest("[data-setting=required]")?this._setRequired(t,e.target.checked):e.target.closest("[data-setting=checked]")?this._setChecked(t,e.target.checked):e.target.closest("[data-setting=multiple]")?this._setMultiple(t,e.target.checked):e.target.closest("[data-setting=input]")?this._setInput(t,e.target.value):e.target.closest("[data-setting=location]")&&this._setLocation(t,e.target.value),this.builder.updateSchema()}_click(e){if(e.target.closest("button")?.disabled)return;const t=this.builder.selectedElement,i=e.target.closest("[data-role]")?.dataset.role,s=e.target.closest("[data-index]"),r=s?parseInt(s.dataset.index,10):-1,o=e.target.closest("[data-setting]")?.dataset.setting;i==="remove"?this._removeSchemaListItem(t.schema[o],r):["moveUp","moveDown"].includes(i)?this._moveSchemaListItem(t,o,r,i):["add","edit","open"].includes(i)?this.builder.showCondition(o,r):i==="delete"&&this.builder.showCondition("modify")}_blur(){this.builder.updateSchema(),this.builder.draft&&(this.builder.draft.group=null)}_removeSchemaListItem(e,t){e.splice(t,1),this.builder.updateSchema(),se(()=>{this.builder.model.updateItem(),this.builder.selectedElement.settings=this.create(this.builder.selectedElement.schema),this.updateItem()})}_moveSchemaListItem(e,t,i,s){const r=e.schema[t],o=s==="moveUp"?i-1:i+1;o<0||o>=r.length||([r[i],r[o]]=[r[o],r[i]],this.builder.updateSchema(),se(()=>{this.builder.model.updateItem(),this.builder.selectedElement.settings=this.create(this.builder.selectedElement.schema),this.updateItem()}))}_setTitle(e,t){e.schema.title=t,e.item.querySelector("[data-role='label'] > span:not([data-icon])").textContent=t}_setPlaceholder(e,t){e.schema.placeholder=t;const i=e.item.querySelector("input, textarea");i&&(i.placeholder=t)}_setRequired(e,t){e.schema.required=t}_setChecked(e,t){e.schema.checked=t,e.item.querySelector("input[type='checkbox']").checked=t}_setMultiple(e,t){e.schema.multiple=t}_setInput(e,t){e.schema.input=t;const i=w.label({icon:t,label:Re(e.schema).title});e.item.querySelector("label > div").replaceWith(i.querySelector("div"))}_setLocation(e,t){e.schema.location=t;const i=w.label({icon:t,label:Re(e.schema).title,tag:"h3"});e.item.querySelector("h3").replaceWith(i)}create(e){const t={...e};for(const r of["visibility","status"])Array.isArray(e[r])&&(t[r]=e[r].map(o=>{const a=this.builder.elements.get(o.id)?.schema;return{...o,name:a?.title??o.name,label:a?.options?.find(l=>l.value===o.value)?.label??o.label}}));const s=le.DEFAULT_SETTINGS[e.type].map(r=>["name","description"].includes(e.id)&&r==="deleteButton"?null:on[r](t)).filter(Boolean);return this.refreshSavedState(e,s),s}refreshSavedState(e=this.builder.selectedElement?.schema,t=this.panel.children){if(!e)return;const i=this.builder.savedField(e.id);if(i)for(const s of t){const r=s.dataset.setting;if(r==="input"&&!s.querySelector("[data-role='saved-input-type']")){const o=document.createElement("p");if(o.dataset.role="saved-input-type",o.className="text-sm text-base-medium",["name","description"].includes(e.id))o.textContent="This input's type cannot be changed.";else{const a=document.createElement("strong");a.textContent="Replace or Delete",o.append("Click ",a," in order to change this input's type.")}s.replaceChildren(o)}if(["multiple","location"].includes(r)){const o=s.matches("button, input, select")?[s]:s.querySelectorAll("button, input, select");for(const a of o)a.disabled=!0}if(["options","columns"].includes(r))for(const o of s.querySelectorAll("[data-index]")){const a=e[r][Number(o.dataset.index)],l=r==="options"?"value":"id";if(i[r]?.some(d=>d[l]===a[l])){const d=o.querySelector("[data-role='remove']");d&&(d.disabled=!1,d.title="Save will clear values for this removed choice or column.")}}}}selectItem(){const e=this.builder.selectedElement;e.settings=this.create(e.schema),this.panel.replaceChildren(...e.settings),this.panel.dataset.visible="true",this.builder.formSettings.visible=!1}deselectItem(){this.panel.dataset.visible="false"}updateItem(){this.panel.dataset.visible="false";const e=this.builder.selectedElement;this.panel.replaceChildren(...e.settings),this.panel.dataset.visible="true"}}class ln{constructor(e){this._destroyed=!1,this._generationPromise=null,this.builder=e,this.column=document.getElementById("form-settings-panel"),this.restrictions=document.querySelector("[data-role='restrict-access']"),this.selectGroup=null;const t=this.column?.querySelector("#generate");t?(this.generateForm=new St({target:t,submitGroup:t.querySelector("[data-role='submit-group']"),messages:{submit:"Generate",submitting:"Thinking...",submitted:"Generated"}}),this.generateForm.error.setAttribute("role","status"),this.generateForm.error.setAttribute("aria-live","polite"),this.generateForm.error.setAttribute("aria-atomic","true")):this.generateForm=null,this._generateSchema=this._generateSchema.bind(this),this._saveRestrictions=this._saveRestrictions.bind(this),this._restrictionPromise=null,this.restrictionForm=this.restrictions?new St({target:this.restrictions,messages:{submit:"Save Restrictions",submitting:"Saving",submitted:"Saved"}}):null,this._input=this._input.bind(this),this._click=this._click.bind(this),this._restrictionUpdated=this._restrictionUpdated.bind(this),this.modal=null}init(){if(!this._destroyed&&(this.generateForm&&(this.generateForm.init(),this.generateForm.target.addEventListener("submit",this._generateSchema)),this.column?.addEventListener("input",this._input),this.column?.addEventListener("click",this._click),this.restrictions)){this.restrictionForm.init(),this.restrictions.addEventListener("submit",this._saveRestrictions);const e=this.column.querySelector("[data-role='restrict-group-input']");this.selectGroup=new ci(e),this.selectGroup.init(),this.restrictions.addEventListener("updated",this._restrictionUpdated)}}_restrictionUpdated(e){if(this._destroyed)return;Object.keys(e.detail.options).length&&(this.restrictions.querySelector("[name='admin']").checked=!1);const t=this.restrictions.querySelector("ul"),i=this.restrictions.querySelector("template");for(const[s,r]of Object.entries(e.detail.options)){if([...t.querySelectorAll("input[name='group-key']")].some(a=>a.value===s))continue;const o=i.content.firstElementChild.cloneNode(!0);o.querySelector("input").value=s,o.querySelector("span").textContent=r.name,o.querySelector("button").dataset.key=s,t.append(o)}this.selectGroup.clear({notify:!1}),this.restrictionForm.markUnsavedState()}_input(e){if(e.target.name==="admin"&&e.target.checked&&(this.restrictions.querySelector("ul").replaceChildren(),this.selectGroup.clear({notify:!1}),this.restrictionForm.markUnsavedState()),e.target.name==="description"&&this.generateForm?.target){const t=this.generateForm.target.querySelector("[data-role='explain']");t&&(t.dataset.visible="true")}}_click(e){const t=e.target.closest("[data-role]");if(t?.dataset.role==="generate"&&this.generateForm?.target){const i=this.generateForm.target.dataset.visible==="true";this.generateForm.target.dataset.visible=i?"false":"true",i||this.generateForm.target.querySelector("textarea")?.focus()}else if(t?.dataset.role==="cancel"&&this.generateForm?.target){this._generationIdentity=null,this.generateForm.target.dataset.visible="false",this.generateForm.messages.submit="Generate",this.generateForm.resetSubmitButton();const i=this.generateForm.target.querySelector("textarea");i&&(i.value="")}else t?.dataset.role==="remove-restriction"&&(t.closest("li")?.remove(),this.restrictionForm.markUnsavedState())}get visible(){return this.column.dataset.visible==="true"}set visible(e){this.column.dataset.visible=e?"true":"false"}_saveRestrictions(e){if(e.preventDefault(),e.stopPropagation(),this._restrictionPromise)return this._restrictionPromise;if(this._destroyed)return;const t=this.restrictionForm,i=new FormData(this.restrictions),s=JSON.stringify([...i]);return t.submitting(),t.submitButton.disabled=!0,this._restrictionPromise=(async()=>{try{const r=await pe.put(this.restrictions.dataset.route,i);if(this._destroyed)return;r?.ok===!0?JSON.stringify([...new FormData(this.restrictions)])===s?t.success():(t.resetSubmitButton(),t.markUnsavedState()):t.showError(r?.error||"Could not save restrictions. Try again.")}catch(r){xe(r,this.restrictions,{context:"builder-save-restrictions"}),this._destroyed||t.showError("Could not save restrictions. Try again.")}finally{this._destroyed||(t.submitButton.disabled=!1),this._restrictionPromise=null}})(),this._restrictionPromise}_generateSchema(e){if(e.preventDefault(),e.stopPropagation(),this._generationPromise)return this._generationPromise;if(this._destroyed||!this.generateForm?.target)return Promise.resolve(!1);const t=new FormData(this.generateForm.target),i=t.get("description"),s=e.submitter||this.generateForm.submitButton;if(i)s?.dataset.explain&&t.append("explain",s.dataset.explain);else return this.generateForm.showError("Please enter a description"),Promise.resolve(!1);this.builder.updateSchema(),this.builder.draft.group=null;const r={request_id:crypto.randomUUID(),draft_revision:this.builder.draft.revision};this._generationIdentity=r;const o=this.builder.captureDraft();t.set("schema",JSON.stringify(o.schema)),t.set("html_fields",JSON.stringify(o.html_fields)),t.set("baseline",this.builder.draft.baseline||""),t.set("draft_revision",String(r.draft_revision)),t.set("request_id",r.request_id),s&&(s.disabled=!0,s.setAttribute("aria-disabled","true"),s.setAttribute("aria-busy","true"));const a=(async()=>{try{const d=await pe.post(ti.createSchema,t,{replaceErrorPage:!1});if(this._destroyed||this._generationIdentity!==r)return!1;if(!d?.modal&&(r.draft_revision!==this.builder.draft.revision||d?.request_id!==r.request_id||d?.draft_revision!==r.draft_revision)&&d?.ok===!0)return this.generateForm.messages.submit="Regenerate",this.generateForm.showError("Your draft changed while generation was running. Regenerate using your current draft."),!1;const u=await this._updateSchema(d);return this._destroyed?!1:((u||d?.ok===!0&&d.modal)&&(this.generateForm.messages.submit="Generate",u?this.generateForm.success():this.generateForm.resetSubmitButton()),u)}catch(d){return xe(d,s,{context:"builder-generate-schema"}),this._destroyed||this.generateForm.showError("Could not generate this form. Try again."),!1}finally{s&&!this._destroyed&&s.isConnected!==!1&&(s.disabled=!1,s.setAttribute("aria-disabled","false"),s.removeAttribute("aria-busy"))}})();this._generationPromise=a;const l=()=>{this._generationPromise===a&&(this._generationPromise=null)};return a.then(l,l),a}async _updateSchema(e){if(this._destroyed||!this.generateForm)return!1;if(e?.ok===!0&&e.operations){try{const t=this.builder.draft.revision;if(Object.keys(e.html_fields||{}).length&&await this.builder.prepareGeneratedDocuments(e.html_fields),this._destroyed||this.builder._destroyed)return!1;if(t!==this.builder.draft.revision)return this.generateForm.messages.submit="Regenerate",this.generateForm.showError("Your draft changed while generation was running. Regenerate using your current draft."),!1;this.builder.draft.applyGeneration(e)&&this.builder.restoreDraft()}catch(t){return this.generateForm.showError(t.message),!1}return!0}else e?.ok===!0&&e.modal?(this.modal?.destroy(),this.modal=new si(this.builder),this.modal.attach(e.modal,this.generateForm)):(this.generateForm.showError(e?.error||"Could not generate this form. Try again."),e?.code==="stale_form_draft"&&this.builder.header.showConflict(e));return!1}destroy(){this._destroyed||(this._destroyed=!0,this.generateForm?.target?.removeEventListener("submit",this._generateSchema),this.column?.removeEventListener("input",this._input),this.column?.removeEventListener("click",this._click),this.restrictions?.removeEventListener("updated",this._restrictionUpdated),this.restrictions?.removeEventListener("submit",this._saveRestrictions),this.restrictionForm?.destroy(),this.generateForm?.destroy(),this.selectGroup?.destroy(),this.modal?.destroy(),this.modal=null)}}class dn{constructor(e){this._destroyed=!1,this._previewGeneration=0,this._messageTimer=null,this._savePromise=null,this.builder=e,this.nameDisplay=document.getElementById("form-name-display"),this.nameInput=document.getElementById("form-name-input"),this.nameHidden=document.getElementById("form-name-hidden"),this.saveButton=document.querySelector("[data-saved]"),this.schemaForm=document.getElementById("schema-form"),this.notification=document.getElementById("notification"),this.previewToggle=document.getElementById("preview-toggle"),this.previewPanel=document.getElementById("preview-panel"),this.draftControls=document.querySelector("[data-role='draft-history']"),this.saveButton?.setAttribute("aria-describedby","notification"),this.notification?.setAttribute("role","status"),this.notification?.setAttribute("aria-live","polite"),this.notification?.setAttribute("aria-atomic","true"),this.togglePreviewPanel=this.togglePreviewPanel.bind(this),this.saveForm=this.saveForm.bind(this),this.editFormName=this.editFormName.bind(this),this._nameBlur=this._nameBlur.bind(this),this._nameKeyDown=this._nameKeyDown.bind(this),this._nameInput=this._nameInput.bind(this),this.renderer=null,this.init()}init(){this.nameInput.addEventListener("blur",this._nameBlur),this.nameInput.addEventListener("keydown",this._nameKeyDown),this.nameInput.addEventListener("input",this._nameInput)}saved(){this.saveButton&&(this.saveButton.dataset.saved="true",this.saveButton.dataset.kind="saved",this.saveButton.setAttribute("aria-disabled","true"),this.builder.pendingChange||this.clearMessage())}unsaved(){this.saveButton&&(this.saveButton.dataset.saved="false",this.saveButton.dataset.kind="unsaved",this.saveButton.setAttribute("aria-disabled",String(!!(this._savePromise||this.builder.pendingChange||this.builder.online===!1))))}clearMessage(){clearTimeout(this._messageTimer),this._messageTimer=null,this.notification&&(this.notification.textContent="",this.notification.dataset.visible="false")}message(e,{persistent:t=!1}={}){this._destroyed||(clearTimeout(this._messageTimer),this._messageTimer=null,this.notification.textContent=e,this.notification.dataset.visible="true",t||(this._messageTimer=setTimeout(()=>{this._destroyed||(this.notification.dataset.visible="false")},3e3)))}showConflict(e){if(e?.code!=="stale_form_draft"||!e.saved_url)return!1;this.message(`${e.error||"The saved form changed. Your draft is preserved."} `,{persistent:!0});const t=document.createElement("a");return t.href=e.saved_url,t.target="_blank",t.rel="noopener",t.dataset.role="open-saved-form",t.className="underline",t.textContent="Open saved form",this.notification.append(t),!0}get persistenceState(){return this.builder.captureDraft()}acknowledge(e){const t=this.persistenceState;return t.name===e.name&&ii(t.schema,e.schema)?(this.saved(),!0):(this.unsaved(),!1)}closePreview(){this._previewGeneration+=1,this.renderer?.destroy(),this.renderer=null,this.previewToggle.dataset.active="false",this.previewToggle.setAttribute("aria-checked","false"),this.previewPanel.dataset.visible="false",this.draftControls&&(this.draftControls.dataset.visible="true")}async togglePreviewPanel(){if(this._destroyed)return;const e=++this._previewGeneration,t=this.previewToggle.dataset.active==="true";this.previewToggle.dataset.active=t?"false":"true",this.previewToggle.setAttribute("aria-checked",t?"false":"true");let i=null;if(!t&&(i=new di({target:this.previewPanel,schema:this.builder.schema,kind:"form",key:this.builder.key,submission:{},htmlFields:Object.fromEntries(Object.entries(this.builder.htmlFields).map(([s,r])=>[s,this.builder.previewHtml(r)]))}),await i.render(),this._destroyed||e!==this._previewGeneration)){i.destroy();return}await se(()=>{if(this._destroyed||e!==this._previewGeneration){i?.destroy();return}this.draftControls&&(this.draftControls.dataset.visible=t?"true":"false"),t?(this.renderer?.destroy(),this.renderer=null,this.builder.elt.dataset.expanded="false",this.previewPanel.dataset.visible="false",this.builder.model.show()):(this.renderer=i,this.builder.elt.dataset.expanded="true",this.previewPanel.dataset.visible="true",this.builder.conditions.hide(),this.builder.model.hide())},{label:"builder:toggle-preview"})}saveForm(){if(this.builder.pendingChange)return Promise.resolve(!1);if(this._savePromise)return this._savePromise;if(this.builder.online===!1||this._destroyed||!this.saveButton||!this.schemaForm)return Promise.resolve(!1);const e=this.saveButton,t=document.activeElement===e;if(this.builder.updateSchema(),!this.builder.draft.dirty)return Promise.resolve(!0);this.builder.draft.group=null;const i=this.persistenceState;(!this._saveAttempt||!this.builder.draft.equal(this._saveAttempt.state,i)||this._saveAttempt.baseline!==this.builder.draft.baseline)&&(this._saveAttempt={state:i,baseline:this.builder.draft.baseline,id:crypto.randomUUID()}),this.unsaved(),this.clearMessage(),e.setAttribute("aria-disabled","true"),e.setAttribute("aria-busy","true");const s=(async()=>{try{const o=await this.builder.draftPayload(i,this.schemaForm.dataset.route,this._saveAttempt.id);if(this._destroyed)return!1;const a=await pe.put(this.schemaForm.dataset.route,o,{replaceErrorPage:!1});return this._destroyed?!1:a?.rejected_change?(this._saveAttempt=null,this.message(a.rejected_change.error,{persistent:!0}),!1):a?.ok===!0&&a.draft&&a.baseline?(this.builder.draft.acknowledge(i,a),this._saveAttempt=null,this.builder.setPendingChange?.(a.pending_change||null),this.builder.draft.equal(this.persistenceState,this.builder.draft.state)?(this.builder.settings.refreshSavedState(),this.builder.conditions.condition?.refreshSavedState?.(),this.builder.refreshDraftControls()):await this.builder.restoreDraft({preserveFocus:!0}),!0):(this.showConflict(a)||this.message(a?.error||"Could not save this form. Try again.",{persistent:!0}),!1)}catch(o){return xe(o,e,{context:"builder-save"}),this.message("Could not save this form. Try again.",{persistent:!0}),!1}finally{!this._destroyed&&e.isConnected!==!1&&(e.setAttribute("aria-disabled",String(!!(this.builder.pendingChange||e.dataset.saved==="true"))),e.removeAttribute("aria-busy"),this.builder.offline?.(!this.builder.online),t&&(!document.activeElement||document.activeElement===document.body||document.activeElement===e)&&e.focus({preventScroll:!0}))}})();this._savePromise=s;const r=()=>{this._savePromise===s&&(this._savePromise=null)};return s.then(r,r),s}editFormName(){this.builder.pendingChange||(this._originalName=this.nameDisplay.textContent,this.nameDisplay.dataset.visible="false",this.nameInput.dataset.visible="true",this.nameInput.focus(),this.nameInput.select())}_nameBlur(){const e=this.nameInput.value.trim();this.nameDisplay.textContent=e,this.nameHidden.value=e,this.builder.updateSchema(!1,"form-name"),this.builder.draft.group=null,this.nameInput.dataset.visible="false",this.nameDisplay.dataset.visible="true"}_nameInput(){this.nameHidden.value=this.nameInput.value.trim(),this.builder.updateSchema(!1,"form-name")}_nameKeyDown(e){e.key==="Enter"?(e.preventDefault(),this.nameInput.blur()):e.key==="Escape"&&(this.nameInput.value=this._originalName,this.nameInput.blur())}destroy(){this._destroyed||(this._destroyed=!0,this._previewGeneration+=1,clearTimeout(this._messageTimer),this._messageTimer=null,this.nameInput.removeEventListener("blur",this._nameBlur),this.nameInput.removeEventListener("keydown",this._nameKeyDown),this.nameInput.removeEventListener("input",this._nameInput),this.renderer?.destroy(),this.renderer=null)}}class cn{constructor(e){this.builder=e,this.panel=document.getElementById("model-panel"),this.defaultPanel=document.getElementById("default-panel"),this.uniqueElements=["status","signature","bookmark"],this.defaultElements=["name","description"],this._addElement=this._addElement.bind(this),this._moveElement=this._moveElement.bind(this)}get elements(){return Array.from(this.panel.querySelectorAll(".form-element"))}get defaults(){return Array.from(this.defaultPanel.querySelectorAll(".form-element"))}show(){this.defaultPanel.dataset.visible=this.defaults.length>0?"true":"false",this.panel.dataset.visible="true"}hide(){this.defaultPanel.dataset.visible="false",this.panel.dataset.visible="false"}init(){const e=Array.from(this.builder.elements.values());e.filter(i=>this.defaultElements.includes(i.schema.id)).length>0&&(this.defaultPanel.dataset.visible="true"),e.forEach(i=>{this.defaultElements.includes(i.schema.id)?(Array.from(i.item.querySelectorAll("input, textarea")).forEach(s=>{s.remove()}),this.defaultPanel.appendChild(i.item)):this.panel.appendChild(i.item)}),this.sortable=p.create(this.panel,{group:{name:"builder",pull:!1,put:!0},animation:150,onAdd:this._addElement,onUpdate:this._moveElement})}_addElement(e){const t=this.builder.createElement({type:e.item.dataset.type});e.item.remove(),e.to.insertBefore(t,e.to.children[e.newDraggableIndex]),this.builder.updateSchemaOrder(),this.builder.selectElement(t.id)}_moveElement(){this.builder.updateSchemaOrder()}updateItem(){const e=this.builder.selectedElement,t=Kt[e.schema.type](e.schema);e.item.replaceWith(t),e.item=t,this.selectItem()}selectItem(){const e=this.builder.selectedElement.item;this.elements.forEach(t=>{t.dataset.selected=t===e?"true":"false"}),this.defaults.forEach(t=>{t.dataset.selected=t===e?"true":"false"})}deselectItem(){const e=this.builder.selectedElement;e&&(e.item.dataset.selected="false")}hasUniqueElement(e){return this.uniqueElements.includes(e)&&Array.from(this.builder.elements.values()).some(t=>t.schema.type===e)}focusItem(){const e=this.builder.selectedElement.item;this.elements.forEach(t=>{t.dataset.visible=t===e?"true":"false"}),this.panel.classList.remove("min-h-75"),this.defaultPanel.dataset.visible="false"}blurItem(){this.elements.forEach(e=>{e.dataset.visible="true"}),this.defaultPanel.children.length>0&&(this.defaultPanel.dataset.visible="true"),this.panel.classList.add("min-h-75")}destroy(){this.sortable?.destroy(),this.sortable=null}}const H=n=>{const e=document.createElement("div");return e.id=n.id,e.dataset.selected="false",e.dataset.visible="true",e.className=`${C.builder.model}`,e},Y=n=>{const e=le.PRESENTATION_DEFAULTS[n.type]||{};return{...n,title:n.title??e.title,input:n.input??e.input,location:n.location??e.location}},un=n=>{const e=H(n),t=Y(n);return e.classList.add("flex","flex-row","gap-2"),e.appendChild(w.checkbox({label:t.title,checked:!!n.checked,name:n.id,disabled:!0})),e},hn=n=>{const e=H(n),t=Y(n),i=w.label({icon:"html",label:t.title,tag:"h3"});return e.appendChild(i),e},fn=n=>{const e=H(n),t=Y(n);e.classList.add("flex","flex-col","gap-1");const i=w.input({icon:t.input,label:t.title,name:n.id,type:t.input,disabled:!0,placeholder:n.placeholder});return e.appendChild(i),e},mn=n=>{const e=H(n),t=Y(n);let i;return t.location==="out"?i=w.label({icon:t.location,label:t.title,tag:"h3"}):i=w.select({label:t.title,icon:t.location,selectIcon:"search",disabled:!0}),e.appendChild(i),e},pn=n=>{const e=H(n),t=Y(n),i=w.label({icon:"bookmark",label:t.title});return e.appendChild(i),e},gn=n=>{const e=H(n),t=Y(n);e.classList.add("flex","flex-col","gap-1");const i=w.input({label:t.title,icon:"location",name:n.id,selectIcon:"search",type:"text",disabled:!0,placeholder:n.placeholder});return e.appendChild(i),e},bn=n=>{const e=H(n),t=Y(n);e.classList.add("flex","flex-col","gap-1");const i=w.select({label:t.title,icon:"select",selectIcon:"dropdown",name:n.id,disabled:!0,placeholder:n.placeholder||"select an option..."});return e.appendChild(i),e},vn=n=>{const e=H(n),t=Y(n),i=e.appendChild(document.createElement("fieldset"));return i.className=`${C.radio.fieldset.column}`,i.appendChild(w.label({icon:"radio",tag:"legend",label:t.title})),n.options&&n.options.forEach(s=>{i.appendChild(w.radio({label:s.label,value:s.value,name:n.id,disabled:!0,styles:{label:`${C.radio.label} first-of-type:pt-1`}}))}),e},yn=n=>{const e=H(n),t=Y(n),i=w.label({icon:"signature",label:t.title,tag:"h3"});return e.appendChild(i),e},_n=n=>{const e=H(n),t=Y(n),i=w.label({tag:"h3",label:t.title,icon:"status"});return e.appendChild(i),e},En=n=>{const e=H(n),t=Y(n);e.classList.add("flex","flex-col","gap-1");const i=w.textarea({label:t.title,placeholder:n.placeholder||"",icon:"textarea",disabled:!0,rows:2});return e.appendChild(i),e},wn=n=>{const e=H(n),t=Y(n);return e.appendChild(w.label({icon:"checklist",label:t.title,tag:"h3"})),e},Sn=n=>{const e=H(n),t=Y(n);e.classList.add("flex","flex-col","gap-1");const i=n.columns||[],s=w.label({icon:"table",label:t.title,tag:"h3"});e.appendChild(s);const r=e.appendChild(document.createElement("div"));return r.className="flex flex-row gap-2 empty:hidden flex-wrap",i.forEach(o=>{r.appendChild(w.badge({icon:o.location||o.input||o.type,text:o.title,kind:"form",styles:{badge:`${C.badge.builder}`,text:"text-base-dark"}}))}),e},Kt={checkbox:un,html:hn,input:fn,link:mn,bookmark:pn,location:gn,radio:vn,select:bn,signature:yn,status:_n,textarea:En,table:Sn,todo:wn};class Cn{constructor(e){this._destroyed=!1,this.elt=e,this.elements=new Map,this._independentDocuments=new Set,this.images=new Map,this._restoringDraft=!1,this.bootstrap=JSON.parse(document.getElementById("builder-draft")?.textContent||"null"),this.htmlFields=structuredClone(this.bootstrap?.html_fields||{}),this.conversionInstructions=structuredClone(this.bootstrap?.conversion_instructions||{}),this.conversionCatalog=JSON.parse(document.getElementById("builder-conversions")?.textContent||"null"),this.draft=this.bootstrap?new Ct(this.bootstrap,this.bootstrap.baseline):null,this.draft&&(delete this.draft.state.baseline,delete this.draft.saved.baseline,delete this.draft.state.pending_change,delete this.draft.saved.pending_change),this.selectedElement=null,this.schemaElt=document.querySelector('input[name="schema"]'),this.key=e.dataset.key,this.offlineIndicator=document.querySelector('[data-role="offline"]'),this.online=tt.online,this.hidden=tt.hidden,this.blurred=!1,this.blurredAt=null,this.EntityMenu=new ei(this),this.SearchBox=null,this.offlineModal=null,this._searchPromise=null,this.components=new Gi(this),this.model=new cn(this),this.settings=new an(this),this.conditions=new Hi(this),this.header=new dn(this),this.formSettings=new ln(this),this.click=this._click.bind(this),this.keydown=this._keydown.bind(this),this.beforeUnload=t=>{this.draft?.dirty&&(t.preventDefault(),t.returnValue="")}}async init(){return this._destroyed?this:(this.createFormElements(),this.draft??=new Ct(this.captureDraft()),this.model.init(),this.settings.init(),this.formSettings.init(),this.bootstrap?.pending_change&&this.setPendingChange(this.bootstrap.pending_change),this.offlineModal=new ri(this,this.offlineIndicator),this.offlineModal.enable(),this.offline(!this.online),document.addEventListener("click",this.click),document.addEventListener("keydown",this.keydown),window.addEventListener("beforeunload",this.beforeUnload),this.refreshDraftControls(),this.elt._lp_view=this,this._searchPromise=this._initSearch().catch(e=>(xe(e,this.elt,{context:"builder-search-startup"}),null)),this.elt.setAttribute("initialized",""),this)}async _initSearch(){const e=document.querySelector("[lp-search]");if(!e||this._destroyed)return null;const t=new Qt(e);return this.SearchBox=t,await t.init(),this._destroyed||this.SearchBox!==t?(t.destroy(),null):t}async sync({hidden:e=document.hidden,blurred:t=!1,blurredAt:i=null}={}){const s=this.online,r=this.hidden||!s,o=!!(e&&t);o&&!this.blurred?this.blurredAt=i??Date.now():o||(this.blurredAt=null),this.hidden=e,this.blurred=o,this.online=tt.online,this.offline(!this.online);const a=this.changeStatus?.polling;e||!this.online?o&&this.online?a?.blur(this.blurredAt):a?.pause():r?await a?.trigger(null,{fresh:!0}):await a?.resume(),this.online&&(e||!s)&&await this.flushIndependentDocuments({keepalive:e})}registerIndependentDocument(e){return this._independentDocuments.add(e),e}unregisterIndependentDocument(e){this._independentDocuments.delete(e)}async flushIndependentDocuments(e={}){return(await Promise.allSettled([...this._independentDocuments].map(i=>Promise.resolve().then(()=>i.flush(e))))).every(i=>i.status==="fulfilled"&&i.value===!0)}offline(e){const t=document.querySelector("[lp-search]");this.offlineIndicator&&(this.offlineIndicator.dataset.visible=e?"true":"false",this.offlineIndicator.setAttribute("aria-hidden",e?"false":"true")),t&&(t.dataset.visible=e?"false":"true");const i=this.header.saveButton;if(i){const s=i.getAttribute("aria-busy")==="true";i.dataset.visible="true",i.setAttribute("aria-disabled",String(!!(e||s||this.pendingChange||i.dataset.saved==="true")))}}updateSchema(e=!1,t=null){const i=Array.from(this.elements.values()).map(r=>r.schema);!e&&mi(i)&&this.header.message("Conditions that depended on removed or incompatible choices were removed from this draft.",{persistent:!0});const s=JSON.stringify(i);s!==this.schemaElt.value&&(this.schemaElt.value=s,!e&&this.header.unsaved()),!e&&!this._restoringDraft&&this.draft&&(this.draft.record(this.captureDraft(),t),this.refreshDraftControls())}get schema(){return Array.from(this.elements.values(),e=>structuredClone(e.schema))}setPendingChange(e){e&&(this.changeStatus??=new ui(this)),this.changeStatus?.show(e)}captureDraft(){const e=Object.fromEntries(Object.entries(this.conversionInstructions||{}).filter(([t,i])=>{const s=this.savedField(t),r=this.schema.find(o=>o.id===t);return i&&s&&r&&this.conversionCatalog?.rules[Ie(s)]?.[Ie(r)]==="ai"}));return{name:this.header.nameHidden.value,schema:this.schema,form_type:this.elt.dataset.formType,html_fields:structuredClone(this.htmlFields),selected_id:this.selectedElement?.schema.id||null,...Object.keys(e).length?{conversion_instructions:e}:{}}}setHtml(e,t){this.htmlFields[e]=this.canonicalHtml(t),this.draft.updateHtml(e,this.htmlFields[e])&&this.refreshDraftControls()}canonicalHtml(e){for(const[t,i]of this.images)e=e.replaceAll(i.url,`draft-image:${t}`);return e}previewHtml(e){for(const[t,i]of this.images)e=e.replaceAll(`draft-image:${t}`,i.url);return e}addDraftImage(e,t){const i=crypto.randomUUID(),s=URL.createObjectURL(t);return this.images.set(i,{file:t,fieldId:e,url:s,uploads:new Map}),s}pruneImages(){const e=[this.draft.state,...this.draft.past,...this.draft.future,this.header._saveAttempt?.state,this._copyAttempt?.state],t=new Set(Array.from(this.elements.values()).filter(i=>i.conditions?.html?.document?.editor).map(i=>i.schema.id));for(const[i,s]of this.images)t.has(s.fieldId)||e.some(r=>Object.values(r?.html_fields||{}).some(o=>o.includes(`draft-image:${i}`)))||(URL.revokeObjectURL(s.url),this.images.delete(i))}async draftPayload(e,t,i){const s=new FormData;s.set("name",e.name),s.set("schema",JSON.stringify(e.schema)),Dt(this.draft.saved.schema,e.schema)&&s.set("migration",JSON.stringify({version:this.conversionCatalog?.version||1,clear_invalid:!0,instructions:e.conversion_instructions||{}})),s.set("html_fields",JSON.stringify(e.html_fields)),s.set("baseline",this.draft.baseline||""),s.set("save_id",i);const r=[],o=[];for(const[a,l]of this.images){if(!Object.values(e.html_fields).some(u=>u.includes(`draft-image:${a}`)))continue;const d=`draft-image-${a}`;if(r.push({id:a,field_id:l.fieldId,input_name:d}),l.file.size>1024*1024){let u=l.uploads.get(t);if(!u){const c=await Et.directUpload.createSession({route:t,file:l.file,inputName:d,replaceErrorPage:!1}),f=await Et.directUpload.upload({file:l.file,sessionUrl:c.session_url,chunkSize:c.chunk_size});u={token:c.token,input_name:d,filename:l.file.name,content_type:l.file.type,size:l.file.size,generation:f.generation,path:f.name},l.uploads.set(t,u)}o.push(u)}else s.append(d,l.file,l.file.name||"image.png")}return s.set("image_manifest",JSON.stringify(r)),o.length&&s.set("direct_uploads",JSON.stringify(o)),s}refreshDraftControls(){if(!this.draft)return;this.draft.dirty?this.header.unsaved():this.header.saved();const e=this.elt.querySelector("[data-role='undo-draft']"),t=this.elt.querySelector("[data-role='redo-draft']");e&&(e.disabled=!this.draft.past.length),t&&(t.disabled=!this.draft.future.length)}restoreDraft({preserveFocus:e=!1}={}){const t=document.activeElement,i=this.conditions.condition,s=e&&i?.key?{key:i.key,index:i.index,fieldId:i.element.schema.id,setting:structuredClone(i.setting)}:null,r=this.conditions.condition?.document?.editor,o=e&&r?.view.dom.contains(t)?{from:r.state.selection.from,to:r.state.selection.to}:null,a=e&&(this.settings.panel.contains(t)||this.conditions.panel.contains(t))&&t.name?{name:t.name,start:t.selectionStart,end:t.selectionEnd}:null;this._restoringDraft=!0,this.conditions.hide(),this.header.closePreview();const l=new Map;this.elements.forEach(c=>{const f=this.draft.state.schema.some(m=>m.id===c.schema.id&&m.type==="html");for(const[m,b]of Object.entries(c.conditions||{}))m==="html"&&f?l.set(c.schema.id,b):b.destroy?.()}),this.pruneImages(),this.elements.clear(),this.model.panel.replaceChildren(),this.model.defaultPanel.replaceChildren(),this.selectedElement=null;const d=this.draft.state;this.htmlFields=structuredClone(d.html_fields),this.conversionInstructions=structuredClone(d.conversion_instructions||{}),this.header.nameHidden.value=d.name,this.header.nameInput.value=d.name,this.header.nameDisplay.textContent=d.name;for(const c of d.schema){const f=this.createElement(structuredClone(c)),m=l.get(c.id);if(m){const S=this.elements.get(c.id);m.element=S,S.conditions={html:m},S.destroy=()=>Object.values(S.conditions).forEach(q=>{q.destroy()});const M=m.document?.editor,A=this.previewHtml(d.html_fields[c.id]||"");M&&this.canonicalHtml(M.getHTML())!==d.html_fields[c.id]&&(M.commands.setContent(A,{emitUpdate:!1}),m.document._lastFlushedContent=m.document._currentContent())}const b=["name","description"].includes(c.id);if(b)for(const S of f.querySelectorAll("input, textarea"))S.remove();(b?this.model.defaultPanel:this.model.panel).append(f)}this.updateSchema(!0),this.model.show(),d.selected_id&&this.elements.has(d.selected_id)?this.selectElement(d.selected_id):(this.settings.deselectItem(),this.formSettings.visible=!0),this.elt.dataset.expanded="false",this._restoringDraft=!1,this.refreshDraftControls();const u=()=>se(()=>{if(!a||this._destroyed)return;const c=s?this.conditions.panel:this.settings.panel,f=Array.from(c.querySelectorAll("input, textarea")).find(m=>m.name===a.name);f?.focus(),f?.setSelectionRange&&a.start!==null&&f.setSelectionRange(a.start,a.end)});if(s&&this.elements.has(s.fieldId))return this.selectElement(s.fieldId),this.showCondition(s.key,s.index,s.setting).then(u);if(o&&this.selectedElement)return this.showCondition("html").then(()=>{const c=this.conditions.condition?.document?.editor;c&&!this._destroyed&&c.chain().focus().setTextSelection(o).run()});if(a)return u()}async prepareGeneratedDocuments(e){const{default:t}=await import("./html.js?v=bee5ee89");for(const[i,s]of Object.entries(e||{})){const r=this.elements.get(i);if(!(this._destroyed||r?.schema.type!=="html"||this.htmlFields[i]===s)){if(r.conditions??={},!r.conditions.html){const o=this.selectedElement;this.selectedElement=r,r.conditions.html=new t(this),this.selectedElement=o,r.destroy=()=>Object.values(r.conditions).forEach(a=>{a.destroy()})}await r.conditions.html.init()}}}undoDraft(e=!1){this.pendingChange||(this.updateSchema(),(e?this.draft.redo():this.draft.undo())&&this.restoreDraft())}_keydown(e){!(e.ctrlKey||e.metaKey)||e.altKey||e.target.closest("input, textarea, select, [contenteditable='true']")||(e.key.toLowerCase()==="z"||e.key.toLowerCase()==="y")&&(e.preventDefault(),this.undoDraft(e.shiftKey||e.key.toLowerCase()==="y"))}savedField(e){return this.draft?.saved.schema.find(t=>t.id===e)}async createFormElements(){const e=this.schemaElt.value,t=this.bootstrap?JSON.stringify(this.bootstrap.schema):e||this.elt.dataset.schema,i=t?JSON.parse(t):[];for(const s of i)this.createElement(s);this.updateSchema(!0)}_click(e){const i=e.target.closest("[data-role='menu-trigger']")?.closest("[lp-menu]");if(i&&this.elt.contains(i)){e.preventDefault(),e.stopPropagation(),this.EntityMenu.toggle(i);return}const s=e.target.closest("button"),r=e.target.closest(".form-element"),o=e.target.closest("#preview-panel");r&&!o?this.selectElement(r.id):s?.hasAttribute("lp-help")?this._showHelpModal(s):s?.dataset.role==="form-settings"?(this.deselectElement(),this.formSettings.visible=!0):s?.id==="preview-toggle"?this.header.togglePreviewPanel():s?.dataset.role==="save-form"?this.header.saveForm():["undo-draft","redo-draft"].includes(s?.dataset.role)?this.undoDraft(s.dataset.role==="redo-draft"):s?.dataset.action==="copy-form"?this.copyForm(s):s?.getAttribute("lp-control")==="delete"?this._showDeleteModal(s):e.target?.id==="form-name-display"&&this.header.editFormName()}async copyForm(e){if(this._destroyed||!e?.dataset.route||e.disabled)return;const t=document.activeElement===e;let i=!1;e.disabled=!0,e.setAttribute("aria-disabled","true"),e.setAttribute("aria-busy","true"),this.header.clearMessage();try{this.updateSchema(),this.draft.group=null;const s=this.captureDraft(),r=this.draft.revision;this._copyAttempt??={state:s,id:crypto.randomUUID()},this.draft.equal(s,this._copyAttempt.state)||(this._copyAttempt={state:s,id:crypto.randomUUID()});const o=await this.draftPayload(s,e.dataset.route,this._copyAttempt.id),a=await pe.post(e.dataset.route,o,{replaceErrorPage:!1});if(this._destroyed)return;if(a?.ok===!0&&a.url){if(this._copyAttempt=null,this.draft.revision!==r||!this.draft.equal(this.captureDraft(),s)){this.header.message("Copy created. Your later draft edits are still here. ",{persistent:!0});const l=document.createElement("a");l.href=a.url,l.target="_blank",l.rel="noopener",l.textContent="Open copy",l.className="underline",this.header.notification.append(l);return}window.removeEventListener("beforeunload",this.beforeUnload),window.location.assign(a.url),i=!0;return}this.header.showConflict(a)||this.header.message(a?.error||"Could not copy this form.",{persistent:!0})}catch(s){xe(s,e,{context:"builder-copy-form"}),this.header.message("Could not copy this form. Try again.",{persistent:!0})}finally{!i&&!this._destroyed&&e.isConnected!==!1&&(e.disabled=!1,e.setAttribute("aria-disabled","false"),e.removeAttribute("aria-busy"),t&&(!document.activeElement||document.activeElement===document.body||document.activeElement===e)&&e.focus({preventScroll:!0}))}}async _showDeleteModal(e){if(this._destroyed)return;await new oi(this,e).init()}async _showHelpModal(e){if(this._destroyed)return;await new ai(this,e).init()}selectElement(e){this.selectedElement=this.elements.get(e),this.draft&&(this.draft.state.selected_id=e),se(()=>{this.model.selectItem(),this.settings.selectItem()})}deselectElement(){this.model.deselectItem(),this.settings.deselectItem(),this.selectedElement=null,this.draft&&(this.draft.state.selected_id=null)}createElement(e){e.id=e.id??ni(e.type),e.type==="html"&&!Object.hasOwn(this.htmlFields,e.id)&&(this.htmlFields[e.id]=""),e.type==="table"&&!Array.isArray(e.columns)&&(e.columns=[]);const t=Kt[e.type](e);return this.elements.set(e.id,{item:t,schema:e,settings:this.settings.create(e)}),t}getEligibleConditionTargets(){return Array.from(this.elements.values()).filter(e=>["checkbox","radio","select"].includes(e.schema.type)&&e!==this.selectedElement).map(e=>({label:e.schema.title,value:e.schema.id,details:{icon:e.schema.type,kind:"form",name:e.schema.title}}))}async showCondition(e,t=-1,i=null){if(this._destroyed||this.conditions.loading)return;this.conditions.loading=!0;const s=this.selectedElement;if(!s){this.conditions.loading=!1;return}s.conditions??={};let r=s.conditions[e]??null,o=!1;if(!r){if(r=await fi(this,e),o=!0,this._destroyed||this.selectedElement!==s){r?.destroy?.(),this.conditions.loading=!1;return}s.conditions[e]=r}if(s.destroy||(s.destroy=()=>{Object.values(s.conditions).forEach(a=>{a.destroy()})}),r.index=t,r.draftSetting=i,await r.init(),this._destroyed||this.selectedElement!==s){o&&(r.destroy?.(),delete s.conditions[e]),this.conditions.loading=!1;return}await se(()=>{this._destroyed||this.selectedElement!==s||this.conditions.open(r)},{label:"builder:show-condition"})}updateSchemaOrder(){const e=new Map;Array.from(this.model.defaults).forEach(t=>{e.set(t.id,this.elements.get(t.id))}),Array.from(this.model.elements).forEach(t=>{e.set(t.id,this.elements.get(t.id))}),this.elements=e,this.updateSchema()}removeElement(){delete this.htmlFields[this.selectedElement.schema.id],this.selectedElement.destroy&&this.selectedElement.destroy(),this.selectedElement.item.remove(),this.elements.delete(this.selectedElement.schema.id),this.selectedElement=null,this.updateSchema(),this.pruneImages()}destroy(){if(!this._destroyed){this._destroyed=!0,this.SearchBox?.destroy?.(),this.SearchBox=null,this.offlineModal?.destroy?.(),this.offlineModal=null,this.components.destroy(),this.model.destroy(),this.settings.destroy(),this.conditions.destroy(),this.header.destroy(),this.formSettings.destroy(),this.changeStatus?.destroy(),this.EntityMenu.destroy(),this.elements.forEach(e=>{e.destroy&&e.destroy()}),this.elements.clear(),this._independentDocuments.clear();for(const e of this.images.values())URL.revokeObjectURL(e.url);this.images.clear(),document.removeEventListener("click",this.click),document.removeEventListener("keydown",this.keydown),window.removeEventListener("beforeunload",this.beforeUnload),this.elt._lp_view===this&&delete this.elt._lp_view}}}export{le as C,Cn as F,Ie as f};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { SearchBox } from './search.js?v=b564d2b9';
+import { EntityMenu } from './entityMenu.js?v=b564d2b9';
+import { u as uploadElement } from './upload.js?v=b564d2b9';
+import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b564d2b9';
+import { c as connectivity } from './connectivity.js?v=b564d2b9';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b564d2b9';
+import { PollingCoordinator } from './polling.js?v=b564d2b9';
+import { STYLES } from './styles.js?v=b564d2b9';
+import { s as setIcon } from './icons.js?v=b564d2b9';
+import { p as primitives } from './primitives.js?v=b564d2b9';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=b564d2b9';
+import { F as FacetsBox } from './facets.js?v=b564d2b9';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_builder_observes_migration_completion_without_leaving
+ * @tests tests_js/test_036c_form_migrations.py::test_migration_status_uses_notification_and_keeps_save_disabled
+ * @tests tests_js/test_036c_form_migrations.py::test_builder_resumes_migration_polling_and_clears_completed_status
+ * @matrix form-migration : saved-job progress reload recovery
+ */
+class FormChangeStatus {
+	constructor(builder) {
+		this.builder = builder;
+		this.polling = new PollingCoordinator(builder).init();
+		this.node = document.createElement("span");
+		this.node.dataset.role = "form-change-status";
+		this.node.hidden = true;
+		if (builder.hidden && builder.blurred)
+			this.polling.blur(builder.blurredAt ?? Date.now());
+	}
+
+	show(change) {
+		this.change = change;
+		this.unsubscribe?.();
+		this.node.hidden = !change;
+		for (const panel of [
+			this.builder.settings.panel,
+			this.builder.conditions.panel,
+			this.builder.components.panel,
+			this.builder.model.panel,
+			this.builder.formSettings.panel,
+		])
+			if (panel) panel.inert = Boolean(change);
+		this.builder.pendingChange = change;
+		const header = this.builder.header;
+		header.saveButton?.setAttribute(
+			"aria-disabled",
+			String(
+				Boolean(change || header._savePromise || !this.builder.draft.dirty),
+			),
+		);
+		if (!change) {
+			header.clearMessage();
+			return;
+		}
+		const message = document.createElement("span");
+		const failed = ["failed", "expired", "cancelled", "superseded"].includes(
+			change.status,
+		);
+		message.textContent = failed
+			? "Form update needs attention."
+			: "Schema migration in progress, Save temporarily disabled";
+		this.node.replaceChildren(message);
+		if (failed && change.error) {
+			message.textContent += ` ${change.error}`;
+		}
+		if (failed && change.failed_entity) {
+			const affected = this.node.appendChild(document.createElement("span"));
+			affected.textContent = ` Affected ${change.failed_entity.kind}: `;
+			const link = affected.appendChild(document.createElement("a"));
+			link.href = change.failed_entity.url;
+			link.textContent = change.failed_entity.name;
+		}
+		header.message("", { persistent: true });
+		header.notification.append(this.node);
+		if (failed) {
+			const help = this.node.appendChild(document.createElement("span"));
+			help.textContent =
+				" Retry continues unfinished work and keeps answers already updated. Save will be available when the update finishes.";
+			const button = this.node.appendChild(document.createElement("button"));
+			button.type = "button";
+			button.className = "ml-2 font-semibold underline";
+			button.textContent = "Retry";
+			button.addEventListener("click", async () => {
+				button.disabled = true;
+				try {
+					const data = new FormData();
+					data.set("action", "retry");
+					const result = await request.post(
+						`/forms/${this.builder.key}/change`,
+						data,
+						{ replaceErrorPage: false },
+					);
+					if (result?.ok) await this.accept(result);
+					else
+						message.textContent =
+							result?.error || "Could not update the job. Try again.";
+				} finally {
+					button.disabled = false;
+				}
+			});
+		}
+		if (!failed && change.operation)
+			this.unsubscribe = this.polling.subscribe(
+				{
+					id: `builder-change:${change.operation}`,
+					type: "operation",
+					key: change.operation,
+					revision: 0,
+				},
+				{
+					whileBlurred: () =>
+						this.node.isConnected &&
+						!this.node.hidden &&
+						this.node.checkVisibility({
+							checkOpacity: true,
+							checkVisibilityCSS: true,
+						}),
+					onResult: async () => {
+						const result = await request.get(
+							`/forms/${this.builder.key}/change`,
+							null,
+							{ replaceErrorPage: false },
+						);
+						if (!this.builder._destroyed && result?.ok)
+							await this.accept(result);
+					},
+				},
+			);
+	}
+
+	async accept(result) {
+		if (result.pending_change) {
+			// Keep the existing subscription while ordinary progress advances.
+			if (JSON.stringify(result.pending_change) !== JSON.stringify(this.change))
+				this.show(result.pending_change);
+			return;
+		}
+		this.show(null);
+		if (result.rejected_change) {
+			// The staged draft was rejected before any values changed. Preserve
+			// local edits while restoring the real saved baseline for another Save.
+			this.builder.draft.saved = structuredClone(result.draft);
+			this.builder.draft.baseline = result.baseline;
+			this.builder.draft.formDirty = !this.builder.draft.equalForm(
+				this.builder.draft.state,
+				result.draft,
+			);
+			this.builder.refreshDraftControls();
+			this.builder.header.message(result.rejected_change.error, {
+				persistent: true,
+			});
+			return;
+		}
+		this.builder.draft.acknowledge(this.builder.draft.saved, result);
+		await this.builder.restoreDraft();
+		this.builder.header.message("Form update finished.");
+	}
+
+	destroy() {
+		this.unsubscribe?.();
+		this.polling.destroy();
+		this.node.remove();
+	}
+}
+
+const CONDITION_REGISTRY = {
+	modify: () => import('./modify.js?v=b564d2b9'),
+	html: () => import('./html.js?v=b564d2b9'),
+	status: () => import('./status.js?v=b564d2b9'),
+	visibility: () => import('./visibility.js?v=b564d2b9'),
+	columns: () => import('./columns.js?v=b564d2b9'),
+	options: () => import('./options.js?v=b564d2b9'),
+};
+
+/**
+ * @testable infrastructure
+ */
+const loadCondition = async (builder, condition) => {
+	const module = await CONDITION_REGISTRY[condition]();
+	return new module.default(builder);
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_036b_builder_draft.py::test_builder_draft_history_and_generation
+ * @matrix forms : draft-history stable-identity schema-generation stale-acknowledgement
+ */
+class BuilderDraft {
+	constructor(state, baseline = null) {
+		this.state = structuredClone(state);
+		this.saved = structuredClone(state);
+		this.baseline = baseline;
+		this.revision = 0;
+		this.past = [];
+		this.future = [];
+		this.group = null;
+		// Recomputed on form edits/Save, so Document typing only compares HTML.
+		this.formDirty = false;
+	}
+
+	content(state = this.state) {
+		const { selected_id: _selection, ...content } = state;
+		return content;
+	}
+
+	equal(a, b) {
+		return this.serialize(this.content(a)) === this.serialize(this.content(b));
+	}
+
+	equalForm(a, b) {
+		const { html_fields: _aHtml, ...aForm } = this.content(a);
+		const { html_fields: _bHtml, ...bForm } = this.content(b);
+		return this.serialize(aForm) === this.serialize(bForm);
+	}
+
+	serialize(value) {
+		return JSON.stringify(value, (_key, item) =>
+			item && typeof item === "object" && !Array.isArray(item)
+				? Object.fromEntries(
+						Object.keys(item)
+							.sort()
+							.map((key) => [key, item[key]]),
+					)
+				: item,
+		);
+	}
+
+	get dirty() {
+		return (
+			this.formDirty ||
+			this.serialize(this.state.html_fields) !==
+				this.serialize(this.saved.html_fields)
+		);
+	}
+
+	updateHtml(fieldId, html) {
+		if (this.state.html_fields[fieldId] === html) return false;
+		// The Document editor owns its history. Typing never snapshots the form.
+		this.state.html_fields[fieldId] = html;
+		this.revision += 1;
+		return true;
+	}
+
+	record(state, group = null) {
+		if (this.equal(this.state, state)) {
+			this.state.selected_id = state.selected_id;
+			return false;
+		}
+		if (!this.equalForm(this.state, state)) {
+			if (!group || this.group !== group) {
+				this.past.push(structuredClone(this.state));
+				if (this.past.length > 100) this.past.shift();
+			}
+			this.future = [];
+			this.group = group;
+		}
+		this.state = structuredClone(state);
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.revision += 1;
+		return true;
+	}
+
+	restoreForm(state) {
+		const documents = new Set(
+			this.state.schema
+				.filter((field) => field.type === "html")
+				.map((field) => field.id),
+		);
+		// Keep current content for surviving fields; restored fields bring their
+		// snapshot content back with them, including any local image references.
+		for (const field of state.schema) {
+			if (field.type !== "html" || !documents.has(field.id)) continue;
+			if (Object.hasOwn(this.state.html_fields, field.id))
+				state.html_fields[field.id] = this.state.html_fields[field.id];
+			else delete state.html_fields[field.id];
+		}
+		this.state = state;
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.group = null;
+		this.revision += 1;
+	}
+
+	undo() {
+		if (!this.past.length) return false;
+		this.future.push(structuredClone(this.state));
+		this.restoreForm(this.past.pop());
+		return true;
+	}
+
+	redo() {
+		if (!this.future.length) return false;
+		this.past.push(structuredClone(this.state));
+		this.restoreForm(this.future.pop());
+		return true;
+	}
+
+	acknowledge(submitted, response) {
+		const replacement = response.image_urls || {};
+		const map = (state) => {
+			const result = structuredClone(state);
+			for (const [id, html] of Object.entries(result.html_fields || {})) {
+				result.html_fields[id] = Object.entries(replacement).reduce(
+					(text, [token, url]) =>
+						text.replaceAll(
+							token.startsWith("draft-image:") ? token : `draft-image:${token}`,
+							url,
+						),
+					html,
+				);
+			}
+			return result;
+		};
+		const reconcile = (value, source, accepted) => {
+			if (this.serialize(value) === this.serialize(source))
+				return structuredClone(accepted);
+			if (
+				Array.isArray(value) &&
+				Array.isArray(source) &&
+				Array.isArray(accepted)
+			) {
+				return value.map((entry, index) => {
+					const identity = entry?.id ?? entry?.value;
+					const original =
+						identity === undefined
+							? source[index]
+							: source.find((item) => (item?.id ?? item?.value) === identity);
+					const saved =
+						identity === undefined
+							? accepted[index]
+							: accepted.find((item) => (item?.id ?? item?.value) === identity);
+					return original && saved
+						? reconcile(entry, original, saved)
+						: structuredClone(entry);
+				});
+			}
+			if (
+				value &&
+				source &&
+				accepted &&
+				typeof value === "object" &&
+				typeof source === "object" &&
+				typeof accepted === "object" &&
+				!Array.isArray(value)
+			) {
+				const result = structuredClone(value);
+				for (const key of new Set([
+					...Object.keys(source),
+					...Object.keys(accepted),
+				])) {
+					const merged = reconcile(value[key], source[key], accepted[key]);
+					if (merged === undefined) delete result[key];
+					else result[key] = merged;
+				}
+				return result;
+			}
+			return structuredClone(value);
+		};
+		const unchanged = this.equal(this.state, submitted);
+		const apply = (state) => ({
+			...reconcile(map(state), map(submitted), response.draft),
+			selected_id: state.selected_id,
+		});
+		this.past = this.past.map(apply);
+		this.future = this.future.map(apply);
+		this.state = apply(this.state);
+		this.saved = { ...structuredClone(response.draft), selected_id: null };
+		this.baseline = response.baseline;
+		this.revision += 1;
+		if (unchanged)
+			this.state = {
+				...structuredClone(this.saved),
+				selected_id: this.state.selected_id,
+			};
+		this.formDirty = !this.equalForm(this.state, this.saved);
+		this.group = null;
+		return unchanged;
+	}
+
+	applyGeneration(response) {
+		const next = structuredClone(this.state);
+		const fields = new Map(next.schema.map((field) => [field.id, field]));
+		if (!Array.isArray(response.operations))
+			throw new Error("Invalid generated changes.");
+		for (const operation of response.operations) {
+			if (operation.op === "add_field") {
+				const field = operation.field;
+				if (!field?.id || fields.has(field.id))
+					throw new Error("Generated field identity is invalid.");
+				if (
+					![
+						"input",
+						"textarea",
+						"checkbox",
+						"select",
+						"radio",
+						"table",
+						"html",
+						"status",
+						"signature",
+						"link",
+						"bookmark",
+						"location",
+						"todo",
+					].includes(field.type)
+				)
+					throw new Error("Unsupported generated field type.");
+				const added = structuredClone(field);
+				if (added.type === "html") next.html_fields[added.id] = "";
+				next.schema.push(added);
+				fields.set(added.id, added);
+				continue;
+			}
+			const field = fields.get(operation.field_id);
+			if (!field)
+				throw new Error("A generated change targets an unknown field.");
+			if (operation.op === "update_field") {
+				if (
+					!operation.changes ||
+					Object.entries(operation.changes).some(
+						([key, value]) =>
+							!["title", "placeholder"].includes(key) ||
+							typeof value !== "string",
+					)
+				) {
+					throw new Error(
+						"This generated change needs a later migration step.",
+					);
+				}
+				Object.assign(field, operation.changes);
+			} else if (operation.op === "update_option") {
+				const option = field.options?.find(
+					(item) => item.value === operation.value,
+				);
+				if (!option || typeof operation.label !== "string")
+					throw new Error("Invalid generated option label.");
+				option.label = operation.label;
+			} else if (operation.op === "update_column") {
+				const column = field.columns?.find(
+					(item) => item.id === operation.column_id,
+				);
+				if (!column || typeof operation.title !== "string")
+					throw new Error("Invalid generated column label.");
+				column.title = operation.title;
+			} else
+				throw new Error("This generated change needs a later migration step.");
+		}
+		for (const [id, html] of Object.entries(response.html_fields || {})) {
+			if (fields.get(id)?.type !== "html" || typeof html !== "string")
+				throw new Error("Invalid generated text content.");
+			next.html_fields[id] = html;
+		}
+		return this.record(next);
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_036c_form_migrations.py::test_schema_changes_and_condition_repairs_are_local
+ * @matrix form-migration : schema-only stable-identity conditions
+ */
+const fieldKind = (field) =>
+	field.type === "input"
+		? field.input || "text"
+		: field.type === "link"
+			? field.location || "out"
+			: field.type === "select" && field.multiple
+				? "multiple"
+				: field.type;
+
+/**
+ * @testable true
+ * @tests tests_js/test_036c_form_migrations.py::test_schema_changes_and_condition_repairs_are_local
+ * @matrix form-migration : schema-only stable-identity
+ */
+const needsMigration = (before, after) =>
+	before.some((field) => {
+		if (["html", "status"].includes(field.type)) return false;
+		const target = after.find(({ id }) => id === field.id);
+		if (!target) return true;
+		if (fieldKind(field) !== fieldKind(target)) return true;
+		if (
+			field.options?.some(
+				({ value }) =>
+					!target.options?.some((option) => option.value === value),
+			)
+		)
+			return true;
+		return field.columns
+			? needsMigration(field.columns, target.columns || [])
+			: false;
+	});
+
+/**
+ * @testable true
+ * @tests tests_js/test_036c_form_migrations.py::test_schema_changes_and_condition_repairs_are_local
+ * @matrix form-migration : conditions
+ */
+const repairConditions = (schema) => {
+	let removed = 0;
+	for (const field of schema)
+		for (const key of ["visibility", "status"]) {
+			if (!Array.isArray(field[key])) continue;
+			field[key] = field[key].filter((condition) => {
+				const source = schema.find(({ id }) => id === condition.id);
+				const selected = condition.value ?? condition.checked;
+				const values = Array.isArray(selected) ? selected : [selected];
+				const supported =
+					source &&
+					(["radio", "select"].includes(source.type)
+						? values.every((value) =>
+								source.options?.some((option) => option.value === value),
+							)
+						: source.type === "checkbox" && condition.type === "checkbox");
+				if (supported) condition.type = source.type;
+				else removed++;
+				return supported;
+			});
+		}
+	return removed;
+};
+
 /**!
  * Sortable 1.15.7
  * @author	RubaXa   <trash@rubaxa.org>
  * @author	owenm    <owen23355@gmail.com>
  * @license MIT
  */
+function _defineProperty(e, r, t) {
+  return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
+    value: t,
+    enumerable: true,
+    configurable: true,
+    writable: true
+  }) : e[r] = t, e;
+}
+function _extends() {
+  return _extends = Object.assign ? Object.assign.bind() : function (n) {
+    for (var e = 1; e < arguments.length; e++) {
+      var t = arguments[e];
+      for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+    }
+    return n;
+  }, _extends.apply(null, arguments);
+}
+function ownKeys(e, r) {
+  var t = Object.keys(e);
+  if (Object.getOwnPropertySymbols) {
+    var o = Object.getOwnPropertySymbols(e);
+    r && (o = o.filter(function (r) {
+      return Object.getOwnPropertyDescriptor(e, r).enumerable;
+    })), t.push.apply(t, o);
+  }
+  return t;
+}
+function _objectSpread2(e) {
+  for (var r = 1; r < arguments.length; r++) {
+    var t = null != arguments[r] ? arguments[r] : {};
+    r % 2 ? ownKeys(Object(t), true).forEach(function (r) {
+      _defineProperty(e, r, t[r]);
+    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) {
+      Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
+    });
+  }
+  return e;
+}
+function _objectWithoutProperties(e, t) {
+  if (null == e) return {};
+  var o,
+    r,
+    i = _objectWithoutPropertiesLoose(e, t);
+  if (Object.getOwnPropertySymbols) {
+    var n = Object.getOwnPropertySymbols(e);
+    for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]);
+  }
+  return i;
+}
+function _objectWithoutPropertiesLoose(r, e) {
+  if (null == r) return {};
+  var t = {};
+  for (var n in r) if ({}.hasOwnProperty.call(r, n)) {
+    if (-1 !== e.indexOf(n)) continue;
+    t[n] = r[n];
+  }
+  return t;
+}
+function _toPrimitive(t, r) {
+  if ("object" != typeof t || !t) return t;
+  var e = t[Symbol.toPrimitive];
+  if (void 0 !== e) {
+    var i = e.call(t, r);
+    if ("object" != typeof i) return i;
+    throw new TypeError("@@toPrimitive must return a primitive value.");
+  }
+  return ("string" === r ? String : Number)(t);
+}
+function _toPropertyKey(t) {
+  var i = _toPrimitive(t, "string");
+  return "symbol" == typeof i ? i : i + "";
+}
+function _typeof(o) {
+  "@babel/helpers - typeof";
+
+  return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) {
+    return typeof o;
+  } : function (o) {
+    return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
+  }, _typeof(o);
+}
+
+var version = "1.15.7";
+
+function userAgent(pattern) {
+  if (typeof window !== 'undefined' && window.navigator) {
+    return !! /*@__PURE__*/navigator.userAgent.match(pattern);
+  }
+}
+var IE11OrLess = userAgent(/(?:Trident.*rv[ :]?11\.|msie|iemobile|Windows Phone)/i);
+var Edge = userAgent(/Edge/i);
+var FireFox = userAgent(/firefox/i);
+var Safari = userAgent(/safari/i) && !userAgent(/chrome/i) && !userAgent(/android/i);
+var IOS = userAgent(/iP(ad|od|hone)/i);
+var ChromeForAndroid = userAgent(/chrome/i) && userAgent(/android/i);
+
+var captureMode = {
+  capture: false,
+  passive: false
+};
+function on(el, event, fn) {
+  el.addEventListener(event, fn, !IE11OrLess && captureMode);
+}
+function off(el, event, fn) {
+  el.removeEventListener(event, fn, !IE11OrLess && captureMode);
+}
+function matches( /**HTMLElement*/el, /**String*/selector) {
+  if (!selector) return;
+  selector[0] === '>' && (selector = selector.substring(1));
+  if (el) {
+    try {
+      if (el.matches) {
+        return el.matches(selector);
+      } else if (el.msMatchesSelector) {
+        return el.msMatchesSelector(selector);
+      } else if (el.webkitMatchesSelector) {
+        return el.webkitMatchesSelector(selector);
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+  return false;
+}
+function getParentOrHost(el) {
+  return el.host && el !== document && el.host.nodeType && el.host !== el ? el.host : el.parentNode;
+}
+function closest( /**HTMLElement*/el, /**String*/selector, /**HTMLElement*/ctx, includeCTX) {
+  if (el) {
+    ctx = ctx || document;
+    do {
+      if (selector != null && (selector[0] === '>' ? el.parentNode === ctx && matches(el, selector) : matches(el, selector)) || includeCTX && el === ctx) {
+        return el;
+      }
+      if (el === ctx) break;
+      /* jshint boss:true */
+    } while (el = getParentOrHost(el));
+  }
+  return null;
+}
+var R_SPACE = /\s+/g;
+function toggleClass(el, name, state) {
+  if (el && name) {
+    if (el.classList) {
+      el.classList[state ? 'add' : 'remove'](name);
+    } else {
+      var className = (' ' + el.className + ' ').replace(R_SPACE, ' ').replace(' ' + name + ' ', ' ');
+      el.className = (className + (state ? ' ' + name : '')).replace(R_SPACE, ' ');
+    }
+  }
+}
+function css(el, prop, val) {
+  var style = el && el.style;
+  if (style) {
+    if (val === void 0) {
+      if (document.defaultView && document.defaultView.getComputedStyle) {
+        val = document.defaultView.getComputedStyle(el, '');
+      } else if (el.currentStyle) {
+        val = el.currentStyle;
+      }
+      return prop === void 0 ? val : val[prop];
+    } else {
+      if (!(prop in style) && prop.indexOf('webkit') === -1) {
+        prop = '-webkit-' + prop;
+      }
+      style[prop] = val + (typeof val === 'string' ? '' : 'px');
+    }
+  }
+}
+function matrix(el, selfOnly) {
+  var appliedTransforms = '';
+  if (typeof el === 'string') {
+    appliedTransforms = el;
+  } else {
+    do {
+      var transform = css(el, 'transform');
+      if (transform && transform !== 'none') {
+        appliedTransforms = transform + ' ' + appliedTransforms;
+      }
+      /* jshint boss:true */
+    } while (!selfOnly && (el = el.parentNode));
+  }
+  var matrixFn = window.DOMMatrix || window.WebKitCSSMatrix || window.CSSMatrix || window.MSCSSMatrix;
+  /*jshint -W056 */
+  return matrixFn && new matrixFn(appliedTransforms);
+}
+function find(ctx, tagName, iterator) {
+  if (ctx) {
+    var list = ctx.getElementsByTagName(tagName),
+      i = 0,
+      n = list.length;
+    if (iterator) {
+      for (; i < n; i++) {
+        iterator(list[i], i);
+      }
+    }
+    return list;
+  }
+  return [];
+}
+function getWindowScrollingElement() {
+  var scrollingElement = document.scrollingElement;
+  if (scrollingElement) {
+    return scrollingElement;
+  } else {
+    return document.documentElement;
+  }
+}
+
+/**
+ * Returns the "bounding client rect" of given element
+ * @param  {HTMLElement} el                       The element whose boundingClientRect is wanted
+ * @param  {[Boolean]} relativeToContainingBlock  Whether the rect should be relative to the containing block of (including) the container
+ * @param  {[Boolean]} relativeToNonStaticParent  Whether the rect should be relative to the relative parent of (including) the contaienr
+ * @param  {[Boolean]} undoScale                  Whether the container's scale() should be undone
+ * @param  {[HTMLElement]} container              The parent the element will be placed in
+ * @return {Object}                               The boundingClientRect of el, with specified adjustments
+ */
+function getRect(el, relativeToContainingBlock, relativeToNonStaticParent, undoScale, container) {
+  if (!el.getBoundingClientRect && el !== window) return;
+  var elRect, top, left, bottom, right, height, width;
+  if (el !== window && el.parentNode && el !== getWindowScrollingElement()) {
+    elRect = el.getBoundingClientRect();
+    top = elRect.top;
+    left = elRect.left;
+    bottom = elRect.bottom;
+    right = elRect.right;
+    height = elRect.height;
+    width = elRect.width;
+  } else {
+    top = 0;
+    left = 0;
+    bottom = window.innerHeight;
+    right = window.innerWidth;
+    height = window.innerHeight;
+    width = window.innerWidth;
+  }
+  if ((relativeToContainingBlock || relativeToNonStaticParent) && el !== window) {
+    // Adjust for translate()
+    container = container || el.parentNode;
+
+    // solves #1123 (see: https://stackoverflow.com/a/37953806/6088312)
+    // Not needed on <= IE11
+    if (!IE11OrLess) {
+      do {
+        if (container && container.getBoundingClientRect && (css(container, 'transform') !== 'none' || relativeToNonStaticParent && css(container, 'position') !== 'static')) {
+          var containerRect = container.getBoundingClientRect();
+
+          // Set relative to edges of padding box of container
+          top -= containerRect.top + parseInt(css(container, 'border-top-width'));
+          left -= containerRect.left + parseInt(css(container, 'border-left-width'));
+          bottom = top + elRect.height;
+          right = left + elRect.width;
+          break;
+        }
+        /* jshint boss:true */
+      } while (container = container.parentNode);
+    }
+  }
+  if (undoScale && el !== window) {
+    // Adjust for scale()
+    var elMatrix = matrix(container || el),
+      scaleX = elMatrix && elMatrix.a,
+      scaleY = elMatrix && elMatrix.d;
+    if (elMatrix) {
+      top /= scaleY;
+      left /= scaleX;
+      width /= scaleX;
+      height /= scaleY;
+      bottom = top + height;
+      right = left + width;
+    }
+  }
+  return {
+    top: top,
+    left: left,
+    bottom: bottom,
+    right: right,
+    width: width,
+    height: height
+  };
+}
+
+/**
+ * Checks if a side of an element is scrolled past a side of its parents
+ * @param  {HTMLElement}  el           The element who's side being scrolled out of view is in question
+ * @param  {String}       elSide       Side of the element in question ('top', 'left', 'right', 'bottom')
+ * @param  {String}       parentSide   Side of the parent in question ('top', 'left', 'right', 'bottom')
+ * @return {HTMLElement}               The parent scroll element that the el's side is scrolled past, or null if there is no such element
+ */
+function isScrolledPast(el, elSide, parentSide) {
+  var parent = getParentAutoScrollElement(el, true),
+    elSideVal = getRect(el)[elSide];
+
+  /* jshint boss:true */
+  while (parent) {
+    var parentSideVal = getRect(parent)[parentSide],
+      visible = void 0;
+    {
+      visible = elSideVal >= parentSideVal;
+    }
+    if (!visible) return parent;
+    if (parent === getWindowScrollingElement()) break;
+    parent = getParentAutoScrollElement(parent, false);
+  }
+  return false;
+}
+
+/**
+ * Gets nth child of el, ignoring hidden children, sortable's elements (does not ignore clone if it's visible)
+ * and non-draggable elements
+ * @param  {HTMLElement} el       The parent element
+ * @param  {Number} childNum      The index of the child
+ * @param  {Object} options       Parent Sortable's options
+ * @return {HTMLElement}          The child at index childNum, or null if not found
+ */
+function getChild(el, childNum, options, includeDragEl) {
+  var currentChild = 0,
+    i = 0,
+    children = el.children;
+  while (i < children.length) {
+    if (children[i].style.display !== 'none' && children[i] !== Sortable.ghost && (includeDragEl || children[i] !== Sortable.dragged) && closest(children[i], options.draggable, el, false)) {
+      if (currentChild === childNum) {
+        return children[i];
+      }
+      currentChild++;
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
+ * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
+ * @param  {HTMLElement} el       Parent element
+ * @param  {selector} selector    Any other elements that should be ignored
+ * @return {HTMLElement}          The last child, ignoring ghostEl
+ */
+function lastChild(el, selector) {
+  var last = el.lastElementChild;
+  while (last && (last === Sortable.ghost || css(last, 'display') === 'none' || selector && !matches(last, selector))) {
+    last = last.previousElementSibling;
+  }
+  return last || null;
+}
+
+/**
+ * Returns the index of an element within its parent for a selected set of
+ * elements
+ * @param  {HTMLElement} el
+ * @param  {selector} selector
+ * @return {number}
+ */
+function index(el, selector) {
+  var index = 0;
+  if (!el || !el.parentNode) {
+    return -1;
+  }
+
+  /* jshint boss:true */
+  while (el = el.previousElementSibling) {
+    if (el.nodeName.toUpperCase() !== 'TEMPLATE' && el !== Sortable.clone && (!selector || matches(el, selector))) {
+      index++;
+    }
+  }
+  return index;
+}
+
+/**
+ * Returns the scroll offset of the given element, added with all the scroll offsets of parent elements.
+ * The value is returned in real pixels.
+ * @param  {HTMLElement} el
+ * @return {Array}             Offsets in the format of [left, top]
+ */
+function getRelativeScrollOffset(el) {
+  var offsetLeft = 0,
+    offsetTop = 0,
+    winScroller = getWindowScrollingElement();
+  if (el) {
+    do {
+      var elMatrix = matrix(el),
+        scaleX = elMatrix.a,
+        scaleY = elMatrix.d;
+      offsetLeft += el.scrollLeft * scaleX;
+      offsetTop += el.scrollTop * scaleY;
+    } while (el !== winScroller && (el = el.parentNode));
+  }
+  return [offsetLeft, offsetTop];
+}
+
+/**
+ * Returns the index of the object within the given array
+ * @param  {Array} arr   Array that may or may not hold the object
+ * @param  {Object} obj  An object that has a key-value pair unique to and identical to a key-value pair in the object you want to find
+ * @return {Number}      The index of the object in the array, or -1
+ */
+function indexOfObject(arr, obj) {
+  for (var i in arr) {
+    if (!arr.hasOwnProperty(i)) continue;
+    for (var key in obj) {
+      if (obj.hasOwnProperty(key) && obj[key] === arr[i][key]) return Number(i);
+    }
+  }
+  return -1;
+}
+function getParentAutoScrollElement(el, includeSelf) {
+  // skip to window
+  if (!el || !el.getBoundingClientRect) return getWindowScrollingElement();
+  var elem = el;
+  var gotSelf = false;
+  do {
+    // we don't need to get elem css if it isn't even overflowing in the first place (performance)
+    if (elem.clientWidth < elem.scrollWidth || elem.clientHeight < elem.scrollHeight) {
+      var elemCSS = css(elem);
+      if (elem.clientWidth < elem.scrollWidth && (elemCSS.overflowX == 'auto' || elemCSS.overflowX == 'scroll') || elem.clientHeight < elem.scrollHeight && (elemCSS.overflowY == 'auto' || elemCSS.overflowY == 'scroll')) {
+        if (!elem.getBoundingClientRect || elem === document.body) return getWindowScrollingElement();
+        if (gotSelf || includeSelf) return elem;
+        gotSelf = true;
+      }
+    }
+    /* jshint boss:true */
+  } while (elem = elem.parentNode);
+  return getWindowScrollingElement();
+}
+function extend(dst, src) {
+  if (dst && src) {
+    for (var key in src) {
+      if (src.hasOwnProperty(key)) {
+        dst[key] = src[key];
+      }
+    }
+  }
+  return dst;
+}
+function isRectEqual(rect1, rect2) {
+  return Math.round(rect1.top) === Math.round(rect2.top) && Math.round(rect1.left) === Math.round(rect2.left) && Math.round(rect1.height) === Math.round(rect2.height) && Math.round(rect1.width) === Math.round(rect2.width);
+}
+var _throttleTimeout;
+function throttle(callback, ms) {
+  return function () {
+    if (!_throttleTimeout) {
+      var args = arguments,
+        _this = this;
+      if (args.length === 1) {
+        callback.call(_this, args[0]);
+      } else {
+        callback.apply(_this, args);
+      }
+      _throttleTimeout = setTimeout(function () {
+        _throttleTimeout = void 0;
+      }, ms);
+    }
+  };
+}
+function cancelThrottle() {
+  clearTimeout(_throttleTimeout);
+  _throttleTimeout = void 0;
+}
+function scrollBy(el, x, y) {
+  el.scrollLeft += x;
+  el.scrollTop += y;
+}
+function clone(el) {
+  var Polymer = window.Polymer;
+  var $ = window.jQuery || window.Zepto;
+  if (Polymer && Polymer.dom) {
+    return Polymer.dom(el).cloneNode(true);
+  } else if ($) {
+    return $(el).clone(true)[0];
+  } else {
+    return el.cloneNode(true);
+  }
+}
+function getChildContainingRectFromElement(container, options, ghostEl) {
+  var rect = {};
+  Array.from(container.children).forEach(function (child) {
+    var _rect$left, _rect$top, _rect$right, _rect$bottom;
+    if (!closest(child, options.draggable, container, false) || child.animated || child === ghostEl) return;
+    var childRect = getRect(child);
+    rect.left = Math.min((_rect$left = rect.left) !== null && _rect$left !== void 0 ? _rect$left : Infinity, childRect.left);
+    rect.top = Math.min((_rect$top = rect.top) !== null && _rect$top !== void 0 ? _rect$top : Infinity, childRect.top);
+    rect.right = Math.max((_rect$right = rect.right) !== null && _rect$right !== void 0 ? _rect$right : -Infinity, childRect.right);
+    rect.bottom = Math.max((_rect$bottom = rect.bottom) !== null && _rect$bottom !== void 0 ? _rect$bottom : -Infinity, childRect.bottom);
+  });
+  rect.width = rect.right - rect.left;
+  rect.height = rect.bottom - rect.top;
+  rect.x = rect.left;
+  rect.y = rect.top;
+  return rect;
+}
+var expando = 'Sortable' + new Date().getTime();
+
+function AnimationStateManager() {
+  var animationStates = [],
+    animationCallbackId;
+  return {
+    captureAnimationState: function captureAnimationState() {
+      animationStates = [];
+      if (!this.options.animation) return;
+      var children = [].slice.call(this.el.children);
+      children.forEach(function (child) {
+        if (css(child, 'display') === 'none' || child === Sortable.ghost) return;
+        animationStates.push({
+          target: child,
+          rect: getRect(child)
+        });
+        var fromRect = _objectSpread2({}, animationStates[animationStates.length - 1].rect);
+
+        // If animating: compensate for current animation
+        if (child.thisAnimationDuration) {
+          var childMatrix = matrix(child, true);
+          if (childMatrix) {
+            fromRect.top -= childMatrix.f;
+            fromRect.left -= childMatrix.e;
+          }
+        }
+        child.fromRect = fromRect;
+      });
+    },
+    addAnimationState: function addAnimationState(state) {
+      animationStates.push(state);
+    },
+    removeAnimationState: function removeAnimationState(target) {
+      animationStates.splice(indexOfObject(animationStates, {
+        target: target
+      }), 1);
+    },
+    animateAll: function animateAll(callback) {
+      var _this = this;
+      if (!this.options.animation) {
+        clearTimeout(animationCallbackId);
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      var animating = false,
+        animationTime = 0;
+      animationStates.forEach(function (state) {
+        var time = 0,
+          target = state.target,
+          fromRect = target.fromRect,
+          toRect = getRect(target),
+          prevFromRect = target.prevFromRect,
+          prevToRect = target.prevToRect,
+          animatingRect = state.rect,
+          targetMatrix = matrix(target, true);
+        if (targetMatrix) {
+          // Compensate for current animation
+          toRect.top -= targetMatrix.f;
+          toRect.left -= targetMatrix.e;
+        }
+        target.toRect = toRect;
+        if (target.thisAnimationDuration) {
+          // Could also check if animatingRect is between fromRect and toRect
+          if (isRectEqual(prevFromRect, toRect) && !isRectEqual(fromRect, toRect) &&
+          // Make sure animatingRect is on line between toRect & fromRect
+          (animatingRect.top - toRect.top) / (animatingRect.left - toRect.left) === (fromRect.top - toRect.top) / (fromRect.left - toRect.left)) {
+            // If returning to same place as started from animation and on same axis
+            time = calculateRealTime(animatingRect, prevFromRect, prevToRect, _this.options);
+          }
+        }
+
+        // if fromRect != toRect: animate
+        if (!isRectEqual(toRect, fromRect)) {
+          target.prevFromRect = fromRect;
+          target.prevToRect = toRect;
+          if (!time) {
+            time = _this.options.animation;
+          }
+          _this.animate(target, animatingRect, toRect, time);
+        }
+        if (time) {
+          animating = true;
+          animationTime = Math.max(animationTime, time);
+          clearTimeout(target.animationResetTimer);
+          target.animationResetTimer = setTimeout(function () {
+            target.animationTime = 0;
+            target.prevFromRect = null;
+            target.fromRect = null;
+            target.prevToRect = null;
+            target.thisAnimationDuration = null;
+          }, time);
+          target.thisAnimationDuration = time;
+        }
+      });
+      clearTimeout(animationCallbackId);
+      if (!animating) {
+        if (typeof callback === 'function') callback();
+      } else {
+        animationCallbackId = setTimeout(function () {
+          if (typeof callback === 'function') callback();
+        }, animationTime);
+      }
+      animationStates = [];
+    },
+    animate: function animate(target, currentRect, toRect, duration) {
+      if (duration) {
+        css(target, 'transition', '');
+        css(target, 'transform', '');
+        var elMatrix = matrix(this.el),
+          scaleX = elMatrix && elMatrix.a,
+          scaleY = elMatrix && elMatrix.d,
+          translateX = (currentRect.left - toRect.left) / (scaleX || 1),
+          translateY = (currentRect.top - toRect.top) / (scaleY || 1);
+        target.animatingX = !!translateX;
+        target.animatingY = !!translateY;
+        css(target, 'transform', 'translate3d(' + translateX + 'px,' + translateY + 'px,0)');
+        this.forRepaintDummy = repaint(target); // repaint
+
+        css(target, 'transition', 'transform ' + duration + 'ms' + (this.options.easing ? ' ' + this.options.easing : ''));
+        css(target, 'transform', 'translate3d(0,0,0)');
+        typeof target.animated === 'number' && clearTimeout(target.animated);
+        target.animated = setTimeout(function () {
+          css(target, 'transition', '');
+          css(target, 'transform', '');
+          target.animated = false;
+          target.animatingX = false;
+          target.animatingY = false;
+        }, duration);
+      }
+    }
+  };
+}
+function repaint(target) {
+  return target.offsetWidth;
+}
+function calculateRealTime(animatingRect, fromRect, toRect, options) {
+  return Math.sqrt(Math.pow(fromRect.top - animatingRect.top, 2) + Math.pow(fromRect.left - animatingRect.left, 2)) / Math.sqrt(Math.pow(fromRect.top - toRect.top, 2) + Math.pow(fromRect.left - toRect.left, 2)) * options.animation;
+}
+
+var plugins = [];
+var defaults = {
+  initializeByDefault: true
+};
+var PluginManager = {
+  mount: function mount(plugin) {
+    // Set default static properties
+    for (var option in defaults) {
+      if (defaults.hasOwnProperty(option) && !(option in plugin)) {
+        plugin[option] = defaults[option];
+      }
+    }
+    plugins.forEach(function (p) {
+      if (p.pluginName === plugin.pluginName) {
+        throw "Sortable: Cannot mount plugin ".concat(plugin.pluginName, " more than once");
+      }
+    });
+    plugins.push(plugin);
+  },
+  pluginEvent: function pluginEvent(eventName, sortable, evt) {
+    var _this = this;
+    this.eventCanceled = false;
+    evt.cancel = function () {
+      _this.eventCanceled = true;
+    };
+    var eventNameGlobal = eventName + 'Global';
+    plugins.forEach(function (plugin) {
+      if (!sortable[plugin.pluginName]) return;
+      // Fire global events if it exists in this sortable
+      if (sortable[plugin.pluginName][eventNameGlobal]) {
+        sortable[plugin.pluginName][eventNameGlobal](_objectSpread2({
+          sortable: sortable
+        }, evt));
+      }
+
+      // Only fire plugin event if plugin is enabled in this sortable,
+      // and plugin has event defined
+      if (sortable.options[plugin.pluginName] && sortable[plugin.pluginName][eventName]) {
+        sortable[plugin.pluginName][eventName](_objectSpread2({
+          sortable: sortable
+        }, evt));
+      }
+    });
+  },
+  initializePlugins: function initializePlugins(sortable, el, defaults, options) {
+    plugins.forEach(function (plugin) {
+      var pluginName = plugin.pluginName;
+      if (!sortable.options[pluginName] && !plugin.initializeByDefault) return;
+      var initialized = new plugin(sortable, el, sortable.options);
+      initialized.sortable = sortable;
+      initialized.options = sortable.options;
+      sortable[pluginName] = initialized;
+
+      // Add default options from plugin
+      _extends(defaults, initialized.defaults);
+    });
+    for (var option in sortable.options) {
+      if (!sortable.options.hasOwnProperty(option)) continue;
+      var modified = this.modifyOption(sortable, option, sortable.options[option]);
+      if (typeof modified !== 'undefined') {
+        sortable.options[option] = modified;
+      }
+    }
+  },
+  getEventProperties: function getEventProperties(name, sortable) {
+    var eventProperties = {};
+    plugins.forEach(function (plugin) {
+      if (typeof plugin.eventProperties !== 'function') return;
+      _extends(eventProperties, plugin.eventProperties.call(sortable[plugin.pluginName], name));
+    });
+    return eventProperties;
+  },
+  modifyOption: function modifyOption(sortable, name, value) {
+    var modifiedValue;
+    plugins.forEach(function (plugin) {
+      // Plugin must exist on the Sortable
+      if (!sortable[plugin.pluginName]) return;
+
+      // If static option listener exists for this option, call in the context of the Sortable's instance of this plugin
+      if (plugin.optionListeners && typeof plugin.optionListeners[name] === 'function') {
+        modifiedValue = plugin.optionListeners[name].call(sortable[plugin.pluginName], value);
+      }
+    });
+    return modifiedValue;
+  }
+};
+
+function dispatchEvent(_ref) {
+  var sortable = _ref.sortable,
+    rootEl = _ref.rootEl,
+    name = _ref.name,
+    targetEl = _ref.targetEl,
+    cloneEl = _ref.cloneEl,
+    toEl = _ref.toEl,
+    fromEl = _ref.fromEl,
+    oldIndex = _ref.oldIndex,
+    newIndex = _ref.newIndex,
+    oldDraggableIndex = _ref.oldDraggableIndex,
+    newDraggableIndex = _ref.newDraggableIndex,
+    originalEvent = _ref.originalEvent,
+    putSortable = _ref.putSortable,
+    extraEventProperties = _ref.extraEventProperties;
+  sortable = sortable || rootEl && rootEl[expando];
+  if (!sortable) return;
+  var evt,
+    options = sortable.options,
+    onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1);
+  // Support for new CustomEvent feature
+  if (window.CustomEvent && !IE11OrLess && !Edge) {
+    evt = new CustomEvent(name, {
+      bubbles: true,
+      cancelable: true
+    });
+  } else {
+    evt = document.createEvent('Event');
+    evt.initEvent(name, true, true);
+  }
+  evt.to = toEl || rootEl;
+  evt.from = fromEl || rootEl;
+  evt.item = targetEl || rootEl;
+  evt.clone = cloneEl;
+  evt.oldIndex = oldIndex;
+  evt.newIndex = newIndex;
+  evt.oldDraggableIndex = oldDraggableIndex;
+  evt.newDraggableIndex = newDraggableIndex;
+  evt.originalEvent = originalEvent;
+  evt.pullMode = putSortable ? putSortable.lastPutMode : undefined;
+  var allEventProperties = _objectSpread2(_objectSpread2({}, extraEventProperties), PluginManager.getEventProperties(name, sortable));
+  for (var option in allEventProperties) {
+    evt[option] = allEventProperties[option];
+  }
+  if (rootEl) {
+    rootEl.dispatchEvent(evt);
+  }
+  if (options[onName]) {
+    options[onName].call(sortable, evt);
+  }
+}
+
+var _excluded = ["evt"];
+var pluginEvent = function pluginEvent(eventName, sortable) {
+  var _ref = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {},
+    originalEvent = _ref.evt,
+    data = _objectWithoutProperties(_ref, _excluded);
+  PluginManager.pluginEvent.bind(Sortable)(eventName, sortable, _objectSpread2({
+    dragEl: dragEl,
+    parentEl: parentEl,
+    ghostEl: ghostEl,
+    rootEl: rootEl,
+    nextEl: nextEl,
+    lastDownEl: lastDownEl,
+    cloneEl: cloneEl,
+    cloneHidden: cloneHidden,
+    dragStarted: moved,
+    putSortable: putSortable,
+    activeSortable: Sortable.active,
+    originalEvent: originalEvent,
+    oldIndex: oldIndex,
+    oldDraggableIndex: oldDraggableIndex,
+    newIndex: newIndex,
+    newDraggableIndex: newDraggableIndex,
+    hideGhostForTarget: _hideGhostForTarget,
+    unhideGhostForTarget: _unhideGhostForTarget,
+    cloneNowHidden: function cloneNowHidden() {
+      cloneHidden = true;
+    },
+    cloneNowShown: function cloneNowShown() {
+      cloneHidden = false;
+    },
+    dispatchSortableEvent: function dispatchSortableEvent(name) {
+      _dispatchEvent({
+        sortable: sortable,
+        name: name,
+        originalEvent: originalEvent
+      });
+    }
+  }, data));
+};
+function _dispatchEvent(info) {
+  dispatchEvent(_objectSpread2({
+    putSortable: putSortable,
+    cloneEl: cloneEl,
+    targetEl: dragEl,
+    rootEl: rootEl,
+    oldIndex: oldIndex,
+    oldDraggableIndex: oldDraggableIndex,
+    newIndex: newIndex,
+    newDraggableIndex: newDraggableIndex
+  }, info));
+}
+var dragEl,
+  parentEl,
+  ghostEl,
+  rootEl,
+  nextEl,
+  lastDownEl,
+  cloneEl,
+  cloneHidden,
+  oldIndex,
+  newIndex,
+  oldDraggableIndex,
+  newDraggableIndex,
+  activeGroup,
+  putSortable,
+  awaitingDragStarted = false,
+  ignoreNextClick = false,
+  sortables = [],
+  tapEvt,
+  touchEvt,
+  lastDx,
+  lastDy,
+  tapDistanceLeft,
+  tapDistanceTop,
+  moved,
+  lastTarget,
+  lastDirection,
+  pastFirstInvertThresh = false,
+  isCircumstantialInvert = false,
+  targetMoveDistance,
+  // For positioning ghost absolutely
+  ghostRelativeParent,
+  ghostRelativeParentInitialScroll = [],
+  // (left, top)
+
+  _silent = false,
+  savedInputChecked = [];
+
+/** @const */
+var documentExists = typeof document !== 'undefined',
+  PositionGhostAbsolutely = IOS,
+  CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
+  // This will not pass for IE9, because IE9 DnD only works on anchors
+  supportDraggable = documentExists && !ChromeForAndroid && !IOS && 'draggable' in document.createElement('div'),
+  supportCssPointerEvents = function () {
+    if (!documentExists) return;
+    // false when <= IE11
+    if (IE11OrLess) {
+      return false;
+    }
+    var el = document.createElement('x');
+    el.style.cssText = 'pointer-events:auto';
+    return el.style.pointerEvents === 'auto';
+  }(),
+  _detectDirection = function _detectDirection(el, options) {
+    var elCSS = css(el),
+      elWidth = parseInt(elCSS.width) - parseInt(elCSS.paddingLeft) - parseInt(elCSS.paddingRight) - parseInt(elCSS.borderLeftWidth) - parseInt(elCSS.borderRightWidth),
+      child1 = getChild(el, 0, options),
+      child2 = getChild(el, 1, options),
+      firstChildCSS = child1 && css(child1),
+      secondChildCSS = child2 && css(child2),
+      firstChildWidth = firstChildCSS && parseInt(firstChildCSS.marginLeft) + parseInt(firstChildCSS.marginRight) + getRect(child1).width,
+      secondChildWidth = secondChildCSS && parseInt(secondChildCSS.marginLeft) + parseInt(secondChildCSS.marginRight) + getRect(child2).width;
+    if (elCSS.display === 'flex') {
+      return elCSS.flexDirection === 'column' || elCSS.flexDirection === 'column-reverse' ? 'vertical' : 'horizontal';
+    }
+    if (elCSS.display === 'grid') {
+      return elCSS.gridTemplateColumns.split(' ').length <= 1 ? 'vertical' : 'horizontal';
+    }
+    if (child1 && firstChildCSS["float"] && firstChildCSS["float"] !== 'none') {
+      var touchingSideChild2 = firstChildCSS["float"] === 'left' ? 'left' : 'right';
+      return child2 && (secondChildCSS.clear === 'both' || secondChildCSS.clear === touchingSideChild2) ? 'vertical' : 'horizontal';
+    }
+    return child1 && (firstChildCSS.display === 'block' || firstChildCSS.display === 'flex' || firstChildCSS.display === 'table' || firstChildCSS.display === 'grid' || firstChildWidth >= elWidth && elCSS[CSSFloatProperty] === 'none' || child2 && elCSS[CSSFloatProperty] === 'none' && firstChildWidth + secondChildWidth > elWidth) ? 'vertical' : 'horizontal';
+  },
+  _dragElInRowColumn = function _dragElInRowColumn(dragRect, targetRect, vertical) {
+    var dragElS1Opp = vertical ? dragRect.left : dragRect.top,
+      dragElS2Opp = vertical ? dragRect.right : dragRect.bottom,
+      dragElOppLength = vertical ? dragRect.width : dragRect.height,
+      targetS1Opp = vertical ? targetRect.left : targetRect.top,
+      targetS2Opp = vertical ? targetRect.right : targetRect.bottom,
+      targetOppLength = vertical ? targetRect.width : targetRect.height;
+    return dragElS1Opp === targetS1Opp || dragElS2Opp === targetS2Opp || dragElS1Opp + dragElOppLength / 2 === targetS1Opp + targetOppLength / 2;
+  },
+  /**
+   * Detects first nearest empty sortable to X and Y position using emptyInsertThreshold.
+   * @param  {Number} x      X position
+   * @param  {Number} y      Y position
+   * @return {HTMLElement}   Element of the first found nearest Sortable
+   */
+  _detectNearestEmptySortable = function _detectNearestEmptySortable(x, y) {
+    var ret;
+    sortables.some(function (sortable) {
+      var threshold = sortable[expando].options.emptyInsertThreshold;
+      if (!threshold || lastChild(sortable)) return;
+      var rect = getRect(sortable),
+        insideHorizontally = x >= rect.left - threshold && x <= rect.right + threshold,
+        insideVertically = y >= rect.top - threshold && y <= rect.bottom + threshold;
+      if (insideHorizontally && insideVertically) {
+        return ret = sortable;
+      }
+    });
+    return ret;
+  },
+  _prepareGroup = function _prepareGroup(options) {
+    function toFn(value, pull) {
+      return function (to, from, dragEl, evt) {
+        var sameGroup = to.options.group.name && from.options.group.name && to.options.group.name === from.options.group.name;
+        if (value == null && (pull || sameGroup)) {
+          // Default pull value
+          // Default pull and put value if same group
+          return true;
+        } else if (value == null || value === false) {
+          return false;
+        } else if (pull && value === 'clone') {
+          return value;
+        } else if (typeof value === 'function') {
+          return toFn(value(to, from, dragEl, evt), pull)(to, from, dragEl, evt);
+        } else {
+          var otherGroup = (pull ? to : from).options.group.name;
+          return value === true || typeof value === 'string' && value === otherGroup || value.join && value.indexOf(otherGroup) > -1;
+        }
+      };
+    }
+    var group = {};
+    var originalGroup = options.group;
+    if (!originalGroup || _typeof(originalGroup) != 'object') {
+      originalGroup = {
+        name: originalGroup
+      };
+    }
+    group.name = originalGroup.name;
+    group.checkPull = toFn(originalGroup.pull, true);
+    group.checkPut = toFn(originalGroup.put);
+    group.revertClone = originalGroup.revertClone;
+    options.group = group;
+  },
+  _hideGhostForTarget = function _hideGhostForTarget() {
+    if (!supportCssPointerEvents && ghostEl) {
+      css(ghostEl, 'display', 'none');
+    }
+  },
+  _unhideGhostForTarget = function _unhideGhostForTarget() {
+    if (!supportCssPointerEvents && ghostEl) {
+      css(ghostEl, 'display', '');
+    }
+  };
+
+// #1184 fix - Prevent click event on fallback if dragged but item not changed position
+if (documentExists && !ChromeForAndroid) {
+  document.addEventListener('click', function (evt) {
+    if (ignoreNextClick) {
+      evt.preventDefault();
+      evt.stopPropagation && evt.stopPropagation();
+      evt.stopImmediatePropagation && evt.stopImmediatePropagation();
+      ignoreNextClick = false;
+      return false;
+    }
+  }, true);
+}
+var nearestEmptyInsertDetectEvent = function nearestEmptyInsertDetectEvent(evt) {
+  if (dragEl) {
+    evt = evt.touches ? evt.touches[0] : evt;
+    var nearest = _detectNearestEmptySortable(evt.clientX, evt.clientY);
+    if (nearest) {
+      // Create imitation event
+      var event = {};
+      for (var i in evt) {
+        if (evt.hasOwnProperty(i)) {
+          event[i] = evt[i];
+        }
+      }
+      event.target = event.rootEl = nearest;
+      event.preventDefault = void 0;
+      event.stopPropagation = void 0;
+      nearest[expando]._onDragOver(event);
+    }
+  }
+};
+var _checkOutsideTargetEl = function _checkOutsideTargetEl(evt) {
+  if (dragEl) {
+    dragEl.parentNode[expando]._isOutsideThisEl(evt.target);
+  }
+};
+
+/**
+ * @class  Sortable
+ * @param  {HTMLElement}  el
+ * @param  {Object}       [options]
+ */
+function Sortable(el, options) {
+  if (!(el && el.nodeType && el.nodeType === 1)) {
+    throw "Sortable: `el` must be an HTMLElement, not ".concat({}.toString.call(el));
+  }
+  this.el = el; // root element
+  this.options = options = _extends({}, options);
+
+  // Export instance
+  el[expando] = this;
+  var defaults = {
+    group: null,
+    sort: true,
+    disabled: false,
+    store: null,
+    handle: null,
+    draggable: /^[uo]l$/i.test(el.nodeName) ? '>li' : '>*',
+    swapThreshold: 1,
+    // percentage; 0 <= x <= 1
+    invertSwap: false,
+    // invert always
+    invertedSwapThreshold: null,
+    // will be set to same as swapThreshold if default
+    removeCloneOnHide: true,
+    direction: function direction() {
+      return _detectDirection(el, this.options);
+    },
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    ignore: 'a, img',
+    filter: null,
+    preventOnFilter: true,
+    animation: 0,
+    easing: null,
+    setData: function setData(dataTransfer, dragEl) {
+      dataTransfer.setData('Text', dragEl.textContent);
+    },
+    dropBubble: false,
+    dragoverBubble: false,
+    dataIdAttr: 'data-id',
+    delay: 0,
+    delayOnTouchOnly: false,
+    touchStartThreshold: (Number.parseInt ? Number : window).parseInt(window.devicePixelRatio, 10) || 1,
+    forceFallback: false,
+    fallbackClass: 'sortable-fallback',
+    fallbackOnBody: false,
+    fallbackTolerance: 0,
+    fallbackOffset: {
+      x: 0,
+      y: 0
+    },
+    // Disabled on Safari: #1571; Enabled on Safari IOS: #2244
+    supportPointer: Sortable.supportPointer !== false && 'PointerEvent' in window && (!Safari || IOS),
+    emptyInsertThreshold: 5
+  };
+  PluginManager.initializePlugins(this, el, defaults);
+
+  // Set default options
+  for (var name in defaults) {
+    !(name in options) && (options[name] = defaults[name]);
+  }
+  _prepareGroup(options);
+
+  // Bind all private methods
+  for (var fn in this) {
+    if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
+      this[fn] = this[fn].bind(this);
+    }
+  }
+
+  // Setup drag mode
+  this.nativeDraggable = options.forceFallback ? false : supportDraggable;
+  if (this.nativeDraggable) {
+    // Touch start threshold cannot be greater than the native dragstart threshold
+    this.options.touchStartThreshold = 1;
+  }
+
+  // Bind events
+  if (options.supportPointer) {
+    on(el, 'pointerdown', this._onTapStart);
+  } else {
+    on(el, 'mousedown', this._onTapStart);
+    on(el, 'touchstart', this._onTapStart);
+  }
+  if (this.nativeDraggable) {
+    on(el, 'dragover', this);
+    on(el, 'dragenter', this);
+  }
+  sortables.push(this.el);
+
+  // Restore sorting
+  options.store && options.store.get && this.sort(options.store.get(this) || []);
+
+  // Add animation state manager
+  _extends(this, AnimationStateManager());
+}
+Sortable.prototype = /** @lends Sortable.prototype */{
+  constructor: Sortable,
+  _isOutsideThisEl: function _isOutsideThisEl(target) {
+    if (!this.el.contains(target) && target !== this.el) {
+      lastTarget = null;
+    }
+  },
+  _getDirection: function _getDirection(evt, target) {
+    return typeof this.options.direction === 'function' ? this.options.direction.call(this, evt, target, dragEl) : this.options.direction;
+  },
+  _onTapStart: function _onTapStart( /** Event|TouchEvent */evt) {
+    if (!evt.cancelable) return;
+    var _this = this,
+      el = this.el,
+      options = this.options,
+      preventOnFilter = options.preventOnFilter,
+      type = evt.type,
+      touch = evt.touches && evt.touches[0] || evt.pointerType && evt.pointerType === 'touch' && evt,
+      target = (touch || evt).target,
+      originalTarget = evt.target.shadowRoot && (evt.path && evt.path[0] || evt.composedPath && evt.composedPath()[0]) || target,
+      filter = options.filter;
+    _saveInputCheckedState(el);
+
+    // Don't trigger start event when an element is been dragged, otherwise the evt.oldindex always wrong when set option.group.
+    if (dragEl) {
+      return;
+    }
+    if (/mousedown|pointerdown/.test(type) && evt.button !== 0 || options.disabled) {
+      return; // only left button and enabled
+    }
+
+    // cancel dnd if original target is content editable
+    if (originalTarget.isContentEditable) {
+      return;
+    }
+
+    // Safari ignores further event handling after mousedown
+    if (!this.nativeDraggable && Safari && target && target.tagName.toUpperCase() === 'SELECT') {
+      return;
+    }
+    target = closest(target, options.draggable, el, false);
+    if (target && target.animated) {
+      return;
+    }
+    if (lastDownEl === target) {
+      // Ignoring duplicate `down`
+      return;
+    }
+
+    // Get the index of the dragged element within its parent
+    oldIndex = index(target);
+    oldDraggableIndex = index(target, options.draggable);
+
+    // Check filter
+    if (typeof filter === 'function') {
+      if (filter.call(this, evt, target, this)) {
+        _dispatchEvent({
+          sortable: _this,
+          rootEl: originalTarget,
+          name: 'filter',
+          targetEl: target,
+          toEl: el,
+          fromEl: el
+        });
+        pluginEvent('filter', _this, {
+          evt: evt
+        });
+        preventOnFilter && evt.preventDefault();
+        return; // cancel dnd
+      }
+    } else if (filter) {
+      filter = filter.split(',').some(function (criteria) {
+        criteria = closest(originalTarget, criteria.trim(), el, false);
+        if (criteria) {
+          _dispatchEvent({
+            sortable: _this,
+            rootEl: criteria,
+            name: 'filter',
+            targetEl: target,
+            fromEl: el,
+            toEl: el
+          });
+          pluginEvent('filter', _this, {
+            evt: evt
+          });
+          return true;
+        }
+      });
+      if (filter) {
+        preventOnFilter && evt.preventDefault();
+        return; // cancel dnd
+      }
+    }
+    if (options.handle && !closest(originalTarget, options.handle, el, false)) {
+      return;
+    }
+
+    // Prepare `dragstart`
+    this._prepareDragStart(evt, touch, target);
+  },
+  _prepareDragStart: function _prepareDragStart( /** Event */evt, /** Touch */touch, /** HTMLElement */target) {
+    var _this = this,
+      el = _this.el,
+      options = _this.options,
+      ownerDocument = el.ownerDocument,
+      dragStartFn;
+    if (target && !dragEl && target.parentNode === el) {
+      var dragRect = getRect(target);
+      rootEl = el;
+      dragEl = target;
+      parentEl = dragEl.parentNode;
+      nextEl = dragEl.nextSibling;
+      lastDownEl = target;
+      activeGroup = options.group;
+      Sortable.dragged = dragEl;
+      tapEvt = {
+        target: dragEl,
+        clientX: (touch || evt).clientX,
+        clientY: (touch || evt).clientY
+      };
+      tapDistanceLeft = tapEvt.clientX - dragRect.left;
+      tapDistanceTop = tapEvt.clientY - dragRect.top;
+      this._lastX = (touch || evt).clientX;
+      this._lastY = (touch || evt).clientY;
+      dragEl.style['will-change'] = 'all';
+      dragStartFn = function dragStartFn() {
+        pluginEvent('delayEnded', _this, {
+          evt: evt
+        });
+        if (Sortable.eventCanceled) {
+          _this._onDrop();
+          return;
+        }
+        // Delayed drag has been triggered
+        // we can re-enable the events: touchmove/mousemove
+        _this._disableDelayedDragEvents();
+        if (!FireFox && _this.nativeDraggable) {
+          dragEl.draggable = true;
+        }
+
+        // Bind the events: dragstart/dragend
+        _this._triggerDragStart(evt, touch);
+
+        // Drag start event
+        _dispatchEvent({
+          sortable: _this,
+          name: 'choose',
+          originalEvent: evt
+        });
+
+        // Chosen item
+        toggleClass(dragEl, options.chosenClass, true);
+      };
+
+      // Disable "draggable"
+      options.ignore.split(',').forEach(function (criteria) {
+        find(dragEl, criteria.trim(), _disableDraggable);
+      });
+      on(ownerDocument, 'dragover', nearestEmptyInsertDetectEvent);
+      on(ownerDocument, 'mousemove', nearestEmptyInsertDetectEvent);
+      on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
+      if (options.supportPointer) {
+        on(ownerDocument, 'pointerup', _this._onDrop);
+        // Native D&D triggers pointercancel
+        !this.nativeDraggable && on(ownerDocument, 'pointercancel', _this._onDrop);
+      } else {
+        on(ownerDocument, 'mouseup', _this._onDrop);
+        on(ownerDocument, 'touchend', _this._onDrop);
+        on(ownerDocument, 'touchcancel', _this._onDrop);
+      }
+
+      // Make dragEl draggable (must be before delay for FireFox)
+      if (FireFox && this.nativeDraggable) {
+        this.options.touchStartThreshold = 4;
+        dragEl.draggable = true;
+      }
+      pluginEvent('delayStart', this, {
+        evt: evt
+      });
+
+      // Delay is impossible for native DnD in Edge or IE
+      if (options.delay && (!options.delayOnTouchOnly || touch) && (!this.nativeDraggable || !(Edge || IE11OrLess))) {
+        if (Sortable.eventCanceled) {
+          this._onDrop();
+          return;
+        }
+        // If the user moves the pointer or let go the click or touch
+        // before the delay has been reached:
+        // disable the delayed drag
+        if (options.supportPointer) {
+          on(ownerDocument, 'pointerup', _this._disableDelayedDrag);
+          on(ownerDocument, 'pointercancel', _this._disableDelayedDrag);
+        } else {
+          on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
+          on(ownerDocument, 'touchend', _this._disableDelayedDrag);
+          on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
+        }
+        on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
+        on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
+        options.supportPointer && on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
+        _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+      } else {
+        dragStartFn();
+      }
+    }
+  },
+  _delayedDragTouchMoveHandler: function _delayedDragTouchMoveHandler( /** TouchEvent|PointerEvent **/e) {
+    var touch = e.touches ? e.touches[0] : e;
+    if (Math.max(Math.abs(touch.clientX - this._lastX), Math.abs(touch.clientY - this._lastY)) >= Math.floor(this.options.touchStartThreshold / (this.nativeDraggable && window.devicePixelRatio || 1))) {
+      this._disableDelayedDrag();
+    }
+  },
+  _disableDelayedDrag: function _disableDelayedDrag() {
+    dragEl && _disableDraggable(dragEl);
+    clearTimeout(this._dragStartTimer);
+    this._disableDelayedDragEvents();
+  },
+  _disableDelayedDragEvents: function _disableDelayedDragEvents() {
+    var ownerDocument = this.el.ownerDocument;
+    off(ownerDocument, 'mouseup', this._disableDelayedDrag);
+    off(ownerDocument, 'touchend', this._disableDelayedDrag);
+    off(ownerDocument, 'touchcancel', this._disableDelayedDrag);
+    off(ownerDocument, 'pointerup', this._disableDelayedDrag);
+    off(ownerDocument, 'pointercancel', this._disableDelayedDrag);
+    off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
+    off(ownerDocument, 'touchmove', this._delayedDragTouchMoveHandler);
+    off(ownerDocument, 'pointermove', this._delayedDragTouchMoveHandler);
+  },
+  _triggerDragStart: function _triggerDragStart( /** Event */evt, /** Touch */touch) {
+    touch = touch || evt.pointerType == 'touch' && evt;
+    if (!this.nativeDraggable || touch) {
+      if (this.options.supportPointer) {
+        on(document, 'pointermove', this._onTouchMove);
+      } else if (touch) {
+        on(document, 'touchmove', this._onTouchMove);
+      } else {
+        on(document, 'mousemove', this._onTouchMove);
+      }
+    } else {
+      on(dragEl, 'dragend', this);
+      on(rootEl, 'dragstart', this._onDragStart);
+    }
+    try {
+      if (document.selection) {
+        _nextTick(function () {
+          document.selection.empty();
+        });
+      } else {
+        window.getSelection().removeAllRanges();
+      }
+    } catch (err) {}
+  },
+  _dragStarted: function _dragStarted(fallback, evt) {
+    awaitingDragStarted = false;
+    if (rootEl && dragEl) {
+      pluginEvent('dragStarted', this, {
+        evt: evt
+      });
+      if (this.nativeDraggable) {
+        on(document, 'dragover', _checkOutsideTargetEl);
+      }
+      var options = this.options;
+
+      // Apply effect
+      !fallback && toggleClass(dragEl, options.dragClass, false);
+      toggleClass(dragEl, options.ghostClass, true);
+      Sortable.active = this;
+      fallback && this._appendGhost();
+
+      // Drag start event
+      _dispatchEvent({
+        sortable: this,
+        name: 'start',
+        originalEvent: evt
+      });
+    } else {
+      this._nulling();
+    }
+  },
+  _emulateDragOver: function _emulateDragOver() {
+    if (touchEvt) {
+      this._lastX = touchEvt.clientX;
+      this._lastY = touchEvt.clientY;
+      _hideGhostForTarget();
+      var target = document.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+      var parent = target;
+      while (target && target.shadowRoot) {
+        target = target.shadowRoot.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+        if (target === parent) break;
+        parent = target;
+      }
+      dragEl.parentNode[expando]._isOutsideThisEl(target);
+      if (parent) {
+        do {
+          if (parent[expando]) {
+            var inserted = void 0;
+            inserted = parent[expando]._onDragOver({
+              clientX: touchEvt.clientX,
+              clientY: touchEvt.clientY,
+              target: target,
+              rootEl: parent
+            });
+            if (inserted && !this.options.dragoverBubble) {
+              break;
+            }
+          }
+          target = parent; // store last element
+        }
+        /* jshint boss:true */ while (parent = getParentOrHost(parent));
+      }
+      _unhideGhostForTarget();
+    }
+  },
+  _onTouchMove: function _onTouchMove( /**TouchEvent*/evt) {
+    if (tapEvt) {
+      var options = this.options,
+        fallbackTolerance = options.fallbackTolerance,
+        fallbackOffset = options.fallbackOffset,
+        touch = evt.touches ? evt.touches[0] : evt,
+        ghostMatrix = ghostEl && matrix(ghostEl, true),
+        scaleX = ghostEl && ghostMatrix && ghostMatrix.a,
+        scaleY = ghostEl && ghostMatrix && ghostMatrix.d,
+        relativeScrollOffset = PositionGhostAbsolutely && ghostRelativeParent && getRelativeScrollOffset(ghostRelativeParent),
+        dx = (touch.clientX - tapEvt.clientX + fallbackOffset.x) / (scaleX || 1) + (relativeScrollOffset ? relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0] : 0) / (scaleX || 1),
+        dy = (touch.clientY - tapEvt.clientY + fallbackOffset.y) / (scaleY || 1) + (relativeScrollOffset ? relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1] : 0) / (scaleY || 1);
+
+      // only set the status to dragging, when we are actually dragging
+      if (!Sortable.active && !awaitingDragStarted) {
+        if (fallbackTolerance && Math.max(Math.abs(touch.clientX - this._lastX), Math.abs(touch.clientY - this._lastY)) < fallbackTolerance) {
+          return;
+        }
+        this._onDragStart(evt, true);
+      }
+      if (ghostEl) {
+        if (ghostMatrix) {
+          ghostMatrix.e += dx - (lastDx || 0);
+          ghostMatrix.f += dy - (lastDy || 0);
+        } else {
+          ghostMatrix = {
+            a: 1,
+            b: 0,
+            c: 0,
+            d: 1,
+            e: dx,
+            f: dy
+          };
+        }
+        var cssMatrix = "matrix(".concat(ghostMatrix.a, ",").concat(ghostMatrix.b, ",").concat(ghostMatrix.c, ",").concat(ghostMatrix.d, ",").concat(ghostMatrix.e, ",").concat(ghostMatrix.f, ")");
+        css(ghostEl, 'webkitTransform', cssMatrix);
+        css(ghostEl, 'mozTransform', cssMatrix);
+        css(ghostEl, 'msTransform', cssMatrix);
+        css(ghostEl, 'transform', cssMatrix);
+        lastDx = dx;
+        lastDy = dy;
+        touchEvt = touch;
+      }
+      evt.cancelable && evt.preventDefault();
+    }
+  },
+  _appendGhost: function _appendGhost() {
+    // Bug if using scale(): https://stackoverflow.com/questions/2637058
+    // Not being adjusted for
+    if (!ghostEl) {
+      var container = this.options.fallbackOnBody ? document.body : rootEl,
+        rect = getRect(dragEl, true, PositionGhostAbsolutely, true, container),
+        options = this.options;
+
+      // Position absolutely
+      if (PositionGhostAbsolutely) {
+        // Get relatively positioned parent
+        ghostRelativeParent = container;
+        while (css(ghostRelativeParent, 'position') === 'static' && css(ghostRelativeParent, 'transform') === 'none' && ghostRelativeParent !== document) {
+          ghostRelativeParent = ghostRelativeParent.parentNode;
+        }
+        if (ghostRelativeParent !== document.body && ghostRelativeParent !== document.documentElement) {
+          if (ghostRelativeParent === document) ghostRelativeParent = getWindowScrollingElement();
+          rect.top += ghostRelativeParent.scrollTop;
+          rect.left += ghostRelativeParent.scrollLeft;
+        } else {
+          ghostRelativeParent = getWindowScrollingElement();
+        }
+        ghostRelativeParentInitialScroll = getRelativeScrollOffset(ghostRelativeParent);
+      }
+      ghostEl = dragEl.cloneNode(true);
+      toggleClass(ghostEl, options.ghostClass, false);
+      toggleClass(ghostEl, options.fallbackClass, true);
+      toggleClass(ghostEl, options.dragClass, true);
+      css(ghostEl, 'transition', '');
+      css(ghostEl, 'transform', '');
+      css(ghostEl, 'box-sizing', 'border-box');
+      css(ghostEl, 'margin', 0);
+      css(ghostEl, 'top', rect.top);
+      css(ghostEl, 'left', rect.left);
+      css(ghostEl, 'width', rect.width);
+      css(ghostEl, 'height', rect.height);
+      css(ghostEl, 'opacity', '0.8');
+      css(ghostEl, 'position', PositionGhostAbsolutely ? 'absolute' : 'fixed');
+      css(ghostEl, 'zIndex', '100000');
+      css(ghostEl, 'pointerEvents', 'none');
+      Sortable.ghost = ghostEl;
+      container.appendChild(ghostEl);
+
+      // Set transform-origin
+      css(ghostEl, 'transform-origin', tapDistanceLeft / parseInt(ghostEl.style.width) * 100 + '% ' + tapDistanceTop / parseInt(ghostEl.style.height) * 100 + '%');
+    }
+  },
+  _onDragStart: function _onDragStart( /**Event*/evt, /**boolean*/fallback) {
+    var _this = this;
+    var dataTransfer = evt.dataTransfer;
+    var options = _this.options;
+    pluginEvent('dragStart', this, {
+      evt: evt
+    });
+    if (Sortable.eventCanceled) {
+      this._onDrop();
+      return;
+    }
+    pluginEvent('setupClone', this);
+    if (!Sortable.eventCanceled) {
+      cloneEl = clone(dragEl);
+      cloneEl.removeAttribute("id");
+      cloneEl.draggable = false;
+      cloneEl.style['will-change'] = '';
+      this._hideClone();
+      toggleClass(cloneEl, this.options.chosenClass, false);
+      Sortable.clone = cloneEl;
+    }
+
+    // #1143: IFrame support workaround
+    _this.cloneId = _nextTick(function () {
+      pluginEvent('clone', _this);
+      if (Sortable.eventCanceled) return;
+      if (!_this.options.removeCloneOnHide) {
+        rootEl.insertBefore(cloneEl, dragEl);
+      }
+      _this._hideClone();
+      _dispatchEvent({
+        sortable: _this,
+        name: 'clone'
+      });
+    });
+    !fallback && toggleClass(dragEl, options.dragClass, true);
+
+    // Set proper drop events
+    if (fallback) {
+      ignoreNextClick = true;
+      _this._loopId = setInterval(_this._emulateDragOver, 50);
+    } else {
+      // Undo what was set in _prepareDragStart before drag started
+      off(document, 'mouseup', _this._onDrop);
+      off(document, 'touchend', _this._onDrop);
+      off(document, 'touchcancel', _this._onDrop);
+      if (dataTransfer) {
+        dataTransfer.effectAllowed = 'move';
+        options.setData && options.setData.call(_this, dataTransfer, dragEl);
+      }
+      on(document, 'drop', _this);
+
+      // #1276 fix:
+      css(dragEl, 'transform', 'translateZ(0)');
+    }
+    awaitingDragStarted = true;
+    _this._dragStartId = _nextTick(_this._dragStarted.bind(_this, fallback, evt));
+    on(document, 'selectstart', _this);
+    moved = true;
+    window.getSelection().removeAllRanges();
+    if (Safari) {
+      css(document.body, 'user-select', 'none');
+    }
+  },
+  // Returns true - if no further action is needed (either inserted or another condition)
+  _onDragOver: function _onDragOver( /**Event*/evt) {
+    var el = this.el,
+      target = evt.target,
+      dragRect,
+      targetRect,
+      revert,
+      options = this.options,
+      group = options.group,
+      activeSortable = Sortable.active,
+      isOwner = activeGroup === group,
+      canSort = options.sort,
+      fromSortable = putSortable || activeSortable,
+      vertical,
+      _this = this,
+      completedFired = false;
+    if (_silent) return;
+    function dragOverEvent(name, extra) {
+      pluginEvent(name, _this, _objectSpread2({
+        evt: evt,
+        isOwner: isOwner,
+        axis: vertical ? 'vertical' : 'horizontal',
+        revert: revert,
+        dragRect: dragRect,
+        targetRect: targetRect,
+        canSort: canSort,
+        fromSortable: fromSortable,
+        target: target,
+        completed: completed,
+        onMove: function onMove(target, after) {
+          return _onMove(rootEl, el, dragEl, dragRect, target, getRect(target), evt, after);
+        },
+        changed: changed
+      }, extra));
+    }
+
+    // Capture animation state
+    function capture() {
+      dragOverEvent('dragOverAnimationCapture');
+      _this.captureAnimationState();
+      if (_this !== fromSortable) {
+        fromSortable.captureAnimationState();
+      }
+    }
+
+    // Return invocation when dragEl is inserted (or completed)
+    function completed(insertion) {
+      dragOverEvent('dragOverCompleted', {
+        insertion: insertion
+      });
+      if (insertion) {
+        // Clones must be hidden before folding animation to capture dragRectAbsolute properly
+        if (isOwner) {
+          activeSortable._hideClone();
+        } else {
+          activeSortable._showClone(_this);
+        }
+        if (_this !== fromSortable) {
+          // Set ghost class to new sortable's ghost class
+          toggleClass(dragEl, putSortable ? putSortable.options.ghostClass : activeSortable.options.ghostClass, false);
+          toggleClass(dragEl, options.ghostClass, true);
+        }
+        if (putSortable !== _this && _this !== Sortable.active) {
+          putSortable = _this;
+        } else if (_this === Sortable.active && putSortable) {
+          putSortable = null;
+        }
+
+        // Animation
+        if (fromSortable === _this) {
+          _this._ignoreWhileAnimating = target;
+        }
+        _this.animateAll(function () {
+          dragOverEvent('dragOverAnimationComplete');
+          _this._ignoreWhileAnimating = null;
+        });
+        if (_this !== fromSortable) {
+          fromSortable.animateAll();
+          fromSortable._ignoreWhileAnimating = null;
+        }
+      }
+
+      // Null lastTarget if it is not inside a previously swapped element
+      if (target === dragEl && !dragEl.animated || target === el && !target.animated) {
+        lastTarget = null;
+      }
+
+      // no bubbling and not fallback
+      if (!options.dragoverBubble && !evt.rootEl && target !== document) {
+        dragEl.parentNode[expando]._isOutsideThisEl(evt.target);
+
+        // Do not detect for empty insert if already inserted
+        !insertion && nearestEmptyInsertDetectEvent(evt);
+      }
+      !options.dragoverBubble && evt.stopPropagation && evt.stopPropagation();
+      return completedFired = true;
+    }
+
+    // Call when dragEl has been inserted
+    function changed() {
+      newIndex = index(dragEl);
+      newDraggableIndex = index(dragEl, options.draggable);
+      _dispatchEvent({
+        sortable: _this,
+        name: 'change',
+        toEl: el,
+        newIndex: newIndex,
+        newDraggableIndex: newDraggableIndex,
+        originalEvent: evt
+      });
+    }
+    if (evt.preventDefault !== void 0) {
+      evt.cancelable && evt.preventDefault();
+    }
+    target = closest(target, options.draggable, el, true);
+    dragOverEvent('dragOver');
+    if (Sortable.eventCanceled) return completedFired;
+    if (dragEl.contains(evt.target) || target.animated && target.animatingX && target.animatingY || _this._ignoreWhileAnimating === target) {
+      return completed(false);
+    }
+    ignoreNextClick = false;
+    if (activeSortable && !options.disabled && (isOwner ? canSort || (revert = parentEl !== rootEl) // Reverting item into the original list
+    : putSortable === this || (this.lastPutMode = activeGroup.checkPull(this, activeSortable, dragEl, evt)) && group.checkPut(this, activeSortable, dragEl, evt))) {
+      vertical = this._getDirection(evt, target) === 'vertical';
+      dragRect = getRect(dragEl);
+      dragOverEvent('dragOverValid');
+      if (Sortable.eventCanceled) return completedFired;
+      if (revert) {
+        parentEl = rootEl; // actualization
+        capture();
+        this._hideClone();
+        dragOverEvent('revert');
+        if (!Sortable.eventCanceled) {
+          if (nextEl) {
+            rootEl.insertBefore(dragEl, nextEl);
+          } else {
+            rootEl.appendChild(dragEl);
+          }
+        }
+        return completed(true);
+      }
+      var elLastChild = lastChild(el, options.draggable);
+      if (!elLastChild || _ghostIsLast(evt, vertical, this) && !elLastChild.animated) {
+        // Insert to end of list
+
+        // If already at end of list: Do not insert
+        if (elLastChild === dragEl) {
+          return completed(false);
+        }
+
+        // if there is a last element, it is the target
+        if (elLastChild && el === evt.target) {
+          target = elLastChild;
+        }
+        if (target) {
+          targetRect = getRect(target);
+        }
+        if (_onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, !!target) !== false) {
+          capture();
+          if (elLastChild && elLastChild.nextSibling) {
+            // the last draggable element is not the last node
+            el.insertBefore(dragEl, elLastChild.nextSibling);
+          } else {
+            el.appendChild(dragEl);
+          }
+          parentEl = el; // actualization
+
+          changed();
+          return completed(true);
+        }
+      } else if (elLastChild && _ghostIsFirst(evt, vertical, this)) {
+        // Insert to start of list
+        var firstChild = getChild(el, 0, options, true);
+        if (firstChild === dragEl) {
+          return completed(false);
+        }
+        target = firstChild;
+        targetRect = getRect(target);
+        if (_onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, false) !== false) {
+          capture();
+          el.insertBefore(dragEl, firstChild);
+          parentEl = el; // actualization
+
+          changed();
+          return completed(true);
+        }
+      } else if (target.parentNode === el) {
+        targetRect = getRect(target);
+        var direction = 0,
+          targetBeforeFirstSwap,
+          differentLevel = dragEl.parentNode !== el,
+          differentRowCol = !_dragElInRowColumn(dragEl.animated && dragEl.toRect || dragRect, target.animated && target.toRect || targetRect, vertical),
+          side1 = vertical ? 'top' : 'left',
+          scrolledPastTop = isScrolledPast(target, 'top', 'top') || isScrolledPast(dragEl, 'top', 'top'),
+          scrollBefore = scrolledPastTop ? scrolledPastTop.scrollTop : void 0;
+        if (lastTarget !== target) {
+          targetBeforeFirstSwap = targetRect[side1];
+          pastFirstInvertThresh = false;
+          isCircumstantialInvert = !differentRowCol && options.invertSwap || differentLevel;
+        }
+        direction = _getSwapDirection(evt, target, targetRect, vertical, differentRowCol ? 1 : options.swapThreshold, options.invertedSwapThreshold == null ? options.swapThreshold : options.invertedSwapThreshold, isCircumstantialInvert, lastTarget === target);
+        var sibling;
+        if (direction !== 0) {
+          // Check if target is beside dragEl in respective direction (ignoring hidden elements)
+          var dragIndex = index(dragEl);
+          do {
+            dragIndex -= direction;
+            sibling = parentEl.children[dragIndex];
+          } while (sibling && (css(sibling, 'display') === 'none' || sibling === ghostEl));
+        }
+        // If dragEl is already beside target: Do not insert
+        if (direction === 0 || sibling === target) {
+          return completed(false);
+        }
+        lastTarget = target;
+        lastDirection = direction;
+        var nextSibling = target.nextElementSibling,
+          after = false;
+        after = direction === 1;
+        var moveVector = _onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, after);
+        if (moveVector !== false) {
+          if (moveVector === 1 || moveVector === -1) {
+            after = moveVector === 1;
+          }
+          _silent = true;
+          setTimeout(_unsilent, 30);
+          capture();
+          if (after && !nextSibling) {
+            el.appendChild(dragEl);
+          } else {
+            target.parentNode.insertBefore(dragEl, after ? nextSibling : target);
+          }
+
+          // Undo chrome's scroll adjustment (has no effect on other browsers)
+          if (scrolledPastTop) {
+            scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
+          }
+          parentEl = dragEl.parentNode; // actualization
+
+          // must be done before animation
+          if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
+            targetMoveDistance = Math.abs(targetBeforeFirstSwap - getRect(target)[side1]);
+          }
+          changed();
+          return completed(true);
+        }
+      }
+      if (el.contains(dragEl)) {
+        return completed(false);
+      }
+    }
+    return false;
+  },
+  _ignoreWhileAnimating: null,
+  _offMoveEvents: function _offMoveEvents() {
+    off(document, 'mousemove', this._onTouchMove);
+    off(document, 'touchmove', this._onTouchMove);
+    off(document, 'pointermove', this._onTouchMove);
+    off(document, 'dragover', nearestEmptyInsertDetectEvent);
+    off(document, 'mousemove', nearestEmptyInsertDetectEvent);
+    off(document, 'touchmove', nearestEmptyInsertDetectEvent);
+  },
+  _offUpEvents: function _offUpEvents() {
+    var ownerDocument = this.el.ownerDocument;
+    off(ownerDocument, 'mouseup', this._onDrop);
+    off(ownerDocument, 'touchend', this._onDrop);
+    off(ownerDocument, 'pointerup', this._onDrop);
+    off(ownerDocument, 'pointercancel', this._onDrop);
+    off(ownerDocument, 'touchcancel', this._onDrop);
+    off(document, 'selectstart', this);
+  },
+  _onDrop: function _onDrop( /**Event*/evt) {
+    var el = this.el,
+      options = this.options;
+
+    // Get the index of the dragged element within its parent
+    newIndex = index(dragEl);
+    newDraggableIndex = index(dragEl, options.draggable);
+    pluginEvent('drop', this, {
+      evt: evt
+    });
+    parentEl = dragEl && dragEl.parentNode;
+
+    // Get again after plugin event
+    newIndex = index(dragEl);
+    newDraggableIndex = index(dragEl, options.draggable);
+    if (Sortable.eventCanceled) {
+      this._nulling();
+      return;
+    }
+    awaitingDragStarted = false;
+    isCircumstantialInvert = false;
+    pastFirstInvertThresh = false;
+    clearInterval(this._loopId);
+    clearTimeout(this._dragStartTimer);
+    _cancelNextTick(this.cloneId);
+    _cancelNextTick(this._dragStartId);
+
+    // Unbind events
+    if (this.nativeDraggable) {
+      off(document, 'drop', this);
+      off(el, 'dragstart', this._onDragStart);
+    }
+    this._offMoveEvents();
+    this._offUpEvents();
+    if (Safari) {
+      css(document.body, 'user-select', '');
+    }
+    css(dragEl, 'transform', '');
+    if (evt) {
+      if (moved) {
+        evt.cancelable && evt.preventDefault();
+        !options.dropBubble && evt.stopPropagation();
+      }
+      ghostEl && ghostEl.parentNode && ghostEl.parentNode.removeChild(ghostEl);
+      if (rootEl === parentEl || putSortable && putSortable.lastPutMode !== 'clone') {
+        // Remove clone(s)
+        cloneEl && cloneEl.parentNode && cloneEl.parentNode.removeChild(cloneEl);
+      }
+      if (dragEl) {
+        if (this.nativeDraggable) {
+          off(dragEl, 'dragend', this);
+        }
+        _disableDraggable(dragEl);
+        dragEl.style['will-change'] = '';
+
+        // Remove classes
+        // ghostClass is added in dragStarted
+        if (moved && !awaitingDragStarted) {
+          toggleClass(dragEl, putSortable ? putSortable.options.ghostClass : this.options.ghostClass, false);
+        }
+        toggleClass(dragEl, this.options.chosenClass, false);
+
+        // Drag stop event
+        _dispatchEvent({
+          sortable: this,
+          name: 'unchoose',
+          toEl: parentEl,
+          newIndex: null,
+          newDraggableIndex: null,
+          originalEvent: evt
+        });
+        if (rootEl !== parentEl) {
+          if (newIndex >= 0) {
+            // Add event
+            _dispatchEvent({
+              rootEl: parentEl,
+              name: 'add',
+              toEl: parentEl,
+              fromEl: rootEl,
+              originalEvent: evt
+            });
+
+            // Remove event
+            _dispatchEvent({
+              sortable: this,
+              name: 'remove',
+              toEl: parentEl,
+              originalEvent: evt
+            });
+
+            // drag from one list and drop into another
+            _dispatchEvent({
+              rootEl: parentEl,
+              name: 'sort',
+              toEl: parentEl,
+              fromEl: rootEl,
+              originalEvent: evt
+            });
+            _dispatchEvent({
+              sortable: this,
+              name: 'sort',
+              toEl: parentEl,
+              originalEvent: evt
+            });
+          }
+          putSortable && putSortable.save();
+        } else {
+          if (newIndex !== oldIndex) {
+            if (newIndex >= 0) {
+              // drag & drop within the same list
+              _dispatchEvent({
+                sortable: this,
+                name: 'update',
+                toEl: parentEl,
+                originalEvent: evt
+              });
+              _dispatchEvent({
+                sortable: this,
+                name: 'sort',
+                toEl: parentEl,
+                originalEvent: evt
+              });
+            }
+          }
+        }
+        if (Sortable.active) {
+          /* jshint eqnull:true */
+          if (newIndex == null || newIndex === -1) {
+            newIndex = oldIndex;
+            newDraggableIndex = oldDraggableIndex;
+          }
+          _dispatchEvent({
+            sortable: this,
+            name: 'end',
+            toEl: parentEl,
+            originalEvent: evt
+          });
+
+          // Save sorting
+          this.save();
+        }
+      }
+    }
+    this._nulling();
+  },
+  _nulling: function _nulling() {
+    pluginEvent('nulling', this);
+    rootEl = dragEl = parentEl = ghostEl = nextEl = cloneEl = lastDownEl = cloneHidden = tapEvt = touchEvt = moved = newIndex = newDraggableIndex = oldIndex = oldDraggableIndex = lastTarget = lastDirection = putSortable = activeGroup = Sortable.dragged = Sortable.ghost = Sortable.clone = Sortable.active = null;
+    var el = this.el;
+    savedInputChecked.forEach(function (checkEl) {
+      if (el.contains(checkEl)) {
+        checkEl.checked = true;
+      }
+    });
+    savedInputChecked.length = lastDx = lastDy = 0;
+  },
+  handleEvent: function handleEvent( /**Event*/evt) {
+    switch (evt.type) {
+      case 'drop':
+      case 'dragend':
+        this._onDrop(evt);
+        break;
+      case 'dragenter':
+      case 'dragover':
+        if (dragEl) {
+          this._onDragOver(evt);
+          _globalDragOver(evt);
+        }
+        break;
+      case 'selectstart':
+        evt.preventDefault();
+        break;
+    }
+  },
+  /**
+   * Serializes the item into an array of string.
+   * @returns {String[]}
+   */
+  toArray: function toArray() {
+    var order = [],
+      el,
+      children = this.el.children,
+      i = 0,
+      n = children.length,
+      options = this.options;
+    for (; i < n; i++) {
+      el = children[i];
+      if (closest(el, options.draggable, this.el, false)) {
+        order.push(el.getAttribute(options.dataIdAttr) || _generateId(el));
+      }
+    }
+    return order;
+  },
+  /**
+   * Sorts the elements according to the array.
+   * @param  {String[]}  order  order of the items
+   */
+  sort: function sort(order, useAnimation) {
+    var items = {},
+      rootEl = this.el;
+    this.toArray().forEach(function (id, i) {
+      var el = rootEl.children[i];
+      if (closest(el, this.options.draggable, rootEl, false)) {
+        items[id] = el;
+      }
+    }, this);
+    useAnimation && this.captureAnimationState();
+    order.forEach(function (id) {
+      if (items[id]) {
+        rootEl.removeChild(items[id]);
+        rootEl.appendChild(items[id]);
+      }
+    });
+    useAnimation && this.animateAll();
+  },
+  /**
+   * Save the current sorting
+   */
+  save: function save() {
+    var store = this.options.store;
+    store && store.set && store.set(this);
+  },
+  /**
+   * For each element in the set, get the first element that matches the selector by testing the element itself and traversing up through its ancestors in the DOM tree.
+   * @param   {HTMLElement}  el
+   * @param   {String}       [selector]  default: `options.draggable`
+   * @returns {HTMLElement|null}
+   */
+  closest: function closest$1(el, selector) {
+    return closest(el, selector || this.options.draggable, this.el, false);
+  },
+  /**
+   * Set/get option
+   * @param   {string} name
+   * @param   {*}      [value]
+   * @returns {*}
+   */
+  option: function option(name, value) {
+    var options = this.options;
+    if (value === void 0) {
+      return options[name];
+    } else {
+      var modifiedValue = PluginManager.modifyOption(this, name, value);
+      if (typeof modifiedValue !== 'undefined') {
+        options[name] = modifiedValue;
+      } else {
+        options[name] = value;
+      }
+      if (name === 'group') {
+        _prepareGroup(options);
+      }
+    }
+  },
+  /**
+   * Destroy
+   */
+  destroy: function destroy() {
+    pluginEvent('destroy', this);
+    var el = this.el;
+    el[expando] = null;
+    off(el, 'mousedown', this._onTapStart);
+    off(el, 'touchstart', this._onTapStart);
+    off(el, 'pointerdown', this._onTapStart);
+    if (this.nativeDraggable) {
+      off(el, 'dragover', this);
+      off(el, 'dragenter', this);
+    }
+    // Remove draggable attributes
+    Array.prototype.forEach.call(el.querySelectorAll('[draggable]'), function (el) {
+      el.removeAttribute('draggable');
+    });
+    this._onDrop();
+    this._disableDelayedDragEvents();
+    sortables.splice(sortables.indexOf(this.el), 1);
+    this.el = el = null;
+  },
+  _hideClone: function _hideClone() {
+    if (!cloneHidden) {
+      pluginEvent('hideClone', this);
+      if (Sortable.eventCanceled) return;
+      css(cloneEl, 'display', 'none');
+      if (this.options.removeCloneOnHide && cloneEl.parentNode) {
+        cloneEl.parentNode.removeChild(cloneEl);
+      }
+      cloneHidden = true;
+    }
+  },
+  _showClone: function _showClone(putSortable) {
+    if (putSortable.lastPutMode !== 'clone') {
+      this._hideClone();
+      return;
+    }
+    if (cloneHidden) {
+      pluginEvent('showClone', this);
+      if (Sortable.eventCanceled) return;
+
+      // show clone at dragEl or original position
+      if (dragEl.parentNode == rootEl && !this.options.group.revertClone) {
+        rootEl.insertBefore(cloneEl, dragEl);
+      } else if (nextEl) {
+        rootEl.insertBefore(cloneEl, nextEl);
+      } else {
+        rootEl.appendChild(cloneEl);
+      }
+      if (this.options.group.revertClone) {
+        this.animate(dragEl, cloneEl);
+      }
+      css(cloneEl, 'display', '');
+      cloneHidden = false;
+    }
+  }
+};
+function _globalDragOver( /**Event*/evt) {
+  if (evt.dataTransfer) {
+    evt.dataTransfer.dropEffect = 'move';
+  }
+  evt.cancelable && evt.preventDefault();
+}
+function _onMove(fromEl, toEl, dragEl, dragRect, targetEl, targetRect, originalEvent, willInsertAfter) {
+  var evt,
+    sortable = fromEl[expando],
+    onMoveFn = sortable.options.onMove,
+    retVal;
+  // Support for new CustomEvent feature
+  if (window.CustomEvent && !IE11OrLess && !Edge) {
+    evt = new CustomEvent('move', {
+      bubbles: true,
+      cancelable: true
+    });
+  } else {
+    evt = document.createEvent('Event');
+    evt.initEvent('move', true, true);
+  }
+  evt.to = toEl;
+  evt.from = fromEl;
+  evt.dragged = dragEl;
+  evt.draggedRect = dragRect;
+  evt.related = targetEl || toEl;
+  evt.relatedRect = targetRect || getRect(toEl);
+  evt.willInsertAfter = willInsertAfter;
+  evt.originalEvent = originalEvent;
+  fromEl.dispatchEvent(evt);
+  if (onMoveFn) {
+    retVal = onMoveFn.call(sortable, evt, originalEvent);
+  }
+  return retVal;
+}
+function _disableDraggable(el) {
+  el.draggable = false;
+}
+function _unsilent() {
+  _silent = false;
+}
+function _ghostIsFirst(evt, vertical, sortable) {
+  var firstElRect = getRect(getChild(sortable.el, 0, sortable.options, true));
+  var childContainingRect = getChildContainingRectFromElement(sortable.el, sortable.options, ghostEl);
+  var spacer = 10;
+  return vertical ? evt.clientX < childContainingRect.left - spacer || evt.clientY < firstElRect.top && evt.clientX < firstElRect.right : evt.clientY < childContainingRect.top - spacer || evt.clientY < firstElRect.bottom && evt.clientX < firstElRect.left;
+}
+function _ghostIsLast(evt, vertical, sortable) {
+  var lastElRect = getRect(lastChild(sortable.el, sortable.options.draggable));
+  var childContainingRect = getChildContainingRectFromElement(sortable.el, sortable.options, ghostEl);
+  var spacer = 10;
+  return vertical ? evt.clientX > childContainingRect.right + spacer || evt.clientY > lastElRect.bottom && evt.clientX > lastElRect.left : evt.clientY > childContainingRect.bottom + spacer || evt.clientX > lastElRect.right && evt.clientY > lastElRect.top;
+}
+function _getSwapDirection(evt, target, targetRect, vertical, swapThreshold, invertedSwapThreshold, invertSwap, isLastTarget) {
+  var mouseOnAxis = vertical ? evt.clientY : evt.clientX,
+    targetLength = vertical ? targetRect.height : targetRect.width,
+    targetS1 = vertical ? targetRect.top : targetRect.left,
+    targetS2 = vertical ? targetRect.bottom : targetRect.right,
+    invert = false;
+  if (!invertSwap) {
+    // Never invert or create dragEl shadow when target movemenet causes mouse to move past the end of regular swapThreshold
+    if (isLastTarget && targetMoveDistance < targetLength * swapThreshold) {
+      // multiplied only by swapThreshold because mouse will already be inside target by (1 - threshold) * targetLength / 2
+      // check if past first invert threshold on side opposite of lastDirection
+      if (!pastFirstInvertThresh && (lastDirection === 1 ? mouseOnAxis > targetS1 + targetLength * invertedSwapThreshold / 2 : mouseOnAxis < targetS2 - targetLength * invertedSwapThreshold / 2)) {
+        // past first invert threshold, do not restrict inverted threshold to dragEl shadow
+        pastFirstInvertThresh = true;
+      }
+      if (!pastFirstInvertThresh) {
+        // dragEl shadow (target move distance shadow)
+        if (lastDirection === 1 ? mouseOnAxis < targetS1 + targetMoveDistance // over dragEl shadow
+        : mouseOnAxis > targetS2 - targetMoveDistance) {
+          return -lastDirection;
+        }
+      } else {
+        invert = true;
+      }
+    } else {
+      // Regular
+      if (mouseOnAxis > targetS1 + targetLength * (1 - swapThreshold) / 2 && mouseOnAxis < targetS2 - targetLength * (1 - swapThreshold) / 2) {
+        return _getInsertDirection(target);
+      }
+    }
+  }
+  invert = invert || invertSwap;
+  if (invert) {
+    // Invert of regular
+    if (mouseOnAxis < targetS1 + targetLength * invertedSwapThreshold / 2 || mouseOnAxis > targetS2 - targetLength * invertedSwapThreshold / 2) {
+      return mouseOnAxis > targetS1 + targetLength / 2 ? 1 : -1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Gets the direction dragEl must be swapped relative to target in order to make it
+ * seem that dragEl has been "inserted" into that element's position
+ * @param  {HTMLElement} target       The target whose position dragEl is being inserted at
+ * @return {Number}                   Direction dragEl must be swapped
+ */
+function _getInsertDirection(target) {
+  if (index(dragEl) < index(target)) {
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+/**
+ * Generate id
+ * @param   {HTMLElement} el
+ * @returns {String}
+ * @private
+ */
+function _generateId(el) {
+  var str = el.tagName + el.className + el.src + el.href + el.textContent,
+    i = str.length,
+    sum = 0;
+  while (i--) {
+    sum += str.charCodeAt(i);
+  }
+  return sum.toString(36);
+}
+function _saveInputCheckedState(root) {
+  savedInputChecked.length = 0;
+  var inputs = root.getElementsByTagName('input');
+  var idx = inputs.length;
+  while (idx--) {
+    var el = inputs[idx];
+    el.checked && savedInputChecked.push(el);
+  }
+}
+function _nextTick(fn) {
+  return setTimeout(fn, 0);
+}
+function _cancelNextTick(id) {
+  return clearTimeout(id);
+}
+
+// Fixed #973:
+if (documentExists) {
+  on(document, 'touchmove', function (evt) {
+    if ((Sortable.active || awaitingDragStarted) && evt.cancelable) {
+      evt.preventDefault();
+    }
+  });
+}
+
+// Export utils
+Sortable.utils = {
+  on: on,
+  off: off,
+  css: css,
+  find: find,
+  is: function is(el, selector) {
+    return !!closest(el, selector, el, false);
+  },
+  extend: extend,
+  throttle: throttle,
+  closest: closest,
+  toggleClass: toggleClass,
+  clone: clone,
+  index: index,
+  nextTick: _nextTick,
+  cancelNextTick: _cancelNextTick,
+  detectDirection: _detectDirection,
+  getChild: getChild,
+  expando: expando
+};
+
+/**
+ * Get the Sortable instance of an element
+ * @param  {HTMLElement} element The element
+ * @return {Sortable|undefined}         The instance of Sortable
+ */
+Sortable.get = function (element) {
+  return element[expando];
+};
+
+/**
+ * Mount a plugin to Sortable
+ * @param  {...SortablePlugin|SortablePlugin[]} plugins       Plugins being mounted
+ */
+Sortable.mount = function () {
+  for (var _len = arguments.length, plugins = new Array(_len), _key = 0; _key < _len; _key++) {
+    plugins[_key] = arguments[_key];
+  }
+  if (plugins[0].constructor === Array) plugins = plugins[0];
+  plugins.forEach(function (plugin) {
+    if (!plugin.prototype || !plugin.prototype.constructor) {
+      throw "Sortable: Mounted plugin must be a constructor function, not ".concat({}.toString.call(plugin));
+    }
+    if (plugin.utils) Sortable.utils = _objectSpread2(_objectSpread2({}, Sortable.utils), plugin.utils);
+    PluginManager.mount(plugin);
+  });
+};
+
+/**
+ * Create sortable instance
+ * @param {HTMLElement}  el
+ * @param {Object}      [options]
+ */
+Sortable.create = function (el, options) {
+  return new Sortable(el, options);
+};
+
+// Export
+Sortable.version = version;
+
+var autoScrolls = [],
+  scrollEl,
+  scrollRootEl,
+  scrolling = false,
+  lastAutoScrollX,
+  lastAutoScrollY,
+  touchEvt$1,
+  pointerElemChangedInterval;
+function AutoScrollPlugin() {
+  function AutoScroll() {
+    this.defaults = {
+      scroll: true,
+      forceAutoScrollFallback: false,
+      scrollSensitivity: 30,
+      scrollSpeed: 10,
+      bubbleScroll: true
+    };
+
+    // Bind all private methods
+    for (var fn in this) {
+      if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
+        this[fn] = this[fn].bind(this);
+      }
+    }
+  }
+  AutoScroll.prototype = {
+    dragStarted: function dragStarted(_ref) {
+      var originalEvent = _ref.originalEvent;
+      if (this.sortable.nativeDraggable) {
+        on(document, 'dragover', this._handleAutoScroll);
+      } else {
+        if (this.options.supportPointer) {
+          on(document, 'pointermove', this._handleFallbackAutoScroll);
+        } else if (originalEvent.touches) {
+          on(document, 'touchmove', this._handleFallbackAutoScroll);
+        } else {
+          on(document, 'mousemove', this._handleFallbackAutoScroll);
+        }
+      }
+    },
+    dragOverCompleted: function dragOverCompleted(_ref2) {
+      var originalEvent = _ref2.originalEvent;
+      // For when bubbling is canceled and using fallback (fallback 'touchmove' always reached)
+      if (!this.options.dragOverBubble && !originalEvent.rootEl) {
+        this._handleAutoScroll(originalEvent);
+      }
+    },
+    drop: function drop() {
+      if (this.sortable.nativeDraggable) {
+        off(document, 'dragover', this._handleAutoScroll);
+      } else {
+        off(document, 'pointermove', this._handleFallbackAutoScroll);
+        off(document, 'touchmove', this._handleFallbackAutoScroll);
+        off(document, 'mousemove', this._handleFallbackAutoScroll);
+      }
+      clearPointerElemChangedInterval();
+      clearAutoScrolls();
+      cancelThrottle();
+    },
+    nulling: function nulling() {
+      touchEvt$1 = scrollRootEl = scrollEl = scrolling = pointerElemChangedInterval = lastAutoScrollX = lastAutoScrollY = null;
+      autoScrolls.length = 0;
+    },
+    _handleFallbackAutoScroll: function _handleFallbackAutoScroll(evt) {
+      this._handleAutoScroll(evt, true);
+    },
+    _handleAutoScroll: function _handleAutoScroll(evt, fallback) {
+      var _this = this;
+      var x = (evt.touches ? evt.touches[0] : evt).clientX,
+        y = (evt.touches ? evt.touches[0] : evt).clientY,
+        elem = document.elementFromPoint(x, y);
+      touchEvt$1 = evt;
+
+      // IE does not seem to have native autoscroll,
+      // Edge's autoscroll seems too conditional,
+      // MACOS Safari does not have autoscroll,
+      // Firefox and Chrome are good
+      if (fallback || this.options.forceAutoScrollFallback || Edge || IE11OrLess || Safari) {
+        autoScroll(evt, this.options, elem, fallback);
+
+        // Listener for pointer element change
+        var ogElemScroller = getParentAutoScrollElement(elem, true);
+        if (scrolling && (!pointerElemChangedInterval || x !== lastAutoScrollX || y !== lastAutoScrollY)) {
+          pointerElemChangedInterval && clearPointerElemChangedInterval();
+          // Detect for pointer elem change, emulating native DnD behaviour
+          pointerElemChangedInterval = setInterval(function () {
+            var newElem = getParentAutoScrollElement(document.elementFromPoint(x, y), true);
+            if (newElem !== ogElemScroller) {
+              ogElemScroller = newElem;
+              clearAutoScrolls();
+            }
+            autoScroll(evt, _this.options, newElem, fallback);
+          }, 10);
+          lastAutoScrollX = x;
+          lastAutoScrollY = y;
+        }
+      } else {
+        // if DnD is enabled (and browser has good autoscrolling), first autoscroll will already scroll, so get parent autoscroll of first autoscroll
+        if (!this.options.bubbleScroll || getParentAutoScrollElement(elem, true) === getWindowScrollingElement()) {
+          clearAutoScrolls();
+          return;
+        }
+        autoScroll(evt, this.options, getParentAutoScrollElement(elem, false), false);
+      }
+    }
+  };
+  return _extends(AutoScroll, {
+    pluginName: 'scroll',
+    initializeByDefault: true
+  });
+}
+function clearAutoScrolls() {
+  autoScrolls.forEach(function (autoScroll) {
+    clearInterval(autoScroll.pid);
+  });
+  autoScrolls = [];
+}
+function clearPointerElemChangedInterval() {
+  clearInterval(pointerElemChangedInterval);
+}
+var autoScroll = throttle(function (evt, options, rootEl, isFallback) {
+  // Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
+  if (!options.scroll) return;
+  var x = (evt.touches ? evt.touches[0] : evt).clientX,
+    y = (evt.touches ? evt.touches[0] : evt).clientY,
+    sens = options.scrollSensitivity,
+    speed = options.scrollSpeed,
+    winScroller = getWindowScrollingElement();
+  var scrollThisInstance = false,
+    scrollCustomFn;
+
+  // New scroll root, set scrollEl
+  if (scrollRootEl !== rootEl) {
+    scrollRootEl = rootEl;
+    clearAutoScrolls();
+    scrollEl = options.scroll;
+    scrollCustomFn = options.scrollFn;
+    if (scrollEl === true) {
+      scrollEl = getParentAutoScrollElement(rootEl, true);
+    }
+  }
+  var layersOut = 0;
+  var currentParent = scrollEl;
+  do {
+    var el = currentParent,
+      rect = getRect(el),
+      top = rect.top,
+      bottom = rect.bottom,
+      left = rect.left,
+      right = rect.right,
+      width = rect.width,
+      height = rect.height,
+      canScrollX = void 0,
+      canScrollY = void 0,
+      scrollWidth = el.scrollWidth,
+      scrollHeight = el.scrollHeight,
+      elCSS = css(el),
+      scrollPosX = el.scrollLeft,
+      scrollPosY = el.scrollTop;
+    if (el === winScroller) {
+      canScrollX = width < scrollWidth && (elCSS.overflowX === 'auto' || elCSS.overflowX === 'scroll' || elCSS.overflowX === 'visible');
+      canScrollY = height < scrollHeight && (elCSS.overflowY === 'auto' || elCSS.overflowY === 'scroll' || elCSS.overflowY === 'visible');
+    } else {
+      canScrollX = width < scrollWidth && (elCSS.overflowX === 'auto' || elCSS.overflowX === 'scroll');
+      canScrollY = height < scrollHeight && (elCSS.overflowY === 'auto' || elCSS.overflowY === 'scroll');
+    }
+    var vx = canScrollX && (Math.abs(right - x) <= sens && scrollPosX + width < scrollWidth) - (Math.abs(left - x) <= sens && !!scrollPosX);
+    var vy = canScrollY && (Math.abs(bottom - y) <= sens && scrollPosY + height < scrollHeight) - (Math.abs(top - y) <= sens && !!scrollPosY);
+    if (!autoScrolls[layersOut]) {
+      for (var i = 0; i <= layersOut; i++) {
+        if (!autoScrolls[i]) {
+          autoScrolls[i] = {};
+        }
+      }
+    }
+    if (autoScrolls[layersOut].vx != vx || autoScrolls[layersOut].vy != vy || autoScrolls[layersOut].el !== el) {
+      autoScrolls[layersOut].el = el;
+      autoScrolls[layersOut].vx = vx;
+      autoScrolls[layersOut].vy = vy;
+      clearInterval(autoScrolls[layersOut].pid);
+      if (vx != 0 || vy != 0) {
+        scrollThisInstance = true;
+        /* jshint loopfunc:true */
+        autoScrolls[layersOut].pid = setInterval(function () {
+          // emulate drag over during autoscroll (fallback), emulating native DnD behaviour
+          if (isFallback && this.layer === 0) {
+            Sortable.active._onTouchMove(touchEvt$1); // To move ghost if it is positioned absolutely
+          }
+          var scrollOffsetY = autoScrolls[this.layer].vy ? autoScrolls[this.layer].vy * speed : 0;
+          var scrollOffsetX = autoScrolls[this.layer].vx ? autoScrolls[this.layer].vx * speed : 0;
+          if (typeof scrollCustomFn === 'function') {
+            if (scrollCustomFn.call(Sortable.dragged.parentNode[expando], scrollOffsetX, scrollOffsetY, evt, touchEvt$1, autoScrolls[this.layer].el) !== 'continue') {
+              return;
+            }
+          }
+          scrollBy(autoScrolls[this.layer].el, scrollOffsetX, scrollOffsetY);
+        }.bind({
+          layer: layersOut
+        }), 24);
+      }
+    }
+    layersOut++;
+  } while (options.bubbleScroll && currentParent !== winScroller && (currentParent = getParentAutoScrollElement(currentParent, false)));
+  scrolling = scrollThisInstance; // in case another function catches scrolling as false in between when it is not
+}, 30);
+
+var drop = function drop(_ref) {
+  var originalEvent = _ref.originalEvent,
+    putSortable = _ref.putSortable,
+    dragEl = _ref.dragEl,
+    activeSortable = _ref.activeSortable,
+    dispatchSortableEvent = _ref.dispatchSortableEvent,
+    hideGhostForTarget = _ref.hideGhostForTarget,
+    unhideGhostForTarget = _ref.unhideGhostForTarget;
+  if (!originalEvent) return;
+  var toSortable = putSortable || activeSortable;
+  hideGhostForTarget();
+  var touch = originalEvent.changedTouches && originalEvent.changedTouches.length ? originalEvent.changedTouches[0] : originalEvent;
+  var target = document.elementFromPoint(touch.clientX, touch.clientY);
+  unhideGhostForTarget();
+  if (toSortable && !toSortable.el.contains(target)) {
+    dispatchSortableEvent('spill');
+    this.onSpill({
+      dragEl: dragEl,
+      putSortable: putSortable
+    });
+  }
+};
+function Revert() {}
+Revert.prototype = {
+  startIndex: null,
+  dragStart: function dragStart(_ref2) {
+    var oldDraggableIndex = _ref2.oldDraggableIndex;
+    this.startIndex = oldDraggableIndex;
+  },
+  onSpill: function onSpill(_ref3) {
+    var dragEl = _ref3.dragEl,
+      putSortable = _ref3.putSortable;
+    this.sortable.captureAnimationState();
+    if (putSortable) {
+      putSortable.captureAnimationState();
+    }
+    var nextSibling = getChild(this.sortable.el, this.startIndex, this.options);
+    if (nextSibling) {
+      this.sortable.el.insertBefore(dragEl, nextSibling);
+    } else {
+      this.sortable.el.appendChild(dragEl);
+    }
+    this.sortable.animateAll();
+    if (putSortable) {
+      putSortable.animateAll();
+    }
+  },
+  drop: drop
+};
+_extends(Revert, {
+  pluginName: 'revertOnSpill'
+});
+function Remove() {}
+Remove.prototype = {
+  onSpill: function onSpill(_ref4) {
+    var dragEl = _ref4.dragEl,
+      putSortable = _ref4.putSortable;
+    var parentSortable = putSortable || this.sortable;
+    parentSortable.captureAnimationState();
+    dragEl.parentNode && dragEl.parentNode.removeChild(dragEl);
+    parentSortable.animateAll();
+  },
+  drop: drop
+};
+_extends(Remove, {
+  pluginName: 'removeOnSpill'
+});
+
+Sortable.mount(new AutoScrollPlugin());
+Sortable.mount(Remove, Revert);
+
+const CONFIG = {
+	FORM_COMPONENTS: [
+		{ type: "input", label: "Input" },
+		{ type: "link", label: "Link" },
+		{ type: "location", label: "Location" },
+		{ type: "textarea", label: "Text" },
+		{ type: "checkbox", label: "Checkbox" },
+		{ type: "radio", label: "Radio Group" },
+		{ type: "select", label: "Select" },
+		{ type: "table", label: "Table" },
+		{ type: "todo", label: "Todo List", icon: "checklist" },
+		{ type: "signature", label: "Signature" },
+		{ type: "html", label: "Document" },
+		{ type: "status", label: "Status" },
+	],
+	PAGE_COMPONENTS: [
+		{ type: "input", label: "Input" },
+		{ type: "link", label: "Link" },
+		{ type: "location", label: "Location" },
+		{ type: "textarea", label: "Text" },
+		{ type: "bookmark", label: "Bookmark" },
+		{ type: "checkbox", label: "Checkbox" },
+		{ type: "radio", label: "Radio Group" },
+		{ type: "select", label: "Select" },
+		{ type: "table", label: "Table" },
+	],
+	INPUTS: [
+		{ type: "text", name: "Text" },
+		{ type: "tel", name: "Phone Number" },
+		{ type: "number", name: "Number" },
+		{ type: "email", name: "Email" },
+		{ type: "date", name: "Date" },
+		{ type: "time", name: "Time" },
+	],
+	TABLE_COLUMNS: [
+		{ type: "text", name: "Text" },
+		{ type: "tel", name: "Phone Number" },
+		{ type: "number", name: "Number" },
+		{ type: "email", name: "Email" },
+		{ type: "date", name: "Date" },
+		{ type: "time", name: "Time" },
+		{ type: "out", name: "External Link" },
+		{ type: "in", name: "Internal Link" },
+		{ type: "checkbox", name: "Checkbox" },
+	],
+	LINKS: [
+		{ type: "out", name: "External" },
+		{ type: "in", name: "Internal" },
+	],
+	PRESENTATION_DEFAULTS: {
+		bookmark: { title: "Bookmark" },
+		checkbox: { title: "Checkbox" },
+		html: { title: "Rich Text" },
+		input: { title: "Input", input: "text" },
+		link: { title: "Link", location: "out" },
+		location: { title: "Location" },
+		radio: { title: "Radio Group" },
+		select: { title: "Select" },
+		signature: { title: "Signature" },
+		status: { title: "Status" },
+		table: { title: "Table" },
+		todo: { title: "Todo List" },
+		textarea: { title: "Text" },
+	},
+	DEFAULT_SETTINGS: {
+		input: [
+			"title",
+			"placeholder",
+			"visibility",
+			"input",
+			"required",
+			"deleteButton",
+		],
+		link: ["title", "visibility", "required", "location", "deleteButton"],
+		location: [
+			"title",
+			"placeholder",
+			"visibility",
+			"required",
+			"deleteButton",
+		],
+		textarea: [
+			"title",
+			"placeholder",
+			"visibility",
+			"required",
+			"deleteButton",
+		],
+		bookmark: ["title", "deleteButton"],
+		checkbox: ["title", "visibility", "checked", "required", "deleteButton"],
+		radio: ["title", "visibility", "options", "required", "deleteButton"],
+		select: [
+			"title",
+			"placeholder",
+			"visibility",
+			"options",
+			"multiple",
+			"required",
+			"deleteButton",
+		],
+		html: ["title", "visibility", "editor", "deleteButton"],
+		signature: ["title", "required", "deleteButton"],
+		status: ["title", "status", "deleteButton"],
+		table: ["title", "columns", "visibility", "deleteButton"],
+		todo: ["title", "visibility", "deleteButton"],
+	},
+};
+
+/**
+ * @testable infrastructure
+ */
+class ComponentsPanel {
+	constructor(builder) {
+		this.builder = builder;
+		this.column = document.getElementById("components-column");
+		this.panel = document.getElementById("components-panel");
+		this._click = this._click.bind(this);
+		this._move = this._move.bind(this);
+		this.init();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
+	 * @tests tests_js/test_032_todo_element_frontend.py::test_todo_builder_registration_is_task_only
+	 * @matrix forms : components page-form task-form
+	 */
+	init() {
+		const componentConfig =
+			this.builder.elt.dataset.formType === "page"
+				? CONFIG.PAGE_COMPONENTS
+				: CONFIG.FORM_COMPONENTS;
+
+		const components = [];
+
+		componentConfig.forEach(({ type, label, icon: iconType = type }) => {
+			const component = document.createElement("div");
+			component.className = `${STYLES.builder.component}`;
+			component.dataset.type = type;
+
+			const icon = component.appendChild(document.createElement("span"));
+			setIcon(icon, iconType, "text-form-default");
+
+			const name = component.appendChild(document.createElement("span"));
+			name.textContent = label;
+
+			const addButton = component.appendChild(document.createElement("button"));
+			addButton.dataset.role = "add";
+			addButton.type = "button";
+			addButton.title = `Add ${label}`;
+			addButton.setAttribute("aria-label", `Add ${label}`);
+			addButton.className =
+				"ml-auto grid size-6 place-items-center rounded-md text-form-default hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default";
+
+			const addIcon = addButton.appendChild(document.createElement("span"));
+			setIcon(addIcon, "add");
+
+			components.push(component);
+		});
+
+		this.panel.append(...components);
+
+		this.sortable = Sortable.create(this.panel, {
+			group: {
+				name: "builder",
+				pull: "clone",
+				put: false,
+			},
+			onMove: this._move,
+			animation: 150,
+			sort: false,
+		});
+
+		this.column.addEventListener("click", this._click);
+	}
+
+	_move(event) {
+		const type = event.dragged.dataset.type;
+		if (this.builder.model.hasUniqueElement(type)) {
+			this.builder.header.message(
+				`Only one ${type} element is allowed per form`,
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
+	 * @matrix forms : builder-add-fields builder-add-inputs unique-component
+	 */
+	_click(event) {
+		const button = event.target.closest("[data-role]");
+		if (button?.dataset.role === "add") {
+			const type = button.closest("[data-type]").dataset.type;
+			if (this.builder.model.hasUniqueElement(type)) {
+				this.builder.header.message(
+					`Only one ${type} element is allowed per form`,
+				);
+				return;
+			}
+
+			const element = this.builder.createElement({ type });
+			this.builder.model.sortable.el.appendChild(element);
+			this.builder.updateSchemaOrder();
+			this.builder.selectElement(element.id);
+		}
+	}
+
+	destroy() {
+		this.column?.removeEventListener("click", this._click);
+		this.sortable?.destroy();
+		this.sortable = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ConditionPanel {
+	constructor(builder) {
+		this.builder = builder;
+		this.panel = document.getElementById("condition-panel");
+		this.loading = false;
+		this.condition = null;
+		this._click = this._click.bind(this);
+		this._draftInput = this._draftInput.bind(this);
+		this.init();
+	}
+
+	init() {
+		this.panel.addEventListener("click", this._click);
+		for (const event of ["input", "change", "updated"])
+			this.panel.addEventListener(event, this._draftInput);
+	}
+
+	_draftInput() {
+		if (this.builder._restoringDraft || !this.condition?.key) return;
+		// Dialog buffers are applied with Add/Update, but already count as newer
+		// user work when deciding whether an asynchronous proposal can replace UI.
+		this.builder.draft.revision += 1;
+		this.builder.draft.group = null;
+	}
+
+	_click(e) {
+		const button = e.target.closest("button");
+		if (button?.dataset.role === "save") {
+			const validated = this.condition.validate();
+			if (!validated) return;
+
+			const index = this.condition.index;
+			const schema = this.condition.element.schema;
+			const conditions = schema[this.condition.key] ?? [];
+
+			if (index === -1) {
+				conditions.push(this.condition.setting);
+			} else {
+				conditions[index] = this.condition.setting;
+			}
+
+			schema[this.condition.key] = conditions;
+			this.condition.element.settings = this.builder.settings.create(schema);
+			this.builder.updateSchema();
+
+			withTransition(() => {
+				this.condition.index = -1;
+				this.condition.init();
+				this.condition.showSuccess();
+				this.condition.focus();
+				this.builder.settings.updateItem();
+				this.builder.model.updateItem();
+			});
+		} else if (button?.dataset.role === "close") {
+			this.close();
+		}
+	}
+
+	destroy() {
+		this.panel?.removeEventListener("click", this._click);
+		for (const event of ["input", "change", "updated"])
+			this.panel?.removeEventListener(event, this._draftInput);
+		this.loading = false;
+		this.condition = null;
+	}
+
+	open(condition) {
+		this.builder.model.sortable.option("disabled", true);
+		this.builder.components.sortable.option("disabled", true);
+		this.builder.model.focusItem();
+
+		if (condition.expand) {
+			this.builder.elt.dataset.expanded = "true";
+		}
+
+		this.panel.replaceChildren(condition.target);
+		this.panel.dataset.visible = "true";
+		this.condition = condition;
+		this.loading = false;
+	}
+
+	hide() {
+		this.builder.model.sortable.option("disabled", false);
+		this.builder.components.sortable.option("disabled", false);
+		this.builder.model.blurItem();
+		this.panel.dataset.visible = "false";
+		this.condition = null;
+	}
+
+	close() {
+		withTransition(() => {
+			this.hide();
+			this.builder.elt.dataset.expanded = "false";
+		});
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+const _section = (name, elements) => {
+	const section = document.createElement("div");
+	section.className = STYLES.builder.settings.section;
+	section.append(...elements.filter(Boolean));
+	section.dataset.setting = name;
+	return section;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _presentation$1 = (schema) => {
+	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
+	return {
+		title: schema.title ?? defaults.title,
+		input: schema.input ?? defaults.input,
+		location: schema.location ?? defaults.location,
+	};
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_036_form_builder_frontend.py::test_builder_schema_lists_use_button_surfaces_and_centered_actions
+ * @matrix forms : action-button-centering builder-list-actions
+ */
+const _toggle = (icon, role, kind = "form", disabled = false) => {
+	const toggle = primitives.toggle({
+		icon: icon,
+		styles: {
+			container: STYLES.builder.settings.toggle.container,
+			icon: STYLES.builder.settings.toggle.icon,
+		},
+		data: {
+			role: role,
+		},
+	});
+	toggle.type = "button";
+	toggle.dataset.kind = kind;
+	if (disabled) {
+		toggle.disabled = true;
+		toggle.classList.add("opacity-50", "pointer-events-none");
+	}
+	return toggle;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _condition = (condition, index) => {
+	const elt = document.createElement("li");
+	elt.className = STYLES.builder.settings.item;
+	elt.dataset.index = index;
+
+	const wrapper = document.createElement("button");
+	wrapper.type = "button";
+	wrapper.className = STYLES.builder.settings.open;
+	wrapper.dataset.role = "open";
+
+	const target = wrapper.appendChild(document.createElement("span"));
+	target.textContent = condition.name;
+	target.className = `font-semibold text-form-dark`;
+
+	const text = wrapper.appendChild(document.createElement("span"));
+	text.className = `italic text-base-dark`;
+	text.textContent = condition.checked ? " is " : " has the value ";
+
+	const status = wrapper.appendChild(document.createElement("span"));
+	status.className = `font-semibold text-project-default`;
+	status.textContent = condition.checked ? "checked" : condition.label;
+
+	const remove = _toggle("x", "remove", "delete");
+
+	elt.append(wrapper, remove);
+	return elt;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _option = (option, index, length) => {
+	const wrapper = document.createElement("li");
+	wrapper.className = STYLES.builder.settings.item;
+	wrapper.dataset.index = index;
+
+	const name = wrapper.appendChild(document.createElement("button"));
+	name.type = "button";
+	name.textContent = option.label;
+	name.className = STYLES.builder.settings.open;
+	name.dataset.role = "open";
+
+	const toggles = document.createElement("div");
+	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
+	if (length > 1) {
+		toggles.appendChild(
+			_toggle("down", "moveDown", "form", index === length - 1),
+		);
+		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
+	}
+	toggles.appendChild(_toggle("x", "remove", "delete"));
+
+	wrapper.append(name, toggles);
+
+	return wrapper;
+};
+
+/**
+ * @testable infrastructure
+ */
+const _column = (column, index, length) => {
+	const wrapper = document.createElement("li");
+	wrapper.className = STYLES.builder.settings.item;
+	wrapper.dataset.index = index;
+
+	const name = primitives.label({
+		icon: column.location || column.input || column.type,
+		label: column.name || column.title,
+		tag: "button",
+		role: "open",
+		styles: {
+			label: STYLES.builder.settings.open,
+			container: "flex flex-row items-center gap-1.5",
+		},
+	});
+	name.type = "button";
+
+	const toggles = document.createElement("div");
+	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
+	if (length > 1) {
+		toggles.appendChild(
+			_toggle("down", "moveDown", "form", index === length - 1),
+		);
+		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
+	}
+	toggles.appendChild(_toggle("x", "remove", "delete"));
+
+	wrapper.append(name, toggles);
+	return wrapper;
+};
+
+/**
+ * @testable infrastructure
+ */
+const title = (schema) => {
+	const title = primitives.input({
+		label: "Title",
+		name: "title",
+		value: _presentation$1(schema).title,
+	});
+	return _section("title", [title]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const placeholder = (schema) => {
+	const placeholder = primitives.input({
+		label: "Placeholder",
+		name: "placeholder",
+		value: schema.placeholder || "",
+	});
+	return _section("placeholder", [placeholder]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const visibility = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Visibility",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.visibility) {
+		const visibilityList = document.createElement("ul");
+		visibilityList.className = `flex flex-col gap-1`;
+		schema.visibility.forEach((condition, index) => {
+			visibilityList.appendChild(_condition(condition, index));
+		});
+		return _section("visibility", [title, visibilityList]);
+	}
+	return _section("visibility", [title]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const status$1 = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Status",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.status) {
+		const statusList = document.createElement("ul");
+		statusList.className = `flex flex-col gap-1`;
+		schema.status.forEach((status, index) => {
+			statusList.appendChild(_condition(status, index));
+		});
+		return _section("status", [title, statusList]);
+	} else {
+		return _section("status", [title]);
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const options = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Options",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.options) {
+		const optionList = document.createElement("ul");
+		optionList.className = `flex flex-col gap-1`;
+		const length = schema.options.length;
+		schema.options.forEach((option, index) => {
+			optionList.appendChild(_option(option, index, length));
+		});
+		return _section("options", [title, optionList]);
+	} else {
+		return _section("options", [title]);
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const editor = () => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Editor",
+		tag: "h3",
+	});
+	const toggle = _toggle("edit", "edit");
+	title.append(label, toggle);
+	return _section("html", [title]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const input$1 = (schema) => {
+	const display = _presentation$1(schema);
+	const fieldset = document.createElement("fieldset");
+	fieldset.className = STYLES.radio.fieldset.column;
+	fieldset.dataset.kind = "base";
+
+	const legend = fieldset.appendChild(document.createElement("legend"));
+	legend.textContent = "Input Type";
+	legend.className = `${STYLES.label.sectionHeading}`;
+
+	CONFIG.INPUTS.forEach((type) => {
+		fieldset.appendChild(
+			primitives.radio({
+				icon: type.type,
+				label: type.name,
+				name: "input",
+				value: type.type,
+				checked: type.type === display.input,
+			}),
+		);
+	});
+
+	return _section("input", [fieldset]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const location$1 = (schema) => {
+	const display = _presentation$1(schema);
+	const fieldset = document.createElement("fieldset");
+	fieldset.className = STYLES.radio.fieldset.column;
+	fieldset.dataset.kind = "form";
+
+	const legend = fieldset.appendChild(document.createElement("legend"));
+	legend.textContent = "Link Type";
+	legend.className = `${STYLES.label.sectionHeading}`;
+
+	CONFIG.LINKS.forEach((type) => {
+		fieldset.appendChild(
+			primitives.radio({
+				icon: type.type,
+				label: type.name,
+				name: "location",
+				value: type.type,
+				checked: type.type === display.location,
+			}),
+		);
+	});
+
+	return _section("location", [fieldset]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const columns = (schema) => {
+	const title = document.createElement("div");
+	title.className = STYLES.builder.settings.title;
+	const label = primitives.label({
+		label: "Columns",
+		tag: "h3",
+	});
+	const toggle = _toggle("add", "add");
+	title.append(label, toggle);
+
+	if (schema.columns?.length) {
+		const columnList = document.createElement("ul");
+		columnList.className = `flex flex-col gap-1`;
+		const length = schema.columns.length;
+		schema.columns.forEach((column, index) => {
+			columnList.appendChild(_column(column, index, length));
+		});
+		return _section("columns", [title, columnList]);
+	} else {
+		return _section("columns", [title]);
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const required = (schema) => {
+	const required = primitives.checkbox({
+		label: "Required",
+		name: "required",
+		checked: !!schema.required,
+	});
+	return _section("required", [required]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const multiple = (schema) => {
+	const multiple = primitives.checkbox({
+		label: "Multiple",
+		name: "multiple",
+		checked: !!schema.multiple,
+	});
+	return _section("multiple", [multiple]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const checked = (schema) => {
+	const checked = primitives.checkbox({
+		label: "Default",
+		name: "checked",
+		checked: !!schema.checked,
+	});
+	return _section("checked", [checked]);
+};
+
+/**
+ * @testable infrastructure
+ */
+const deleteButton = () => {
+	const button = document.createElement("button");
+	button.textContent = "Replace or Delete";
+	button.dataset.kind = "form";
+	button.dataset.role = "delete";
+	button.dataset.setting = "deleteButton";
+	button.className = `${STYLES.button.submit}`;
+	return button;
+};
+
+const SettingsElement = {
+	title: title,
+	placeholder: placeholder,
+	visibility: visibility,
+	status: status$1,
+	options: options,
+	input: input$1,
+	location: location$1,
+	columns: columns,
+	required: required,
+	multiple: multiple,
+	checked: checked,
+	editor: editor,
+	deleteButton: deleteButton,
+};
+
+/**
+ * @testable infrastructure
+ */
+class ElementSettings {
+	constructor(builder) {
+		this.builder = builder;
+		this.panel = document.getElementById("settings-panel");
+		this._input = this._input.bind(this);
+		this._change = this._change.bind(this);
+		this._click = this._click.bind(this);
+		this._blur = this._blur.bind(this);
+	}
+
+	init() {
+		this.panel.addEventListener("input", this._input);
+		this.panel.addEventListener("change", this._change);
+		this.panel.addEventListener("click", this._click);
+		this.panel.addEventListener("blur", this._blur, true);
+	}
+
+	destroy() {
+		this.panel.removeEventListener("input", this._input);
+		this.panel.removeEventListener("change", this._change);
+		this.panel.removeEventListener("click", this._click);
+		this.panel.removeEventListener("blur", this._blur, true);
+	}
+
+	_input(e) {
+		const element = this.builder.selectedElement;
+		if (e.target.closest("[data-setting=title]")) {
+			this._setTitle(element, e.target.value);
+		} else if (e.target.closest("[data-setting=placeholder]")) {
+			this._setPlaceholder(element, e.target.value);
+		}
+		this.builder.updateSchema(false, `${element.schema.id}:${e.target.name}`);
+	}
+
+	_change(e) {
+		const element = this.builder.selectedElement;
+		if (e.target.closest("[data-setting=required]")) {
+			this._setRequired(element, e.target.checked);
+		} else if (e.target.closest("[data-setting=checked]")) {
+			this._setChecked(element, e.target.checked);
+		} else if (e.target.closest("[data-setting=multiple]")) {
+			this._setMultiple(element, e.target.checked);
+		} else if (e.target.closest("[data-setting=input]")) {
+			this._setInput(element, e.target.value);
+		} else if (e.target.closest("[data-setting=location]")) {
+			this._setLocation(element, e.target.value);
+		}
+		this.builder.updateSchema();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
+	 * @matrix forms : builder-field-visibility builder-select-options
+	 */
+	_click(e) {
+		if (e.target.closest("button")?.disabled) return;
+		const element = this.builder.selectedElement;
+		const role = e.target.closest("[data-role]")?.dataset.role;
+		const setting = e.target.closest("[data-index]");
+		const index = setting ? parseInt(setting.dataset.index, 10) : -1;
+		const name = e.target.closest("[data-setting]")?.dataset.setting;
+
+		if (role === "remove") {
+			this._removeSchemaListItem(element.schema[name], index);
+		} else if (["moveUp", "moveDown"].includes(role)) {
+			this._moveSchemaListItem(element, name, index, role);
+		} else if (["add", "edit", "open"].includes(role)) {
+			this.builder.showCondition(name, index);
+		} else if (role === "delete") {
+			this.builder.showCondition("modify");
+		}
+	}
+
+	_blur() {
+		this.builder.updateSchema();
+		if (this.builder.draft) this.builder.draft.group = null;
+	}
+
+	_removeSchemaListItem(schema, index) {
+		schema.splice(index, 1);
+		this.builder.updateSchema();
+		withTransition(() => {
+			this.builder.model.updateItem();
+			this.builder.selectedElement.settings = this.create(
+				this.builder.selectedElement.schema,
+			);
+			this.updateItem();
+		});
+	}
+
+	_moveSchemaListItem(element, name, index, direction) {
+		const arr = element.schema[name];
+		const newIndex = direction === "moveUp" ? index - 1 : index + 1;
+		if (newIndex < 0 || newIndex >= arr.length) return;
+		[arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+		this.builder.updateSchema();
+		withTransition(() => {
+			this.builder.model.updateItem();
+			this.builder.selectedElement.settings = this.create(
+				this.builder.selectedElement.schema,
+			);
+			this.updateItem();
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+	 * @pairs forms:builder-field-title frontend-icons:material-icon-preservation
+	 */
+	_setTitle(element, value) {
+		element.schema.title = value;
+		element.item.querySelector(
+			"[data-role='label'] > span:not([data-icon])",
+		).textContent = value;
+	}
+
+	_setPlaceholder(element, value) {
+		element.schema.placeholder = value;
+		const input = element.item.querySelector("input, textarea");
+		if (input) input.placeholder = value;
+	}
+
+	_setRequired(element, value) {
+		element.schema.required = value;
+	}
+
+	_setChecked(element, value) {
+		element.schema.checked = value;
+		element.item.querySelector("input[type='checkbox']").checked = value;
+	}
+
+	_setMultiple(element, value) {
+		element.schema.multiple = value;
+	}
+
+	_setInput(element, value) {
+		element.schema.input = value;
+		const label = primitives.label({
+			icon: value,
+			label: _presentation$1(element.schema).title,
+		});
+		element.item
+			.querySelector("label > div")
+			.replaceWith(label.querySelector("div"));
+	}
+
+	_setLocation(element, value) {
+		element.schema.location = value;
+		const label = primitives.label({
+			icon: value,
+			label: _presentation$1(element.schema).title,
+			tag: "h3",
+		});
+		element.item.querySelector("h3").replaceWith(label);
+	}
+
+	create(schema) {
+		const display = { ...schema };
+		for (const key of ["visibility", "status"]) {
+			if (Array.isArray(schema[key]))
+				display[key] = schema[key].map((condition) => {
+					const target = this.builder.elements.get(condition.id)?.schema;
+					return {
+						...condition,
+						name: target?.title ?? condition.name,
+						label:
+							target?.options?.find(
+								(option) => option.value === condition.value,
+							)?.label ?? condition.label,
+					};
+				});
+		}
+		const settings = CONFIG.DEFAULT_SETTINGS[schema.type].map((setting) => {
+			if (
+				["name", "description"].includes(schema.id) &&
+				setting === "deleteButton"
+			) {
+				return null;
+			}
+			return SettingsElement[setting](display);
+		});
+		const sections = settings.filter(Boolean);
+		this.refreshSavedState(schema, sections);
+		return sections;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_inputs_use_replacement_panel_after_first_save
+	 * @matrix forms : builder-save stable-identity
+	 */
+	refreshSavedState(
+		schema = this.builder.selectedElement?.schema,
+		sections = this.panel.children,
+	) {
+		if (!schema) return;
+		const saved = this.builder.savedField(schema.id);
+		if (!saved) return;
+		for (const section of sections) {
+			const setting = section.dataset.setting;
+			if (setting === "input") {
+				if (!section.querySelector("[data-role='saved-input-type']")) {
+					const notice = document.createElement("p");
+					notice.dataset.role = "saved-input-type";
+					notice.className = "text-sm text-base-medium";
+					if (["name", "description"].includes(schema.id)) {
+						notice.textContent = "This input's type cannot be changed.";
+					} else {
+						const action = document.createElement("strong");
+						action.textContent = "Replace or Delete";
+						notice.append(
+							"Click ",
+							action,
+							" in order to change this input's type.",
+						);
+					}
+					section.replaceChildren(notice);
+				}
+			}
+			if (["multiple", "location"].includes(setting)) {
+				const controls = section.matches("button, input, select")
+					? [section]
+					: section.querySelectorAll("button, input, select");
+				for (const control of controls) control.disabled = true;
+			}
+			if (["options", "columns"].includes(setting)) {
+				for (const row of section.querySelectorAll("[data-index]")) {
+					const item = schema[setting][Number(row.dataset.index)];
+					const key = setting === "options" ? "value" : "id";
+					if (saved[setting]?.some((original) => original[key] === item[key])) {
+						const remove = row.querySelector("[data-role='remove']");
+						if (remove) {
+							remove.disabled = false;
+							remove.title =
+								"Save will clear values for this removed choice or column.";
+						}
+					}
+				}
+			}
+		}
+	}
+
+	selectItem() {
+		const item = this.builder.selectedElement;
+		item.settings = this.create(item.schema);
+		this.panel.replaceChildren(...item.settings);
+		this.panel.dataset.visible = "true";
+		this.builder.formSettings.visible = false;
+	}
+
+	deselectItem() {
+		this.panel.dataset.visible = "false";
+	}
+
+	updateItem() {
+		this.panel.dataset.visible = "false";
+		const item = this.builder.selectedElement;
+		this.panel.replaceChildren(...item.settings);
+		this.panel.dataset.visible = "true";
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class FormSettings {
+	constructor(builder) {
+		this._destroyed = false;
+		this._generationPromise = null;
+		this.builder = builder;
+		this.column = document.getElementById("form-settings-panel");
+		this.restrictions = document.querySelector("[data-role='restrict-access']");
+		this.selectGroup = null;
+
+		const generateTarget = this.column?.querySelector("#generate");
+		if (generateTarget) {
+			this.generateForm = new BaseForm({
+				target: generateTarget,
+				submitGroup: generateTarget.querySelector("[data-role='submit-group']"),
+				messages: {
+					submit: "Generate",
+					submitting: "Thinking...",
+					submitted: "Generated",
+				},
+			});
+			this.generateForm.error.setAttribute("role", "status");
+			this.generateForm.error.setAttribute("aria-live", "polite");
+			this.generateForm.error.setAttribute("aria-atomic", "true");
+		} else {
+			this.generateForm = null;
+		}
+
+		this._generateSchema = this._generateSchema.bind(this);
+		this._saveRestrictions = this._saveRestrictions.bind(this);
+		this._restrictionPromise = null;
+		this.restrictionForm = this.restrictions
+			? new BaseForm({
+					target: this.restrictions,
+					messages: {
+						submit: "Save Restrictions",
+						submitting: "Saving",
+						submitted: "Saved",
+					},
+				})
+			: null;
+		this._input = this._input.bind(this);
+		this._click = this._click.bind(this);
+		this._restrictionUpdated = this._restrictionUpdated.bind(this);
+		this.modal = null;
+	}
+
+	/**
+	 * @testable true
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
+	 * @matrix forms : access-restrictions group-restricted
+	 */
+	init() {
+		if (this._destroyed) return;
+		if (this.generateForm) {
+			this.generateForm.init();
+			this.generateForm.target.addEventListener("submit", this._generateSchema);
+		}
+
+		this.column?.addEventListener("input", this._input);
+		this.column?.addEventListener("click", this._click);
+
+		if (this.restrictions) {
+			this.restrictionForm.init();
+			this.restrictions.addEventListener("submit", this._saveRestrictions);
+			const input = this.column.querySelector(
+				"[data-role='restrict-group-input']",
+			);
+			this.selectGroup = new FacetsBox(input);
+			this.selectGroup.init();
+			this.restrictions.addEventListener("updated", this._restrictionUpdated);
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
+	 */
+	_restrictionUpdated(event) {
+		if (this._destroyed) return;
+		if (Object.keys(event.detail.options).length) {
+			this.restrictions.querySelector("[name='admin']").checked = false;
+		}
+		const list = this.restrictions.querySelector("ul");
+		const template = this.restrictions.querySelector("template");
+		for (const [key, option] of Object.entries(event.detail.options)) {
+			if (
+				[...list.querySelectorAll("input[name='group-key']")].some(
+					(input) => input.value === key,
+				)
+			)
+				continue;
+			const item = template.content.firstElementChild.cloneNode(true);
+			item.querySelector("input").value = key;
+			item.querySelector("span").textContent = option.name;
+			item.querySelector("button").dataset.key = key;
+			list.append(item);
+		}
+		this.selectGroup.clear({ notify: false });
+		this.restrictionForm.markUnsavedState();
+	}
+
+	/**
+	 * @testable true
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
+	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
+	 * @matrix forms : access-restrictions explicit-submit owner-restricted
+	 */
+	_input(event) {
+		if (event.target.name === "admin" && event.target.checked) {
+			this.restrictions.querySelector("ul").replaceChildren();
+			this.selectGroup.clear({ notify: false });
+			this.restrictionForm.markUnsavedState();
+		}
+		if (event.target.name === "description" && this.generateForm?.target) {
+			const explain = this.generateForm.target.querySelector(
+				"[data-role='explain']",
+			);
+			if (explain) explain.dataset.visible = "true";
+		}
+	}
+
+	_click(event) {
+		const button = event.target.closest("[data-role]");
+		if (button?.dataset.role === "generate" && this.generateForm?.target) {
+			const visible = this.generateForm.target.dataset.visible === "true";
+			this.generateForm.target.dataset.visible = visible ? "false" : "true";
+			if (!visible) this.generateForm.target.querySelector("textarea")?.focus();
+		} else if (button?.dataset.role === "cancel" && this.generateForm?.target) {
+			this._generationIdentity = null;
+			this.generateForm.target.dataset.visible = "false";
+			this.generateForm.messages.submit = "Generate";
+			this.generateForm.resetSubmitButton();
+			const ta = this.generateForm.target.querySelector("textarea");
+			if (ta) ta.value = "";
+		} else if (button?.dataset.role === "remove-restriction") {
+			button.closest("li")?.remove();
+			this.restrictionForm.markUnsavedState();
+		}
+	}
+
+	get visible() {
+		return this.column.dataset.visible === "true";
+	}
+
+	set visible(value) {
+		this.column.dataset.visible = value ? "true" : "false";
+	}
+
+	/**
+	 * @testable true
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
+	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
+	 * @matrix forms : access-restrictions group-restricted owner-restricted
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_restriction_save_submits_snapshot_and_releases_failed_submitter
+	 * @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
+	 * @matrix forms : access-restrictions explicit-submit retryable-action single-flight
+	 */
+	_saveRestrictions(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._restrictionPromise) return this._restrictionPromise;
+		if (this._destroyed) return;
+		const form = this.restrictionForm;
+		const data = new FormData(this.restrictions);
+		const snapshot = JSON.stringify([...data]);
+		form.submitting();
+		form.submitButton.disabled = true;
+		this._restrictionPromise = (async () => {
+			try {
+				const response = await request.put(
+					this.restrictions.dataset.route,
+					data,
+				);
+				if (this._destroyed) return;
+				if (response?.ok === true) {
+					if (JSON.stringify([...new FormData(this.restrictions)]) === snapshot)
+						form.success();
+					else {
+						form.resetSubmitButton();
+						form.markUnsavedState();
+					}
+				} else
+					form.showError(
+						response?.error || "Could not save restrictions. Try again.",
+					);
+			} catch (error) {
+				captureError(error, this.restrictions, {
+					context: "builder-save-restrictions",
+				});
+				if (!this._destroyed)
+					form.showError("Could not save restrictions. Try again.");
+			} finally {
+				if (!this._destroyed) form.submitButton.disabled = false;
+				this._restrictionPromise = null;
+			}
+		})();
+		return this._restrictionPromise;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
+	 * @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
+	 * @matrix forms : draft-history
+	 * @pair forms:stale-response
+	 */
+	_generateSchema(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._generationPromise) return this._generationPromise;
+		if (this._destroyed || !this.generateForm?.target) {
+			return Promise.resolve(false);
+		}
+
+		const data = new FormData(this.generateForm.target);
+		const prompt = data.get("description");
+		const submitter = event.submitter || this.generateForm.submitButton;
+
+		if (!prompt) {
+			this.generateForm.showError("Please enter a description");
+			return Promise.resolve(false);
+		} else if (submitter?.dataset.explain) {
+			data.append("explain", submitter.dataset.explain);
+		}
+
+		this.builder.updateSchema();
+		this.builder.draft.group = null;
+		const identity = {
+			request_id: crypto.randomUUID(),
+			draft_revision: this.builder.draft.revision,
+		};
+		this._generationIdentity = identity;
+		const draft = this.builder.captureDraft();
+		data.set("schema", JSON.stringify(draft.schema));
+		data.set("html_fields", JSON.stringify(draft.html_fields));
+		data.set("baseline", this.builder.draft.baseline || "");
+		data.set("draft_revision", String(identity.draft_revision));
+		data.set("request_id", identity.request_id);
+		if (submitter) {
+			submitter.disabled = true;
+			submitter.setAttribute("aria-disabled", "true");
+			submitter.setAttribute("aria-busy", "true");
+		}
+
+		const pending = (async () => {
+			try {
+				const response = await request.post(ENDPOINTS.createSchema, data, {
+					replaceErrorPage: false,
+				});
+				if (this._destroyed) return false;
+				if (this._generationIdentity !== identity) return false;
+				if (
+					!response?.modal &&
+					(identity.draft_revision !== this.builder.draft.revision ||
+						response?.request_id !== identity.request_id ||
+						response?.draft_revision !== identity.draft_revision)
+				) {
+					if (response?.ok === true) {
+						this.generateForm.messages.submit = "Regenerate";
+						this.generateForm.showError(
+							"Your draft changed while generation was running. Regenerate using your current draft.",
+						);
+						return false;
+					}
+				}
+				const success = await this._updateSchema(response);
+				if (this._destroyed) return false;
+				if (success || (response?.ok === true && response.modal)) {
+					this.generateForm.messages.submit = "Generate";
+					if (success) this.generateForm.success();
+					else this.generateForm.resetSubmitButton();
+				}
+				return success;
+			} catch (error) {
+				captureError(error, submitter, { context: "builder-generate-schema" });
+				if (!this._destroyed) {
+					this.generateForm.showError(
+						"Could not generate this form. Try again.",
+					);
+				}
+				return false;
+			} finally {
+				if (submitter && !this._destroyed && submitter.isConnected !== false) {
+					submitter.disabled = false;
+					submitter.setAttribute("aria-disabled", "false");
+					submitter.removeAttribute("aria-busy");
+				}
+			}
+		})();
+		this._generationPromise = pending;
+		const clearPending = () => {
+			if (this._generationPromise === pending) this._generationPromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
+	}
+
+	async _updateSchema(response) {
+		if (this._destroyed || !this.generateForm) return false;
+
+		if (response?.ok === true && response.operations) {
+			try {
+				const revision = this.builder.draft.revision;
+				if (Object.keys(response.html_fields || {}).length)
+					await this.builder.prepareGeneratedDocuments(response.html_fields);
+				if (this._destroyed || this.builder._destroyed) return false;
+				if (revision !== this.builder.draft.revision) {
+					this.generateForm.messages.submit = "Regenerate";
+					this.generateForm.showError(
+						"Your draft changed while generation was running. Regenerate using your current draft.",
+					);
+					return false;
+				}
+				if (this.builder.draft.applyGeneration(response)) {
+					this.builder.restoreDraft();
+				}
+			} catch (error) {
+				this.generateForm.showError(error.message);
+				return false;
+			}
+			return true;
+		} else if (response?.ok === true && response.modal) {
+			this.modal?.destroy();
+			this.modal = new Modal(this.builder);
+			void this.modal.attach(response.modal, this.generateForm);
+		} else {
+			this.generateForm.showError(
+				response?.error || "Could not generate this form. Try again.",
+			);
+			if (response?.code === "stale_form_draft")
+				this.builder.header.showConflict(response);
+		}
+		return false;
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.generateForm?.target?.removeEventListener(
+			"submit",
+			this._generateSchema,
+		);
+		this.column?.removeEventListener("input", this._input);
+		this.column?.removeEventListener("click", this._click);
+		this.restrictions?.removeEventListener("updated", this._restrictionUpdated);
+		this.restrictions?.removeEventListener("submit", this._saveRestrictions);
+		this.restrictionForm?.destroy();
+		this.generateForm?.destroy();
+		this.selectGroup?.destroy();
+		this.modal?.destroy();
+		this.modal = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class Header {
+	constructor(builder) {
+		this._destroyed = false;
+		this._previewGeneration = 0;
+		this._messageTimer = null;
+		this._savePromise = null;
+		this.builder = builder;
+		this.nameDisplay = document.getElementById("form-name-display");
+		this.nameInput = document.getElementById("form-name-input");
+		this.nameHidden = document.getElementById("form-name-hidden");
+		this.saveButton = document.querySelector("[data-saved]");
+		this.schemaForm = document.getElementById("schema-form");
+		this.notification = document.getElementById("notification");
+		this.previewToggle = document.getElementById("preview-toggle");
+		this.previewPanel = document.getElementById("preview-panel");
+		this.draftControls = document.querySelector("[data-role='draft-history']");
+		this.saveButton?.setAttribute("aria-describedby", "notification");
+		this.notification?.setAttribute("role", "status");
+		this.notification?.setAttribute("aria-live", "polite");
+		this.notification?.setAttribute("aria-atomic", "true");
+
+		this.togglePreviewPanel = this.togglePreviewPanel.bind(this);
+		this.saveForm = this.saveForm.bind(this);
+		this.editFormName = this.editFormName.bind(this);
+		this._nameBlur = this._nameBlur.bind(this);
+		this._nameKeyDown = this._nameKeyDown.bind(this);
+		this._nameInput = this._nameInput.bind(this);
+
+		this.renderer = null;
+
+		this.init();
+	}
+
+	init() {
+		this.nameInput.addEventListener("blur", this._nameBlur);
+		this.nameInput.addEventListener("keydown", this._nameKeyDown);
+		this.nameInput.addEventListener("input", this._nameInput);
+	}
+
+	saved() {
+		if (!this.saveButton) return;
+		this.saveButton.dataset.saved = "true";
+		this.saveButton.dataset.kind = "saved";
+		this.saveButton.setAttribute("aria-disabled", "true");
+		if (!this.builder.pendingChange) this.clearMessage();
+	}
+
+	unsaved() {
+		if (!this.saveButton) return;
+		this.saveButton.dataset.saved = "false";
+		this.saveButton.dataset.kind = "unsaved";
+		this.saveButton.setAttribute(
+			"aria-disabled",
+			String(
+				Boolean(
+					this._savePromise ||
+						this.builder.pendingChange ||
+						this.builder.online === false,
+				),
+			),
+		);
+	}
+
+	clearMessage() {
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		if (!this.notification) return;
+		this.notification.textContent = "";
+		this.notification.dataset.visible = "false";
+	}
+
+	message(text, { persistent = false } = {}) {
+		if (this._destroyed) return;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		this.notification.textContent = text;
+		this.notification.dataset.visible = "true";
+		if (!persistent) {
+			this._messageTimer = setTimeout(() => {
+				if (this._destroyed) return;
+				this.notification.dataset.visible = "false";
+			}, 3000);
+		}
+	}
+
+	showConflict(response) {
+		if (response?.code !== "stale_form_draft" || !response.saved_url)
+			return false;
+		this.message(
+			`${response.error || "The saved form changed. Your draft is preserved."} `,
+			{ persistent: true },
+		);
+		const link = document.createElement("a");
+		link.href = response.saved_url;
+		link.target = "_blank";
+		link.rel = "noopener";
+		link.dataset.role = "open-saved-form";
+		link.className = "underline";
+		link.textContent = "Open saved form";
+		this.notification.append(link);
+		return true;
+	}
+
+	get persistenceState() {
+		return this.builder.captureDraft();
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
+	 * @reason acknowledgements are only valid when the live state matches the submitted snapshot
+	 */
+	acknowledge(state) {
+		const current = this.persistenceState;
+		if (current.name === state.name && areEqual(current.schema, state.schema)) {
+			this.saved();
+			return true;
+		}
+		this.unsaved();
+		return false;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
+	 * @pair forms:builder-preview
+	 */
+	closePreview() {
+		this._previewGeneration += 1;
+		this.renderer?.destroy();
+		this.renderer = null;
+		this.previewToggle.dataset.active = "false";
+		this.previewToggle.setAttribute("aria-checked", "false");
+		this.previewPanel.dataset.visible = "false";
+		if (this.draftControls) this.draftControls.dataset.visible = "true";
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
+	 * @matrix forms : builder-preview focus-recovery
+	 */
+	async togglePreviewPanel() {
+		if (this._destroyed) return;
+		const generation = ++this._previewGeneration;
+		const active = this.previewToggle.dataset.active === "true";
+		this.previewToggle.dataset.active = active ? "false" : "true";
+		this.previewToggle.setAttribute("aria-checked", active ? "false" : "true");
+
+		let renderer = null;
+		if (!active) {
+			renderer = new Renderer({
+				target: this.previewPanel,
+				schema: this.builder.schema,
+				kind: "form",
+				key: this.builder.key,
+				submission: {},
+				htmlFields: Object.fromEntries(
+					Object.entries(this.builder.htmlFields).map(([id, html]) => [
+						id,
+						this.builder.previewHtml(html),
+					]),
+				),
+			});
+			await renderer.render();
+			if (this._destroyed || generation !== this._previewGeneration) {
+				renderer.destroy();
+				return;
+			}
+		}
+
+		await withTransition(
+			() => {
+				if (this._destroyed || generation !== this._previewGeneration) {
+					renderer?.destroy();
+					return;
+				}
+				if (this.draftControls)
+					this.draftControls.dataset.visible = active ? "true" : "false";
+				if (!active) {
+					this.renderer = renderer;
+					this.builder.elt.dataset.expanded = "true";
+					this.previewPanel.dataset.visible = "true";
+					this.builder.conditions.hide();
+					this.builder.model.hide();
+				} else {
+					this.renderer?.destroy();
+					this.renderer = null;
+					this.builder.elt.dataset.expanded = "false";
+					this.previewPanel.dataset.visible = "false";
+					this.builder.model.show();
+				}
+			},
+			{ label: "builder:toggle-preview" },
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
+	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_save_feedback_retains_keyboard_focus
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_generation_is_one_undoable_unsaved_command
+	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
+	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
+	 */
+	saveForm() {
+		if (this.builder.pendingChange) return Promise.resolve(false);
+		if (this._savePromise) return this._savePromise;
+		if (this.builder.online === false) return Promise.resolve(false);
+		if (this._destroyed || !this.saveButton || !this.schemaForm) {
+			return Promise.resolve(false);
+		}
+
+		const button = this.saveButton;
+		const hadFocus = document.activeElement === button;
+		this.builder.updateSchema();
+		if (!this.builder.draft.dirty) return Promise.resolve(true);
+		this.builder.draft.group = null;
+		const state = this.persistenceState;
+		if (
+			!this._saveAttempt ||
+			!this.builder.draft.equal(this._saveAttempt.state, state) ||
+			this._saveAttempt.baseline !== this.builder.draft.baseline
+		) {
+			this._saveAttempt = {
+				state,
+				baseline: this.builder.draft.baseline,
+				id: crypto.randomUUID(),
+			};
+		}
+		this.unsaved();
+		this.clearMessage();
+		// Keep keyboard focus; clean and in-flight saves are guarded above.
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+
+		const pending = (async () => {
+			try {
+				const payload = await this.builder.draftPayload(
+					state,
+					this.schemaForm.dataset.route,
+					this._saveAttempt.id,
+				);
+				if (this._destroyed) return false;
+				const response = await request.put(
+					this.schemaForm.dataset.route,
+					payload,
+					{ replaceErrorPage: false },
+				);
+				if (this._destroyed) return false;
+				if (response?.rejected_change) {
+					this._saveAttempt = null;
+					this.message(response.rejected_change.error, { persistent: true });
+					return false;
+				}
+				if (response?.ok === true && response.draft && response.baseline) {
+					this.builder.draft.acknowledge(state, response);
+					this._saveAttempt = null;
+					this.builder.setPendingChange?.(response.pending_change || null);
+					if (
+						this.builder.draft.equal(
+							this.persistenceState,
+							this.builder.draft.state,
+						)
+					) {
+						this.builder.settings.refreshSavedState();
+						this.builder.conditions.condition?.refreshSavedState?.();
+						this.builder.refreshDraftControls();
+					} else {
+						await this.builder.restoreDraft({ preserveFocus: true });
+					}
+					return true;
+				}
+				if (!this.showConflict(response))
+					this.message(
+						response?.error || "Could not save this form. Try again.",
+						{ persistent: true },
+					);
+				return false;
+			} catch (error) {
+				captureError(error, button, { context: "builder-save" });
+				this.message("Could not save this form. Try again.", {
+					persistent: true,
+				});
+				return false;
+			} finally {
+				if (!this._destroyed && button.isConnected !== false) {
+					button.setAttribute(
+						"aria-disabled",
+						String(
+							Boolean(
+								this.builder.pendingChange || button.dataset.saved === "true",
+							),
+						),
+					);
+					button.removeAttribute("aria-busy");
+					this.builder.offline?.(!this.builder.online);
+					if (
+						hadFocus &&
+						(!document.activeElement ||
+							document.activeElement === document.body ||
+							document.activeElement === button)
+					) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			}
+		})();
+		this._savePromise = pending;
+		const clearPending = () => {
+			if (this._savePromise === pending) this._savePromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
+	}
+
+	editFormName() {
+		if (this.builder.pendingChange) return;
+		this._originalName = this.nameDisplay.textContent;
+		this.nameDisplay.dataset.visible = "false";
+		this.nameInput.dataset.visible = "true";
+		this.nameInput.focus();
+		this.nameInput.select();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
+	 * @pairs entity-menu:title-menu forms:builder-form-name frontend-icons:material-icon-preservation
+	 */
+	_nameBlur() {
+		const newName = this.nameInput.value.trim();
+		this.nameDisplay.textContent = newName;
+		this.nameHidden.value = newName;
+		this.builder.updateSchema(false, "form-name");
+		this.builder.draft.group = null;
+		this.nameInput.dataset.visible = "false";
+		this.nameDisplay.dataset.visible = "true";
+	}
+
+	_nameInput() {
+		this.nameHidden.value = this.nameInput.value.trim();
+		this.builder.updateSchema(false, "form-name");
+	}
+
+	_nameKeyDown(e) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			this.nameInput.blur();
+		} else if (e.key === "Escape") {
+			this.nameInput.value = this._originalName;
+			this.nameInput.blur();
+		}
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this._previewGeneration += 1;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		this.nameInput.removeEventListener("blur", this._nameBlur);
+		this.nameInput.removeEventListener("keydown", this._nameKeyDown);
+		this.nameInput.removeEventListener("input", this._nameInput);
+		this.renderer?.destroy();
+		this.renderer = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ModelPanel {
+	constructor(builder) {
+		this.builder = builder;
+		this.panel = document.getElementById("model-panel");
+		this.defaultPanel = document.getElementById("default-panel");
+		this.uniqueElements = ["status", "signature", "bookmark"];
+		this.defaultElements = ["name", "description"];
+		this._addElement = this._addElement.bind(this);
+		this._moveElement = this._moveElement.bind(this);
+	}
+
+	get elements() {
+		return Array.from(this.panel.querySelectorAll(".form-element"));
+	}
+
+	get defaults() {
+		return Array.from(this.defaultPanel.querySelectorAll(".form-element"));
+	}
+
+	show() {
+		this.defaultPanel.dataset.visible =
+			this.defaults.length > 0 ? "true" : "false";
+		this.panel.dataset.visible = "true";
+	}
+
+	hide() {
+		this.defaultPanel.dataset.visible = "false";
+		this.panel.dataset.visible = "false";
+	}
+
+	init() {
+		const elements = Array.from(this.builder.elements.values());
+		const defaults = elements.filter((element) =>
+			this.defaultElements.includes(element.schema.id),
+		);
+		if (defaults.length > 0) {
+			this.defaultPanel.dataset.visible = "true";
+		}
+
+		elements.forEach((element) => {
+			if (this.defaultElements.includes(element.schema.id)) {
+				Array.from(element.item.querySelectorAll("input, textarea")).forEach(
+					(input) => {
+						input.remove();
+					},
+				);
+				this.defaultPanel.appendChild(element.item);
+			} else {
+				this.panel.appendChild(element.item);
+			}
+		});
+
+		this.sortable = Sortable.create(this.panel, {
+			group: {
+				name: "builder",
+				pull: false,
+				put: true,
+			},
+			animation: 150,
+			onAdd: this._addElement,
+			onUpdate: this._moveElement,
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
+	 * @pair forms:builder-drag-component
+	 */
+	_addElement(event) {
+		const item = this.builder.createElement({
+			type: event.item.dataset.type,
+		});
+		event.item.remove();
+		event.to.insertBefore(item, event.to.children[event.newDraggableIndex]);
+		this.builder.updateSchemaOrder();
+		this.builder.selectElement(item.id);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
+	 * @pair forms:builder-drag-component
+	 */
+	_moveElement() {
+		this.builder.updateSchemaOrder();
+	}
+
+	updateItem() {
+		const element = this.builder.selectedElement;
+		const item = ModelElement[element.schema.type](element.schema);
+		element.item.replaceWith(item);
+		element.item = item;
+		this.selectItem();
+	}
+
+	selectItem() {
+		const selected = this.builder.selectedElement.item;
+
+		this.elements.forEach((element) => {
+			element.dataset.selected = element === selected ? "true" : "false";
+		});
+		this.defaults.forEach((element) => {
+			element.dataset.selected = element === selected ? "true" : "false";
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
+	deselectItem() {
+		const selected = this.builder.selectedElement;
+		if (selected) selected.item.dataset.selected = "false";
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
+	 * @matrix forms signature : unique-component
+	 */
+	hasUniqueElement(type) {
+		return (
+			this.uniqueElements.includes(type) &&
+			Array.from(this.builder.elements.values()).some(
+				(element) => element.schema.type === type,
+			)
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
+	focusItem() {
+		const selected = this.builder.selectedElement.item;
+		this.elements.forEach((element) => {
+			element.dataset.visible = element === selected ? "true" : "false";
+		});
+		this.panel.classList.remove("min-h-75");
+		this.defaultPanel.dataset.visible = "false";
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle
+	 */
+	blurItem() {
+		this.elements.forEach((element) => {
+			element.dataset.visible = "true";
+		});
+		if (this.defaultPanel.children.length > 0) {
+			this.defaultPanel.dataset.visible = "true";
+		}
+		this.panel.classList.add("min-h-75");
+	}
+
+	destroy() {
+		this.sortable?.destroy();
+		this.sortable = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+const _model = (schema) => {
+	const element = document.createElement("div");
+	element.id = schema.id;
+	element.dataset.selected = "false";
+	element.dataset.visible = "true";
+	element.className = `${STYLES.builder.model}`;
+	return element;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_019_form_sync_frontend.py::test_builder_model_defaults_are_presentation_only
+ * @matrix form-schema forms : builder immutable-schema presentation-defaults
+ */
+const _presentation = (schema) => {
+	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
+	return {
+		...schema,
+		title: schema.title ?? defaults.title,
+		input: schema.input ?? defaults.input,
+		location: schema.location ?? defaults.location,
+	};
+};
+
+/**
+ * @testable infrastructure
+ */
+const checkbox = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-row", "gap-2");
+
+	element.appendChild(
+		primitives.checkbox({
+			label: display.title,
+			checked: !!schema.checked,
+			name: schema.id,
+			disabled: true,
+		}),
+	);
+
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const html = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		icon: "html",
+		label: display.title,
+		tag: "h3",
+	});
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const input = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const input = primitives.input({
+		icon: display.input,
+		label: display.title,
+		name: schema.id,
+		type: display.input,
+		disabled: true,
+		placeholder: schema.placeholder,
+	});
+
+	element.appendChild(input);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const link = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	let linkElt;
+	if (display.location === "out") {
+		linkElt = primitives.label({
+			icon: display.location,
+			label: display.title,
+			tag: "h3",
+		});
+	} else {
+		linkElt = primitives.select({
+			label: display.title,
+			icon: display.location,
+			selectIcon: "search",
+			disabled: true,
+		});
+	}
+
+	element.appendChild(linkElt);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const bookmark = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		icon: "bookmark",
+		label: display.title,
+	});
+
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const location = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const input = primitives.input({
+		label: display.title,
+		icon: "location",
+		name: schema.id,
+		selectIcon: "search",
+		type: "text",
+		disabled: true,
+		placeholder: schema.placeholder,
+	});
+
+	element.appendChild(input);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const select = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const select = primitives.select({
+		label: display.title,
+		icon: "select",
+		selectIcon: "dropdown",
+		name: schema.id,
+		disabled: true,
+		placeholder: schema.placeholder || "select an option...",
+	});
+
+	element.appendChild(select);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const radio = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const fieldset = element.appendChild(document.createElement("fieldset"));
+	fieldset.className = `${STYLES.radio.fieldset.column}`;
+
+	fieldset.appendChild(
+		primitives.label({
+			icon: "radio",
+			tag: "legend",
+			label: display.title,
+		}),
+	);
+
+	if (!schema.options) {
+		return element;
+	}
+
+	schema.options.forEach((option) => {
+		fieldset.appendChild(
+			primitives.radio({
+				label: option.label,
+				value: option.value,
+				name: schema.id,
+				disabled: true,
+				styles: {
+					label: `${STYLES.radio.label} first-of-type:pt-1`,
+				},
+			}),
+		);
+	});
+
+	return element;
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
+ * @matrix forms signature : builder-preview builder-signature-field
+ */
+const signature = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		icon: "signature",
+		label: display.title,
+		tag: "h3",
+	});
+
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const status = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	const label = primitives.label({
+		tag: "h3",
+		label: display.title,
+		icon: "status",
+	});
+
+	element.appendChild(label);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const textarea = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+
+	const textarea = primitives.textarea({
+		label: display.title,
+		placeholder: schema.placeholder || "",
+		icon: "textarea",
+		disabled: true,
+		rows: 2,
+	});
+
+	element.appendChild(textarea);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const todo = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	element.appendChild(
+		primitives.label({
+			icon: "checklist",
+			label: display.title,
+			tag: "h3",
+		}),
+	);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
+const table = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+	element.classList.add("flex", "flex-col", "gap-1");
+	const columns = schema.columns || [];
+
+	const label = primitives.label({
+		icon: "table",
+		label: display.title,
+		tag: "h3",
+	});
+	element.appendChild(label);
+
+	const badgesContainer = element.appendChild(document.createElement("div"));
+	badgesContainer.className = `flex flex-row gap-2 empty:hidden flex-wrap`;
+
+	columns.forEach((column) => {
+		badgesContainer.appendChild(
+			primitives.badge({
+				icon: column.location || column.input || column.type,
+				text: column.title,
+				kind: "form",
+				styles: {
+					badge: `${STYLES.badge.builder}`,
+					text: "text-base-dark",
+				},
+			}),
+		);
+	});
+
+	return element;
+};
+
+const ModelElement = {
+	checkbox,
+	html,
+	input,
+	link,
+	bookmark,
+	location,
+	radio,
+	select,
+	signature,
+	status,
+	textarea,
+	table,
+	todo,
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_046_async_query_lifecycle.py::test_builder_destroys_owned_search_modal_and_panels_during_startup
+ * @matrix forms : builder-lifecycle late-publication listener-teardown
+ */
+class FormBuilder {
+	constructor(node) {
+		this._destroyed = false;
+		this.elt = node;
+		this.elements = new Map();
+		this._independentDocuments = new Set();
+		this.images = new Map();
+		this._restoringDraft = false;
+		this.bootstrap = JSON.parse(
+			document.getElementById("builder-draft")?.textContent || "null",
+		);
+		this.htmlFields = structuredClone(this.bootstrap?.html_fields || {});
+		this.conversionInstructions = structuredClone(
+			this.bootstrap?.conversion_instructions || {},
+		);
+		this.conversionCatalog = JSON.parse(
+			document.getElementById("builder-conversions")?.textContent || "null",
+		);
+		this.draft = this.bootstrap
+			? new BuilderDraft(this.bootstrap, this.bootstrap.baseline)
+			: null;
+		if (this.draft) {
+			delete this.draft.state.baseline;
+			delete this.draft.saved.baseline;
+			delete this.draft.state.pending_change;
+			delete this.draft.saved.pending_change;
+		}
+		this.selectedElement = null;
+		this.schemaElt = document.querySelector('input[name="schema"]');
+		this.key = node.dataset.key;
+		this.offlineIndicator = document.querySelector('[data-role="offline"]');
+		this.online = connectivity.online;
+		this.hidden = connectivity.hidden;
+		this.blurred = false;
+		this.blurredAt = null;
+		this.EntityMenu = new EntityMenu(this);
+		this.SearchBox = null;
+		this.offlineModal = null;
+		this._searchPromise = null;
+
+		this.components = new ComponentsPanel(this);
+		this.model = new ModelPanel(this);
+		this.settings = new ElementSettings(this);
+		this.conditions = new ConditionPanel(this);
+		this.header = new Header(this);
+		this.formSettings = new FormSettings(this);
+
+		this.click = this._click.bind(this);
+		this.keydown = this._keydown.bind(this);
+		this.beforeUnload = (event) => {
+			if (this.draft?.dirty) {
+				event.preventDefault();
+				event.returnValue = "";
+			}
+		};
+	}
+
+	async init() {
+		if (this._destroyed) return this;
+		this.createFormElements();
+		this.draft ??= new BuilderDraft(this.captureDraft());
+
+		this.model.init();
+		this.settings.init();
+		this.formSettings.init();
+		if (this.bootstrap?.pending_change)
+			this.setPendingChange(this.bootstrap.pending_change);
+
+		this.offlineModal = new OfflineModal(this, this.offlineIndicator);
+		this.offlineModal.enable();
+		this.offline(!this.online);
+
+		document.addEventListener("click", this.click);
+		document.addEventListener("keydown", this.keydown);
+		window.addEventListener("beforeunload", this.beforeUnload);
+		this.refreshDraftControls();
+		this.elt._lp_view = this;
+
+		this._searchPromise = this._initSearch().catch((error) => {
+			captureError(error, this.elt, { context: "builder-search-startup" });
+			return null;
+		});
+		this.elt.setAttribute("initialized", "");
+		return this;
+	}
+
+	async _initSearch() {
+		const search = document.querySelector("[lp-search]");
+		if (!search || this._destroyed) return null;
+
+		const searchBox = new SearchBox(search);
+		this.SearchBox = searchBox;
+		await searchBox.init();
+		if (this._destroyed || this.SearchBox !== searchBox) {
+			searchBox.destroy();
+			return null;
+		}
+		return searchBox;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
+	 * @tests tests_js/test_036c_form_migrations.py::test_builder_resumes_migration_polling_and_clears_completed_status
+	 * @matrix editor html-field : teardown
+	 * @matrix forms offline : builder-lifecycle
+	 * @matrix form-migration : progress recovery
+	 */
+	async sync({
+		hidden = document.hidden,
+		blurred = false,
+		blurredAt = null,
+	} = {}) {
+		const wasOnline = this.online;
+		const wasInactive = this.hidden || !wasOnline;
+		const visibleBlur = Boolean(hidden && blurred);
+		if (visibleBlur && !this.blurred) this.blurredAt = blurredAt ?? Date.now();
+		else if (!visibleBlur) this.blurredAt = null;
+		this.hidden = hidden;
+		this.blurred = visibleBlur;
+		this.online = connectivity.online;
+		this.offline(!this.online);
+		const polling = this.changeStatus?.polling;
+		if (hidden || !this.online) {
+			if (visibleBlur && this.online) polling?.blur(this.blurredAt);
+			else polling?.pause();
+		}
+		// A request started before leaving may still report the job as pending.
+		else if (wasInactive) await polling?.trigger(null, { fresh: true });
+		else await polling?.resume();
+		if (this.online && (hidden || !wasOnline)) {
+			await this.flushIndependentDocuments({ keepalive: hidden });
+		}
+	}
+
+	registerIndependentDocument(document) {
+		this._independentDocuments.add(document);
+		return document;
+	}
+
+	unregisterIndependentDocument(document) {
+		this._independentDocuments.delete(document);
+	}
+
+	async flushIndependentDocuments(options = {}) {
+		const results = await Promise.allSettled(
+			[...this._independentDocuments].map((document) =>
+				Promise.resolve().then(() => document.flush(options)),
+			),
+		);
+		return results.every(
+			(result) => result.status === "fulfilled" && result.value === true,
+		);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/builder.mjs::FormBuilder.sync
+	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
+	 * @reason builder connectivity controls are applied through the shared view lifecycle
+	 */
+	offline(offline) {
+		const search = document.querySelector("[lp-search]");
+		if (this.offlineIndicator) {
+			this.offlineIndicator.dataset.visible = offline ? "true" : "false";
+			this.offlineIndicator.setAttribute(
+				"aria-hidden",
+				offline ? "false" : "true",
+			);
+		}
+		if (search) search.dataset.visible = offline ? "false" : "true";
+		const saveButton = this.header.saveButton;
+		if (saveButton) {
+			// Keep the control in the tab order through health transitions.
+			const saving = saveButton.getAttribute("aria-busy") === "true";
+			saveButton.dataset.visible = "true";
+			saveButton.setAttribute(
+				"aria-disabled",
+				String(
+					Boolean(
+						offline ||
+							saving ||
+							this.pendingChange ||
+							saveButton.dataset.saved === "true",
+					),
+				),
+			);
+		}
+	}
+
+	updateSchema(silent = false, group = null) {
+		const schemas = Array.from(this.elements.values()).map(
+			(element) => element.schema,
+		);
+		if (!silent && repairConditions(schemas))
+			this.header.message(
+				"Conditions that depended on removed or incompatible choices were removed from this draft.",
+				{ persistent: true },
+			);
+		const schemaString = JSON.stringify(schemas);
+		if (schemaString !== this.schemaElt.value) {
+			this.schemaElt.value = schemaString;
+			!silent && this.header.unsaved();
+		}
+		if (!silent && !this._restoringDraft && this.draft) {
+			this.draft.record(this.captureDraft(), group);
+			this.refreshDraftControls();
+		}
+	}
+
+	get schema() {
+		return Array.from(this.elements.values(), (element) =>
+			structuredClone(element.schema),
+		);
+	}
+
+	setPendingChange(change) {
+		if (change) this.changeStatus ??= new FormChangeStatus(this);
+		this.changeStatus?.show(change);
+	}
+
+	captureDraft() {
+		const instructions = Object.fromEntries(
+			Object.entries(this.conversionInstructions || {}).filter(
+				([id, value]) => {
+					const source = this.savedField(id);
+					const target = this.schema.find((field) => field.id === id);
+					return (
+						value &&
+						source &&
+						target &&
+						this.conversionCatalog?.rules[fieldKind(source)]?.[
+							fieldKind(target)
+						] === "ai"
+					);
+				},
+			),
+		);
+		return {
+			name: this.header.nameHidden.value,
+			schema: this.schema,
+			form_type: this.elt.dataset.formType,
+			html_fields: structuredClone(this.htmlFields),
+			selected_id: this.selectedElement?.schema.id || null,
+			...(Object.keys(instructions).length
+				? { conversion_instructions: instructions }
+				: {}),
+		};
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : draft-history
+	 */
+	setHtml(fieldId, html) {
+		this.htmlFields[fieldId] = this.canonicalHtml(html);
+		if (this.draft.updateHtml(fieldId, this.htmlFields[fieldId]))
+			this.refreshDraftControls();
+	}
+
+	canonicalHtml(html) {
+		for (const [id, image] of this.images)
+			html = html.replaceAll(image.url, `draft-image:${id}`);
+		return html;
+	}
+
+	previewHtml(html) {
+		for (const [id, image] of this.images)
+			html = html.replaceAll(`draft-image:${id}`, image.url);
+		return html;
+	}
+
+	addDraftImage(fieldId, file) {
+		const id = crypto.randomUUID();
+		const url = URL.createObjectURL(file);
+		this.images.set(id, { file, fieldId, url, uploads: new Map() });
+		return url;
+	}
+
+	pruneImages() {
+		const states = [
+			this.draft.state,
+			...this.draft.past,
+			...this.draft.future,
+			this.header._saveAttempt?.state,
+			this._copyAttempt?.state,
+		];
+		const openEditors = new Set(
+			Array.from(this.elements.values())
+				.filter((element) => element.conditions?.html?.document?.editor)
+				.map((element) => element.schema.id),
+		);
+		for (const [id, image] of this.images) {
+			if (openEditors.has(image.fieldId)) continue;
+			if (
+				states.some((state) =>
+					Object.values(state?.html_fields || {}).some((html) =>
+						html.includes(`draft-image:${id}`),
+					),
+				)
+			)
+				continue;
+			URL.revokeObjectURL(image.url);
+			this.images.delete(id);
+		}
+	}
+
+	async draftPayload(state, route, saveId) {
+		const data = new FormData();
+		data.set("name", state.name);
+		data.set("schema", JSON.stringify(state.schema));
+		if (needsMigration(this.draft.saved.schema, state.schema))
+			data.set(
+				"migration",
+				JSON.stringify({
+					version: this.conversionCatalog?.version || 1,
+					clear_invalid: true,
+					instructions: state.conversion_instructions || {},
+				}),
+			);
+		data.set("html_fields", JSON.stringify(state.html_fields));
+		data.set("baseline", this.draft.baseline || "");
+		data.set("save_id", saveId);
+		const manifest = [];
+		const direct = [];
+		for (const [id, image] of this.images) {
+			if (
+				!Object.values(state.html_fields).some((html) =>
+					html.includes(`draft-image:${id}`),
+				)
+			)
+				continue;
+			const inputName = `draft-image-${id}`;
+			manifest.push({ id, field_id: image.fieldId, input_name: inputName });
+			if (image.file.size > 1024 * 1024) {
+				let uploaded = image.uploads.get(route);
+				if (!uploaded) {
+					const session = await uploadElement.directUpload.createSession({
+						route,
+						file: image.file,
+						inputName,
+						replaceErrorPage: false,
+					});
+					const metadata = await uploadElement.directUpload.upload({
+						file: image.file,
+						sessionUrl: session.session_url,
+						chunkSize: session.chunk_size,
+					});
+					uploaded = {
+						token: session.token,
+						input_name: inputName,
+						filename: image.file.name,
+						content_type: image.file.type,
+						size: image.file.size,
+						generation: metadata.generation,
+						path: metadata.name,
+					};
+					image.uploads.set(route, uploaded);
+				}
+				direct.push(uploaded);
+			} else data.append(inputName, image.file, image.file.name || "image.png");
+		}
+		data.set("image_manifest", JSON.stringify(manifest));
+		if (direct.length) data.set("direct_uploads", JSON.stringify(direct));
+		return data;
+	}
+
+	refreshDraftControls() {
+		if (!this.draft) return;
+		this.draft.dirty ? this.header.unsaved() : this.header.saved();
+		const undo = this.elt.querySelector("[data-role='undo-draft']");
+		const redo = this.elt.querySelector("[data-role='redo-draft']");
+		if (undo) undo.disabled = !this.draft.past.length;
+		if (redo) redo.disabled = !this.draft.future.length;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036b_builder_draft.py::test_builder_save_restores_unsubmitted_condition_buffer
+	 * @matrix forms : draft-history stale-acknowledgement focus-recovery
+	 */
+	restoreDraft({ preserveFocus = false } = {}) {
+		const active = document.activeElement;
+		const condition = this.conditions.condition;
+		const dialog =
+			preserveFocus && condition?.key
+				? {
+						key: condition.key,
+						index: condition.index,
+						fieldId: condition.element.schema.id,
+						setting: structuredClone(condition.setting),
+					}
+				: null;
+		const editor = this.conditions.condition?.document?.editor;
+		const htmlFocus =
+			preserveFocus && editor?.view.dom.contains(active)
+				? { from: editor.state.selection.from, to: editor.state.selection.to }
+				: null;
+		const inputFocus =
+			preserveFocus &&
+			(this.settings.panel.contains(active) ||
+				this.conditions.panel.contains(active)) &&
+			active.name
+				? {
+						name: active.name,
+						start: active.selectionStart,
+						end: active.selectionEnd,
+					}
+				: null;
+		this._restoringDraft = true;
+		this.conditions.hide();
+		this.header.closePreview();
+		const retainedDocuments = new Map();
+		this.elements.forEach((element) => {
+			const survives = this.draft.state.schema.some(
+				(field) => field.id === element.schema.id && field.type === "html",
+			);
+			for (const [name, condition] of Object.entries(
+				element.conditions || {},
+			)) {
+				if (name === "html" && survives)
+					retainedDocuments.set(element.schema.id, condition);
+				else condition.destroy?.();
+			}
+		});
+		this.pruneImages();
+		this.elements.clear();
+		this.model.panel.replaceChildren();
+		this.model.defaultPanel.replaceChildren();
+		this.selectedElement = null;
+		const state = this.draft.state;
+		this.htmlFields = structuredClone(state.html_fields);
+		this.conversionInstructions = structuredClone(
+			state.conversion_instructions || {},
+		);
+		this.header.nameHidden.value = state.name;
+		this.header.nameInput.value = state.name;
+		this.header.nameDisplay.textContent = state.name;
+		for (const field of state.schema) {
+			const item = this.createElement(structuredClone(field));
+			const documentCondition = retainedDocuments.get(field.id);
+			if (documentCondition) {
+				const element = this.elements.get(field.id);
+				documentCondition.element = element;
+				element.conditions = { html: documentCondition };
+				element.destroy = () =>
+					Object.values(element.conditions).forEach((condition) => {
+						condition.destroy();
+					});
+				const editor = documentCondition.document?.editor;
+				const html = this.previewHtml(state.html_fields[field.id] || "");
+				if (
+					editor &&
+					this.canonicalHtml(editor.getHTML()) !== state.html_fields[field.id]
+				) {
+					editor.commands.setContent(html, { emitUpdate: false });
+					documentCondition.document._lastFlushedContent =
+						documentCondition.document._currentContent();
+				}
+			}
+			const isDefault = ["name", "description"].includes(field.id);
+			if (isDefault)
+				for (const input of item.querySelectorAll("input, textarea"))
+					input.remove();
+			const panel = isDefault ? this.model.defaultPanel : this.model.panel;
+			panel.append(item);
+		}
+		this.updateSchema(true);
+		this.model.show();
+		if (state.selected_id && this.elements.has(state.selected_id))
+			this.selectElement(state.selected_id);
+		else {
+			this.settings.deselectItem();
+			this.formSettings.visible = true;
+		}
+		this.elt.dataset.expanded = "false";
+		this._restoringDraft = false;
+		this.refreshDraftControls();
+		const restoreInput = () =>
+			withTransition(() => {
+				if (!inputFocus || this._destroyed) return;
+				const panel = dialog ? this.conditions.panel : this.settings.panel;
+				const input = Array.from(
+					panel.querySelectorAll("input, textarea"),
+				).find((control) => control.name === inputFocus.name);
+				input?.focus();
+				if (input?.setSelectionRange && inputFocus.start !== null)
+					input.setSelectionRange(inputFocus.start, inputFocus.end);
+			});
+		if (dialog && this.elements.has(dialog.fieldId)) {
+			this.selectElement(dialog.fieldId);
+			return this.showCondition(dialog.key, dialog.index, dialog.setting).then(
+				restoreInput,
+			);
+		}
+		if (htmlFocus && this.selectedElement) {
+			return this.showCondition("html").then(() => {
+				const current = this.conditions.condition?.document?.editor;
+				if (current && !this._destroyed)
+					current.chain().focus().setTextSelection(htmlFocus).run();
+			});
+		}
+		if (inputFocus) return restoreInput();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_generated_document_uses_editor_undo_before_first_open
+	 * @matrix html-field : generated-document-undo retained-editor
+	 */
+	async prepareGeneratedDocuments(htmlFields) {
+		const { default: HtmlEditor } = await import('./html.js?v=b564d2b9');
+		for (const [id, html] of Object.entries(htmlFields || {})) {
+			const element = this.elements.get(id);
+			if (
+				this._destroyed ||
+				element?.schema.type !== "html" ||
+				this.htmlFields[id] === html
+			)
+				continue;
+			element.conditions ??= {};
+			if (!element.conditions.html) {
+				const selected = this.selectedElement;
+				this.selectedElement = element;
+				element.conditions.html = new HtmlEditor(this);
+				this.selectedElement = selected;
+				element.destroy = () =>
+					Object.values(element.conditions).forEach((condition) => {
+						condition.destroy();
+					});
+			}
+			await element.conditions.html.init();
+		}
+	}
+
+	undoDraft(redo = false) {
+		if (this.pendingChange) return;
+		this.updateSchema();
+		if (redo ? this.draft.redo() : this.draft.undo()) {
+			this.restoreDraft();
+		}
+	}
+
+	_keydown(event) {
+		if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+		if (
+			event.target.closest("input, textarea, select, [contenteditable='true']")
+		)
+			return;
+		if (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") {
+			event.preventDefault();
+			this.undoDraft(event.shiftKey || event.key.toLowerCase() === "y");
+		}
+	}
+
+	savedField(id) {
+		return this.draft?.saved.schema.find((field) => field.id === id);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
+	 * @matrix forms : builder-defaults page-form task-form
+	 */
+	async createFormElements() {
+		const recentSchema = this.schemaElt.value;
+		const schemaJSON = this.bootstrap
+			? JSON.stringify(this.bootstrap.schema)
+			: recentSchema
+				? recentSchema
+				: this.elt.dataset.schema;
+		const schema = schemaJSON ? JSON.parse(schemaJSON) : [];
+
+		for (const elt of schema) {
+			this.createElement(elt);
+		}
+
+		this.updateSchema(true);
+	}
+
+	_click(event) {
+		const menuTrigger = event.target.closest("[data-role='menu-trigger']");
+		const menu = menuTrigger?.closest("[lp-menu]");
+		if (menu && this.elt.contains(menu)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this.EntityMenu.toggle(menu);
+			return;
+		}
+
+		const button = event.target.closest("button");
+		const element = event.target.closest(".form-element");
+		const preview = event.target.closest("#preview-panel");
+
+		if (element && !preview) {
+			this.selectElement(element.id);
+		} else if (button?.hasAttribute("lp-help")) {
+			this._showHelpModal(button);
+		} else if (button?.dataset.role === "form-settings") {
+			this.deselectElement();
+			this.formSettings.visible = true;
+		} else if (button?.id === "preview-toggle") {
+			this.header.togglePreviewPanel();
+		} else if (button?.dataset.role === "save-form") {
+			this.header.saveForm();
+		} else if (["undo-draft", "redo-draft"].includes(button?.dataset.role)) {
+			this.undoDraft(button.dataset.role === "redo-draft");
+		} else if (button?.dataset.action === "copy-form") {
+			this.copyForm(button);
+		} else if (button?.getAttribute("lp-control") === "delete") {
+			this._showDeleteModal(button);
+		} else if (event.target?.id === "form-name-display") {
+			this.header.editFormName();
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
+	 * @matrix forms : builder-copy navigation schema
+	 * @pair entity-menu:builder-copy
+	 */
+	async copyForm(button) {
+		if (this._destroyed || !button?.dataset.route || button.disabled) return;
+
+		const hadFocus = document.activeElement === button;
+		let terminal = false;
+		button.disabled = true;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		this.header.clearMessage();
+		try {
+			this.updateSchema();
+			this.draft.group = null;
+			const state = this.captureDraft();
+			const revision = this.draft.revision;
+			this._copyAttempt ??= { state, id: crypto.randomUUID() };
+			if (!this.draft.equal(state, this._copyAttempt.state))
+				this._copyAttempt = { state, id: crypto.randomUUID() };
+			const data = await this.draftPayload(
+				state,
+				button.dataset.route,
+				this._copyAttempt.id,
+			);
+			const response = await request.post(button.dataset.route, data, {
+				replaceErrorPage: false,
+			});
+			if (this._destroyed) return;
+			if (response?.ok === true && response.url) {
+				this._copyAttempt = null;
+				if (
+					this.draft.revision !== revision ||
+					!this.draft.equal(this.captureDraft(), state)
+				) {
+					this.header.message(
+						"Copy created. Your later draft edits are still here. ",
+						{ persistent: true },
+					);
+					const link = document.createElement("a");
+					link.href = response.url;
+					link.target = "_blank";
+					link.rel = "noopener";
+					link.textContent = "Open copy";
+					link.className = "underline";
+					this.header.notification.append(link);
+					return;
+				}
+				window.removeEventListener("beforeunload", this.beforeUnload);
+				window.location.assign(response.url);
+				terminal = true;
+				return;
+			}
+			if (!this.header.showConflict(response))
+				this.header.message(response?.error || "Could not copy this form.", {
+					persistent: true,
+				});
+		} catch (error) {
+			captureError(error, button, { context: "builder-copy-form" });
+			this.header.message("Could not copy this form. Try again.", {
+				persistent: true,
+			});
+		} finally {
+			if (!terminal && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
+		}
+	}
+
+	async _showDeleteModal(button) {
+		if (this._destroyed) return;
+		const modal = new DeleteModal(this, button);
+		await modal.init();
+	}
+
+	async _showHelpModal(button) {
+		if (this._destroyed) return;
+		const modal = new HelpModal(this, button);
+		await modal.init();
+	}
+
+	selectElement(id) {
+		this.selectedElement = this.elements.get(id);
+		if (this.draft) this.draft.state.selected_id = id;
+		withTransition(() => {
+			this.model.selectItem();
+			this.settings.selectItem();
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : builder-lifecycle draft-history
+	 */
+	deselectElement() {
+		this.model.deselectItem();
+		this.settings.deselectItem();
+		this.selectedElement = null;
+		if (this.draft) this.draft.state.selected_id = null;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
+	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
+	 */
+	createElement(schema) {
+		schema.id = schema.id ?? generateElementId(schema.type);
+		if (schema.type === "html" && !Object.hasOwn(this.htmlFields, schema.id))
+			this.htmlFields[schema.id] = "";
+		if (schema.type === "table" && !Array.isArray(schema.columns)) {
+			schema.columns = [];
+		}
+		const element = ModelElement[schema.type](schema);
+
+		this.elements.set(schema.id, {
+			item: element,
+			schema: schema,
+			settings: this.settings.create(schema),
+		});
+
+		return element;
+	}
+
+	getEligibleConditionTargets() {
+		return Array.from(this.elements.values())
+			.filter(
+				(element) =>
+					["checkbox", "radio", "select"].includes(element.schema.type) &&
+					element !== this.selectedElement,
+			)
+			.map((element) => ({
+				label: element.schema.title,
+				value: element.schema.id,
+				details: {
+					icon: element.schema.type,
+					kind: "form",
+					name: element.schema.title,
+				},
+			}));
+	}
+
+	async showCondition(name, index = -1, draftSetting = null) {
+		if (this._destroyed || this.conditions.loading) return;
+		this.conditions.loading = true;
+		const element = this.selectedElement;
+		if (!element) {
+			this.conditions.loading = false;
+			return;
+		}
+
+		element.conditions ??= {};
+		let condition = element.conditions[name] ?? null;
+		let created = false;
+		if (!condition) {
+			condition = await loadCondition(this, name);
+			created = true;
+			if (this._destroyed || this.selectedElement !== element) {
+				condition?.destroy?.();
+				this.conditions.loading = false;
+				return;
+			}
+			element.conditions[name] = condition;
+		}
+
+		if (!element.destroy) {
+			element.destroy = () => {
+				Object.values(element.conditions).forEach((condition) => {
+					condition.destroy();
+				});
+			};
+		}
+
+		condition.index = index;
+		condition.draftSetting = draftSetting;
+		await condition.init();
+		if (this._destroyed || this.selectedElement !== element) {
+			if (created) {
+				condition.destroy?.();
+				delete element.conditions[name];
+			}
+			this.conditions.loading = false;
+			return;
+		}
+
+		await withTransition(
+			() => {
+				if (this._destroyed || this.selectedElement !== element) return;
+				this.conditions.open(condition);
+			},
+			{ label: "builder:show-condition" },
+		);
+	}
+
+	updateSchemaOrder() {
+		const sortedMap = new Map();
+
+		Array.from(this.model.defaults).forEach((element) => {
+			sortedMap.set(element.id, this.elements.get(element.id));
+		});
+
+		Array.from(this.model.elements).forEach((element) => {
+			sortedMap.set(element.id, this.elements.get(element.id));
+		});
+
+		this.elements = sortedMap;
+
+		this.updateSchema();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components
+	 * @pair forms:builder-delete-components
+	 */
+	removeElement() {
+		delete this.htmlFields[this.selectedElement.schema.id];
+		if (this.selectedElement.destroy) this.selectedElement.destroy();
+		this.selectedElement.item.remove();
+		this.elements.delete(this.selectedElement.schema.id);
+
+		this.selectedElement = null;
+		this.updateSchema();
+		this.pruneImages();
+	}
+
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.SearchBox?.destroy?.();
+		this.SearchBox = null;
+		this.offlineModal?.destroy?.();
+		this.offlineModal = null;
+		this.components.destroy();
+		this.model.destroy();
+		this.settings.destroy();
+		this.conditions.destroy();
+		this.header.destroy();
+		this.formSettings.destroy();
+		this.changeStatus?.destroy();
+		this.EntityMenu.destroy();
+
+		this.elements.forEach((element) => {
+			if (element.destroy) element.destroy();
+		});
+		this.elements.clear();
+		this._independentDocuments.clear();
+		for (const image of this.images.values()) URL.revokeObjectURL(image.url);
+		this.images.clear();
+
+		document.removeEventListener("click", this.click);
+		document.removeEventListener("keydown", this.keydown);
+		window.removeEventListener("beforeunload", this.beforeUnload);
+		if (this.elt._lp_view === this) delete this.elt._lp_view;
+	}
+}
+
+export { CONFIG as C, FormBuilder as F, fieldKind as f };

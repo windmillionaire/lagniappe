@@ -233,6 +233,7 @@ def diagnostic_record(record):
 # @matrix ai-observability : job-correlation privacy
 def operation_diagnostic_payload(operation, records, *, query_limit=QUERY_LIMIT):
     """Build a transferable, privacy-bounded job/provider snapshot."""
+    records = reconcile_generation_records(records, [operation])
     telemetry_id = operation.get("telemetry_id")
     matching = [
         diagnostic_record(record)
@@ -729,3 +730,27 @@ def aggregate_records(records, *, query_limit=QUERY_LIMIT):
         ],
         "limited": count >= query_limit,
     }
+
+
+# @testable true
+# @tests tests_unit/test_015c_ai_observability.py::test_report_telemetry_marks_lost_attempts_interrupted
+# @matrix observability : in-flight deferred-context exception-transparency
+def reconcile_generation_records(records, operations, *, now=None):
+    """Project orphaned report attempts as interrupted using durable job state."""
+    now = now or datetime.now(timezone.utc)
+    jobs = {item.get("telemetry_id"): item for item in operations if item.get("telemetry_id")}
+    result = []
+    for record in records:
+        item = dict(record)
+        if item.get("state") == "running" and item.get("deferred_job_type") == "report-ai":
+            job = jobs.get(item.get("telemetry_id"), {})
+            created = item.get("created")
+            if isinstance(created, datetime) and created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            expired = isinstance(created, datetime) and now - created >= timedelta(minutes=10)
+            stopped = job.get("status") in {"complete", "failed", "cancelled", "superseded"}
+            replaced = int(job.get("attempt") or 0) > int(item.get("deferred_job_attempt") or 0)
+            if expired or stopped or replaced:
+                item.update(state="interrupted", active_provider_stage="interrupted", success=False, terminal_error_category="interrupted", terminal_error_class="interrupted")
+        result.append(item)
+    return result

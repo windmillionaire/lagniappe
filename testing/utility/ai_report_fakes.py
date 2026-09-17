@@ -10,6 +10,8 @@ from testing.utility.test_entities import TestEntities
 
 
 def _attach_report_process(report):
+    report.db = {}
+    report.available = True
     class Process:
         def begin_execution(self, result=None):
             report.status = "running"

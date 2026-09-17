@@ -25,6 +25,7 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
+            "view": {"type": "string", "enum": ["default", "edit"]},
             "id": {
                 "type": "string",
                 "description": "The page hash token from prompt context or search results.",
@@ -75,17 +76,19 @@ def execute_get_page_details(args, user):
     if not page.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
 
-    result = {"page": page.to_ai(user)}
+    from .get_entity import edit_entity
+    result = {"page": edit_entity(page, user) if args.get("view") == "edit" else page.to_ai(user)}
 
     if page.model:
         result["category"] = page.model.to_ai(user)
 
     if not args.get("exclude_tasks"):
-        if args.get("compact_tasks"):
+        if args.get("compact_tasks") or args.get("view") == "edit":
             listing = compact_task_list(
                 page,
                 user,
                 include_completed=False,
+                view=args.get("view"),
                 limit=args.get("task_limit", DEFAULT_TASK_LIMIT),
                 cursor=args.get("task_cursor"),
             )

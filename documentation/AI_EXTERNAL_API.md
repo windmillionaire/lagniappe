@@ -38,7 +38,7 @@ remote MCP service has separately revocable ChatGPT and Codex OAuth grants.
 Normal setup asks about AI and then external AI/MCP. Change those choices with
 `./setup.sh ai` and deploy the resulting configuration. Model defaults are an
 informational line during setup; change models in Admin → Site Settings → AI
-Models. Saved reports and provider-free browser review, execution and undo
+Models. Saved reports and provider-free browser review, execution
 remain available within normal permissions even when generation is disabled.
 
 Legacy settings without these flags preserve existing built-in and REST access.
@@ -290,18 +290,12 @@ null, and an `error` explains the gap. Private raw keys are never substituted fo
 an unavailable projection. The existing `task` and `history` fields retain their
 current-task and older-occurrence meanings.
 
-For patches, `get_guidelines(task="form_autofill",
-actions=["update_form_values"], field_types=[...])` omits the full Autofill
-and file-discovery workflow. Reuse guidance already received when sufficient.
-
-Execution receipts expose applied/skipped counts for submission and schema
-updates without returning private recovery data. Counts describe action outcomes,
-not a fresh field-value read; use `get_schema(..., include_values=true)` to inspect
-the saved result. Batch patches accumulate on one working entity per durable key
-and save the combined result. Undo restores the same batch in reverse row order.
-The browser report labels successful patches as `Task Updated` or `Page Updated`
-with a link to each distinct applied target. Skipped-only targets are not labeled
-as updated; this display projection leaves the execution/undo ledger unchanged.
+For selected answer patches, request `form_autofill` guidance with
+`actions=["update_task"]` or `["update_page"]`. Use `data.entity` and
+`data.changes.submission`, keyed by exact answer IDs. Omitted fields remain
+unchanged. Form reassignment requires a complete target submission; review
+shows removed values. Each update saves Form, answers, classification, and
+description together.
 
 Proposal plan reads and submission receipts also expose `action_summary`:
 `{total, by_type, maximum}`. The external maximum is 100. These count the saved
@@ -389,7 +383,7 @@ still be fetched after uploads and immediately before submission.
    replaces the prior result while the report remains reusable; `status_url`
    retrieves the detailed Plan resource.
 
-Contract version 9 is an intentional breaking cutover: the contract uses only
+Contract version 10 is an intentional breaking cutover: the contract uses only
 top-level `contract_version`, and primary read-tool subjects use only `id`.
 There are no legacy aliases. Clients must refresh discovery, OpenAPI, the tool
 catalog, and the current Plan contract rather than replaying an older shape or
@@ -494,60 +488,29 @@ uploads. To move an existing file to a new Task, place `create_task` first and
 reference its action id in `move_file.data.to_task_action` and `depends_on`.
 Task Form submissions must contain final values.
 
-Call `start_plan(actions=["update_form_values", "complete_task"])` when the
-needed actions are known to include selected schemas in the first response.
-Otherwise use the compact action list, then request
-`get_plan_contract(actions=["update_form_values", "complete_task"])`
-for exact shapes. Use read tools to identify the intended record and inspect its
-current schema. Put final field patches before `complete_task`, with the patch's
-id in completion's `depends_on`. Failed/skipped required updates prevent completion.
-The completion action uses only `data.task` and optional `task_name`; it never
-uses name-based matching or historical replacement semantics. Normal required
-fields, recurrence, permissions, retry and undo still apply.
-
-For `update_form_values`, the external action's `data` contains only `updates`.
-Every row supplies `schema_id` (the exact Form field id), `new_value`, and exactly
-one target: `page` or `task` for an existing entity, or `page_action` or
-`task_action` for an earlier creation action. Repeat the target for each field,
-including multiple fields on the same entity. Omitted fields retain their values.
+The cohesive update contracts are `update_task`, `update_model_task`,
+`update_project`, and `update_page`. Every action supplies an exact `entity`
+and a nonempty `changes` object. Earlier outputs use `$action_id` references.
 
 ```json
-{
-  "type": "update_form_values",
-  "data": {
-    "updates": [
-      {"task": "hash:012345abcdef", "schema_id": "textarea-notes", "new_value": "Updated notes"}
-    ]
-  }
-}
+{"id":"edit","type":"update_task","data":{"entity":"hash:012345abcdef","changes":{"name":"Review results","submission":{"textarea-notes":"Updated notes"},"due_date":"2026-10-01"}}}
 ```
 
-The external schema rejects top-level targets, missing row targets, and multiple
-targets in one row before semantic validation.
+Task updates preserve identity, attachments, history, dates and recurrence unless
+explicitly changed. Completed tasks cannot be restructured. Model-task defaults
+affect future tasks only. Project ordering includes all models exactly once.
+Use `get_entity(view="edit")` or paginated `get_page_tasks(view="edit")` for
+complete descriptions, answer IDs, revisions, relationships, and shared schemas.
+Contract 10 removes superseded atomic updates and aliases. Schema migrations,
+completion, file movement and document append remain distinct actions.
 
-`set_task_due_date` edits an existing incomplete Task using `data.task` and a
-required `data.due_date`: a valid `YYYY-MM-DD` calendar date, or JSON `null` to
-clear it. This is a task scheduling action, separate from Form-value patches. Resolve relative wording using the plan's current date and timezone.
-Execution uses the acting user's timezone and the Task editor's calendar-date
-behavior; it preserves recurrence rules, postponement metadata, assignment, and
-submission values. A date already matching the requested local day is a no-op.
-Completed Tasks must be reopened separately before changing their due dates.
-The browser preview distinguishes setting a date from clearing it. Retry checks
-the recorded scheduling state; undo restores the prior timestamp and refuses to
-overwrite later due-date, recurrence, or completion changes.
-
-For imported completed occurrences, a date-only `completed_on` represents
-midnight in the acting user's timezone and is stored in UTC. Background report
-execution passes that actor explicitly when preparing the checkpoint and when
-recording either a live completion or older history. Calendar dates therefore
-survive local readback across daylight-saving transitions. This does not rewrite
-timestamps from earlier imports.
-
-The current action vocabulary is deliberately not backward-compatible. Contract
-version 9 uses `update_form_values`, `update_form_schema`, `add_page_category`,
-`suggest_page_deletion`, and one `attach_file` action. Clients must refresh the
-contract; new proposals cannot use `extend_form_schema`. Previously stored
-additive schema actions retain their execution/recovery behavior.
+After execution starts, `start_plan(revises_plan_id=..., instructions=...)`
+creates a linked correction. Read its source snapshot and current workspace
+state; propose only additional changes, never repeat successful creations.
+Browser approval checks the source snapshot and prevents subsequent source
+retries. Before execution, revise the same Plan. External corrections remain
+provider-free; browser corrections use the normal AI entitlement. Ambiguous
+writes and active Form migrations must be reconciled first.
 
 `update_form_schema` accepts `add_field`, `add_select_option`, `update_field`
 (`schema_id`, partial `patch`), `remove_field`, and `reorder_fields` (`ids`). IDs
@@ -580,7 +543,7 @@ execution never calls a site model and does not require site AI entitlement.
 Candidate values are reviewed in the browser alongside affected links and
 explicit destructive-change warnings; viewing candidates rechecks permissions.
 The parent report waits for Form publication before dependent actions continue.
-Once a migration starts, report Undo is unavailable; partial failures use Retry.
+Once a migration starts, partial failures use Retry before corrective planning.
 
 The API envelope remains capped at 1 MiB. The prepared schema proposal, including
 server-owned review metadata, has a 750 KiB guard to reserve Datastore space for
@@ -601,8 +564,8 @@ not proposal fields. Manual editor typing receives no header.
 
 Document append execution requires a checkpointed collaborative baseline. Unsaved
 edits stop execution for a retry; HTML-only older documents must be opened and
-saved once first. Retry receipts prevent duplicate additions. Undo removes only
-the unchanged addition and stops if subsequent document changes would be lost.
+saved once first. Retry receipts prevent duplicate additions. Edit or remove
+existing text in the document editor.
 See [document sync](SYNC_DOCUMENTS.md#reviewed-document-appends) for persistence.
 
 Pending uploads always block submission. Finalized files classified as
@@ -633,16 +596,15 @@ create additional alerts or restore dismissed ones. Optional notification email
 follows the user's existing preferences. Existing published Plans are not bulk
 backfilled; a later changed submission can create their first notification.
 
-Opening, changing, executing, retrying, undoing, or deleting a saved report is
+Opening, changing, executing, retrying or deleting a saved report is
 provider-free and therefore does not require site AI access. Those browser
 operations still require the report owner's authenticated session, CSRF where
 applicable, a valid report state, and current permission for every affected
 resource. Internal report revision is different: it calls Lagniappe's configured
-provider and still requires the corresponding site AI-access level. External
-reports cannot invoke that provider-backed revision route.
+provider and still requires the corresponding site AI-access level. After execution, either origin can create a site-origin corrective report
+through the browser with the normal AI entitlement.
 
-For an API-origin report, browser skip, execution start, every undo checkpoint,
-execution-failure persistence, terminal execution cleanup, and deletion use the
+For an API-origin report, browser skip, execution start, execution-failure persistence, terminal execution cleanup, and deletion use the
 shared claim key as a one-shot transactional fence rather than taking a
 long-lived API lease. Each transaction compares the exact Report revision,
 reads the shared operation-claim key, and deletes an absent or expired claim as
@@ -650,8 +612,7 @@ part of the guarded mutation. An active API claim or a changed Report produces
 a conflict with no mutation; mutating the claim key also forces a simultaneous
 API claimant to retry and observe the browser or execution worker's winner.
 
-Delete rejects an API-origin report that still has a deferred execution or is
-in `undoing` status, so deletion is not an active-job cancellation mechanism.
+Delete rejects an API-origin report that still has a deferred execution, so deletion is not an active-job cancellation mechanism.
 Once deletion is eligible, its guarded transaction commits the Report and
 report-only File entity deletions first. Temporary-upload cleanup and other blob
 or cache effects happen only after that durable delete succeeds.
@@ -795,7 +756,7 @@ For example, after reading the source and checking the destination:
 
 ```json
 {
-  "contract_version": 9,
+  "contract_version": 10,
   "file_usage": [{"file": "hash:012345abcdef", "usage": "organize"}],
   "proposal": {
     "summary": "File the annual inspection record on a new page.",
@@ -929,11 +890,11 @@ contract = api_json("GET", plan["contract_url"])
 # and exact schemas to add final values before POSTing to plan["submit_url"].
 ```
 
-## Unified contract version 9
+## Unified contract version 10
 
 Create drafts with `{instructions?, name?}`; `tool` is rejected. Drafts may start
 empty for uploads, but publishing requires instructions or finalized files.
-Submit `{contract_version: 9, proposal, file_usage, name?, instructions?}`.
+Submit `{contract_version: 10, proposal, file_usage, name?, instructions?}`.
 Every finalized upload appears exactly once in file_usage with its file ref and
 usage `evidence` or `organize`. Only organize files require attachment and summary
 actions. With no instructions, all uploads must be organize.

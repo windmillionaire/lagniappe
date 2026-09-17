@@ -5,14 +5,13 @@ from datetime import datetime, timezone
 from html import escape
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Fetch, MutationIntent
+from lagniappe.core.definitions import MutationIntent
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get, utility as database_utility
 from lagniappe.core.tools.cache.documents import document_write_lock
 from lagniappe.core.tools.document_crdt import (
     append_fragment,
     load_document,
-    undo_fragment,
     document_structure,
 )
 from lagniappe.core.tools.document_updates import (
@@ -47,7 +46,7 @@ def document_source_quote(report, timestamp):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/documents.py::prepare_document_append
-# @reason stable text/structure signature used by conservative document undo
+# @reason stable text/structure signature rejects stale append baselines
 def document_signature(document):
     return {
         "html": document.fingerprint,
@@ -58,8 +57,8 @@ def document_signature(document):
 
 
 # @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_and_undo_preserve_content
-# @matrix ai-report editor : document append retry undo conflict
+# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
+# @matrix ai-report editor : document append retry conflict
 def prepare_document_append(action, report, user, created, record):
     page = _resolve_entity(
         _first_data_reference(_data(action), "page"), created, expected=Entities.PAGE
@@ -79,9 +78,9 @@ def prepare_document_append(action, report, user, created, record):
 
 
 # @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_and_undo_preserve_content
-# @matrix ai-report editor : document append retry undo conflict
-# @matrix ai-report editor sync : document append browser-review persistence source-attribution undo
+# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
+# @matrix ai-report editor : document append retry conflict
+# @matrix ai-report editor sync : document append browser-review persistence source-attribution
 def _append_page_document(action, report, user, created, context):
     record = context["action_record"]
     page = _resolve_entity(
@@ -94,10 +93,6 @@ def _append_page_document(action, report, user, created, context):
             record["idempotency_key"]
         )
         if receipt:
-            if receipt["state"] != "applied":
-                raise exceptions.ValidationError(
-                    "This document append has already been undone."
-                )
             return page, [], {"document_after": receipt["signature"]}
         checkpointed_document(page)
         if document_signature(document) != record["before"]["signature"]:
@@ -127,8 +122,8 @@ def _append_page_document(action, report, user, created, context):
 
 
 # @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_and_undo_preserve_content
-# @matrix ai-report editor : document append retry undo conflict
+# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
+# @matrix ai-report editor : document append retry conflict
 def inspect_document_append(record, user):
     page = _load_result_entity((record.get("before") or {}).get("entity"))
     if page is None:
@@ -148,48 +143,3 @@ def inspect_document_append(record, user):
     # Reconcile a crash after the document committed but before the Report did.
     record.setdefault("document_after", receipt["signature"])
     return "applied"
-
-
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_and_undo_preserve_content
-# @matrix ai-report editor : document append retry undo conflict
-# @matrix ai-report editor sync : document append browser-review persistence source-attribution undo
-def _undo_page_document(record, _report, user):
-    page = _load_result_entity((record.get("before") or {}).get("entity"))
-    if page is None:
-        raise exceptions.ValidationError(
-            "Document target is unavailable; undo stopped."
-        )
-    with document_write_lock(page.properties.document.sync_id):
-        page = fresh_document(page, user)
-        document = page.properties.document
-        checkpointed_document(page)
-        receipt = load_document(document.ydoc)["lagniappeReports"].get(
-            record["idempotency_key"]
-        )
-        if receipt and receipt["state"] == "undone":
-            return {
-                "entity": _entity_result(page),
-                "note": "Document append already undone.",
-            }
-        if not receipt or document_signature(document) != record.get("document_after"):
-            raise exceptions.ValidationError(
-                "Document changed after the append; undo stopped to preserve those edits."
-            )
-        html = ""
-        history_key = record["before"]["history_key"]
-        if history_key:
-            history = Entities.fetch_one(history_key, request=Fetch.root())
-            if (
-                not isinstance(history, Entities.DOCUMENT_HISTORY)
-                or history.key.parent != page.key
-                or history.get_asset("document") is None
-            ):
-                raise exceptions.ValidationError("Saved document version is unavailable; undo stopped.")
-            html = history.get_asset("document").get()
-        snapshot = undo_fragment(document.ydoc, record["idempotency_key"])
-        save_checkpoint(page, html=html, ydoc=snapshot)
-        return {
-            "entity": _entity_result(page),
-            "note": "Removed the report's document addition.",
-        }

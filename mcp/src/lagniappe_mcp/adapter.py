@@ -319,6 +319,8 @@ class LagniappeAdapter:
         body = {"instructions": arguments.get("instructions", "")}
         if "name" in arguments:
             body["name"] = arguments["name"]
+        if "revises_plan_id" in arguments:
+            body["revises_plan_id"] = arguments["revises_plan_id"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
         plan = self._safe_plan(value)
         return await self._with_lifecycle_context(

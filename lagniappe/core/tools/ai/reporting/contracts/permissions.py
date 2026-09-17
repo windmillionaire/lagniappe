@@ -9,7 +9,7 @@ from .actions import ACTION_ORDER
 def allowed_report_actions(user):
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
-    allowed = {"create_task", "complete_task", "set_task_due_date", "skip", "needs_review"}
+    allowed = {"create_task", "complete_task", "skip", "needs_review", "update_task", "update_page", "update_project", "update_model_task"}
 
     if capabilities["can_create_forms"]:
         allowed.add("create_form")
@@ -24,23 +24,15 @@ def allowed_report_actions(user):
     if capabilities["can_append_page_documents"]:
         allowed.add("append_page_document")
     if capabilities["can_attach_files_to_pages"]:
-        allowed.add("add_form_to_page")
         allowed.add("attach_file")
     if capabilities["can_attach_files_to_tasks"]:
         allowed.add("attach_file")
-    if capabilities["can_move_pages"]:
-        allowed.add("add_page_category")
-        allowed.add("move_page")
     if capabilities["can_move_tasks"]:
         allowed.add("move_task")
     if capabilities["can_move_files"]:
         allowed.add("move_file")
-    if capabilities["can_rename_entities"]:
-        allowed.add("rename_entity")
     if capabilities["can_update_form_schemas"]:
         allowed.add("update_form_schema")
-    if capabilities["can_update_submissions"]:
-        allowed.add("update_form_values")
     if capabilities["can_delete_pages"]:
         allowed.add("suggest_page_deletion")
 
@@ -81,7 +73,7 @@ def report_action_permission_context(user, allowed_actions=None):
         ),
         "can_add_forms_to_pages": (
             user_capabilities["can_attach_files_to_pages"]
-            and "add_form_to_page" in allowed_set
+            and "update_page" in allowed_set
         ),
         "can_attach_files_to_tasks": (
             user_capabilities["can_attach_files_to_tasks"]
@@ -89,7 +81,7 @@ def report_action_permission_context(user, allowed_actions=None):
         ),
         "can_move_pages": (
             user_capabilities["can_move_pages"]
-            and bool({"add_page_category", "move_page"} & allowed_set)
+            and "update_page" in allowed_set
         ),
         "can_move_tasks": (
             user_capabilities["can_move_tasks"] and "move_task" in allowed_set
@@ -98,7 +90,7 @@ def report_action_permission_context(user, allowed_actions=None):
             user_capabilities["can_move_files"] and "move_file" in allowed_set
         ),
         "can_rename_entities": (
-            user_capabilities["can_rename_entities"] and "rename_entity" in allowed_set
+            user_capabilities["can_rename_entities"] and bool({"update_page", "update_task", "update_project", "update_model_task"} & allowed_set)
         ),
         "can_update_form_schemas": (
             user_capabilities["can_update_form_schemas"]
@@ -106,13 +98,13 @@ def report_action_permission_context(user, allowed_actions=None):
         ),
         "can_update_submissions": (
             user_capabilities["can_update_submissions"]
-            and "update_form_values" in allowed_set
+            and bool({"update_page", "update_task"} & allowed_set)
         ),
         "can_delete_pages": (
             user_capabilities["can_delete_pages"] and "suggest_page_deletion" in allowed_set
         ),
     }
-    rules = ["Only return action types listed in allowed_actions."]
+    rules = ["Only return action types listed in allowed_actions.", "Cohesive updates require exact editable targets. Use data.entity and data.changes. Omitted fields remain unchanged; form reassignment requires complete target submission. Existing-form submission patches preserve unmentioned answer IDs. Completed tasks cannot be restructured. Model-task form changes affect future tasks only. Project model_tasks ordering includes every model exactly once. Use $action_id for earlier creations. Documents support append only; inline replacement or deletion requires the editor."]
     if "create_page" in allowed_set:
         rules.append("Creating pages requires an editable category.")
     if "create_model_task" in allowed_set:
@@ -121,30 +113,16 @@ def report_action_permission_context(user, allowed_actions=None):
         rules.append("Creating tasks requires an editable target.")
     if "complete_task" in allowed_set:
         rules.append("Completing tasks requires an exact editable Task and its required fields.")
-    if "set_task_due_date" in allowed_set:
-        rules.append("Changing a due date requires an exact editable, incomplete Task.")
     if "append_page_document" in allowed_set:
         rules.append("Document appends require an exact editable Page and preserve existing content.")
     if "attach_file" in allowed_set:
         rules.append("Attaching files requires an editable target.")
-    if "add_form_to_page" in allowed_set:
-        rules.append(
-            "Adding a form to a page requires an editable page and does not require a category."
-        )
-    if "add_page_category" in allowed_set:
-        rules.append(
-            "Adding page categories requires editable source and target entities."
-        )
-    if {"move_page", "move_task"} & allowed_set:
-        rules.append("Moving pages/tasks requires editable source and target entities.")
+    if "move_task" in allowed_set:
+        rules.append("Moving tasks requires editable source and target entities.")
     if "move_file" in allowed_set:
         rules.append("Moving files requires editable source and target pages or tasks.")
-    if "rename_entity" in allowed_set:
-        rules.append("Renaming requires an exact editable entity target.")
     if "update_form_schema" in allowed_set:
         rules.append("Schema edits require editable forms and user review. Preview migrations across every affected Page/Task, explain destructive changes, and require visibility of the complete population.")
-    if "update_form_values" in allowed_set:
-        rules.append("Submission updates require exact editable page/task targets.")
     if "suggest_page_deletion" in allowed_set:
         rules.append("Page deletion is manual cleanup rendered after report execution.")
     rules.append(

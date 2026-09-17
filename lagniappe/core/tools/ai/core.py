@@ -21,6 +21,7 @@ from config.ai_models import (
 
 from ... import exceptions
 from .settings import runtime_ai_settings
+from .provider_session import ProviderSession, current_session
 from .functions import (
     FUNCTION_TOOL,
     MAX_TOOL_ITERATIONS,
@@ -474,6 +475,9 @@ class GenAI:
         observer = GenerationObserver(prompt)
         token = observer.install()
         terminal_error = None
+        control = current_execution_control()
+        session = ProviderSession(control) if getattr(control, "report_planning", False) else None
+        session_token = current_session.set(session)
         try:
             settings = runtime_ai_settings()
             model = GenAI._model_for_prompt(prompt, settings=settings)
@@ -518,9 +522,22 @@ class GenAI:
             terminal_error = error
             raise
         finally:
-            observer.finish(error=terminal_error)
-            observer.reset(token)
-            observer.persist()
+            current_session.reset(session_token)
+            try:
+                if session is not None:
+                    session.close()
+            finally:
+                observer.finish(error=terminal_error)
+                observer.reset(token)
+                observer.persist()
+
+    # @testable infrastructure
+    # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
+    def _request_content(self, **kwargs):
+        session = current_session.get()
+        if session is not None:
+            return session.request(**kwargs)
+        return self.client.models.generate_content(**kwargs)
 
     # @testable false
     # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
@@ -562,7 +579,7 @@ class GenAI:
                 execution_control.before_provider("initial")
             if observer is not None:
                 observer.request("initial")
-            response = self.client.models.generate_content(
+            response = self._request_content(
                 model=model, contents=contents, config=config
             )
         except Exception as e:
@@ -665,6 +682,7 @@ class GenAI:
         tool_cache = {}
         tool_trace = []
         validation_attempts = 0
+        retrieval_finished = False
         while True:
             observer = current_observer()
             execution_control = current_execution_control()
@@ -716,6 +734,10 @@ class GenAI:
                     ]))
                     provider_stage = "validation_repair"
             else:
+                if retrieval_finished:
+                    raise exceptions.AIException(
+                        "The model requested more retrieval after the planning budget ended. Retry generation."
+                    )
                 if iteration >= max_iterations:
                     break
                 iteration_trace = {
@@ -780,13 +802,31 @@ class GenAI:
                     ]
                     contents.append(types.Content(role="user", parts=uri_parts))
 
+            if getattr(execution_control, "report_planning", False) and (
+                len(tool_trace) >= min(16, max_iterations)
+                or execution_control.remaining_seconds <= 180
+            ):
+                retrieval_finished = True
+                config = (final_config or config).model_copy(deep=True)
+                final_config = None
+                config.tools = None
+                config.tool_config = None
+                contents.append(types.Content(role="user", parts=[
+                    types.Part.from_text(text=(
+                        "Retrieval is finished. Return the complete final output now "
+                        "using the evidence already collected. Do not request tools. "
+                        "Clearly identify unsupported changes instead of searching again."
+                    )),
+                ]))
+                provider_stage = "structured_final"
+
             try:
                 execution_control = current_execution_control()
                 if execution_control is not None:
                     execution_control.before_provider(provider_stage)
                 if observer is not None:
                     observer.request(provider_stage)
-                response = self.client.models.generate_content(
+                response = self._request_content(
                     model=model, contents=contents, config=config
                 )
             except Exception as e:
@@ -886,7 +926,7 @@ class GenAI:
                 execution_control.before_provider("structured_final")
             if observer is not None:
                 observer.request("structured_final")
-            response = self.client.models.generate_content(
+            response = self._request_content(
                 model=model,
                 contents=final_contents,
                 config=config,
@@ -948,7 +988,7 @@ class GenAI:
         if execution_control is not None:
             execution_control.before_provider("initial")
         try:
-            response = self.client.models.generate_content(
+            response = self._request_content(
                 model=model, contents=contents, config=config
             )
         except Exception as e:

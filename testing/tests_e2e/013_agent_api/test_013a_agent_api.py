@@ -94,7 +94,7 @@ class Plan(SimpleNamespace):
 
 def _report(actor):
     return Plan(
-        available=True, format_version=1, file_usage=[],
+        available=True, format_version=2, file_usage=[],
         key="report-datastore-key",
         kind="report",
         db={},
@@ -1814,7 +1814,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     )
     created_tools = []
 
-    def create(current, *, instructions, name=None, remote_mcp=False):
+    def create(current, *, instructions, name=None, remote_mcp=False, revises_plan_id=None):
         assert current is actor
         assert remote_mcp is False
         created_tools.append(instructions)
@@ -2166,96 +2166,6 @@ def test_api_report_delete_rejects_active_execution_without_side_effects(monkeyp
 
     def forbidden_side_effect(*_args, **_kwargs):
         pytest.fail("Deleting an active API-origin report performed a side effect")
-
-    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
-    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
-    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
-    monkeypatch.setattr(Entities, "delete", forbidden_side_effect)
-    monkeypatch.setattr(Entities, "touch", forbidden_side_effect)
-    monkeypatch.setattr(
-        external_operations,
-        "delete_plan_if_idle",
-        forbidden_side_effect,
-    )
-    monkeypatch.setattr(DeferredJobs, "cancel", forbidden_side_effect)
-    monkeypatch.setattr(
-        ai_tools,
-        "cleanup_report_upload_manifest",
-        forbidden_side_effect,
-    )
-
-    response = _authenticated_client(monkeypatch, actor).delete(
-        "/tools/reports/report-key"
-    )
-
-    assert response.status_code == 409, response.get_data(as_text=True)
-    assert "being updated" in response.get_data(as_text=True).lower()
-
-
-# @matrix agent-api ai-report : browser-review cas compensation delete undo
-def test_api_report_undo_delete_first_fence_stops_before_compensation(monkeypatch):
-    actor = Actor()
-    report = _report(actor)
-    report.status = "complete"
-    report.db = {"process": "complete-api-report"}
-    report.result = {
-        "ledger_version": 1,
-        "status": "complete",
-        "actions": [{"id": "undo-one", "type": "skip", "status": "complete"}],
-    }
-    undo_calls = []
-    guarded_calls = []
-    compensation_calls = []
-
-    def undo(current, user, *, save=None):
-        undo_calls.append((current, user._get_current_object(), save))
-        assert save is not None
-        save(current)
-        compensation_calls.append(current)
-
-    def reject_deleted_report(current, expected_report):
-        guarded_calls.append((current, expected_report))
-        return agent_api_store.PLAN_OPERATION_MISSING
-
-    def forbidden_side_effect(*_args, **_kwargs):
-        pytest.fail("A delete-first guarded undo performed a persistence side effect")
-
-    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
-    monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)
-    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: report)
-    monkeypatch.setattr(Entities, "save", forbidden_side_effect)
-    monkeypatch.setattr(Entities, "delete", forbidden_side_effect)
-    monkeypatch.setattr(Entities, "touch", forbidden_side_effect)
-    monkeypatch.setattr(ai_tools, "undo_report", undo)
-    monkeypatch.setattr(
-        external_operations,
-        "save_plan_if_idle",
-        reject_deleted_report,
-    )
-
-    response = _authenticated_client(monkeypatch, actor).post(
-        "/tools/reports/report-key/undo"
-    )
-
-    assert response.status_code == 422, response.get_data(as_text=True)
-    assert (
-        "plan changed while undo was in progress"
-        in response.get_data(as_text=True).lower()
-    )
-    assert len(undo_calls) == 1
-    assert undo_calls[0][:2] == (report, actor)
-    assert guarded_calls == [(report, {"process": "complete-api-report"})]
-    assert compensation_calls == []
-
-
-# @matrix agent-api ai-report : browser-review delete undo
-def test_api_report_delete_rejects_undo_in_progress_without_side_effects(monkeypatch):
-    actor = Actor()
-    report = _report(actor)
-    report.status = "undoing"
-
-    def forbidden_side_effect(*_args, **_kwargs):
-        pytest.fail("Deleting an API-origin undo in progress performed a side effect")
 
     monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
     monkeypatch.setattr(Entities, "REPORT", SimpleNamespace)

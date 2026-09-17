@@ -19,6 +19,8 @@ READ_ONLY_CONTEXT_TOOLS = (
 )
 
 REPORT_ACTION_DATA_CONTRACTS = {
+    **{name: {"fields": ("entity", "changes"), "required": ("entity", "changes")}
+       for name in ("update_task", "update_model_task", "update_project", "update_page")},
     "create_form": {
         "fields": ("name", "form_type", "schema"),
         "required": ("name", "form_type", "schema"),
@@ -100,48 +102,6 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required": ("name",),
         "required_groups": (("page", "page_action"),),
     },
-    "add_form_to_page": {
-        "fields": (
-            "page",
-            "page_action",
-            "page_name",
-            "form",
-            "form_action",
-            "form_name",
-        ),
-        "required_groups": (
-            ("page", "page_action"),
-            ("form", "form_action"),
-        ),
-    },
-    "add_page_category": {
-        "fields": (
-            "page",
-            "page_action",
-            "page_name",
-            "category",
-            "category_action",
-            "category_name",
-        ),
-        "required_groups": (
-            ("page", "page_action"),
-            ("category", "category_action"),
-        ),
-    },
-    "move_page": {
-        "fields": (
-            "page",
-            "page_action",
-            "page_name",
-            "category",
-            "category_action",
-            "category_name",
-        ),
-        "required_groups": (
-            ("page", "page_action"),
-            ("category", "category_action"),
-        ),
-    },
     "move_task": {
         "fields": (
             "task",
@@ -175,27 +135,14 @@ REPORT_ACTION_DATA_CONTRACTS = {
             ("to_page", "to_page_action", "to_task", "to_task_action"),
         ),
     },
-    "rename_entity": {
-        "fields": ("entity", "entity_action", "entity_name", "name"),
-        "required": ("name",),
-        "required_groups": (("entity", "entity_action"),),
-    },
     "update_form_schema": {
         "fields": ("form", "form_action", "form_name", "operations", "baseline", "scope_fingerprint", "conversions"),
         "required": ("operations",),
         "required_groups": (("form", "form_action"),),
     },
-    "update_form_values": {
-        "fields": ("page", "page_name", "task", "task_name", "updates"),
-        "required": ("updates",),
-    },
     "complete_task": {
         "fields": ("task", "task_name"),
         "required": ("task",),
-    },
-    "set_task_due_date": {
-        "fields": ("task", "task_name", "due_date"),
-        "required": ("task", "due_date"),
     },
     "attach_file": {
         "fields": ("entity", "entity_action", "entity_name", "file", "display_name"),

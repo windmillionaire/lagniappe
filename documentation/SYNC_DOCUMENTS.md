@@ -85,7 +85,7 @@ documents retain Yjs tombstones to prevent offline resurrection.
 - A reviewed append to an existing document saves one named "Before report
   append" version in that same history, atomically with the append's metadata.
   The Report preallocates its version key, so retries do not duplicate versions.
-  Undo uses that version and CRDT deletions, not retained checkpoint paths.
+  The version remains available for manual inspection or restoration in the editor.
 - Disaster recovery continues to use the existing Storage object generations
   and backup configuration. Retiring a live object allows the existing
   noncurrent-version lifecycle to reclaim it; no new retention policy is added.
@@ -108,9 +108,9 @@ The action requires a saved baseline: pending Redis edits or an older HTML-only
 document stop execution rather than guessing or replacing a draft. The latter
 needs one ordinary editor save. A durable `lagniappeReports` Yjs map records the
 operation receipt, including the expected post-append content signature, so a
-retry after a Report checkpoint failure does not append twice. Undo emits
-deletions (not an old snapshot reset) and checks that later edits are preserved.
-If a required named version is missing, Undo stops without modifying the document.
+retry after a Report checkpoint failure does not append twice. AI/MCP document
+actions remain append-only. Inline edits, replacement and deletion belong in the
+editor; corrective plans do not automatically remove previously appended content.
 
 After an append commits, the server publishes a new revision/generation with the
 merged snapshot. Connected/offline clients merge it using the existing sync

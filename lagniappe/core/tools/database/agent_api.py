@@ -484,6 +484,7 @@ def commit_plan_mutation_if_idle(
     writes=(),
     deletes=(),
     now=None,
+    active_job=None,
 ):
     """Commit one browser mutation only when no API operation owns the Plan.
 
@@ -541,6 +542,19 @@ def commit_plan_mutation_if_idle(
             return PLAN_OPERATION_MISSING
         if dict(current_report) != expected_report:
             return PLAN_OPERATION_STALE
+
+        if active_job is not None:
+            job_key, lease_token = active_job
+            job = DATA.datastore.get(job_key, transaction=transaction)
+            if (
+                job is None
+                or job.get("status") != "running"
+                or job.get("lease_token") != lease_token
+                or not lease_token
+                or job.get("deadline_at") is None
+                or job["deadline_at"] <= now
+            ):
+                return PLAN_OPERATION_LOST
 
         claim_row = DATA.datastore.get(claim_key, transaction=transaction)
         claim = _valid_claim(claim_row)

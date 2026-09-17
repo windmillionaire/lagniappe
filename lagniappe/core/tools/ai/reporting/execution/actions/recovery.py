@@ -1,28 +1,16 @@
 """Inspection and recoverable-error classification for report actions."""
 
-import copy
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.database import get as database_get
 
-from .common import (
-    PAGE_FORM_TYPE_ERROR,
-    SUBMISSION_UPDATE_ROWS_ERROR,
-    TASK_FORM_TYPE_ERROR,
-    _data,
-)
+from .common import TASK_FORM_TYPE_ERROR, _data
 from .results import (
     _entity_result,
 )
-from .references import (
-    _fetch_report_entity,
-    _file_attached_to_endpoint,
-    _load_result_entity,
-)
-from .forms import _submission_previous_value
+from .references import _fetch_report_entity, _file_attached_to_endpoint
 from .task_completion import _completion_state
-from .task_dates import _due_date_state
 from .completed_tasks import (
     _is_completed_task_event,
     _task_state_fingerprint,
@@ -43,33 +31,12 @@ def _expected_action_state(action, record):
         "entity": (record.get("entity") or {}).get("id"),
         "target": (record.get("target") or {}).get("id"),
     }
+    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
+        expected["entity_update_after"] = record.get("entity_update_after")
     if action_type == "complete_task":
         expected["completion_state"] = record.get("completion_state")
         expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
-    if action_type == "set_task_due_date":
-        expected["due_date_state"] = record.get("due_date_state")
-    if action_type == "update_form_values":
-        applied = {
-            item.get("index"): item
-            for item in (record.get("updates") or {}).get("applied") or []
-        }
-        expected["updates"] = [
-            {
-                "entity": (applied[index].get("entity") or {}).get("id"),
-                "schema_id": update.get("schema_id") or update.get("field_id"),
-                "value": copy.deepcopy(update.get("new_value")),
-            }
-            for index, update in enumerate((_data(action).get("updates") or []), 1)
-            if index in applied
-        ]
-        # Only the last applied value of a repeated field survives the batch.
-        expected["updates"] = list({
-            (update["entity"], update["schema_id"]): update
-            for update in expected["updates"]
-        }.values())
-    if action_type == "rename_entity":
-        expected["name"] = str(_data(action).get("name") or "").strip()
-    if action_type in {"update_form_schema", "extend_form_schema"}:
+    if action_type in {"update_form_schema"}:
         expected["schema_fingerprint"] = record.get("schema_fingerprint")
     if action_type == "summarize_file":
         data = _data(action)
@@ -124,11 +91,8 @@ def _urlsafe_key_value(value):
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_stops_when_completed_prefix_permission_is_revoked
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[move]
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[update]
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_submission_batch_persists_all_fields_with_fresh_entity_reads
-# @matrix ai-report : batch-field-patch completed-prefix completed-task moves permissions post-commit-checkpoint recovery
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
+# @matrix ai-report : completed-prefix completed-task permissions post-commit-checkpoint recovery
 # @pair ai-report:skipped-prefix
 def _inspect_action_applied(action, report, user, record):
     action_type = action.get("type")
@@ -179,28 +143,21 @@ def _inspect_action_applied(action, report, user, record):
     if entity is not None and not _recovery_entity_allowed(entity, user):
         return ACTION_DRIFTED
 
+    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
+        from lagniappe.core.tools.entity_patches import _projection
+        if entity is not None and _projection(entity) == expected.get("entity_update_after"):
+            return ACTION_APPLIED
+        # A later completion can advance the recurrence or archive this submission.
+        # Its full post-completion fingerprint is the authoritative final state.
+        records = (report.result or {}).get("actions", [])
+        position = next((index for index, prior in enumerate(records) if prior.get("id") == record.get("id")), len(records))
+        for later in records[position + 1:]:
+            if later.get("type") == "complete_task" and later.get("status") == "complete" and (later.get("entity") or {}).get("id") == entity_id and (later.get("expected") or {}).get("task_state_fingerprint"):
+                return _inspect_action_applied({"type": "complete_task"}, report, user, later)
+        return ACTION_DRIFTED
+
     target_id = expected.get("target")
     target = _fetch_report_entity(target_id) if target_id else None
-    if action_type == "add_form_to_page":
-        return (
-            ACTION_APPLIED
-            if _stored_reference_key(entity, "form") == target_id
-            else ACTION_DRIFTED
-        )
-    if action_type == "add_page_category":
-        keys = [
-            _urlsafe_key_value(key)
-            for key in [entity.db.get("model"), *(entity.db.get("categories") or [])]
-            if key
-        ]
-        return ACTION_APPLIED if target_id in keys else ACTION_DRIFTED
-    if action_type == "move_page":
-        category_ids = {
-            _urlsafe_key_value(key)
-            for key in [entity.db.get("model"), *(entity.db.get("categories") or [])]
-            if key
-        }
-        return ACTION_APPLIED if target_id in category_ids else ACTION_DRIFTED
     if action_type == "move_task":
         return (
             ACTION_APPLIED
@@ -217,24 +174,11 @@ def _inspect_action_applied(action, report, user, record):
         ):
             return ACTION_APPLIED
         return ACTION_DRIFTED
-    if action_type == "rename_entity":
-        return ACTION_APPLIED if entity.name == expected.get("name") else ACTION_DRIFTED
     if action_type == "complete_task":
         if expected.get("task_state_fingerprint") and _task_state_fingerprint(entity) != expected["task_state_fingerprint"]:
             return ACTION_DRIFTED
         return ACTION_APPLIED if _completion_state(entity) == expected.get("completion_state") else ACTION_DRIFTED
-    if action_type == "set_task_due_date":
-        return ACTION_APPLIED if _due_date_state(entity) == expected.get("due_date_state") else ACTION_DRIFTED
-    if action_type == "update_form_values":
-        for update in expected.get("updates") or []:
-            target_entity = _fetch_report_entity(update.get("entity"))
-            if target_entity is None:
-                return ACTION_DRIFTED
-            current = _submission_previous_value(target_entity, update.get("schema_id"))
-            if current["value"] != update.get("value"):
-                return ACTION_DRIFTED
-        return ACTION_APPLIED
-    if action_type in {"update_form_schema", "extend_form_schema"}:
+    if action_type in {"update_form_schema"}:
         return (
             ACTION_APPLIED
             if _value_fingerprint(entity.schema or [])
@@ -263,162 +207,11 @@ def _inspect_action_applied(action, report, user, record):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason compensation inspection is exercised through repeat-safe undo
-def _inspect_action_compensated(record, report, user):
-    action_type = record.get("type")
-    before = record.get("before") or {}
-    if action_type in {"skip", "needs_review", "suggest_page_deletion"}:
-        return ACTION_APPLIED
-    if action_type.startswith("create_"):
-        if record.get("created") is False:
-            if action_type == "create_task" and before.get("existing_task"):
-                task = _load_result_entity(before.get("entity"))
-                if task is None or not _recovery_entity_allowed(task, user):
-                    return ACTION_DRIFTED
-                return (
-                    ACTION_APPLIED
-                    if _task_state_fingerprint(task)
-                    == _value_fingerprint(before.get("task"))
-                    else ACTION_NOT_APPLIED
-                )
-            return ACTION_APPLIED
-        return (
-            ACTION_APPLIED
-            if _load_result_entity(record.get("entity")) is None
-            else ACTION_NOT_APPLIED
-        )
-
-    entity = _load_result_entity(record.get("entity"))
-    if entity is None:
-        return ACTION_DRIFTED
-    if action_type == "append_page_document":
-        from lagniappe.core.tools.document_crdt import load_document
-
-        if not _recovery_entity_allowed(entity, user):
-            return ACTION_DRIFTED
-        receipt = load_document(entity.properties.document.ydoc)["lagniappeReports"].get(record["idempotency_key"])
-        return ACTION_APPLIED if receipt and receipt["state"] == "undone" else ACTION_NOT_APPLIED
-    if action_type == "complete_task":
-        if not _recovery_entity_allowed(entity, user):
-            return ACTION_DRIFTED
-        if record.get("created_histories") and (
-            _task_state_fingerprint(entity) != _value_fingerprint(before.get("task"))
-            or any(
-                _load_result_entity(history) is not None
-                for history in record["created_histories"]
-            )
-        ):
-            return ACTION_NOT_APPLIED
-        return (
-            ACTION_APPLIED
-            if _completion_state(entity) == before.get("completion_state")
-            else ACTION_NOT_APPLIED
-        )
-    if action_type == "set_task_due_date":
-        if not _recovery_entity_allowed(entity, user):
-            return ACTION_DRIFTED
-        return ACTION_APPLIED if _due_date_state(entity) == before.get("due_date_state") else ACTION_NOT_APPLIED
-    if action_type == "add_form_to_page":
-        previous_id = (before.get("form") or {}).get("id")
-        return (
-            ACTION_APPLIED
-            if _stored_reference_key(entity, "form") == previous_id
-            else ACTION_NOT_APPLIED
-        )
-    if action_type == "add_page_category":
-        target_id = (record.get("target") or {}).get("id")
-        keys = {
-            _urlsafe_key_value(key)
-            for key in [entity.db.get("model"), *(entity.db.get("categories") or [])]
-            if key
-        }
-        present = target_id in keys
-        expected_present = bool(before.get("had_category"))
-        return ACTION_APPLIED if present is expected_present else ACTION_NOT_APPLIED
-    if action_type in {"move_page", "move_task"}:
-        previous_id = (before.get("parent") or {}).get("id")
-        if action_type == "move_page":
-            category_ids = {
-                _urlsafe_key_value(key)
-                for key in [
-                    entity.db.get("model"),
-                    *(entity.db.get("categories") or []),
-                ]
-                if key
-            }
-            return ACTION_APPLIED if previous_id in category_ids else ACTION_NOT_APPLIED
-        return (
-            ACTION_APPLIED
-            if _stored_reference_key(entity, "page") == previous_id
-            else ACTION_NOT_APPLIED
-        )
-    if action_type == "move_file":
-        source = _load_result_entity(before.get("source"))
-        target = _load_result_entity(before.get("target"))
-        if source is None or target is None:
-            return ACTION_DRIFTED
-        return (
-            ACTION_APPLIED
-            if _file_attached_to_endpoint(entity, source)
-            and not _file_attached_to_endpoint(entity, target)
-            else ACTION_NOT_APPLIED
-        )
-    if action_type == "rename_entity":
-        return (
-            ACTION_APPLIED if entity.name == before.get("name") else ACTION_NOT_APPLIED
-        )
-    if action_type == "update_form_values":
-        for previous in before.get("updates") or []:
-            target = _load_result_entity(previous.get("entity"))
-            if target is None:
-                return ACTION_DRIFTED
-            current = _submission_previous_value(target, previous.get("schema_id"))
-            if current["had_value"] != previous.get("had_value") or current[
-                "value"
-            ] != previous.get("previous_value"):
-                return ACTION_NOT_APPLIED
-        return ACTION_APPLIED
-    if action_type in {"update_form_schema", "extend_form_schema"}:
-        return (
-            ACTION_APPLIED
-            if _value_fingerprint(entity.schema or [])
-            == _value_fingerprint(before.get("schema") or [])
-            else ACTION_NOT_APPLIED
-        )
-    if action_type == "attach_file":
-        target = _load_result_entity(record.get("target"))
-        if target is None:
-            return ACTION_DRIFTED
-        linked = _file_attached_to_endpoint(entity, target)
-        return (
-            ACTION_APPLIED
-            if linked is bool(before.get("linked"))
-            else ACTION_NOT_APPLIED
-        )
-    if action_type == "summarize_file":
-        summarize = entity.properties.summarize
-        previous = before.get("summarize") or {}
-        restored = (
-            entity.summary == before.get("summary")
-            and summarize.enabled == previous.get("enabled")
-            and summarize.search == previous.get("search")
-            and summarize.status == previous.get("status")
-            and summarize.error == previous.get("error")
-            and summarize.complete == previous.get("complete")
-        )
-        return ACTION_APPLIED if restored else ACTION_NOT_APPLIED
-    return ACTION_APPLIED
-
-
-# @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
-    if _action.get("type") in {"update_form_schema", "extend_form_schema"}:
+    if _action.get("type") in {"update_form_schema"}:
         return False
-    if _action.get("type") == "update_form_values" and str(error) != SUBMISSION_UPDATE_ROWS_ERROR:
-        return False  # Invalid patches must block dependent completions and remain retryable.
     if _action.get("type") == "append_page_document":
         return False  # A document conflict must remain retryable, not be skipped.
     return isinstance(error, exceptions.ValidationError) and not str(error).startswith(
@@ -457,26 +250,13 @@ def _recoverable_action_error_note(action_record, message):
         return (
             "Skipped because the action referenced a page form instead of a task form."
         )
-    if (
-        action_record.get("type") == "add_form_to_page"
-        and message == PAGE_FORM_TYPE_ERROR
-    ):
-        return (
-            "Skipped because the action referenced a task form instead of a page form."
-        )
-    if (
-        action_record.get("type") == "update_form_values"
-        and message == SUBMISSION_UPDATE_ROWS_ERROR
-    ):
-        return "Skipped because no executable submission field updates were provided."
     return "Skipped because this action could not be completed."
 
 
 # @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_skips_empty_submission_update_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @matrix ai-report : completed-task continue empty-update mismatched-form recoverable
+# @matrix ai-report : completed-task continue mismatched-form recoverable
 def _record_recoverable_action_error(action_record, error):
     message = str(error)
     action_record["status"] = "skipped"

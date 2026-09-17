@@ -28,7 +28,7 @@ TASK_LIMIT_SCHEMA = {
 # @covered-by lagniappe/core/tools/ai/function_definitions/get_page_details.py::execute_get_page_details
 # @reason shared compact projection and continuation are exercised through both read tools
 def compact_task_list(
-    page, user, *, include_completed, limit=DEFAULT_TASK_LIMIT, cursor=None
+    page, user, *, include_completed, limit=DEFAULT_TASK_LIMIT, cursor=None, view=None
 ):
     """Page an authorized list without serializing task forms or submissions.
 
@@ -91,10 +91,16 @@ def compact_task_list(
 
     selected = tasks[offset : offset + limit]
     active, completed, errors = [], [], []
+    schemas = {}
     tz = user_timezone(user)
     for task in selected:
         try:
             row = _compact_task(task, user, tz)
+            if view == "edit":
+                from .function_definitions.get_entity import edit_entity
+                row.update(edit_entity(task, user, schemas))
+                row["completed"] = bool(task.completed)
+                row["description_truncated"] = False
         except Exception:
             # Do not expose exception text, related records, or submission data.
             errors.append(
@@ -109,6 +115,7 @@ def compact_task_list(
     has_more = next_offset < len(tasks)
     return {
         "tasks": active,
+        **({"schemas": schemas} if view == "edit" else {}),
         **({"completed_tasks": completed} if include_completed else {}),
         "task_list": {
             "scope": scope,

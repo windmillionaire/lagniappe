@@ -41,29 +41,30 @@ from .ledger import (
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_stops_when_completed_prefix_permission_is_revoked
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion_when_undo_is_unsupported
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_loads_attached_inputs_only_for_pending_file_work
-# @matrix ai-report : attachments cancellation compensation completed-prefix continue create create-order deterministic-run execute idempotency partial-result permissions persistence post-commit-checkpoint recoverable recovery reuse skip-action stale-proposal validation
+# @matrix ai-report : attachments cancellation completed-prefix continue create create-order deterministic-run execute idempotency partial-result permissions persistence post-commit-checkpoint recoverable recovery reuse skip-action stale-proposal validation
 # @matrix ai-report files : execution-inputs initial-load staged-inputs
+# @matrix ai-report : preservation unavailable
 def run_report(report, user, ensure_active=None):
     """Execute or resume a stored AI report proposal from durable checkpoints."""
     ensure_active = ensure_active or (lambda: None)
     ensure_active()
+    if report.db.get("superseded_by"):
+        raise exceptions.ValidationError("This execution was superseded by an approved correction.")
+    if not report.available:
+        raise exceptions.ValidationError("this plan is no longer available")
     proposal = validate_proposal(
         report.proposal,
-        allow_empty_submission_updates=True,
         allow_pending_submissions=False,
         user=user,
-        allow_legacy_schema=True,
     )
     fingerprint = proposal_fingerprint(proposal)
     existing = report.result if isinstance(report.result, dict) else {}
     resuming = (
         existing.get("ledger_version") == REPORT_LEDGER_VERSION
-        and existing.get("status") != "undone"
     )
     if resuming:
         result = existing
@@ -90,7 +91,6 @@ def run_report(report, user, ensure_active=None):
 
     result["status"] = "running"
     result.pop("failed_at", None)
-    result.pop("undo", None)
     created = _restore_completed_action_entities(result)
     context = _build_report_run_context(proposal)
     context["action_records"] = {
@@ -125,6 +125,10 @@ def run_report(report, user, ensure_active=None):
 
         try:
             dependencies = action.get("depends_on", [])
+            if any(context["action_records"].get(dependency, {}).get("status") != "complete" for dependency in dependencies):
+                action_record.update(status="skipped", note="A required earlier action did not complete.")
+                Entities.save(report)
+                continue
             if any(record.get("status") == "skipped" and (record.get("type") == "update_form_schema" or record.get("schema_dependency_skipped")) for dependency in dependencies if (record := context["action_records"].get(dependency, {}))):
                 action_record.update(status="skipped", schema_dependency_skipped=True, note="Required schema update was skipped.")
                 Entities.save(report)
@@ -254,7 +258,7 @@ def run_report(report, user, ensure_active=None):
         result["failed_at"] = failed_placements[0][0] + 1
         message = (
             "One or more files could not be attached to their planned page or "
-            "task. Review the failed file placement before retrying or undoing "
+            "task. Review the failed file placement before retrying "
             "the completed actions."
         )
         report.properties.process.fail(message, result=result)

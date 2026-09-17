@@ -1,2 +1,272 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d51fe509-dafc-40ae-a958-8930c5546357",e._sentryDebugIdIdentifier="sentry-dbid-d51fe509-dafc-40ae-a958-8930c5546357");}catch(e){}}();import{STYLES as g}from"./styles.js?v=bee5ee89";import{f,C as E}from"./builder.js?v=bee5ee89";import{w as S}from"./foundation.js?v=bee5ee89";import"./connectivity.js?v=bee5ee89";import{p as I}from"./primitives.js?v=bee5ee89";import{S as V}from"./select2.js?v=bee5ee89";import{C as A}from"./base2.js?v=bee5ee89";import"./search.js?v=bee5ee89";import"./remote.js?v=bee5ee89";import"./queryLifecycle.js?v=bee5ee89";import"./combobox.js?v=bee5ee89";import"./results.js?v=bee5ee89";import"./icons.js?v=bee5ee89";import"./storage.js?v=bee5ee89";import"./formatting.js?v=bee5ee89";import"./upstreamUnavailable.js?v=bee5ee89";import"./entityMenu.js?v=bee5ee89";import"./dropdown.js?v=bee5ee89";import"./upload.js?v=bee5ee89";import"./buttons.js?v=bee5ee89";import"./modal.js?v=bee5ee89";import"./polling.js?v=bee5ee89";import"./baseForm.js?v=bee5ee89";import"./loader.js?v=bee5ee89";import"./facets.js?v=bee5ee89";import"./submitter.js?v=bee5ee89";const N={checkbox:{text:"Values will be converted to 'True' or 'False'.",radio:"Component will be converted to a Radio with 'True' and 'False' values."},out:{text:"Values will be converted to a plain-text url",bookmark:"Values will not change"},location:{text:"Values will be converted to plain-text addresses"},textarea:{text:"Values will be converted to text; newlines will be lost"},radio:{text:"Values will be converted to the plain-text label of the option selected",select:"Component will be converted into a Select component with the same options"},select:{text:"Values will be converted to the plain-text label of the option selected",radio:"Component will be converted into a Radio component with the same options"},table:{textarea:"Values will be converted to a table with Markdown formatting"},todo:{textarea:"Values will be converted to a todo list with Markdown formatting"}};class T extends A{init(){this.destroy(),this.setTitle("Replace or Delete");const h=this.header.querySelector("[data-role='help']");h.setAttribute("lp-control","help"),h.setAttribute("lp-help","form_element_changes"),h.setAttribute("aria-label","Help with converting or deleting form elements"),this.target.replaceChildren(this.header);const o=this.target.appendChild(document.createElement("p"));o.className="text-sm text-base-medium",o.textContent="If an element is deleted, any values entered using that element in current submissions will be cleared, with the exception of tasks that have already been completed. Already completed tasks will retain the form that accompanied their original submitted values.";const v=this.builder.savedField(this.element.schema.id)||this.element.schema,a=f(v),d=f(this.element.schema),i=(this.builder.conversionCatalog?.types||[]).filter(e=>this.builder.conversionCatalog.rules[a]?.[e.value]&&e.value!==(d==="multiple"?"select":d)&&e.value!=="multiple"&&!(this.builder.elt.dataset.formType==="page"&&e.value==="todo")),l=document.createElement("div");if(l.className=i.length?"grid grid-cols-2 gap-3":"grid grid-cols-1 gap-3",i.length){const e=this.target.appendChild(document.createElement("p"));e.className="text-sm text-base-medium",e.textContent="If you replace the element instead, those values will be converted in order to match the new component type. Values that cannot be converted will be cleared.",this.addReplacement(i,v,l)}else{const e=this.target.appendChild(document.createElement("p"));e.dataset.role="conversion-unavailable",e.dataset.kind="error",e.className="text-sm text-kind-default",e.textContent="This component type cannot be converted"}this.target.append(l);const c=l.appendChild(document.createElement("button"));c.type="button",c.dataset.kind="delete",c.className=g.button.submit,c.textContent="Delete",c.addEventListener("click",()=>{S(()=>{this.builder._destroyed||this.builder.selectedElement!==this.element||(this.builder.conditions.close(),this.builder.removeElement(),this.builder.settings.deselectItem(),this.builder.formSettings.visible=!0)},{label:"builder:delete-element"})})}addReplacement(h,o,v){const a=f(o),d=I.select({label:"Replace With",kind:"form",data:{kind:"form"},name:"conversion-type",placeholder:"Choose a new component...",selectIcon:"dropdown",options:[]});this.target.append(d);const i=d.querySelector("select"),l=this.builder.conversionCatalog,c=this.builder.elt.dataset.aiConversion==="true";for(const[p,s]of[["Deterministic conversions",!1],["AI conversions",!0]]){const n=document.createElement("optgroup");n.label=p;for(const t of h){if(l.rules[a]?.[t.value]==="ai"!==s)continue;const C=E.TABLE_COLUMNS.find(({type:k})=>k===t.value)?.name||t.label,y=s?`${C} (requires AI${c?"":" access"})`:C,w=new Option(y,t.value);w.dataset.details=JSON.stringify({kind:"form",icon:t.value==="todo"?"checklist":t.value,name:y}),w.disabled=s&&!c,n.append(w)}n.childElementCount&&i.append(n)}const e=new V(d);e.init(),this.destroyables.push(e),this.focusTarget=d;const u=this.target.appendChild(document.createElement("p"));u.dataset.role="conversion-description",u.dataset.kind="success",u.className="text-sm text-kind-default",u.setAttribute("aria-live","polite"),u.hidden=!0;const b=this.target.appendChild(document.createElement("label"));b.className="flex flex-col gap-2 text-sm",b.textContent="Conversion instructions (optional)";const r=b.appendChild(document.createElement("textarea"));r.name="conversion-instructions",r.className=g.textarea,r.rows=3,r.maxLength=4e3,r.placeholder="For example: one row per item; preserve completed checkboxes.",r.value=this.builder.conversionInstructions?.[o.id]||"";const x=l.rules[a]?.[f(this.element.schema)]==="ai";b.hidden=!x,r.addEventListener("input",()=>{x&&(this.builder.conversionInstructions??={},this.builder.conversionInstructions[o.id]=r.value,this.builder.updateSchema(!1,`conversion-instructions:${o.id}`))});const m=v.appendChild(document.createElement("button"));m.type="button",m.dataset.kind="form",m.className=g.button.submit,m.textContent="Convert",m.disabled=!0,d.addEventListener("updated",()=>{const p=l.rules[a]?.[i.value]==="ai";b.hidden=!p&&!x,m.disabled=!i.value,u.hidden=!i.value,u.textContent=p?"AI will convert saved values after Save. Review the destination columns and any conversion instructions first. Unresolvable values will be cleared; originals remain available in View changes.":N[a==="multiple"?"select":a]?.[i.value]||"Values will be converted to match the new component type. Values that cannot be converted will be cleared."}),m.addEventListener("click",()=>{const p=l.types.find(({value:t})=>t===i.value);if(!p)return;const s=this.element.schema,n={id:s.id,title:s.title,...p.schema};for(const t of["required","placeholder","visibility"])s[t]!==void 0&&(n[t]=s[t]);if(["radio","select"].includes(n.type)){const t=s.options??o.options;n.options=t?structuredClone(t):a==="checkbox"?[{value:"true",label:"True"},{value:"false",label:"False"}]:[]}n.type==="table"&&(n.columns=s.columns||[]),this.element.schema=n,this.builder.conversionInstructions??={},l.rules[a]?.[i.value]==="ai"?this.builder.conversionInstructions[o.id]=r.value:delete this.builder.conversionInstructions[o.id],this.builder.updateSchema(),this.builder.restoreDraft(),this.builder.header.message("Conversion staged. Save will update submissions; values that cannot be converted will be cleared.",{persistent:!0})})}}export{T as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=b564d2b9';
+import { f as fieldKind, C as CONFIG } from './builder.js?v=b564d2b9';
+import { w as withTransition } from './foundation.js?v=b564d2b9';
+import './connectivity.js?v=b564d2b9';
+import { p as primitives } from './primitives.js?v=b564d2b9';
+import { S as SelectBox } from './select2.js?v=b564d2b9';
+import { C as Condition } from './base2.js?v=b564d2b9';
+import './search.js?v=b564d2b9';
+import './remote.js?v=b564d2b9';
+import './queryLifecycle.js?v=b564d2b9';
+import './combobox.js?v=b564d2b9';
+import './results.js?v=b564d2b9';
+import './icons.js?v=b564d2b9';
+import './storage.js?v=b564d2b9';
+import './formatting.js?v=b564d2b9';
+import './upstreamUnavailable.js?v=b564d2b9';
+import './entityMenu.js?v=b564d2b9';
+import './dropdown.js?v=b564d2b9';
+import './upload.js?v=b564d2b9';
+import './buttons.js?v=b564d2b9';
+import './modal.js?v=b564d2b9';
+import './polling.js?v=b564d2b9';
+import './baseForm.js?v=b564d2b9';
+import './loader.js?v=b564d2b9';
+import './facets.js?v=b564d2b9';
+import './submitter.js?v=b564d2b9';
+
+const MESSAGES = {
+	checkbox: {
+		text: "Values will be converted to 'True' or 'False'.",
+		radio:
+			"Component will be converted to a Radio with 'True' and 'False' values.",
+	},
+	out: {
+		text: "Values will be converted to a plain-text url",
+		bookmark: "Values will not change",
+	},
+	location: { text: "Values will be converted to plain-text addresses" },
+	textarea: { text: "Values will be converted to text; newlines will be lost" },
+	radio: {
+		text: "Values will be converted to the plain-text label of the option selected",
+		select:
+			"Component will be converted into a Select component with the same options",
+	},
+	select: {
+		text: "Values will be converted to the plain-text label of the option selected",
+		radio:
+			"Component will be converted into a Radio component with the same options",
+	},
+	table: {
+		textarea: "Values will be converted to a table with Markdown formatting",
+	},
+	todo: {
+		textarea:
+			"Values will be converted to a todo list with Markdown formatting",
+	},
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_036c_form_migrations.py::test_delete_element_commits_panel_and_model_changes_in_one_transition
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_checkbox_replacement_explains_and_preserves_boolean_choices
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_replacement_choices_and_explanations_match_component_types
+ * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_inputs_use_replacement_panel_after_first_save
+ * @matrix form-migration : modify-panel no-submission-read draft-undo
+ */
+class Modify extends Condition {
+	init() {
+		this.destroy();
+		this.setTitle("Replace or Delete");
+		const help = this.header.querySelector("[data-role='help']");
+		help.setAttribute("lp-control", "help");
+		help.setAttribute("lp-help", "form_element_changes");
+		help.setAttribute(
+			"aria-label",
+			"Help with converting or deleting form elements",
+		);
+		this.target.replaceChildren(this.header);
+		const deletion = this.target.appendChild(document.createElement("p"));
+		deletion.className = "text-sm text-base-medium";
+		deletion.textContent =
+			"If an element is deleted, any values entered using that element in current submissions will be cleared, with the exception of tasks that have already been completed. Already completed tasks will retain the form that accompanied their original submitted values.";
+		const source =
+			this.builder.savedField(this.element.schema.id) || this.element.schema;
+		const sourceKind = fieldKind(source);
+		const kind = fieldKind(this.element.schema);
+		const choices = (this.builder.conversionCatalog?.types || []).filter(
+			(item) => {
+				const rule =
+					this.builder.conversionCatalog.rules[sourceKind]?.[item.value];
+				return (
+					rule &&
+					item.value !== (kind === "multiple" ? "select" : kind) &&
+					item.value !== "multiple" &&
+					!(
+						this.builder.elt.dataset.formType === "page" &&
+						item.value === "todo"
+					)
+				);
+			},
+		);
+		const actions = document.createElement("div");
+		actions.className = choices.length
+			? "grid grid-cols-2 gap-3"
+			: "grid grid-cols-1 gap-3";
+		if (choices.length) {
+			const explanation = this.target.appendChild(document.createElement("p"));
+			explanation.className = "text-sm text-base-medium";
+			explanation.textContent =
+				"If you replace the element instead, those values will be converted in order to match the new component type. Values that cannot be converted will be cleared.";
+			this.addReplacement(choices, source, actions);
+		} else {
+			const unavailable = this.target.appendChild(document.createElement("p"));
+			unavailable.dataset.role = "conversion-unavailable";
+			unavailable.dataset.kind = "error";
+			unavailable.className = "text-sm text-kind-default";
+			unavailable.textContent = "This component type cannot be converted";
+		}
+		this.target.append(actions);
+		const remove = actions.appendChild(document.createElement("button"));
+		remove.type = "button";
+		remove.dataset.kind = "delete";
+		remove.className = STYLES.button.submit;
+		remove.textContent = "Delete";
+		remove.addEventListener("click", () => {
+			void withTransition(
+				() => {
+					if (
+						this.builder._destroyed ||
+						this.builder.selectedElement !== this.element
+					)
+						return;
+					this.builder.conditions.close();
+					this.builder.removeElement();
+					this.builder.settings.deselectItem();
+					this.builder.formSettings.visible = true;
+				},
+				{ label: "builder:delete-element" },
+			);
+		});
+	}
+
+	addReplacement(choices, source, actions) {
+		const sourceKind = fieldKind(source);
+		const selectElt = primitives.select({
+			label: "Replace With",
+			kind: "form",
+			data: { kind: "form" },
+			name: "conversion-type",
+			placeholder: "Choose a new component...",
+			selectIcon: "dropdown",
+			options: [],
+		});
+		this.target.append(selectElt);
+		const select = selectElt.querySelector("select");
+		const catalog = this.builder.conversionCatalog;
+		const canUseAI = this.builder.elt.dataset.aiConversion === "true";
+		for (const [title, ai] of [
+			["Deterministic conversions", false],
+			["AI conversions", true],
+		]) {
+			const group = document.createElement("optgroup");
+			group.label = title;
+			for (const item of choices) {
+				const rule = catalog.rules[sourceKind]?.[item.value];
+				if ((rule === "ai") !== ai) continue;
+				const label =
+					CONFIG.TABLE_COLUMNS.find(({ type }) => type === item.value)?.name ||
+					item.label;
+				const name = ai
+					? `${label} (requires AI${canUseAI ? "" : " access"})`
+					: label;
+				const option = new Option(name, item.value);
+				option.dataset.details = JSON.stringify({
+					kind: "form",
+					icon: item.value === "todo" ? "checklist" : item.value,
+					name,
+				});
+				option.disabled = ai && !canUseAI;
+				group.append(option);
+			}
+			if (group.childElementCount) select.append(group);
+		}
+		const selectBox = new SelectBox(selectElt);
+		selectBox.init();
+		this.destroyables.push(selectBox);
+		this.focusTarget = selectElt;
+		const description = this.target.appendChild(document.createElement("p"));
+		description.dataset.role = "conversion-description";
+		description.dataset.kind = "success";
+		description.className = "text-sm text-kind-default";
+		description.setAttribute("aria-live", "polite");
+		description.hidden = true;
+		const instructionLabel = this.target.appendChild(
+			document.createElement("label"),
+		);
+		instructionLabel.className = "flex flex-col gap-2 text-sm";
+		instructionLabel.textContent = "Conversion instructions (optional)";
+		const instructions = instructionLabel.appendChild(
+			document.createElement("textarea"),
+		);
+		instructions.name = "conversion-instructions";
+		instructions.className = STYLES.textarea;
+		instructions.rows = 3;
+		instructions.maxLength = 4000;
+		instructions.placeholder =
+			"For example: one row per item; preserve completed checkboxes.";
+		instructions.value = this.builder.conversionInstructions?.[source.id] || "";
+		const alreadyAI =
+			catalog.rules[sourceKind]?.[fieldKind(this.element.schema)] === "ai";
+		instructionLabel.hidden = !alreadyAI;
+		instructions.addEventListener("input", () => {
+			if (!alreadyAI) return;
+			this.builder.conversionInstructions ??= {};
+			this.builder.conversionInstructions[source.id] = instructions.value;
+			this.builder.updateSchema(false, `conversion-instructions:${source.id}`);
+		});
+		const convert = actions.appendChild(document.createElement("button"));
+		convert.type = "button";
+		convert.dataset.kind = "form";
+		convert.className = STYLES.button.submit;
+		convert.textContent = "Convert";
+		convert.disabled = true;
+		selectElt.addEventListener("updated", () => {
+			const ai = catalog.rules[sourceKind]?.[select.value] === "ai";
+			instructionLabel.hidden = !ai && !alreadyAI;
+			convert.disabled = !select.value;
+			description.hidden = !select.value;
+			description.textContent = ai
+				? "AI will convert saved values after Save. Review the destination columns and any conversion instructions first. Unresolvable values will be cleared; originals remain available in View changes."
+				: MESSAGES[sourceKind === "multiple" ? "select" : sourceKind]?.[
+						select.value
+					] ||
+					"Values will be converted to match the new component type. Values that cannot be converted will be cleared.";
+		});
+		convert.addEventListener("click", () => {
+			const type = catalog.types.find(({ value }) => value === select.value);
+			if (!type) return;
+			const previous = this.element.schema;
+			const next = { id: previous.id, title: previous.title, ...type.schema };
+			for (const key of ["required", "placeholder", "visibility"])
+				if (previous[key] !== undefined) next[key] = previous[key];
+			if (["radio", "select"].includes(next.type)) {
+				const options = previous.options ?? source.options;
+				next.options = options
+					? structuredClone(options)
+					: sourceKind === "checkbox"
+						? [
+								{ value: "true", label: "True" },
+								{ value: "false", label: "False" },
+							]
+						: [];
+			}
+			if (next.type === "table") next.columns = previous.columns || [];
+			this.element.schema = next;
+			this.builder.conversionInstructions ??= {};
+			if (catalog.rules[sourceKind]?.[select.value] === "ai")
+				this.builder.conversionInstructions[source.id] = instructions.value;
+			else delete this.builder.conversionInstructions[source.id];
+			this.builder.updateSchema();
+			this.builder.restoreDraft();
+			this.builder.header.message(
+				"Conversion staged. Save will update submissions; values that cannot be converted will be cleared.",
+				{ persistent: true },
+			);
+		});
+	}
+}
+
+export { Modify as default };

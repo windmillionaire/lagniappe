@@ -1,1 +1,1 @@
-"""Deterministic AI report execution and compensation."""
+"""Deterministic AI report execution and recovery."""
