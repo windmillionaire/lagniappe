@@ -33,6 +33,26 @@ from lagniappe.core.mutations import plan_mutation
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
+# @pair model-task:reference-links
+def test_model_task_reference_retains_project_without_loading_relations():
+    project = Project(testing=True)
+    project._key = datastore.Key("models", "link-project", project="test")
+    project.db.update({"type": "project", "name": "Link Project", "hash": "link-project"})
+    model = ModelTask(testing=True)
+    model._key = datastore.Key("models", "link-model", parent=project.key)
+    model.db.update({"type": "model", "name": "Link Model", "hash": "link-model", "project": project.key})
+
+    details = model.reference_details
+    assert details["id"] == model.urlsafe_key
+    assert details["parent"] == {"id": project.urlsafe_key, "kind": "project"}
+    assert not model.properties.project.is_set
+
+    model.project = project
+    assert model.reference_details["parent"]["id"] == project.urlsafe_key
+    assert model.reference_details["parent"]["name"] == "Link Project"
+    assert project.reference_details["id"] == project.urlsafe_key
+
+
 # @matrix project : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_project_description(get_test_entities):

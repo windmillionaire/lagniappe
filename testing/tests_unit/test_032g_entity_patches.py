@@ -326,8 +326,12 @@ def test_correction_snapshot_and_approval_reject_changed_source(monkeypatch):
 # @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
 # @matrix entity-patch : integration review dependencies stale-state
 # @matrix ai-report : execute idempotency skip-action validation
-@pytest.mark.parametrize("skip_form,conflict_once", [(False, False), (True, False), (False, True)])
-def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_form, conflict_once):
+@pytest.mark.parametrize("skip_form,conflicts,concurrent_change", [
+    (False, 0, None), (True, 0, None), (False, 1, None),
+    (False, 2, None), (False, 3, None),
+    (False, 1, "description"), (False, 1, "completed"), (False, 1, "permission"),
+])
+def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_form, conflicts, concurrent_change):
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
     from lagniappe.core.tools.ai.reporting.execution.runner import run_report
     from lagniappe.core.tools.database import utility as database_utility
@@ -342,9 +346,25 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
     monkeypatch.setattr(Entities, "fetch_one", fetch)
     writes = []
     rejected = []
+    original_allowed = Entities.TASK.allowed
+    def allowed(self, action, user=None):
+        if concurrent_change == "permission" and rejected:
+            return False
+        return original_allowed(self, action, user=user)
+    monkeypatch.setattr(Entities.TASK, "allowed", allowed)
     def save(*items):
-        if conflict_once and not rejected and any(item.entity_kind == "task" for item in items):
+        if len(rejected) < conflicts and any(item.entity_kind == "task" for item in items):
             rejected.append(True)
+            # Replace the saved root so retry must fetch again, not reuse its
+            # rejected candidate. Unreviewed metadata must survive that reload.
+            fresh = Entities.TASK(deepcopy(store[task.urlsafe_key].db))
+            fresh.attach(task.related_entities)
+            fresh.db["concurrent_marker"] = len(rejected)
+            if concurrent_change == "description":
+                fresh.description = "Changed by another editor"
+            elif concurrent_change == "completed":
+                fresh.completed = True
+            store[task.urlsafe_key] = fresh
             raise MutationConflict("Saved state changed while saving; reload and retry.")
         writes.append(items)
         for item in items:
@@ -361,18 +381,26 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
     prepare_entity_updates(report.proposal, actor)
     report.proposal["actions"][0]["skip"] = skip_form
     result = run_report(report, actor)
-    if conflict_once:
+    if conflicts == 3:
         assert result["status"] == "failed"
         assert report.status == "failed"
         assert result["actions"][0]["status"] == "complete"
         assert result["actions"][1]["status"] == "failed"
         assert not result["actions"][1].get("expected")
+        assert result["actions"][1]["attempts"] == 3
         assert store[task.urlsafe_key].description == "Long original description"
         assert sum(item.entity_kind == "form" for item in store.values()) == 2
         result = run_report(report, actor)
-    assert result["status"] == "complete", [record.get("error") for record in result["actions"]]
+    assert result["status"] == ("failed" if concurrent_change == "permission" else "complete"), [record.get("error") for record in result["actions"]]
     current = store[task.urlsafe_key]
-    if skip_form:
+    if concurrent_change:
+        assert len(rejected) == 1
+        assert result["actions"][1]["status"] == ("failed" if concurrent_change == "permission" else "skipped")
+        assert current.form.key == old_form.key
+        assert current.submission == task.submission
+        assert current.description == ("Changed by another editor" if concurrent_change == "description" else task.description)
+        assert current.completed == (concurrent_change == "completed")
+    elif skip_form:
         assert result["actions"][1]["status"] == "skipped"
         assert current.description == "Long original description"
     else:
@@ -380,6 +408,9 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
         assert current.submission == {"summary": "Migrated"}
         assert current.description == "Short"
         assert current.db["history"] is True
+        if conflicts:
+            assert current.db["concurrent_marker"] == conflicts
+            assert result["actions"][1]["attempts"] == conflicts + 1
         assert current.due_date == task.due_date
         count = sum(any(item.entity_kind == "form" for item in batch) for batch in writes)
         assert run_report(report, actor)["status"] == "complete"

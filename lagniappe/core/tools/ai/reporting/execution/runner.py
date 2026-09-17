@@ -1,5 +1,7 @@
 """Deterministic execution of stored AI report proposals."""
 
+from copy import deepcopy
+
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
@@ -168,31 +170,38 @@ def run_report(report, user, ensure_active=None):
             Entities.save(report)
 
             context["action_record"] = action_record
-            entity, to_save, metadata = adapter.apply(
-                action,
-                report,
-                user,
-                created,
-                context,
-            )
-            ensure_active()
-            _record_action_result(
-                action_record,
-                action,
-                entity,
-                to_save,
-                metadata,
-                created,
-                context,
-            )
-            action_record["expected"] = _expected_action_state(
-                action,
-                action_record,
-            )
-            action_record["status"] = "complete"
-            action_record.pop("error", None)
-            report.result = result
-            Entities.save(*to_save, report)
+            # Only cohesive updates can be rebuilt without side effects. A
+            # rejected guarded write committed neither the edit nor its receipt.
+            # Reapply reloads sources and repeats review/permission validation;
+            # never retry stale writes or an ambiguous provider/storage failure.
+            from ..entity_updates import UPDATE_TARGETS
+            save_attempts = 3 if action["type"] in UPDATE_TARGETS else 1
+            prior_record, prior_created = deepcopy(action_record), dict(created)
+            for save_attempt in range(save_attempts):
+                ensure_active()
+                entity, to_save, metadata = adapter.apply(
+                    action, report, user, created, context,
+                )
+                ensure_active()
+                _record_action_result(
+                    action_record, action, entity, to_save, metadata, created, context,
+                )
+                action_record["expected"] = _expected_action_state(action, action_record)
+                action_record["status"] = "complete"
+                action_record.pop("error", None)
+                report.result = result
+                try:
+                    Entities.save(*to_save, report)
+                    break
+                except exceptions.MutationConflict:
+                    action_record.clear()
+                    action_record.update(deepcopy(prior_record))
+                    action_record["attempts"] += save_attempt
+                    created.clear()
+                    created.update(prior_created)
+                    if save_attempt + 1 == save_attempts:
+                        raise
+                    action_record["attempts"] += 1
         except Exception as error:
             from lagniappe.core.tools.deferred_jobs.errors import (
                 DeferredJobClaimLostError,

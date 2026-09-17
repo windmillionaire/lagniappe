@@ -227,6 +227,23 @@ if (String(link.href) !== "https://example.test/users/index?group=group-1") {
     )
 
 
+# @pair model-task:reference-links
+def test_model_task_link_opens_in_progress_filter(run_node):
+    run_entity_name_check(
+        run_node,
+        r"""
+const project = {id: "project-1", kind: "project", name: "Project"};
+const model = {id: "model-1", kind: "model", parent: project};
+if (String(formatting.url(model)) !== "https://example.test/projects/project-1/status/model-1?completed=false") {
+  throw new Error(`Wrong model task URL: ${formatting.url(model)}`);
+}
+if (String(formatting.url(project)) !== "https://example.test/projects/project-1") {
+  throw new Error(`Wrong project URL: ${formatting.url(project)}`);
+}
+""",
+    )
+
+
 # @matrix combobox entity-name : parent-separator recent-results
 # @styles entity.name.wrapper entity.name.parent entity.name.separator
 def test_recent_combobox_results_reuse_shared_parent_name_formatting(run_node):

@@ -1,2 +1,20 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="a912a546-24b0-4c0c-9a50-eb23cf66d66e",e._sentryDebugIdIdentifier="sentry-dbid-a912a546-24b0-4c0c-9a50-eb23cf66d66e");}catch(e){}}();import{E as s}from"../entity-foundation.js?v=b24bd860";import"../core-foundation.js?v=b24bd860";import"../connectivity.js?v=b24bd860";import"../foundation.js?v=b24bd860";import"../upstreamUnavailable.js?v=b24bd860";class a extends s{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{a as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity-foundation.js?v=b24ca4c6';
+import '../core-foundation.js?v=b24ca4c6';
+import '../connectivity.js?v=b24ca4c6';
+import '../foundation.js?v=b24ca4c6';
+import '../upstreamUnavailable.js?v=b24ca4c6';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
+ * @matrix admin : page-load site-settings
+ */
+class Admin extends Entity {
+	constructor(node) {
+		super(node);
+		this._defaultTabId = node.dataset.defaultTab || "settings";
+	}
+}
+
+export { Admin as default };

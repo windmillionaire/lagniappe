@@ -285,8 +285,15 @@ mutate it or require regeneration.
 Cohesive execution resolves earlier action outputs back to their saved entities
 before preparing each update. Project ordering and relation touches can change
 those records within the same plan; detached preview objects are not execution
-baselines. A rejected atomic write marks execution failed and retains Retry,
-without treating the uncommitted success receipt as an ambiguous write. Already
+baselines. Cohesive updates retry a rejected atomic write up to twice, fetching
+fresh records and repeating review and permission checks each time. Rejected
+attempts discard their staged receipt and output references. Continued contention
+marks execution failed and retains Retry, without treating the uncommitted
+success receipt as an ambiguous write. Other actions and ambiguous failures do
+not use this retry loop. Actions still commit separately with their receipts;
+the whole plan is not one transaction. Already
 completed actions remain resumable and are not recreated. For a report already
-completed with skipped updates, use Revise Plan to propose only the remaining
-changes against the current workspace.
+completed with skipped updates, use Create corrective plan to propose only the
+remaining changes against the current workspace. The post-execution control
+explains that this creates a separate linked report requiring review and approval;
+unexecuted proposals retain the Revise Plan control.

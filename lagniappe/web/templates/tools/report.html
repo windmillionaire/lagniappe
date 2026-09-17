@@ -256,8 +256,9 @@
   {% set can_revise = report.proposal and not report.pending and not report.db.get("superseded_by") and not migration_pending and can_ask_ai and ((report.result and report.status in ["complete", "failed"]) or (report.origin != "api" and not report.result and (report.status == "ready" or (is_ask and report.status == "complete")))) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = not report.db.get("superseded_by") and report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
-  {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
-  {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
+  {% set creates_correction = report.result %}
+  {% set revise_button_label = "Create corrective plan" if creates_correction else ("Revise Response" if is_ask else "Revise Plan") %}
+  {% set revise_heading = "Create a corrective plan" if creates_correction else ("Revise Response" if is_ask else "Revise Proposal") %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
   {% set operation_status = report._operation_status|default(none) %}
   <main lp-view
@@ -592,7 +593,7 @@
             <p>This plan corrects <a href="{{ url_for('tools.report', key=report.db.correction.source) }}">the original execution</a>. Only additional changes will be applied.</p>
           {% endif %}
           {% for correction_id in report.db.get("correction_children", []) %}
-            <p><a href="{{ url_for('tools.report', key=correction_id) }}">View corrective plan</a></p>
+            <p>A separate corrective plan was created. <a class="{{ styles.link.default }}" href="{{ url_for('tools.report', key=correction_id) }}">Open corrective plan</a></p>
           {% endfor %}
           {% if report.db.get("superseded_by") %}
             <p>This execution was superseded by <a href="{{ url_for('tools.report', key=report.db.superseded_by) }}">an approved correction</a>.</p>
@@ -602,12 +603,15 @@
                   action="{{ url_for('tools.revise_report', key=report.urlsafe_key) }}"
                   data-role="revise-report-form"
                   data-submit="{{ revise_button_label }}"
-                  data-submitting="{{ 'Revising Response' if is_ask else 'Revising Plan' }}"
-                  data-submitted="Revision Started"
+                  data-submitting="{{ 'Creating corrective plan' if creates_correction else ('Revising Response' if is_ask else 'Revising Plan') }}"
+                  data-submitted="{{ 'Corrective plan started' if creates_correction else 'Revision Started' }}"
                   data-icon="generate"
                   class="flex flex-col gap-2 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">
               <label for="report-feedback"
                      class="text-sm font-semibold text-base-dark">{{ revise_heading }}</label>
+              {% if creates_correction %}
+                <p class="text-sm">Creates a new linked plan for additional changes. Completed work is kept. Review and approve the new plan before it runs.</p>
+              {% endif %}
               <textarea id="report-feedback"
                         name="feedback"
                         required

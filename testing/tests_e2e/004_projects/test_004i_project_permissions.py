@@ -29,6 +29,17 @@ from testing.utility.network import manual_mutation_headers
 pytestmark = pytest.mark.e2e
 
 
+# @pair projects:wrong-entity-type
+def test_project_url_rejects_model_task_key(get_user, browser_failures):
+    owner = get_user(Users.OWNER)
+    model = ModelTasks.test_create_model_task.get(owner)
+    url = f"{SETTINGS.test_config['BASE_URL']}/projects/{model.key}"
+    with browser_failures.expect_http_error(owner, status=404, path=url):
+        response = owner.page.goto(url)
+        assert response.status == 404
+        expect(owner.page).to_have_title("Error 404")
+
+
 # @pair projects:permission-gates
 def test_project_is_forbidden_without_model_permission(get_user, browser_failures):
     owner = get_user(Users.OWNER)

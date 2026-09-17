@@ -1,2 +1,71 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="e5c0c12d-22da-40f2-b12c-b86a08d9b735",e._sentryDebugIdIdentifier="sentry-dbid-e5c0c12d-22da-40f2-b12c-b86a08d9b735");}catch(e){}}();import{r as s,E as i,c as h}from"./foundation.js?v=b24bd860";import"./connectivity.js?v=b24bd860";import{B as m}from"./baseElement.js?v=b24bd860";import"./upstreamUnavailable.js?v=b24bd860";import"./styles.js?v=b24bd860";import"./icons.js?v=b24bd860";import"./primitives.js?v=b24bd860";class n extends m{constructor(t,e,r){super(t,e,r),this.static=!0,this.html=null,this._destroyed=!1}async _getHtml(){return await s.get(i.html(this.renderer.form.key,this.schema.id).getContent).then(t=>t.markup).catch(t=>(h(t,this.renderer.form.target,{schema:this.schema}),""))}create(){if(this._elt)return this._elt;const t=document.createElement("div");t.className="html-content";const e=this.renderer.form.htmlFields;return e&&Object.hasOwn(e,this.schema.id)?(this.html=e[this.schema.id],t.innerHTML=this.html):this.html===null?this._getHtml().then(r=>{this._destroyed||(this.html=r,t.innerHTML=r)}):t.innerHTML=this.html,t}destroy(){this._destroyed=!0,super.destroy()}}export{n as HtmlElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, E as ENDPOINTS, c as captureError } from './foundation.js?v=b24ca4c6';
+import './connectivity.js?v=b24ca4c6';
+import { B as BaseElement } from './baseElement.js?v=b24ca4c6';
+import './upstreamUnavailable.js?v=b24ca4c6';
+import './styles.js?v=b24ca4c6';
+import './icons.js?v=b24ca4c6';
+import './primitives.js?v=b24ca4c6';
+
+/**
+ * @testable infrastructure
+ */
+class HtmlElement extends BaseElement {
+	constructor(renderer, schema, submission) {
+		super(renderer, schema, submission);
+		this.static = true;
+		this.html = null;
+		this._destroyed = false;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_037_html_element_frontend.py::test_html_element_reports_request_failure_without_masking_original
+	 * @pair form-html:error-reporting
+	 */
+	async _getHtml() {
+		return await request
+			.get(ENDPOINTS.html(this.renderer.form.key, this.schema.id).getContent)
+			.then((response) => response.markup)
+			.catch((error) => {
+				captureError(error, this.renderer.form.target, {
+					schema: this.schema,
+				});
+				return "";
+			});
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : draft-history
+	 */
+	create() {
+		if (this._elt) return this._elt;
+
+		const elt = document.createElement("div");
+		elt.className = "html-content";
+
+		const fields = this.renderer.form.htmlFields;
+		if (fields && Object.hasOwn(fields, this.schema.id)) {
+			this.html = fields[this.schema.id];
+			elt.innerHTML = this.html;
+		} else if (this.html === null) {
+			this._getHtml().then((html) => {
+				if (this._destroyed) return;
+				this.html = html;
+				elt.innerHTML = html;
+			});
+		} else {
+			elt.innerHTML = this.html;
+		}
+
+		return elt;
+	}
+
+	destroy() {
+		this._destroyed = true;
+		super.destroy();
+	}
+}
+
+export { HtmlElement };

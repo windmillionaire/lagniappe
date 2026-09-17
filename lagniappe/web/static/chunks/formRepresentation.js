@@ -1,2 +1,49 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="4f5bcc4e-ed6a-4181-8540-be60cf1141ca",e._sentryDebugIdIdentifier="sentry-dbid-4f5bcc4e-ed6a-4181-8540-be60cf1141ca");}catch(e){}}();const p=(t,i)=>{if(!t||!i)return!1;const o=n=>n.type==="input"?n.input||"text":n.type==="link"?n.location||"out":n.type;return o(t)!==o(i)||!!t.multiple!=!!i.multiple||t.options?.some(({value:n})=>!i.options?.some(s=>s.value===n))?!1:!t.columns?.some(n=>!p(n,i.columns?.find(s=>s.id===n.id)))},l=(t,i)=>(t||[]).some(o=>!p(o,(i||[]).find(n=>n.id===o.id)));export{p as c,l as i};
 /*! Third-party licenses: /third-party-licenses.txt */
+/**
+ * @testable true
+ * @tests tests_js/test_036c_form_migrations.py::test_incompatible_local_values_require_review
+ * @matrix form-migration : stale-input representation-aware
+ */
+const compatibleField = (before, after) => {
+	if (!before || !after) return false;
+	/** @testable infrastructure */
+	const kind = (field) =>
+		field.type === "input"
+			? field.input || "text"
+			: field.type === "link"
+				? field.location || "out"
+				: field.type;
+	if (
+		kind(before) !== kind(after) ||
+		Boolean(before.multiple) !== Boolean(after.multiple)
+	)
+		return false;
+	if (
+		before.options?.some(
+			({ value }) => !after.options?.some((option) => option.value === value),
+		)
+	)
+		return false;
+	return !before.columns?.some(
+		(column) =>
+			!compatibleField(
+				column,
+				after.columns?.find((item) => item.id === column.id),
+			),
+	);
+};
+/**
+ * @testable true
+ * @tests tests_js/test_036c_form_migrations.py::test_incompatible_local_values_require_review
+ * @matrix form-migration : stale-input representation-aware
+ */
+const incompatibleSchema = (before, after) =>
+	(before || []).some(
+		(field) =>
+			!compatibleField(
+				field,
+				(after || []).find((item) => item.id === field.id),
+			),
+	);
+
+export { compatibleField as c, incompatibleSchema as i };

@@ -1449,7 +1449,9 @@ def test_report_revision_requires_saved_response_and_allows_corrections(
         report.result = {"status": "complete", "actions": [{"id": "review", "type": "needs_review", "status": "complete"}]}
         Entities.save(report)
         user.page.reload()
-        expect(user.page.get_by_role("button", name=button_name)).to_be_visible()
+        expect(user.page.get_by_role("button", name=button_name, exact=True)).not_to_be_attached()
+        expect(user.page.get_by_role("button", name="Create corrective plan", exact=True)).to_be_visible()
+        expect(user.page.get_by_text("Creates a new linked plan for additional changes.", exact=False)).to_be_visible()
 
 
 
