@@ -121,6 +121,8 @@ def _report_status(row):
 # @reason shared report-state validation is exercised through public claim outcomes
 def _report_operation_state(report, phase):
     """Return validated state used to decide one serialized Plan operation."""
+    from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
+
     if (
         report is None
         or report.get("type") != "report"
@@ -130,7 +132,7 @@ def _report_operation_state(report, phase):
 
     report_process = _report_process(report)
     status = report_process.get("status") if report_process is not None else None
-    if report.get("format_version") != 1:
+    if report.get("format_version") != REPORT_FORMAT_VERSION:
         return None
     if phase in {"create", "finalize"}:
         if status != "draft":
@@ -450,10 +452,12 @@ def commit_plan_operation(
 # @reason the fenced publication tests cover recipient, state, and durable replay identity
 def _prepare_publication_notification(report, user):
     """Prepare the first publication alert; its manifest marker outlives dismissal."""
+    from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
+
     if (
         report.get("origin") != "api"
         or report.get("user") != user.key
-        or report.get("format_version") != 1
+        or report.get("format_version") != REPORT_FORMAT_VERSION
         or _report_status(report) not in {"complete", "ready"}
     ):
         raise ValueError("Only the creator's published API Plan can notify them")

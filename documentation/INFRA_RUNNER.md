@@ -30,6 +30,11 @@ missing, byte-mismatched, or wrong-version managed copy stops with the exact
 `runner/gcloud.py` activates the complete gcloud configuration saved in
 `lagniappe_dev.yaml`. It verifies configuration name, account, and project as a
 unit and exports the selected project for child pytest/Flask processes.
+After verification, it pins `CLOUDSDK_CORE_ACCOUNT` and `CLOUDSDK_CORE_PROJECT`
+for child gcloud commands. Another checkout changing the same named gcloud
+configuration cannot switch an in-flight deployment to a different operator.
+These process-local pins do not change ADC; re-activation clears them before
+verifying the next saved target.
 Successful activation prints one grouped target summary and lists the credential
 checks completed. Internal callers may suppress repeated success announcements;
 configuration, token, and ADC verification still run normally.

@@ -11,7 +11,7 @@ import pytest
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.entities.ai_report import AIReport
+from lagniappe.core.entities.ai_report import AIReport, REPORT_FORMAT_VERSION
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
@@ -307,7 +307,7 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         {
             "type": "report",
             "origin": "api",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "process": json.dumps({"report": {"status": "draft"}}),
             "agent_manifest": json.dumps({"contract_version": 1}),
         }
@@ -580,7 +580,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
         {
             "type": "report",
             "origin": "api",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "process": json.dumps({"report": {"status": "draft"}}),
             "agent_manifest": json.dumps({"contract_version": 1}),
         }
@@ -706,7 +706,7 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
         {
             "type": "report",
             "origin": "api",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "process": json.dumps({"report": {"status": "ready"}}),
             "proposal": json.dumps({"summary": "API proposal"}),
         }
@@ -877,7 +877,7 @@ def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch)
             "parent": user,
             "user": user,
             "name": "External browser mutation",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "origin": "api",
             "status": "ready",
             "input_files": [file],

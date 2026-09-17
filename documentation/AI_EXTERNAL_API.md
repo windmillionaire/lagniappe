@@ -19,6 +19,11 @@ create a Plan. All requests share one contract; the server derives output_kind
 from actions. Proposals require browser approval, and the API never executes
 workspace mutations or calls Lagniappe's model.
 
+Database operation claims and publication notifications use the shared
+`REPORT_FORMAT_VERSION`, just like report creation and availability checks.
+A format cutover must reject obsolete reports while allowing current-format
+drafts through upload, submission, and notification publication.
+
 The API is part of the application and is gated by the installation's AI and
 external-AI policy. When enabled, authenticated non-public users may manage a
 key and use plans and reads within their workspace permissions,
