@@ -10,6 +10,7 @@ source_roots:
   - lagniappe/core/properties
   - lagniappe/core/restrictions.py
   - lagniappe/core/tools
+  - lagniappe/reference
   - lagniappe/web/routes
   - lagniappe/web/start
   - installer

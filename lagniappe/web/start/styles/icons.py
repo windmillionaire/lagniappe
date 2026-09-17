@@ -32,10 +32,6 @@ ICONS = {
 		"glyph": "graph_3",
 		"fill": 1
 	},
-	"ask": {
-		"glyph": "chat",
-		"fill": 1
-	},
 	"assignedBy": {
 		"glyph": "person_edit",
 		"fill": 1
