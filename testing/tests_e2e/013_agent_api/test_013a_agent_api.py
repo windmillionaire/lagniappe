@@ -441,6 +441,10 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
 # @pairs agent-api:create-revision agent-api:organize-revision agent-api:plan-capability
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeypatch):
+    allowed_origin = "https://workspace.example.test"
+    monkeypatch.setattr(CONFIG, "GOOGLE_LOGIN_URI", allowed_origin)
+    monkeypatch.setattr(CONFIG, "APP_URL", allowed_origin)
+    monkeypatch.setattr(CONFIG, "BASE_URL", allowed_origin)
     actor = Actor()
     report = _report(actor)
     seen = {}
@@ -486,7 +490,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
             "kind": "page",
             "hash": "hash:personalpage",
             "name": "External Planner",
-            "url": "/pages/actor-page",
+            "url": f"{allowed_origin}/pages/actor-page",
             "can_view": True,
             "can_edit": True,
         },

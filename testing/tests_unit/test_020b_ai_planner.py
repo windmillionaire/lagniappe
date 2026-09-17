@@ -39,7 +39,8 @@ def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     monkeypatch.setattr(type(user), "access", lambda self, access: True)
     prompt = planner.report_prompt(_report(user), user)
     assert prompt.tools == list(planner.REPORT_READ_TOOLS)
-    assert len(prompt.tools) == 17
+    assert {"get_help", "get_guidelines", "get_task_history", "query_workspace_filter"} <= set(prompt.tools)
+    assert len(prompt.tools) == len(set(prompt.tools))
     assert prompt.search
     assert {"create_page", "create_task", "move_file", "rename_entity"} <= set(
         prompt.allowed_actions

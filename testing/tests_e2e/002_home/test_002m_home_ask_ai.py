@@ -172,9 +172,14 @@ def _run_ask_job(page, report, job, ai_results, *, quota_fallback):
     ai_results.record("deferred_job_attempts", attempt_records)
     assert saved_job.status == DeferredJobStatus.SUCCEEDED.value, attempt_records
     assert saved_job.checkpoint == {
+        "schema_version": 1,
+        "stage": "ready_to_apply",
         "proposal": response,
+        "file_usage": [],
         "status": saved_report.status,
     }
+    # These questions use existing workspace files; empty DB properties read as None.
+    assert not saved_report.file_usage
     assert saved_report.status in {"ready", "complete"}
     assert not saved_report.pending
     return response, saved_report

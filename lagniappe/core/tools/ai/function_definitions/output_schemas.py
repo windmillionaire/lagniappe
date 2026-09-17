@@ -81,7 +81,16 @@ OUTPUT_SCHEMAS = {
                 "url": {"type": "string"}, "markdown": {"type": "string"},
                 "summary": {"type": "string"},
                 "related": {"type": "array", "items": {"type": "string"}},
-                "context": {"type": "object", "additionalProperties": {"type": "string"}},
+                "context": {
+                    "type": "object",
+                    "properties": {
+                        "email_address": {"type": "string"},
+                        "skill_url": {"type": "string"},
+                        "mcp_url": {"type": "string"},
+                        "connection_name": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
             },
         )},
     }),

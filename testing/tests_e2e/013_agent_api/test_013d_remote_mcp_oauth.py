@@ -791,7 +791,9 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
         response = _open(pilot, "GET", "/manual/section/ai")
         assert response.status_code == 200
         assert 'data-role="external-ai-account-details"' not in response.text
-        assert 'data-role="external-ai-generic-details"' in response.text
+        assert 'data-topic="external_ai"' in response.text
+        assert 'data-role="external-ai-codex-setup"' in response.text
+        assert 'data-role="external-ai-chatgpt-setup"' in response.text
         assert "https://pilot.run.app/mcp" not in response.text
         assert "https://another-installation.run.app/mcp" not in response.text
         assert "https://workspace.example.test" not in response.text

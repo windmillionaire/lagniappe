@@ -7,6 +7,7 @@ import asyncio
 from copy import deepcopy
 import json
 from pathlib import Path
+import runpy
 import stat
 import time
 from typing import Any
@@ -60,6 +61,32 @@ from testing.utility import mcp_client_driver
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "mcp"
+
+
+# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
+# @source lagniappe/core/tools/ai/function_definitions/output_schemas.py::_object
+# @pair mcp-adapter:product-contract
+def test_canonical_read_output_schemas_fit_the_adapter_contract():
+    # Load the app's dependency-free declarations without bootstrapping the app
+    # in the standalone MCP environment. One invalid tool blocks all discovery.
+    schemas = runpy.run_path(str(
+        PACKAGE_ROOT.parent / "lagniappe/core/tools/ai/function_definitions/output_schemas.py"
+    ))["OUTPUT_SCHEMAS"]
+    assert "get_help" in schemas
+    for name, schema in schemas.items():
+        try:
+            validate_schema_document(schema)
+        except SchemaError as error:
+            pytest.fail(f"{name}: {error}")
+    context = schemas["get_help"]["properties"]["topics"]["items"]["properties"]["context"]
+    for value in ({}, {"email_address": "ai@example.test"}, {
+        "skill_url": "https://example.test/api/v1/client-skill.md",
+        "mcp_url": "https://example.run.app/mcp",
+        "connection_name": "example-mcp",
+    }):
+        validate_value(context, value, phase="output")
+    with pytest.raises(SchemaError):
+        validate_value(context, {"mcp_url": 123}, phase="output")
 
 
 def _signed_download_url(**updates: str) -> str:
