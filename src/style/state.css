@@ -7,6 +7,13 @@
 	display: none;
 }
 
+/* Mobile photo visibility belongs to the selected tab, resolved during startup. */
+@media (width < 640px) {
+	[lp-view][data-kind="page"]:not([initialized]) #photo {
+		display: none;
+	}
+}
+
 table[data-visible="true"]:not(.hidden):not([hidden]) {
 	display: table;
 }

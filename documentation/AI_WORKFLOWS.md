@@ -211,6 +211,8 @@ After execution begins, **Revise Plan** creates a new linked report. The source
 must belong to the creator and have stopped; ambiguous writes and active Form
 migrations must be reconciled first. The new report contains a bounded snapshot
 of proposal/outcomes and reads current state to propose additional changes.
+All embedded snapshot properties are excluded from Datastore indexes, including
+long answer HTML, task descriptions, and execution notes.
 Draft corrections leave source retry available. Browser approval checks the
 source snapshot and atomically supersedes its execution; subsequent retries of
 the source are rejected. External `start_plan`/REST creation accepts

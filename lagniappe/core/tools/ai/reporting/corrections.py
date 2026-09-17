@@ -3,6 +3,8 @@
 from copy import deepcopy
 import json
 
+from google.cloud.datastore import Entity as DatastoreEntity
+
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
@@ -19,7 +21,7 @@ def link_correction(report, source, user):
     snapshot = {"proposal": deepcopy(source.proposal), "result": deepcopy(source.result)}
     if len(json.dumps(snapshot, default=str).encode()) > 250 * 1024:
         raise ValidationError("This execution is too large for a corrective snapshot. Create a new plan from current workspace state.")
-    report.db["correction"] = {"source": source.urlsafe_key, "fingerprint": _fingerprint(snapshot), **snapshot}
+    report.db["correction"] = _unindexed_snapshot({"source": source.urlsafe_key, "fingerprint": _fingerprint(snapshot), **snapshot})
     report.input_files = list(source.input_files)
     return report
 
@@ -71,3 +73,17 @@ def save_correction(report, source):
         file.db["report_refs"] = list(dict.fromkeys([*file.db.get("report_refs", []), source.urlsafe_key, report.urlsafe_key]))
     report._form_additional_guards = guards
     Entities.save(source, report, *report.input_files)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/corrections.py::link_correction
+# @reason correction snapshots must exclude nested answer and execution content from indexes
+def _unindexed_snapshot(value):
+    """Exclude every embedded snapshot property, including long answer HTML."""
+    if isinstance(value, dict):
+        result = DatastoreEntity(exclude_from_indexes=tuple(value))
+        result.update({key: _unindexed_snapshot(child) for key, child in value.items()})
+        return result
+    if isinstance(value, list):
+        return [_unindexed_snapshot(child) for child in value]
+    return value

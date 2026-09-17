@@ -139,6 +139,9 @@ retains empty-image actions in Info. Desktop visibility does not change mobile
 tab availability. Readonly pages retain visibility controls without image
 editing controls. PagePhoto owns image mutations and only creates its generation
 form when AI creation is permitted.
+Before a Page publishes `initialized`, CSS keeps its photo card hidden on mobile
+so the server-rendered image cannot flash ahead of the saved tab selection.
+Desktop retains its server-rendered image while the view initializes.
 
 ## ViewComponent
 

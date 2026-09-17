@@ -585,3 +585,39 @@ def test_update_recovery_accepts_later_completion_but_rejects_unrelated_drift(mo
     assert _inspect_action_applied({"type": "update_task"}, report, actor, records[0]) == ACTION_APPLIED
     task.description = "Unrelated later edit"
     assert _inspect_action_applied({"type": "update_task"}, report, actor, records[0]) == ACTION_DRIFTED
+
+
+# @source lagniappe/core/tools/ai/reporting/corrections.py::link_correction
+# @pair ai-report:correction
+def test_correction_snapshot_excludes_nested_long_values_from_datastore_indexes():
+    from google.cloud.datastore.helpers import entity_to_protobuf, entity_from_protobuf
+    from lagniappe.core.tools.ai.reporting.corrections import link_correction
+    from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
+    actor = _test_user("snapshot-owner")
+    source, correction = entity("REPORT", "snapshot-source"), entity("REPORT", "snapshot-correction")
+    source.format_version, source.user, source.parent = REPORT_FORMAT_VERSION, actor, actor
+    source.status, source.pending = "complete", False
+    long_text = "Long answer and migrated task detail. " * 100
+    source.proposal = {"summary": "Source", "answer_html": long_text, "actions": [
+        {"type": "update_task", "data": {"changes": {"description": long_text}}}
+    ]}
+    source.result = {"status": "complete", "actions": [{"status": "skipped", "note": long_text}]}
+    source.input_files = []
+    link_correction(correction, source, actor)
+    correction.db.exclude_from_indexes = correction.exclude_from_index
+    encoded = entity_to_protobuf(correction.db)
+    snapshot = encoded.properties["correction"]
+    assert snapshot.exclude_from_indexes
+    proposal = snapshot.entity_value.properties["proposal"].entity_value
+    answer = proposal.properties["answer_html"]
+    assert len(answer.string_value.encode()) > 1500
+    assert answer.exclude_from_indexes
+    action = proposal.properties["actions"].array_value.values[0].entity_value
+    description = action.properties["data"].entity_value.properties["changes"].entity_value.properties["description"]
+    assert description.exclude_from_indexes
+    result = snapshot.entity_value.properties["result"].entity_value
+    note = result.properties["actions"].array_value.values[0].entity_value.properties["note"]
+    assert note.exclude_from_indexes
+    restored = entity_from_protobuf(encoded)
+    assert restored["correction"]["proposal"] == source.proposal
+    assert restored["correction"]["result"] == source.result
