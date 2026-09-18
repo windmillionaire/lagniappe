@@ -1,12 +1,10 @@
 """Focused AI-report characterization coverage."""
 
-from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
-from lagniappe.core import exceptions
 from lagniappe.core.entities import entity as entity_module
 from lagniappe.core.tools.ai.reporting.contracts import actions as report_contracts
 from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
@@ -19,8 +17,6 @@ from lagniappe.core.tools.ai.reporting.execution.actions.registry import (
 )
 from testing.utility.ai_report_fakes import (
     _attach_report_process,
-    _fetch_from,
-    _fetch_one_from,
     _patch_fake_keys,
     _recovery_store,
     _test_file,
@@ -120,14 +116,9 @@ def test_complete_task_action_preserves_details_and_retries(
 ):
     from lagniappe.core.tools.ai.reporting.execution import batch
     monkeypatch.setattr(batch, "MAX_BATCH_ACTIONS", 1)
-    from lagniappe.core.tools.ai.reporting.execution.actions.task_completion import (
-        _completion_state,
-    )
-
     user, task, report = _completion_case(
         monkeypatch, completed=completed, recurring=recurring
     )
-    before = _completion_state(task)
     old_files = list(task.files)
     original = report_action_lifecycle._execute_action
     calls = []

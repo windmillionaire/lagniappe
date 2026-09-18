@@ -1,14 +1,11 @@
 """Focused AI-report characterization coverage."""
 
-import copy
 from types import SimpleNamespace
 
 import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
-from lagniappe.core.tools.ai.reporting.execution.actions import common as report_common
-from lagniappe.core.tools.ai.reporting.execution.actions import results as report_results
 from testing.utility.ai_report_fakes import (
     _fetch_one_from,
     _patch_fake_keys,

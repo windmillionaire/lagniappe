@@ -4,25 +4,17 @@ Native Organize conversation repair is covered with the real GenAI loop below.
 """
 
 import copy
-import json
 
-from google.genai import types as genai_types
 from datetime import datetime, timezone
-from types import SimpleNamespace
 
 import pytest
 
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai import planner, references as ai_references
+from lagniappe.core.tools.ai import references as ai_references
 from lagniappe.core.tools.ai.reporting.proposals import selection
 from lagniappe.core.tools.ai.reporting.proposals import (
     validation as proposal_validation,
 )
-from testing.utility.ai_report_fakes import (
-    _test_user,
-    _fetch_one_from,
-)
-from testing.utility.test_entities import TestEntities
 
 
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization

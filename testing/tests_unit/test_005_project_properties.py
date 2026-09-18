@@ -17,7 +17,6 @@ Out of scope for this file: ``public_id``, ``ai_generated``, ``save`` /
 """
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from google.cloud import datastore
