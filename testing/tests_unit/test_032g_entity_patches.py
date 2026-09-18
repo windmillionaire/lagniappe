@@ -562,7 +562,6 @@ def test_edit_view_preserves_complete_descriptions_and_deduplicates_schema(monke
     assert edit_entity(task, actor)["editable_fields"] == []
 
 
-# @source lagniappe/core/tools/ai/reporting/corrections.py::save_correction
 # @source lagniappe/core/tools/ai/reporting/corrections.py::link_correction
 # @source lagniappe/core/tools/ai/reporting/corrections.py::approve_correction
 # @source lagniappe/core/tools/ai/report_history.py::delete_report_record

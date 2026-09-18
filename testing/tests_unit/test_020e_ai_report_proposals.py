@@ -1,10 +1,6 @@
-"""Proposal validation and legacy separate-prompt repair characterization.
-
-Native Organize conversation repair is covered with the real GenAI loop below.
-"""
+"""Proposal validation and deterministic schema repair coverage."""
 
 import copy
-
 from datetime import datetime, timezone
 
 import pytest
@@ -15,6 +11,55 @@ from lagniappe.core.tools.ai.reporting.proposals import selection
 from lagniappe.core.tools.ai.reporting.proposals import (
     validation as proposal_validation,
 )
+
+
+# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_complete_form_schema_fields
+# @matrix ai-report : deterministic-repair form-type schema-field-id schema-update
+# @matrix form-schema : deterministic-repair form-type schema-update
+@pytest.mark.unit
+@pytest.mark.parametrize("consumer,form_type", [("create_page", "page"), ("create_task", "task")])
+def test_schema_repairs_keep_existing_fields_and_complete_unambiguous_structure(consumer, form_type):
+    from lagniappe.core.tools.ai.reporting.proposals.repair import _complete_form_schema_fields
+
+    proposal = {"actions": [
+        {"id": "form", "type": "create_form", "data": {"name": "Details", "schema": [
+            {"id": "input-name", "type": "input", "input": "email", "title": "Original"},
+            {"type": "input", "placeholder": "Enter your name"},
+            {"type": "input", "title": "Name"},
+        ]}},
+        {"id": "use", "type": consumer, "data": {"name": "Record", "form_action": "form"}},
+        {"id": "schema", "type": "update_form_schema", "data": {"operations": [
+            {"op": "add_field", "field": {"type": "checkbox", "label": "Ready"}},
+        ]}},
+    ]}
+    before = copy.deepcopy(proposal)
+
+    repaired = _complete_form_schema_fields(proposal)
+
+    assert proposal == before
+    created = repaired["actions"][0]["data"]
+    assert created["form_type"] == form_type
+    assert created["schema"][0] == before["actions"][0]["data"]["schema"][0]
+    assert [field["id"] for field in created["schema"]] == ["input-name", "input-name-2", "input-name-3"]
+    assert all(field["input"] == "text" for field in created["schema"][1:])
+    field = repaired["actions"][2]["data"]["operations"][0]["field"]
+    assert field["id"] == "checkbox-ready" and field["title"] == "Ready"
+    assert _complete_form_schema_fields(repaired) is repaired
+
+
+# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_complete_form_schema_fields
+# @matrix ai-report form-schema : deterministic-repair form-type
+@pytest.mark.unit
+def test_schema_repair_leaves_conflicting_form_usage_for_validation():
+    from lagniappe.core.tools.ai.reporting.proposals.repair import _complete_form_schema_fields
+
+    proposal = {"actions": [
+        {"id": "form", "type": "create_form", "data": {"name": "Shared", "schema": []}},
+        {"id": "page", "type": "create_page", "data": {"form_action": "form"}},
+        {"id": "task", "type": "create_task", "data": {"form_action": "form"}},
+    ]}
+    assert _complete_form_schema_fields(proposal) is proposal
+    assert "form_type" not in proposal["actions"][0]["data"]
 
 
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization

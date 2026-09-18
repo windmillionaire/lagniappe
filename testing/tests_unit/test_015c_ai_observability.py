@@ -662,7 +662,6 @@ def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
     assert "private_prompt" not in str(payload)
 
 
-# @source lagniappe/core/tools/ai/observability.py::reconcile_generation_records
 # @matrix observability : in-flight deferred-context exception-transparency
 def test_report_telemetry_marks_lost_attempts_interrupted():
     now = datetime(2026, 9, 17, tzinfo=timezone.utc)

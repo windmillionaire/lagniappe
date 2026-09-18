@@ -251,6 +251,7 @@ for (const config of ["build/rollup.config.mjs", "build/rollup.dev.config.mjs"])
 
 
 # @source build/publication.mjs::recordBuildArtifacts
+# @pair frontend-build:artifact-inventory
 def test_rollup_metadata_uses_package_version_with_stale_settings(run_node):
     run_node(
         r'''
