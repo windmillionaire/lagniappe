@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections import Counter
 
+from ..report_contracts import MAX_PROPOSAL_ACTIONS
 from ..tools.files.html import sanitize_html
 from .ai_report_process import ReportProcessValue
 
@@ -37,8 +38,6 @@ class Proposal(ReportProcessValue):
     def action_summary(self):
         maximum = None
         if self.entity.origin == "api":
-            from ..tools.ai.external_api import MAX_PROPOSAL_ACTIONS
-
             maximum = MAX_PROPOSAL_ACTIONS
         return summarize_actions(self.value, maximum=maximum)
 

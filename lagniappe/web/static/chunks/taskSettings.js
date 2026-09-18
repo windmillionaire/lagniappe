@@ -1,2 +1,343 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="740f56ca-85a4-4fdc-80ce-f39435e96e32",e._sentryDebugIdIdentifier="sentry-dbid-740f56ca-85a4-4fdc-80ce-f39435e96e32");}catch(e){}}();import{F as c}from"./form2.js?v=b0a05c00";import{InputElement as d}from"./input.js?v=b0a05c00";import{S as m}from"./sectionToggle.js?v=b0a05c00";import{TextareaElement as p}from"./textarea.js?v=b0a05c00";import{w as u}from"./foundation.js?v=b0a05c00";import"./connectivity.js?v=b0a05c00";import"./formRepresentation.js?v=b0a05c00";import"./styles.js?v=b0a05c00";import"./modal.js?v=b0a05c00";import"./upstreamUnavailable.js?v=b0a05c00";import"./baseForm.js?v=b0a05c00";import"./icons.js?v=b0a05c00";import"./primitives.js?v=b0a05c00";import"./loader.js?v=b0a05c00";import"./baseElement.js?v=b0a05c00";import"./formatting.js?v=b0a05c00";import"./facets.js?v=b0a05c00";import"./remote.js?v=b0a05c00";import"./queryLifecycle.js?v=b0a05c00";import"./combobox.js?v=b0a05c00";import"./results.js?v=b0a05c00";import"./storage.js?v=b0a05c00";import"./submitter.js?v=b0a05c00";import"./buttons.js?v=b0a05c00";import"./baseUpload.js?v=b0a05c00";import"./upload.js?v=b0a05c00";import"./dropdown.js?v=b0a05c00";const h={selectUser:"facet",selectForm:"facet",selectProject:"facet",selectCategory:"facet",schedule:"date",uploadFile:"upload"};class a extends c{constructor(t){super(t),this.buttons={},this._actions=null,this._formUpdatedListener=this._formUpdatedListener.bind(this)}_formUpdatedListener(t){const s=t.detail.options?Object.values(t.detail.options)[0]:null,e=this.buttons.selectForm;if(t.detail.name==="project"&&s?.form&&e&&!e.readonly)e.details?.id!==s.form.id&&(e.clear(),e.addOption(s.form));else if(t.detail.name==="form"){if(Object.keys(t.detail.options).length===0)return;const o=Object.keys(t.detail.options)[0],i=this.component.elt.querySelector('[data-widget="TaskForm"]')?.dataset.formKey;if(!i||i===o)return;const l=this.component.widgets.TaskForm;u(()=>{l.destroy(),delete this.component.widgets.TaskForm,this.component.elt.querySelector('[data-widget="TaskForm"]').remove(),this.component.elt.querySelector('[lp-control="form"]').remove()},{label:"task-settings:replace-attached-form"})}}get html(){return[this.nameElement,this.descriptionElement,this.actions]}get actions(){return this.target.querySelector("[data-role='action-buttons']")}async _initForm(){await super._initForm(),await this._initActions()}async _initActions(){const t=this.actions;if(!t)return;const s=Array.from(t.querySelectorAll("button[data-action]"));if(s.length!==0){this.buttons={};for(const e of s){const n=e.dataset.action,o=h[n],i=o&&m[o]?m[o](this,e):null;i&&(await i.init(),this.buttons[n]=i,this.destroyables.push(i))}t.addEventListener("updated",this._formUpdatedListener),this._actions=t}}get pageElement(){return this._facetElement('[data-role="page-select"]')}get nameElement(){return new d({kind:"task",readonly:this.readonly},{id:"name",title:"Name",input:"text",placeholder:"name this task..."},this.target.dataset.name).elt}get descriptionElement(){return new p({kind:"task",readonly:this.readonly},{id:"description",title:"Description",input:"textarea",placeholder:"describe this task..."},this.target.dataset.description).elt}get formData(){const t=super.formData;return["task-file","mimetype"].forEach(s=>{t.delete(s)}),t}_facetElement(t){const s=this.target.querySelector(t);if(!s)return null;const e=m.facet(this,s);return e.init(),this.destroyables.push(e),e.elt}destroy(){this._actions?.removeEventListener("updated",this._formUpdatedListener),this._actions=null,super.destroy(),this.buttons={}}}class f extends a{constructor(t){super(t),this.messages={submit:"Update Task",submitting:"Updating",submitted:"Task Updated"}}}class g extends a{constructor(t){super(t),this.messages={submit:"Move Task",submitting:"Moving",submitted:"Task Moved"}}get html(){return[this.pageElement]}}class b extends c{constructor(t){super(t),this.messages={submit:"Combine Tasks",submitting:"Combining",submitted:"Tasks Combined"}}}class k extends a{constructor(t){super(t),this.messages={submit:"Create Personal Task",submitting:"Creating",submitted:"Task Created"}}postreconcile(){this._resetAfterCreate&&(this.commitReset(),this._resetAfterCreate=!1),super.postreconcile(),this.target.dataset.visible==="true"&&this.target.querySelector("input[name='name']")?.focus()}async created(){await this.prepareReset(),this._resetAfterCreate=!0}offline(){return{action:"create",kind:"task"}}}class y extends a{constructor(t){super(t),this.messages={submit:"Create Task",submitting:"Creating",submitted:"Task Created"},this.component.widgets.PageTaskList?.itemCount===0&&delete this.target.dataset.close}postreconcile(){this._resetAfterCreate&&(this.commitReset(),this._resetAfterCreate=!1),this._closeAfterCreate&&(this.target.dataset.close=this._closeAfterCreate,this._closeAfterCreate=null),super.postreconcile(),this.target.dataset.visible==="true"&&this.target.querySelector("input[name='name']").focus()}async created(){await this.prepareReset(),this._resetAfterCreate=!0,this.component.widgets.PageTaskList?.itemCount>0&&(this._closeAfterCreate="tasks:PageTaskList")}}export{a as BaseTaskSettings,y as CreateTask,k as CreateUserTask,b as TaskCombine,g as TaskMove,f as TaskSettings};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=bedf900f';
+import { InputElement } from './input.js?v=bedf900f';
+import { S as SectionToggle } from './sectionToggle.js?v=bedf900f';
+import { TextareaElement } from './textarea.js?v=bedf900f';
+import { w as withTransition } from './foundation.js?v=bedf900f';
+import './connectivity.js?v=bedf900f';
+import './formRepresentation.js?v=bedf900f';
+import './styles.js?v=bedf900f';
+import './modal.js?v=bedf900f';
+import './upstreamUnavailable.js?v=bedf900f';
+import './baseForm.js?v=bedf900f';
+import './icons.js?v=bedf900f';
+import './primitives.js?v=bedf900f';
+import './loader.js?v=bedf900f';
+import './baseElement.js?v=bedf900f';
+import './formatting.js?v=bedf900f';
+import './facets.js?v=bedf900f';
+import './remote.js?v=bedf900f';
+import './queryLifecycle.js?v=bedf900f';
+import './combobox.js?v=bedf900f';
+import './results.js?v=bedf900f';
+import './storage.js?v=bedf900f';
+import './submitter.js?v=bedf900f';
+import './buttons.js?v=bedf900f';
+import './baseUpload.js?v=bedf900f';
+import './upload.js?v=bedf900f';
+import './dropdown.js?v=bedf900f';
+
+const TASK_BUTTONS = {
+	selectUser: "facet",
+	selectForm: "facet",
+	selectProject: "facet",
+	selectCategory: "facet",
+	schedule: "date",
+	uploadFile: "upload",
+};
+
+/**
+ * @testable infrastructure
+ */
+class BaseTaskSettings extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.buttons = {};
+		this._actions = null;
+		this._formUpdatedListener = this._formUpdatedListener.bind(this);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
+	 * @matrix tasks : attach-form create model-task-link
+	 * @matrix tasks : retained-draft manual-form-choice
+	 */
+	_formUpdatedListener(e) {
+		const project = e.detail.options
+			? Object.values(e.detail.options)[0]
+			: null;
+		const formControl = this.buttons.selectForm;
+		if (
+			e.detail.name === "project" &&
+			project?.form &&
+			formControl &&
+			!formControl.readonly
+		) {
+			if (formControl.details?.id !== project.form.id) {
+				formControl.clear();
+				formControl.addOption(project.form);
+			}
+		} else if (e.detail.name === "form") {
+			const options = Object.keys(e.detail.options);
+			if (options.length === 0) return;
+
+			const formKey = Object.keys(e.detail.options)[0];
+			const existingForm = this.component.elt.querySelector(
+				`[data-widget="TaskForm"]`,
+			)?.dataset.formKey;
+			if (!existingForm || existingForm === formKey) return;
+
+			const form = this.component.widgets.TaskForm;
+			void withTransition(
+				() => {
+					form.destroy();
+					delete this.component.widgets.TaskForm;
+					this.component.elt.querySelector(`[data-widget="TaskForm"]`).remove();
+					this.component.elt.querySelector('[lp-control="form"]').remove();
+				},
+				{ label: "task-settings:replace-attached-form" },
+			);
+		}
+	}
+
+	get html() {
+		return [this.nameElement, this.descriptionElement, this.actions];
+	}
+
+	get actions() {
+		return this.target.querySelector("[data-role='action-buttons']");
+	}
+
+	async _initForm() {
+		await super._initForm();
+		await this._initActions();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_settings_awaits_action_controls_and_cleans_up
+	 * @matrix tasks : action-control-lifecycle teardown
+	 */
+	async _initActions() {
+		const actions = this.actions;
+		if (!actions) return;
+
+		const buttons = Array.from(actions.querySelectorAll("button[data-action]"));
+		if (buttons.length === 0) return;
+
+		this.buttons = {};
+
+		for (const button of buttons) {
+			const action = button.dataset.action;
+			const factory = TASK_BUTTONS[action];
+			const control =
+				factory && SectionToggle[factory]
+					? SectionToggle[factory](this, button)
+					: null;
+			if (!control) continue;
+
+			await control.init();
+			this.buttons[action] = control;
+			this.destroyables.push(control);
+		}
+
+		actions.addEventListener("updated", this._formUpdatedListener);
+		this._actions = actions;
+	}
+
+	get pageElement() {
+		return this._facetElement('[data-role="page-select"]');
+	}
+
+	get nameElement() {
+		const nameElement = new InputElement(
+			{
+				kind: "task",
+				readonly: this.readonly,
+			},
+			{
+				id: "name",
+				title: "Name",
+				input: "text",
+				placeholder: "name this task...",
+			},
+			this.target.dataset.name,
+		).elt;
+
+		return nameElement;
+	}
+
+	get descriptionElement() {
+		return new TextareaElement(
+			{
+				kind: "task",
+				readonly: this.readonly,
+			},
+			{
+				id: "description",
+				title: "Description",
+				input: "textarea",
+				placeholder: "describe this task...",
+			},
+			this.target.dataset.description,
+		).elt;
+	}
+
+	get formData() {
+		const data = super.formData;
+		["task-file", "mimetype"].forEach((name) => {
+			data.delete(name);
+		});
+		return data;
+	}
+
+	_facetElement(selector) {
+		const target = this.target.querySelector(selector);
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		return control.elt;
+	}
+
+	destroy() {
+		this._actions?.removeEventListener("updated", this._formUpdatedListener);
+		this._actions = null;
+		super.destroy();
+		this.buttons = {};
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
+ * @matrix tasks : settings-form update
+ */
+class TaskSettings extends BaseTaskSettings {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Task",
+			submitting: "Updating",
+			submitted: "Task Updated",
+		};
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page
+ * @matrix tasks : completed move title-menu
+ */
+class TaskMove extends BaseTaskSettings {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Move Task",
+			submitting: "Moving",
+			submitted: "Task Moved",
+		};
+	}
+
+	get html() {
+		return [this.pageElement];
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
+ * @matrix task-combine : checkbox-submit delta lazy-form
+ */
+class TaskCombine extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Combine Tasks",
+			submitting: "Combining",
+			submitted: "Tasks Combined",
+		};
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_task_form
+ * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_today
+ * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_in_four_days
+ * @matrix tasks : create-form create-personal due-date
+ */
+class CreateUserTask extends BaseTaskSettings {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Personal Task",
+			submitting: "Creating",
+			submitted: "Task Created",
+		};
+	}
+
+	postreconcile() {
+		if (this._resetAfterCreate) {
+			this.commitReset();
+			this._resetAfterCreate = false;
+		}
+		super.postreconcile();
+		if (this.target.dataset.visible === "true") {
+			this.target.querySelector("input[name='name']")?.focus();
+		}
+	}
+
+	async created() {
+		await this.prepareReset();
+		this._resetAfterCreate = true;
+	}
+
+	offline() {
+		return {
+			action: "create",
+			kind: "task",
+		};
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
+ * @matrix tasks : basic create list-state while-open
+ */
+class CreateTask extends BaseTaskSettings {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Task",
+			submitting: "Creating",
+			submitted: "Task Created",
+		};
+
+		if (this.component.widgets.PageTaskList?.itemCount === 0) {
+			delete this.target.dataset.close;
+		}
+	}
+
+	postreconcile() {
+		if (this._resetAfterCreate) {
+			this.commitReset();
+			this._resetAfterCreate = false;
+		}
+		if (this._closeAfterCreate) {
+			this.target.dataset.close = this._closeAfterCreate;
+			this._closeAfterCreate = null;
+		}
+		super.postreconcile();
+		if (this.target.dataset.visible === "true") {
+			this.target.querySelector("input[name='name']").focus();
+		}
+	}
+
+	async created() {
+		await this.prepareReset();
+		this._resetAfterCreate = true;
+		if (this.component.widgets.PageTaskList?.itemCount > 0) {
+			this._closeAfterCreate = "tasks:PageTaskList";
+		}
+	}
+}
+
+export { BaseTaskSettings, CreateTask, CreateUserTask, TaskCombine, TaskMove, TaskSettings };

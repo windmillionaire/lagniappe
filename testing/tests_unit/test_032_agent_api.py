@@ -1055,6 +1055,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
 
     assert "tool" not in contract
     assert contract["contract_version"] == external_api.CONTRACT_VERSION
+    assert contract["limits"]["max_actions"] == 100
     assert contract["proposal_schema"] is None
     full = external_api.plan_contract(report, actor, submit_url="https://example.test/submit", view="full")
     assert full["proposal_schema"] == {"allowed": ("create_page", "move_page", "summarize_file"), "require_file_summary_terms": True}
@@ -1389,6 +1390,25 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
     assert captured["required_file_refs"] == ["hash:aaaaaaaaaaaa"]
     assert captured["require_file_summaries"] is True
     assert captured["validate_reference_kinds"] is True
+
+    at_limit = {
+        **proposal,
+        "actions": [
+            {"type": "needs_review", "data": {"note": "Check identity"}}
+            for _ in range(100)
+        ],
+    }
+    file_usage = [{"file": "hash:aaaaaaaaaaaa", "usage": "organize"}]
+    assert external_api.validate_external_proposal(
+        at_limit, report, actor, file_usage=file_usage
+    ) == at_limit
+    with pytest.raises(exceptions.AIException, match="too many actions"):
+        external_api.validate_external_proposal(
+            {**at_limit, "actions": [*at_limit["actions"], at_limit["actions"][0]]},
+            report,
+            actor,
+            file_usage=file_usage,
+        )
 
     with pytest.raises(exceptions.AIException, match="confidence"):
         external_api.validate_external_proposal(

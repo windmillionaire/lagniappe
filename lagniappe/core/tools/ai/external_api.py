@@ -9,6 +9,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
+from lagniappe.core.report_contracts import MAX_PROPOSAL_ACTIONS as MAX_PROPOSAL_ACTIONS
 from lagniappe.core.tools import cache, dates
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.database import assets as storage_assets
@@ -41,7 +42,6 @@ from .reporting.proposals.validation import validate_proposal
 CONTRACT_VERSION = 10
 MAX_INSTRUCTIONS_BYTES = 65536
 MAX_PROPOSAL_BYTES = 1024 * 1024
-MAX_PROPOSAL_ACTIONS = 100
 MAX_PLAN_TOOL_CALLS = 100
 MAX_PLAN_FILES = 20
 MAX_FILE_BYTES = 30 * 1024 * 1024
