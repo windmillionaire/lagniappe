@@ -30,6 +30,7 @@ from lagniappe.core.mutations import (
     registered_kinds,
 )
 from lagniappe.core.mutations import executor as mutation_executor
+from lagniappe.core import mutations as mutation_planning
 from lagniappe.core.mutations.delete import Survivor, _merge_survivors
 from testing.utility import mutation_contracts
 from testing.utility.test_entities import TestEntities
@@ -780,11 +781,19 @@ def test_save_executes_datastore_before_cache_and_reports_cache_failure(monkeypa
 
 
 # @matrix mutations : multiple-explicit-roots property-mask save standard-lifecycle
-def test_each_explicit_save_argument_is_a_standard_root():
+def test_each_explicit_save_argument_is_a_standard_root(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Root page", "hash": "root-page"})
     category = TestEntities.get(
         "CATEGORY", {"name": "Root category", "hash": "root-category"}
     )
+    looked_up = []
+    planner_for = mutation_planning.planner_for
+
+    def lookup(entity):
+        looked_up.append(entity)
+        return planner_for(entity)
+
+    monkeypatch.setattr(mutation_planning, "planner_for", lookup)
 
     plan = plan_mutation(
         MutationOperation.SAVE,
@@ -798,6 +807,7 @@ def test_each_explicit_save_argument_is_a_standard_root():
     assert writes[category.key].property_mask is None
     assert writes[page.key].serialize_processes is True
     assert writes[category.key].serialize_processes is True
+    assert looked_up == [page, category]
 
 
 # @matrix mutations user : canonical-page intent-isolation save

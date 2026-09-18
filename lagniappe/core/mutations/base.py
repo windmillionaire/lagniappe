@@ -37,10 +37,11 @@ class MutationPlanBuilder:
     """Merge kind-planner output into one authoritative effect inventory."""
 
     # @testable infrastructure
-    def __init__(self, operation, entities, *, registry=None):
+    def __init__(self, operation, entities, *, registry=None, planner_for=None):
         self.operation = operation
         self.roots = tuple(entities)
         self.entities = registry
+        self._planner_for = planner_for
         self._effects = OrderedDict()
         self._standard_planned = set()
         self._standard_planning = set()
@@ -330,10 +331,11 @@ class MutationPlanBuilder:
             self.standard_root(entity, reason=reason, depends_on=depends_on)
             return
 
-        self._standard_planning.add(key)
-        from .registry import planner_for
+        if self._planner_for is None:
+            raise RuntimeError("Standard mutation planning requires a planner lookup")
 
-        planner_for(entity).plan_save(
+        self._standard_planning.add(key)
+        self._planner_for(entity).plan_save(
             entity,
             self,
             reason=reason,

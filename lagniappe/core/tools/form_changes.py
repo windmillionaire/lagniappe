@@ -399,7 +399,7 @@ def prepare_target(entity, change, *, ai_values=None):
 # @matrix form-migration : partial-read generation removed-link
 # @matrix form-migration : form-authority restricted-submissions
 def apply_target(context, raw, *, ai_values=None):
-    from ..mutations import execute_mutation
+    from ..mutations import execute_mutation, planner_for
     from ..mutations.base import MutationPlanBuilder
 
     form, change = owned_change(context)
@@ -426,7 +426,7 @@ def apply_target(context, raw, *, ai_values=None):
     converted.properties.form.attach({form.key: form})
     converted._form_change_write = True
     builder = MutationPlanBuilder(
-        MutationOperation.SAVE, (converted,), registry=Entities
+        MutationOperation.SAVE, (converted,), registry=Entities, planner_for=planner_for
     )
     if not applied:
         builder.patch(

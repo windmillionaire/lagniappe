@@ -9,9 +9,7 @@ from lagniappe.core.entities import entity as entity_module
 from lagniappe.core.tools.ai.reporting.contracts import actions as report_contracts
 from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
 from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
-from lagniappe.core.tools.ai.reporting.execution.actions import (
-    base as report_action_lifecycle,
-)
+from lagniappe.core.tools.ai.reporting.execution.actions.base import ReportActionAdapter
 from lagniappe.core.tools.ai.reporting.execution.actions.registry import (
     REPORT_ACTION_ADAPTERS,
 )
@@ -120,16 +118,16 @@ def test_complete_task_action_preserves_details_and_retries(
         monkeypatch, completed=completed, recurring=recurring
     )
     old_files = list(task.files)
-    original = report_action_lifecycle._execute_action
+    original = ReportActionAdapter.apply
     calls = []
 
-    def interrupted(action, *args, **kwargs):
+    def interrupted(adapter, action, *args, **kwargs):
         calls.append(action["id"])
         if action["id"] == "finish" and calls.count("finish") == 1:
             raise RuntimeError("Interrupt after completion")
-        return original(action, *args, **kwargs)
+        return original(adapter, action, *args, **kwargs)
 
-    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
+    monkeypatch.setattr(ReportActionAdapter, "apply", interrupted)
     assert report_runner.run_report(report, user)["status"] == "failed"
     assert task.completed is (recurring != "near"), str(report.result)
     completion = task.completed_on
@@ -193,7 +191,9 @@ def test_complete_task_action_requires_permission_and_required_fields(
 
 # @matrix ai-report : action-registry contract
 @pytest.mark.unit
-def test_report_action_registry_matches_proposal_contracts():
+@pytest.mark.parametrize("uses_context", [False, True])
+@pytest.mark.parametrize("with_metadata", [False, True])
+def test_report_action_registry_matches_proposal_contracts(uses_context, with_metadata):
     adapters = REPORT_ACTION_ADAPTERS
 
     assert set(adapters) == set(report_contracts.REPORT_ACTION_DATA_CONTRACTS)
@@ -201,6 +201,29 @@ def test_report_action_registry_matches_proposal_contracts():
     assert all(
         action_type == adapter.action_type for action_type, adapter in adapters.items()
     )
+
+    action = {"type": "local-action"}
+    report, user, entity = object(), object(), object()
+    created, writes = {}, [entity]
+    metadata = {"created": True} if with_metadata else {}
+    result = (entity, writes, metadata) if with_metadata else (entity, writes)
+    calls = []
+
+    def handler(*args):
+        calls.append(args)
+        return result
+
+    adapter = ReportActionAdapter(action["type"], handler, uses_context=uses_context)
+    assert action["type"] not in adapters
+    for context in (None, {"output_key": "local-output"}):
+        assert adapter.apply(action, report, user, created, context) == (
+            entity, writes, metadata
+        )
+        arguments = (action, report, user, created)
+        assert calls[-1] == (
+            (*arguments, context or {}) if uses_context else arguments
+        )
+    assert len(calls) == 2
 
 
 # @matrix ai-report : cancellation deterministic-run
@@ -331,18 +354,18 @@ def test_run_report_retry_resumes_after_completed_create_without_duplicate(monke
         },
     )
     stored, _saves = _recovery_store(monkeypatch)
-    original_execute = report_action_lifecycle._execute_action
+    original_execute = ReportActionAdapter.apply
     calls = []
     failed = {"value": False}
 
-    def interrupted(action, *args, **kwargs):
+    def interrupted(adapter, action, *args, **kwargs):
         calls.append(action["id"])
         if action["id"] == "second_project" and not failed["value"]:
             failed["value"] = True
             raise RuntimeError("injected interruption")
-        return original_execute(action, *args, **kwargs)
+        return original_execute(adapter, action, *args, **kwargs)
 
-    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
+    monkeypatch.setattr(ReportActionAdapter, "apply", interrupted)
 
     first = report_runner.run_report(report, user)
 
@@ -407,16 +430,16 @@ def test_run_report_retry_continues_independent_work_after_completed_entity_chan
         },
     )
     stored, _saves = _recovery_store(monkeypatch)
-    original_execute = report_action_lifecycle._execute_action
+    original_execute = ReportActionAdapter.apply
     calls = []
 
-    def interrupted(action, *args, **kwargs):
+    def interrupted(adapter, action, *args, **kwargs):
         calls.append(action["id"])
         if action["id"] == "second_project":
             raise RuntimeError("injected interruption")
-        return original_execute(action, *args, **kwargs)
+        return original_execute(adapter, action, *args, **kwargs)
 
-    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
+    monkeypatch.setattr(ReportActionAdapter, "apply", interrupted)
     first = report_runner.run_report(report, user)
     project = stored[first["actions"][0]["entity"]["id"]]
     monkeypatch.setattr(
@@ -427,7 +450,7 @@ def test_run_report_retry_continues_independent_work_after_completed_entity_chan
 
     recovered = report_runner.run_report(report, user)
 
-    monkeypatch.setattr(report_action_lifecycle, "_execute_action", original_execute)
+    monkeypatch.setattr(ReportActionAdapter, "apply", original_execute)
     recovered = report_runner.run_report(report, user)
     assert recovered["status"] == "complete"
     assert recovered["actions"][0]["status"] == "complete"
@@ -483,8 +506,8 @@ def test_run_report_reconciles_applying_create_when_output_already_exists(monkey
     report.result = ledger
     stored, _saves = _recovery_store(monkeypatch, project)
     monkeypatch.setattr(
-        report_action_lifecycle,
-        "_execute_action",
+        ReportActionAdapter,
+        "apply",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("reconciled action should not execute again")
         ),
@@ -561,18 +584,18 @@ def test_completed_task_retry_preserves_reused_completion(monkeypatch):
         },
     )
     stored, _saves = _recovery_store(monkeypatch, page, task)
-    original_execute = report_action_lifecycle._execute_action
+    original_execute = ReportActionAdapter.apply
     calls = []
     failed = {"value": False}
 
-    def interrupted(action, *args, **kwargs):
+    def interrupted(adapter, action, *args, **kwargs):
         calls.append(action["id"])
         if action["id"] == "finish_project" and not failed["value"]:
             failed["value"] = True
             raise RuntimeError("stop after task mutation")
-        return original_execute(action, *args, **kwargs)
+        return original_execute(adapter, action, *args, **kwargs)
 
-    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
+    monkeypatch.setattr(ReportActionAdapter, "apply", interrupted)
 
     first = report_runner.run_report(report, user)
 

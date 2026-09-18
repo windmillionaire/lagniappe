@@ -16,6 +16,13 @@ entity-kind planner under `lagniappe/core/mutations/` and produces a
 - cache/search effects; and
 - asset cleanup and other post-commit work.
 
+`mutations/registry.py` owns the explicit kind-to-planner catalog.
+`MutationPlanBuilder` receives its `planner_for` lookup from the save, delete,
+document-checkpoint, or form-change entry point; the base builder does not
+import the catalog. Builders used only for masked/root writes or parent touches
+need no lookup. Any caller that plans standard roots or consumes standard
+intents must supply one.
+
 Every entity passed directly to `Entities.save(*entities)` is a complete root
 write. Lifecycle properties, requirements, process serialization, and the full
 `exclude_from_indexes` set are prepared by the executor.

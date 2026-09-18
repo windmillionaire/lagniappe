@@ -40,12 +40,10 @@ class ReportActionAdapter:
     def inspect_applied(self, action, report, user, record):
         return _inspect_action_applied(action, report, user, record)
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_020h_ai_report_execution.py::test_report_action_registry_matches_proposal_contracts
+    # @matrix ai-report : action-registry contract
     def apply(self, action, report, user, created, context):
-        return _execute_action(action, report, user, created, context)
-
-    # @testable infrastructure
-    def _apply(self, action, report, user, created, context):
         arguments = (action, report, user, created)
         if self.uses_context:
             return _normalize_handler_result(
@@ -56,20 +54,10 @@ class ReportActionAdapter:
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason action dispatch is exercised through deterministic report-run tests
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/base.py::ReportActionAdapter.apply
+# @reason handler result normalization is exercised through the adapter contract
 def _normalize_handler_result(result):
     if len(result) == 2:
         entity, to_save = result
         return entity, to_save, {}
     return result
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason action dispatch is exercised through deterministic report-run tests
-def _execute_action(action, report, user, created, context=None):
-    from .registry import report_action_adapter
-
-    adapter = report_action_adapter(action["type"])
-    return adapter._apply(action, report, user, created, context or {})

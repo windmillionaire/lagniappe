@@ -2,6 +2,7 @@
 
 from ..definitions import MutationOperation
 from .base import MutationPlanBuilder
+from .registry import planner_for
 
 
 # @testable false
@@ -23,6 +24,7 @@ def plan_document_checkpoint(entity, *, advance_parent=False, registry=None):
         MutationOperation.SAVE,
         (entity,),
         registry=registry,
+        planner_for=planner_for,
     )
     builder.patch(
         entity,

@@ -13,6 +13,7 @@ from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import messaging as database_messaging
 from lagniappe.core.tools.database.utility import ExactEntityState
 from .base import MutationPlanBuilder
+from .registry import planner_for
 
 
 # @testable infrastructure
@@ -572,6 +573,7 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
         MutationOperation.DELETE,
         entities,
         registry=registry,
+        planner_for=planner_for,
     )
     collector = DeleteCollector(
         registry,

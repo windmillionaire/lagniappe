@@ -43,3 +43,11 @@ validate_report_action_registry()
 # @reason forward dispatch is exercised through deterministic report execution
 def report_action_adapter(action_type):
     return REPORT_ACTION_ADAPTERS[action_type]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @reason required placement failures are asserted through full report execution
+def _is_required_file_placement(action):
+    adapter = REPORT_ACTION_ADAPTERS.get(action.get("type"))
+    return bool(adapter and adapter.required)

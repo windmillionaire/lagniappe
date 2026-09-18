@@ -186,16 +186,6 @@ def _is_recoverable_action_error(_action, error):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason required placement failures are asserted through full report execution
-def _is_required_file_placement(action):
-    from .registry import REPORT_ACTION_ADAPTERS
-
-    adapter = REPORT_ACTION_ADAPTERS.get(action.get("type"))
-    return bool(adapter and adapter.required)
-
-
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
 # @matrix ai-report : attachments partial-result

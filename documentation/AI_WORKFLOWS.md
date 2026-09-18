@@ -192,6 +192,12 @@ AI proposals may include reviewed create, move, rename,
 attach, schema, and submission actions. `reporting/execution/` owns deterministic
 application; the model is not called during execution.
 
+`execution/actions/registry.py` owns the action catalog, completeness check,
+and required-placement lookup. The runner selects an adapter there;
+`ReportActionAdapter.apply()` invokes that adapter's bound handler and normalizes
+its result without looking back into the registry. Checkpoint and recovery
+helpers retain their existing lifecycle responsibilities.
+
 Because execution is provider-free, viewing, skipping actions, running,
 retrying and deleting a saved report do not require `User.ai_access`.
 They remain creator-bound browser operations, and every action rechecks current
