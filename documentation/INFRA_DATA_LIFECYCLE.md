@@ -92,6 +92,16 @@ path, normally the path printed by `archive`. A successful summary reports the
 archive ID plus its portable entity and file counts; it does not modify the
 archive or contact Google Cloud.
 
+The archive code has three dependency layers within `installer/data_lifecycle/`:
+`portable.py` owns the format constants, identities, value codec, record
+validators, shard writer, and bundled schema; `validation.py` uses that format
+to inspect complete directories and ZIPs; `import_planner.py` owns the read-only
+`ImportPlanner`, including `plan_bundle()` validation and loading. Import the
+planner from its own module. The format and standalone validator do not import
+planning or restore workflows. Provider clients and application modules are not
+loaded when importing the portable format; GeoPoint decoding retains its lazy
+SDK value-type import.
+
 Manual and provider-managed backups remain complete restore artifacts rather
 than owner-facing archives. Google-managed automatic backups cannot filter
 individual kinds, and pinned and unnamed document history share one physical

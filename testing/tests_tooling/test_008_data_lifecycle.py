@@ -20,9 +20,9 @@ from installer.data_lifecycle.archive import _root_manifest, _write_bundle
 from installer.data_lifecycle.assets import AssetCollector
 from installer.data_lifecycle.backup import create_backup, delete_backup, list_backups
 from installer.data_lifecycle.html import OfflineHTMLBuilder, sanitize_stored_html
+from installer.data_lifecycle.import_planner import ImportPlanner
 from installer.data_lifecycle.portable import (
     DecodedEntity,
-    ImportPlanner,
     MissingReference,
     PortableReference,
     ShardWriter,
@@ -859,7 +859,7 @@ def test_import_planner_is_source_independent_and_resolves_two_pass_references(t
             "literal": {"literal:ref:user:userhash0001": True},
         },
     )
-    planned = ImportPlanner(target_prefix="test-").plan([user, page])
+    planned = ImportPlanner(target_prefix="test-").plan([page, user])
     assert planned["recipe"] == "lagniappe-target-key/v1"
     assert planned["identity_count"] == 2
     assert PROJECT_ID not in canonical_json(planned).decode()
@@ -867,8 +867,15 @@ def test_import_planner_is_source_independent_and_resolves_two_pass_references(t
     with pytest.raises(DataLifecycleError, match="unresolved"):
         ImportPlanner().plan([missing])
     bundle = tmp_path / "bundle"
-    _archive_bundle(bundle)
-    assert ImportPlanner(target_prefix="test-").plan_bundle(bundle)["identity_count"] == 1
+    manifest = _archive_bundle(bundle, records=[user, page])
+    planner = ImportPlanner(target_prefix="test-")
+    assert planner.plan_bundle(bundle) == planned
+    output = tmp_path / "bundle.zip"
+    archive_module._publish_zip(bundle, output, manifest)
+    assert planner.plan_bundle(output) == planned
+    (bundle / "README.md").write_text("changed")
+    with pytest.raises(DataLifecycleError, match="size mismatch|checksum mismatch"):
+        planner.plan_bundle(bundle)
 
 
 class _PageIterator:
