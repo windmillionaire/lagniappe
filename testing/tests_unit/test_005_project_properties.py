@@ -439,14 +439,15 @@ def test_project_update_sets_identity_and_description():
 def test_model_task_entity_create_update_order_and_save_relations():
     """ModelTask.create/update/order/save remain focused on model-task relations."""
     project = Project(testing=True)
-    project._key = "prj005b"
+    project._key = datastore.Key("models", "prj005b", project="test")
     project.db.update({"hash": "prj005b", "name": "Project"})
+    project.properties.model_tasks._value = []
     form = TestEntities.get("FORM", {"name": "Task Form", "hash": "frm005b"})
     created_db = {}
 
     with patch(
         "lagniappe.core.entities.entity.database_utility.create_key",
-        return_value=SimpleNamespace(parent=project.key),
+        return_value=datastore.Key("models", "model005b", parent=project.key),
     ):
         with patch("lagniappe.core.entities.entity.database_get.entity", return_value=None):
             with patch(

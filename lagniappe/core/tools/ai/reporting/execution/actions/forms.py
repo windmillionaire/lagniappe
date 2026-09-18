@@ -88,6 +88,9 @@ def _update_form_schema(action, report, user, created, context):
         raise exceptions.ValidationError(
             "This schema migration needs a fresh preview and user review before execution."
         )
+    batch = context.get("batch")
+    if batch is not None and batch.indices:
+        batch.commit()
     migration_id = migration_id or record["idempotency_key"]
     record.update(migration_id=migration_id, migration_form=form.urlsafe_key)
     Entities.save(report)

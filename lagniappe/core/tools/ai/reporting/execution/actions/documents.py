@@ -1,23 +1,19 @@
 """Reviewed, attributed, append-only Page document changes."""
 
-import hashlib
 from datetime import datetime, timezone
 from html import escape
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import MutationIntent
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.database import get as database_get, utility as database_utility
 from lagniappe.core.tools.cache.documents import document_write_lock
 from lagniappe.core.tools.document_crdt import (
     append_fragment,
     load_document,
-    document_structure,
 )
 from lagniappe.core.tools.document_updates import (
     checkpointed_document,
     fresh_document,
-    save_checkpoint,
 )
 
 from .common import _data, _first_data_reference
@@ -44,18 +40,6 @@ def document_source_quote(report, timestamp):
     return f"<blockquote><p>{escape(timestamp)} · {source}</p></blockquote>"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/documents.py::prepare_document_append
-# @reason stable text/structure signature rejects stale append baselines
-def document_signature(document):
-    return {
-        "html": document.fingerprint,
-        "structure": hashlib.sha256(
-            document_structure(document.ydoc).encode()
-        ).hexdigest(),
-    }
-
-
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
 # @matrix ai-report editor : document append retry conflict
@@ -63,17 +47,7 @@ def prepare_document_append(action, report, user, created, record):
     page = _resolve_entity(
         _first_data_reference(_data(action), "page"), created, expected=Entities.PAGE
     )
-    with document_write_lock(page.properties.document.sync_id):
-        page = fresh_document(page, user)
-        checkpointed_document(page)
-        record["before"] = {
-            "entity": _entity_result(page),
-            "signature": document_signature(page.properties.document),
-            "history_key": (
-                database_get.urlsafe_key(database_utility.create_key("document_history", page))
-                if page.get_asset("document") else None
-            ),
-        }
+    record["before"] = {"entity": _entity_result(page)}
     record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
@@ -86,19 +60,21 @@ def _append_page_document(action, report, user, created, context):
     page = _resolve_entity(
         _first_data_reference(_data(action), "page"), created, expected=Entities.PAGE
     )
+    from lagniappe.core.definitions import Action
+    if not page.allowed(Action.EDIT, user=user):
+        raise exceptions.ValidationError("Document is unavailable or no longer editable.")
     with document_write_lock(page.properties.document.sync_id):
-        page = fresh_document(page, user)
         document = page.properties.document
         receipt = load_document(document.ydoc)["lagniappeReports"].get(
             record["idempotency_key"]
         )
         if receipt:
             return page, [], {"document_after": receipt["signature"]}
-        checkpointed_document(page)
-        if document_signature(document) != record["before"]["signature"]:
-            raise exceptions.ValidationError(
-                "Document changed after preparation; recreate the append plan."
-            )
+        batch = context["batch"]
+        first_append = page.key not in batch.documents
+        if first_append:
+            checkpointed_document(page)
+            batch.add_document(page)
         addition = (
             document_source_quote(report, record["document_at"])
             + _data(action)["document"]
@@ -107,17 +83,15 @@ def _append_page_document(action, report, user, created, context):
         snapshot, receipt = append_fragment(
             document.ydoc, addition, record["idempotency_key"], html_after=html
         )
-        if record["before"]["history_key"]:
-            history = Entities.DOCUMENT_HISTORY.create(
-                page, key=database_get.datastore_key(record["before"]["history_key"])
-            )
+        if first_append and page.get_asset("document"):
+            history = Entities.DOCUMENT_HISTORY.create(page)
             if history is None or history.get_asset("document") is None:
                 raise exceptions.ValidationError("Could not preserve the document version; append stopped.")
             history.name = f"Before report append — {record['document_at']}"
             page.add_mutation_intents(
                 MutationIntent.standard(history, reason="report-document-version")
             )
-        save_checkpoint(page, html=html, ydoc=snapshot)
+        document.save(html=html, ydoc=snapshot)
         return page, [], {"document_after": receipt["signature"]}
 
 

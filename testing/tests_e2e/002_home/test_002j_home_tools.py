@@ -684,6 +684,77 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
     assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
 
 
+# @pair ai-access:provider-boundary
+# @template home/tools.html::generation_controls
+@pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
+def test_corrective_plan_controls_require_create_access(get_user, browser_failures, tier):
+    from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction
+
+    suffix = _suffix()
+    user = get_user(
+        UserDefinition(
+            name=f"Correction Access {suffix}",
+            email=f"correction-access-{suffix}@example.test",
+            ai_access=tier,
+        ),
+        creator=get_user(Users.OWNER),
+    )
+    owner = _owner(user)
+    source = Entities.REPORT.create({
+        "user": owner, "parent": owner, "origin": "api",
+        "name": f"test-executed-external-plan-{suffix}",
+        "status": "complete", "pending": False,
+        "proposal": {"summary": "Completed external work", "actions": []},
+        "result": {"status": "complete", "actions": []},
+    })
+    Entities.save(source)
+    correction = Entities.REPORT.create({
+        "user": owner, "parent": owner, "origin": "web",
+        "name": f"test-cancelled-correction-{suffix}",
+        "status": "cancelled", "pending": False,
+    })
+    link_correction(correction, source, owner)
+    save_correction(correction, source)
+
+    user.go(Report.for_entity(user, source))
+    correction_button = user.page.get_by_role("button", name="Create corrective plan", exact=True)
+    if tier is AI.CREATE:
+        expect(correction_button).to_be_visible()
+    else:
+        expect(correction_button).to_have_count(0)
+        path = f"/tools/reports/{source.urlsafe_key}/revise"
+        with browser_failures.expect_http_error(user, status=403, path=path):
+            response = browser_fetch(user, path, data={"feedback": "Change this plan"})
+        assert response["status"] == 403
+
+    user.go(Report.for_entity(user, correction))
+    retry_path = f"/tools/reports/{correction.urlsafe_key}/retry-generation"
+    retry_form = user.page.locator("[data-role='retry-generation-form']")
+    if tier is AI.CREATE:
+        expect(retry_form).to_be_visible()
+    else:
+        expect(retry_form).to_have_count(0)
+        with browser_failures.expect_http_error(user, status=403, path=retry_path):
+            response = browser_fetch(user, retry_path)
+        assert response["status"] == 403
+        persisted = Entities.fetch_one(correction.urlsafe_key, request=Fetch.direct())
+        assert persisted.status == "cancelled"
+        assert not persisted.pending and not persisted.deferred_job
+
+    home = user.go(SitePages.HOME)
+    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+    report_list = user.locate(home.TOOL_REPORT_LIST)
+    expect(report_list.get_by_role("link", name=correction.name)).to_be_visible()
+    expect(report_list.locator(f'form[action="{retry_path}"]')).to_have_count(
+        1 if tier is AI.CREATE else 0
+    )
+
+    if tier is AI.ASK:
+        answer = _ask_answer_report(user)
+        user.go(Report.for_entity(user, answer))
+        expect(user.page.get_by_role("button", name="Revise Response", exact=True)).to_be_visible()
+
+
 # @matrix ai-report : async create persistence title-truncation filter-create
 # @template home/tools.html::create_report
 @pytest.mark.parametrize("cold_list", [False, True])

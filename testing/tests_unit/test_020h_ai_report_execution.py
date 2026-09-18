@@ -118,6 +118,8 @@ def _completion_case(monkeypatch, *, completed=False, recurring=False):
 def test_complete_task_action_preserves_details_and_retries(
     monkeypatch, completed, recurring
 ):
+    from lagniappe.core.tools.ai.reporting.execution import batch
+    monkeypatch.setattr(batch, "MAX_BATCH_ACTIONS", 1)
     from lagniappe.core.tools.ai.reporting.execution.actions.task_completion import (
         _completion_state,
     )
@@ -244,7 +246,7 @@ def test_run_report_checks_deferred_execution_guard(monkeypatch):
 
     assert result["status"] == "complete"
     assert report.status == "complete"
-    assert len(checks) == 3
+    assert len(checks) == 4
     assert saved == [(report,), (report,)]
 
 
@@ -307,6 +309,8 @@ def test_run_report_propagates_deferred_control_stop(monkeypatch):
 # @matrix ai-report : completed-prefix create deterministic-run idempotency recovery
 @pytest.mark.unit
 def test_run_report_retry_resumes_after_completed_create_without_duplicate(monkeypatch):
+    from lagniappe.core.tools.ai.reporting.execution import batch
+    monkeypatch.setattr(batch, "MAX_BATCH_ACTIONS", 1)
     _patch_fake_keys(monkeypatch)
     user = _test_user("report-create-recovery-owner")
     report = TestEntities.get(
@@ -378,9 +382,11 @@ def test_run_report_retry_resumes_after_completed_create_without_duplicate(monke
 
 # @matrix ai-report : completed-prefix deterministic-run permissions recovery
 @pytest.mark.unit
-def test_run_report_retry_stops_when_completed_prefix_permission_is_revoked(
+def test_run_report_retry_continues_independent_work_after_completed_entity_changes(
     monkeypatch,
 ):
+    from lagniappe.core.tools.ai.reporting.execution import batch
+    monkeypatch.setattr(batch, "MAX_BATCH_ACTIONS", 1)
     _patch_fake_keys(monkeypatch)
     user = _test_user("report-recovery-permission-owner")
     report = TestEntities.get(
@@ -430,10 +436,11 @@ def test_run_report_retry_stops_when_completed_prefix_permission_is_revoked(
 
     recovered = report_runner.run_report(report, user)
 
-    assert recovered["status"] == "failed"
-    assert recovered["actions"][0]["status"] == "failed"
-    assert "state has changed" in recovered["actions"][0]["error"]
-    assert calls == ["first_project", "second_project"]
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", original_execute)
+    recovered = report_runner.run_report(report, user)
+    assert recovered["status"] == "complete"
+    assert recovered["actions"][0]["status"] == "complete"
+    assert len([entity for entity in stored.values() if entity.entity_kind == "project"]) == 2
 
 
 
@@ -505,6 +512,8 @@ def test_run_report_reconciles_applying_create_when_output_already_exists(monkey
 # @matrix ai-report : completed-task deterministic-run recovery reuse
 @pytest.mark.unit
 def test_completed_task_retry_preserves_reused_completion(monkeypatch):
+    from lagniappe.core.tools.ai.reporting.execution import batch
+    monkeypatch.setattr(batch, "MAX_BATCH_ACTIONS", 1)
     _patch_fake_keys(monkeypatch)
     user = _test_user("report-completed-task-recovery-owner")
     page = TestEntities.get(

@@ -77,6 +77,11 @@ deadline. Report planning also has a ten-minute total lifetime from job creation
 including queue waits; each attempt uses the earlier deadline. Execution control is checked between provider rounds and
 tool calls and immediately before apply.
 
+Site generation of corrective plans requires AI.CREATE, including retries and
+proposal revisions. The report adapter rechecks that entitlement before provider
+preparation and publication. External corrective proposals and their approved
+execution remain independent of site provider access.
+
 Autofill uses a form-specific revision and active lock, so unrelated target
 settings do not cause false drift. Other mutation adapters use their declared
 target fingerprint. Report execution also checks the report's active operation
@@ -250,8 +255,9 @@ and Form membership. Existing errors containing only column IDs are translated
 using the pending schema. Retry continues unfinished work and preserves receipts
 for already-converted answers.
 
-`update_form_schema` report actions record the child migration ID before starting
-it. The report runner raises the existing dependency-pending signal and releases
+`update_form_schema` report actions flush their current execution batch and record
+the child migration ID before starting it. The report runner raises the existing
+dependency-pending signal and releases
 its worker while the child runs. Retry checks the pending owner/publication
 receipt, and dependent actions proceed only after publication. Candidates remain
 inside the linked report, whose fingerprint is rechecked by the worker. No bulk
@@ -297,3 +303,10 @@ When adding a deferred adapter:
 Analytics and exported operation diagnostics reconcile running report telemetry
 against durable terminal job state, replacement attempts, and the ten-minute
 limit. Orphaned attempts appear as interrupted, rather than remaining in-flight.
+
+Report execution uses general batches with a shared working entity map; action
+dependencies do not require intermediate commits. Workspace writes and their report
+results share a transaction and a batch receipt. Recovery reads that receipt before
+replaying a failed group. A completed report with pending document publications is
+still considered unfinished by the execution adapter until those publications have
+been reconciled. See [AI workflows](AI_WORKFLOWS.md) for batching and overwrite semantics.

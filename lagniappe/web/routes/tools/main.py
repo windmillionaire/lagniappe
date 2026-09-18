@@ -25,7 +25,7 @@ from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
-from lagniappe.web.auth import ai_access, logged_in
+from lagniappe.web.auth import ai_access, logged_in, require_ai_access
 
 from . import tools
 
@@ -58,12 +58,16 @@ def cancel_generation(job_key):
 
 # @testable true
 # @matrix ai-report : cancellation revision reload
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access
+# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/retry-generation", methods=["POST"])
 @ai_access(AI.ASK)
 def retry_generation(key):
     report = _get_report(key)
     if report is None:
         abort(404)
+    if report.db.get("correction"):
+        require_ai_access(AI.CREATE)
     if report.origin == "api" or report.status not in {"failed", "cancelled"} or report.proposal or report.deferred_job:
         abort(409, description="This report cannot restart generation.")
     snapshot = external_operations.report_snapshot(report)
@@ -168,6 +172,7 @@ def _preview_report_files():
 # @reason explain modal shares the real organize prompt assembly
 def _explain_ai_prompt():
     report = SimpleNamespace(
+        db={},
         origin="web",
         instructions=request.form.get("instructions"),
         input_files=_preview_report_files(),
@@ -473,8 +478,11 @@ def run_report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_browser_correction_requires_create_access
 # @matrix ai-report : async completed-state feedback live-submit organize ready-state revision route-guard
 # @pair agent-api:provider-free-revision
+# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):
@@ -482,6 +490,8 @@ def revise_report(key):
     if not report:
         return responses.not_found("Report not found")
     correcting = bool(report.result)
+    if correcting or report.db.get("correction"):
+        require_ai_access(AI.CREATE)
     if report.origin == "api" and not correcting:
         return responses.error("Revise an unexecuted external plan through its originating assistant.")
     can_revise = bool(report.proposal) and not report.pending and (report.status in {"complete", "failed"} if correcting else report.status == "ready" or (report.output_kind == "answer" and report.status == "complete"))

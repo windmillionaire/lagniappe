@@ -100,6 +100,14 @@ and `TableSorting` initialization complete.
 
 ## Specialized views
 
+Project model-task rows have the same small up/down controls as Builder option
+lists, immediately before Delete. Moving a row saves the complete order through
+the Project's `reorder-models` endpoint, then moves the existing DOM rows without
+replacing open forms or discarding unsaved edits. Controls are disabled at the
+list boundaries, while saving and while offline, and are absent for viewers.
+The server validates exact Project membership and edit permissions through the
+shared entity patch service and saves changed models together.
+
 Help articles use `ShellView` directly through the shared view registry. Their
 server-rendered article has no entity polling or Report state. The report-style
 header's Close link returns Home; Markdown body rendering is shared with the

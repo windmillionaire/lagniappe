@@ -366,6 +366,8 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
             self.entity.add_mutation_intents(
                 MutationIntent.touch(value, reason="related-form-list-member")
             )
+            self._cache_attached_entities()
+            self._invalidate_projections()
             return True
         return False
 

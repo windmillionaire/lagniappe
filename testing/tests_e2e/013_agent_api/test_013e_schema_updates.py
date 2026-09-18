@@ -91,6 +91,7 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
     ]
     proposal = {"summary": "Convert saved Notes and Count. Unconvertible values clear; migration cannot be undone.", "confidence": 1, "issues": [], "actions": [
         {"id": "schema", "type": "update_form_schema", "data": {"form": f"hash:{form.entity.hash}", "operations": operations, "baseline": first["baseline"], "scope_fingerprint": first["scope_fingerprint"], "conversions": candidates}},
+        {"id": "published", "type": "create_project", "depends_on": ["schema"], "data": {"name": "Published migration"}},
     ]}
     if origin == "api":
         incomplete = deepcopy(proposal)
@@ -99,7 +100,7 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
         assert refused.status_code == 422, refused.text
         submitted = client.post(f"/api/v1/plans/{plan_id}/submit", headers=headers, json={"file_usage": [], "contract_version": external_api.CONTRACT_VERSION, "proposal": proposal})
         assert submitted.status_code == 200, submitted.text
-        assert submitted.json["action_summary"] == {"total": 1, "by_type": {"update_form_schema": 1}, "maximum": 100}
+        assert submitted.json["action_summary"] == {"total": 2, "by_type": {"update_form_schema": 1, "create_project": 1}, "maximum": 100}
     else:
         from lagniappe.core.tools.ai.reporting.proposals.validation import validate_proposal
         report = Entities.fetch_one(plan_id, request=Fetch.direct())
@@ -162,6 +163,7 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
         assert resumed.state.value == "complete", resumed
     final = Entities.fetch_one(plan_id, request=Fetch.direct())
     assert final.status == "complete"
+    assert Entities.fetch_one(final.result["actions"][1]["entity"]["id"], request=Fetch.direct()).name == "Published migration"
     for task in tasks:
         saved = Entities.fetch_one(task.key, request=Fetch.direct())
         assert saved.generation == 1

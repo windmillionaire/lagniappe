@@ -282,6 +282,11 @@ def test_publish_checkpoint_preserves_live_updates(monkeypatch):
             updates=[{"revision": 1, "update": crdt.encode_document(live)}]
         ),
     )
+    # A previously loaded execution baseline must not publish over live work.
+    observed = documents.current_document_state(
+        "page:document", seed={"ydoc": appended, "fingerprint": "new"}, reconcile=False
+    )
+    assert observed == state
     fresh = documents.current_document_state(
         "page:document", seed={"ydoc": appended, "fingerprint": "new"}
     )
@@ -446,10 +451,7 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
             "fingerprint": digest,
         }
         stored_html[digest] = html
-        for intent in entity.mutation_intents:
-            if intent.intent is MutationIntentType.STANDARD:
-                histories["saved-version"] = intent.entity
-        entity._mutation_intents = []
+        entity.db["assets"] = json.dumps(entity.assets)
 
     save(
         page,
@@ -465,12 +467,10 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
         "checkpointed_document",
         lambda entity: document_updates.document_seed(entity),
     )
-    monkeypatch.setattr(actions, "save_checkpoint", save)
+    monkeypatch.setattr(Document, "save", lambda document, **kwargs: save(document.entity, **kwargs))
     monkeypatch.setattr(actions, "_resolve_entity", lambda *args, **kwargs: page)
     monkeypatch.setattr(actions, "_load_result_entity", lambda *_: page)
-    monkeypatch.setattr(actions.database_get, "datastore_key", lambda key: key)
-    monkeypatch.setattr(actions.database_get, "urlsafe_key", lambda key: "saved-version")
-    def make_version(entity, *, key):
+    def make_version(entity, *, key=None):
         history = actions.Entities.DOCUMENT_HISTORY(testing=True)
         class HistoryKey:
             parent = page.key
@@ -487,15 +487,30 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
         "type": "append_page_document",
         "data": {"page": page.urlsafe_key, "document": "<p>Added</p>"},
     }
-    report = SimpleNamespace(origin="api", agent_manifest={"source": "remote_mcp"})
+    from lagniappe.core.tools.ai.reporting.execution.batch import ExecutionBatch, WorkingEntities
+    report = TestEntities.get("REPORT", {"name": "Append", "hash": "append-report", "parent": user, "user": user})
+    report.origin, report.agent_manifest = "api", {"source": "remote_mcp"}
     record = {"idempotency_key": "append-one"}
+    result = {"actions": [record]}
+    workspace = WorkingEntities()
+    workspace.remember(page)
+    batch = ExecutionBatch(report, result, workspace, lambda: None)
+    context = {"action_record": record, "batch": batch}
+    def commit(*items):
+        for intent in report.mutation_intents:
+            if intent.intent is MutationIntentType.STANDARD:
+                histories["saved-version"] = intent.entity
+    monkeypatch.setattr(Entities, "save", commit)
     actions.prepare_document_append(action, report, user, {}, record)
     prepared = copy.deepcopy(record)
     assert "assets" not in prepared["before"]
     entity, pending, metadata = actions._append_page_document(
-        action, report, user, {}, {"action_record": record}
+        action, report, user, {}, context
     )
-    assert entity is page and pending == []  # no later full-Page save
+    assert entity is page and pending == []  # batch stages a masked Page write
+    assert not histories
+    batch.stage(0, entity, pending)
+    batch.commit()
     assert "Remote MCP" in page.properties.document.html
     assert page.properties.document.html.startswith(
         "<p>Keep</p><blockquote>" if existing else "<blockquote>"
@@ -506,7 +521,7 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
     assert len(histories) == int(existing)
     if existing:
         assert histories["saved-version"].name.startswith("Before report append")
-    actions._append_page_document(action, report, user, {}, {"action_record": prepared})
+    actions._append_page_document(action, report, user, {}, {"action_record": prepared, "batch": batch})
     assert page.properties.document.ydoc == snapshot
     saved_html = page.properties.document.html
     changed, _ = crdt.append_fragment(snapshot, "<p>Other edit</p>", "other")

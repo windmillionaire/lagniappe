@@ -54,7 +54,9 @@ class ReportAdapter(DeferredJobAdapter):
         }
         Entities.save(report, context.actor)
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_corrective_report_generation_requires_create_access
+    # @pair ai-access:provider-boundary
     def authorize(self, context):
         super().authorize(context)
         report = context.input("report")
@@ -64,6 +66,10 @@ class ReportAdapter(DeferredJobAdapter):
             raise exceptions.ValidationError("Deferred report is invalid.")
         if not report.available:
             raise exceptions.ValidationError("this plan is no longer available")
+        if report.db.get("correction") and not context.actor.access(AI.CREATE):
+            raise exceptions.ValidationError(
+                "Creating corrective plans requires Create AI access."
+            )
         if not report.allowed(Action.EDIT, user=context.actor):
             raise exceptions.ValidationError(
                 "You do not have permission to update this report."
@@ -395,6 +401,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         context.inputs["report"] = report
         self.validate_apply(context)
         result = report.result if isinstance(report.result, dict) else {}
+        if report.db.get("execution_documents"):
+            return DeferredJobInspection.NOT_APPLIED
         if report.status == "complete" and result.get("status") == "complete":
             return DeferredJobInspection.APPLIED
         if report.status == "running":

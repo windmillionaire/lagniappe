@@ -211,6 +211,42 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     assert report.note == "Waiting for external plan"
 
 
+# @source lagniappe/core/tools/ai/external_api.py::create_plan
+# @pair agent-api:entitlement-independent
+@pytest.mark.unit
+@pytest.mark.parametrize("source_origin", ["web", "api"])
+def test_external_correction_does_not_require_provider_access(monkeypatch, source_origin):
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("external-correction-owner")
+    actor.ai_access = "NONE"
+    actor.access = lambda _required: pytest.fail("External correction checked site AI access")
+    source = external_api.Entities.REPORT.create({
+        "user": actor,
+        "origin": source_origin,
+        "status": "complete",
+        "pending": False,
+        "proposal": {"summary": "Original work", "actions": []},
+        "result": {"status": "complete", "actions": []},
+    })
+    saved = []
+    monkeypatch.setattr(external_api.Entities, "fetch_one", _fetch_one_from({source.urlsafe_key: source}))
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+
+    correction = external_api.create_plan(
+        actor, instructions="Adjust the completed work", remote_mcp=True,
+        revises_plan_id=source.urlsafe_key,
+    )
+
+    assert correction.origin == "api"
+    assert correction.status == "draft"
+    assert correction.pending is False
+    assert correction.db["correction"]["source"] == source.urlsafe_key
+    assert correction.db["correction"]["result"] == source.result
+    assert source.db["correction_children"] == [correction.urlsafe_key]
+    assert not source.db.get("superseded_by")
+    assert saved == [source, correction]
+
+
 # @matrix agent-api ai-report : upload-batch-identity upload-manifest
 @pytest.mark.unit
 def test_external_upload_batch_identity_is_preserved_in_every_record():
@@ -1813,6 +1849,36 @@ def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypat
         },
     }
     assert report.proposal["actions"][0]["data"]["category"] == entity.urlsafe_key
+
+
+# @matrix agent-api ai-report : public-reference round-trip stored-execution
+@pytest.mark.unit
+def test_public_plan_omits_preview_references_before_loading_entities(monkeypatch):
+    from google.cloud.datastore import Key
+
+    preview = Key("form", "proposal-form", project="proposal-preview").to_legacy_urlsafe().decode()
+    saved = Key("models", "saved-page", project="test-project").to_legacy_urlsafe().decode()
+    entity = SimpleNamespace(urlsafe_key=saved, hash="abcdef123456")
+    reads = []
+
+    def fetch(*identifiers, request):
+        reads.extend(identifiers)
+        assert preview not in identifiers
+        return [entity]
+
+    monkeypatch.setattr(external_api.Entities, "fetch", fetch)
+    report = SimpleNamespace(agent_manifest={}, proposal={"actions": [{
+        "id": "update", "type": "update_page",
+        "data": {"entity": saved, "changes": {"form": "$new_form"}},
+        "_entity_update": {"display_after": {"form": {"id": preview, "name": "New"}}},
+    }]})
+    public = external_api.public_plan_proposal(report)
+    assert reads == [saved]
+    assert public["actions"][0]["data"] == {
+        "entity": "hash:abcdef123456", "changes": {"form": "$new_form"},
+    }
+    assert "_entity_update" not in public["actions"][0]
+    assert report.proposal["actions"][0]["_entity_update"]["display_after"]["form"]["id"] == preview
 
 
 # @matrix agent-api files : complete-inventory deterministic-fingerprint seven-file-regression

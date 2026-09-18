@@ -5,14 +5,13 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.database import get as database_get
 
-from .common import TASK_FORM_TYPE_ERROR, _data
+from .common import TASK_FORM_TYPE_ERROR
 from .results import (
     _entity_result,
 )
 from .references import _fetch_report_entity, _file_attached_to_endpoint
 from .task_completion import _completion_state
 from .completed_tasks import (
-    _is_completed_task_event,
     _task_state_fingerprint,
     _value_fingerprint,
 )
@@ -20,39 +19,6 @@ from .completed_tasks import (
 ACTION_APPLIED = "applied"
 ACTION_NOT_APPLIED = "not-applied"
 ACTION_DRIFTED = "drifted"
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/recovery.py::_inspect_action_applied
-# @reason expected state is asserted through move, update, and task retries
-def _expected_action_state(action, record):
-    action_type = action.get("type")
-    expected = {
-        "entity": (record.get("entity") or {}).get("id"),
-        "target": (record.get("target") or {}).get("id"),
-    }
-    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
-        expected["entity_update_after"] = record.get("entity_update_after")
-    if action_type == "complete_task":
-        expected["completion_state"] = record.get("completion_state")
-        expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
-    if action_type in {"update_form_schema"}:
-        expected["schema_fingerprint"] = record.get("schema_fingerprint")
-    if action_type == "summarize_file":
-        data = _data(action)
-        expected["summary"] = (
-            data.get("summary") or data.get("description") or ""
-        ).strip()
-        expected["retrieval_terms"] = [
-            term.strip()
-            for term in (data.get("retrieval_terms") or [])
-            if isinstance(term, str) and term.strip()
-        ][:2]
-        expected["search"] = data.get("search", True) is not False
-    if action_type == "create_task" and _is_completed_task_event(_data(action)):
-        expected["task"] = (record.get("target") or {}).get("id")
-        expected["task_state_fingerprint"] = record.get("task_state_fingerprint")
-    return expected
 
 
 # @testable false
@@ -89,7 +55,6 @@ def _urlsafe_key_value(value):
 
 
 # @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_stops_when_completed_prefix_permission_is_revoked
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
 # @matrix ai-report : completed-prefix completed-task permissions post-commit-checkpoint recovery

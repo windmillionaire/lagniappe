@@ -253,7 +253,7 @@
   {% set report_icon = "generate" %}
   {% set can_ask_ai = current_user.access(AI.ASK) %}
   {% set can_create_ai = current_user.access(AI.CREATE) %}
-  {% set can_revise = report.proposal and not report.pending and not report.db.get("superseded_by") and not migration_pending and can_ask_ai and ((report.result and report.status in ["complete", "failed"]) or (report.origin != "api" and not report.result and (report.status == "ready" or (is_ask and report.status == "complete")))) %}
+  {% set can_revise = report.proposal and not report.pending and not report.db.get("superseded_by") and not migration_pending and (can_create_ai if report.result or report.db.get("correction") else can_ask_ai) and ((report.result and report.status in ["complete", "failed"]) or (report.origin != "api" and not report.result and (report.status == "ready" or (is_ask and report.status == "complete")))) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = not report.db.get("superseded_by") and report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
   {% set creates_correction = report.result %}

@@ -213,7 +213,7 @@
       <input type="hidden" name="operation-id" value="{{ report.deferred_job.idempotency_key }}" />
       <button type="submit" class="{{ styles.button.submit }}">Cancel</button>
     </form>
-  {% elif report.available and report.origin != 'api' and report.status in ['cancelled', 'failed'] and not report.proposal and not report.deferred_job %}
+  {% elif report.available and report.origin != 'api' and report.status in ['cancelled', 'failed'] and not report.proposal and not report.deferred_job and (not report.db.get('correction') or current_user.access(AI.CREATE)) %}
     <form method="post" action="{{ url_for('tools.retry_generation', key=report.urlsafe_key) }}" data-role="retry-generation-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <button type="submit" class="{{ styles.button.submit }}">Retry generation</button>

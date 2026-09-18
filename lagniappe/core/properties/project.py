@@ -48,13 +48,23 @@ class ModelTasks(RelatedEntityListMixin, Property):
         )
 
         self._value = [m for m in model_tasks if isinstance(m, Entities.MODEL_TASK)]
+        self._cache_attached_entities()
         return self._value
 
     # Entity Attributes
     def add(self, model):
-        if model and model.key not in [m.key for m in super().value]:
-            model.order = len(super().value) + 1
-            super().value.append(model)
+        models = self.value
+        if model and model.key not in [m.key for m in models]:
+            model.order = max([len(models), *(m.order or 0 for m in models)]) + 1
+            models.append(model)
+            self._cache_attached_entities()
+            self._invalidate_projections()
+
+    def attach(self, key_map):
+        if self.is_set:
+            self._value = [key_map.get(model.key, model) for model in self._value]
+            self._cache_attached_entities()
+            self._invalidate_projections()
 
 
 # @testable true

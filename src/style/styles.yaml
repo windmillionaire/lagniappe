@@ -133,11 +133,11 @@ builder:
       container:
         classes: "action-icon-button size-5 transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
         intent: centered builder settings action using the shared icon-button interaction outline
-        surfaces: [frontend]
+        surfaces: [server, frontend]
       icon:
         classes: icon-xs text-kind-default
         intent: icon presentation within builder settings toggle
-        surfaces: [frontend]
+        surfaces: [server, frontend]
         hooks: [icon-xs]
         css: [src/style/icons.css]
 

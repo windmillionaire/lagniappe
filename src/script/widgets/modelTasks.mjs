@@ -2,6 +2,7 @@ import { BaseList } from "../elements/base/baseList";
 import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { SectionToggle } from "../elements/sectionToggle";
+import { request, withTransition } from "../shared";
 
 /**
  * @testable infrastructure
@@ -107,11 +108,127 @@ export class ModelTaskInfo extends ModelTask {
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
+ * @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_task_arrows_preserve_open_edits_and_saved_order
+ * @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_order_rejects_invalid_membership_and_readonly_users
  * @pair model-tasks:delete
+ * @matrix model-tasks : ordering persistence permission-gates parent-membership
  */
 export class ModelTaskList extends BaseList {
+	constructor(attributes) {
+		super(attributes);
+		this._click = this._click.bind(this);
+		this._moving = false;
+	}
+
+	init() {
+		this.component.elt.addEventListener("click", this._click);
+		this._observer = new MutationObserver(() => this._updateMoveButtons());
+		this._observeRows();
+	}
+
+	get rows() {
+		return Array.from(this.target.querySelectorAll(":scope > li[lp-entity]"));
+	}
+
+	_observeRows() {
+		this._observer?.disconnect();
+		this._observer?.observe(this.target, { childList: true });
+		this._updateMoveButtons();
+	}
+
+	_updateMoveButtons() {
+		const rows = this.rows;
+		rows.forEach((row, index) => {
+			for (const button of row.querySelectorAll("[data-role='move-model']")) {
+				const atEnd =
+					button.dataset.direction === "up"
+						? index === 0
+						: index === rows.length - 1;
+				button.disabled =
+					this._moving || this.readonly || this.view.online === false || atEnd;
+			}
+		});
+	}
+
+	sync() {
+		this._updateMoveButtons();
+	}
+
+	async _click(event) {
+		const button = event.target.closest("[data-role='move-model']");
+		if (!button || !this.target.contains(button)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		if (
+			button.disabled ||
+			this._moving ||
+			this.readonly ||
+			this.view.online === false
+		)
+			return;
+		const rows = this.rows;
+		const index = rows.indexOf(button.closest("li[lp-entity]"));
+		const next = index + (button.dataset.direction === "up" ? -1 : 1);
+		if (index < 0 || next < 0 || next >= rows.length) return;
+		[rows[index], rows[next]] = [rows[next], rows[index]];
+		const error = this.component.elt.querySelector(
+			"[data-role='model-order-error']",
+		);
+		if (error) error.dataset.visible = "false";
+		this._moving = true;
+		this.target.setAttribute("aria-busy", "true");
+		this._updateMoveButtons();
+		try {
+			const response = await request.put(
+				this.target.dataset.reorderRoute,
+				{
+					model_tasks: rows.map((row) => row.dataset.key),
+				},
+				{ replaceErrorPage: false },
+			);
+			if (!response.ok) {
+				if (error) {
+					error.textContent =
+						response.error || "Could not save the model task order. Try again.";
+					error.dataset.visible = "true";
+				}
+				return;
+			}
+			const current = new Map(this.rows.map((row) => [row.dataset.key, row]));
+			await withTransition(
+				() => {
+					response.model_tasks.forEach((key, order) => {
+						const row = current.get(key);
+						if (!row) return;
+						row.dataset.order = order + 1;
+						this.target.append(row);
+					});
+				},
+				{ label: "model-tasks:reorder" },
+			);
+		} finally {
+			this._moving = false;
+			this.target.setAttribute("aria-busy", "false");
+			this._updateMoveButtons();
+			if (button.isConnected && !button.disabled)
+				button.focus({ preventScroll: true });
+		}
+	}
+
 	postreconcile() {
 		super.postreconcile();
+		const rows = this.rows;
+		const ordered = [...rows].sort(
+			(a, b) => Number(a.dataset.order) - Number(b.dataset.order),
+		);
+		if (ordered.some((row, index) => row !== rows[index]))
+			this.target.append(...ordered);
+		this._observeRows();
 		this.target.setAttribute("loaded", "");
+	}
+
+	destroy() {
+		this.component.elt.removeEventListener("click", this._click);
+		this._observer?.disconnect();
 	}
 }

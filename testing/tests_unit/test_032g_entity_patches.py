@@ -1,4 +1,4 @@
-"""Cohesive patches validate detached final states and retain exact source guards."""
+"""Cohesive patches validate selected changes and preserve omitted fields."""
 from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -59,7 +59,7 @@ def test_task_patch_preserves_omitted_values_and_source():
     assert prepared.entity.due_date == task.due_date
     assert prepared.entity.db["history"] is True
     assert prepared.entity.db["scheduled_uncomplete_token"] == "keep-token"
-    assert dict(prepared.guards[0][1]) == dict(original)
+    assert prepared.guards == ()
     assert prepared.before["description"] == "Long original description"
     assert prepared.after["description"] == "Short"
 
@@ -79,7 +79,7 @@ def test_reassignment_requires_complete_values_and_reviews_removals():
     assert prepared.entity.form.key == target.key
     assert task.form.key == form.key
     assert task.description == "Long original description"
-    assert {key for key, value in prepared.guards} >= {task.key, form.key, target.key}
+    assert {item.key for item in prepared.forms} == {form.key, target.key}
 
 
 # @matrix entity-patch : preservation validation preparation permissions
@@ -137,19 +137,19 @@ def test_page_patch_preserves_omitted_membership():
 
 
 # @matrix entity-patch : preservation validation preparation permissions
-def test_patch_guards_reject_concurrent_completion_and_form_changes(monkeypatch):
+def test_patch_checks_completion_and_migrations_without_owner_guards(monkeypatch):
     actor, task, form, page = case()
     prepared = prepare_patch(task, {"description": "Short", "submission": {"answer": "Migrated"}}, actor)
-    rows = {key: deepcopy(dict(expected)) for key, expected in prepared.guards}
-    monkeypatch.setattr(database_utility, "DATA", SimpleNamespace(datastore=SimpleNamespace(get=lambda key, transaction: rows.get(key))))
-    database_utility.check_mutation_guards(object(), prepared.guards)
-    rows[task.key]["completed"] = True
-    with pytest.raises(MutationConflict):
-        database_utility.check_mutation_guards(object(), prepared.guards)
-    rows[task.key] = dict(task.db)
-    rows[form.key]["pending_form_change"] = "concurrent-migration"
-    with pytest.raises(MutationConflict):
-        database_utility.check_mutation_guards(object(), prepared.guards)
+    assert prepared.guards == ()
+    page.db["modified"] = datetime.now(timezone.utc)
+    assert prepare_patch(task, {"description": "Short"}, actor).entity.description == "Short"
+    task.completed = True
+    with pytest.raises(ValidationError, match="Completed"):
+        prepare_patch(task, {"description": "Short"}, actor)
+    task.completed = False
+    form.db["pending_form_change"] = "concurrent-migration"
+    with pytest.raises(ValidationError, match="Wait"):
+        prepare_patch(task, {"description": "Short"}, actor)
     assert task.description == "Long original description"
 
 
@@ -188,6 +188,32 @@ def test_page_form_registration_is_detached_and_pending_checklist_stays_unchecke
     assert not category.forms
     assert not page.form
     assert any(intent.reason == "page-category-form-registration" for intent in prepared.entity.mutation_intents)
+
+
+# @matrix entity-patch : preservation preparation
+def test_page_form_registration_preserves_unloaded_category_forms(monkeypatch):
+    actor, _task, _form, page = case()
+    category = entity("CATEGORY", "shallow-category")
+    original = entity("FORM", "original-page-form")
+    target = entity("FORM", "added-page-form")
+    for form in (original, target):
+        form.form_type = "page"
+        form.schema = [{"id": "notes", "type": "textarea", "title": "Notes"}]
+    category.db["forms"] = [original.key]
+    category.properties.forms.attach({})
+    page.model = category
+    reads = []
+
+    def fetch(*keys, request):
+        reads.extend(keys)
+        return [original]
+
+    monkeypatch.setattr(Entities, "fetch", fetch)
+    prepared = prepare_patch(page, {"form": target, "submission": {"notes": "Keep"}}, actor)
+    registration = next(intent for intent in prepared.entity.mutation_intents if intent.reason == "page-category-form-registration")
+    assert set(registration.entity.properties.forms.keys) == {original.key, target.key}
+    assert category.properties.forms.keys == [original.key]
+    assert reads == [original.key]
 
 
 # @matrix entity-patch : preservation validation preparation permissions
@@ -232,7 +258,7 @@ def test_update_review_and_execution_share_exact_references(monkeypatch):
 
 
 # @matrix entity-patch : integration review dependencies stale-state
-def test_update_execution_rejects_changed_source_and_changed_proposal(monkeypatch):
+def test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal(monkeypatch):
     actor, task, form, page = case()
     monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: task)
     action = {"type": "update_task", "data": {"entity": task.urlsafe_key, "changes": {"description": "Short"}}}
@@ -240,8 +266,8 @@ def test_update_execution_rejects_changed_source_and_changed_proposal(monkeypatc
         execute_update_action(action, None, actor, {})
     review_update_action(action, actor)
     task.description = "Human edit"
-    with pytest.raises(ValidationError, match="source changed"):
-        execute_update_action(action, None, actor, {})
+    updated, _, _ = execute_update_action(action, None, actor, {})
+    assert updated.description == "Short"
     assert task.description == "Human edit"
     review_update_action(action, actor)
     action["data"]["changes"]["description"] = "Unreviewed replacement"
@@ -291,6 +317,20 @@ def test_proposal_prepares_new_forms_and_model_order(monkeypatch):
     assert project.model_tasks == [first]
 
 
+# @matrix entity-patch : integration review dependencies
+def test_proposal_orders_models_on_a_new_project():
+    from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
+    proposal = {"actions": [
+        {"id": "project", "type": "create_project", "data": {"name": "New Project"}},
+        {"id": "first", "type": "create_model_task", "data": {"name": "First", "project_action": "project"}},
+        {"id": "second", "type": "create_model_task", "data": {"name": "Second", "project_action": "project"}},
+        {"id": "order", "type": "update_project", "data": {"entity": "$project", "changes": {"model_tasks": ["$second", "$first"]}}},
+    ]}
+    prepare_entity_updates(proposal, _test_user("new-project-owner"))
+    assert proposal["actions"][-1]["depends_on"] == ["first", "second"]
+    assert proposal["actions"][-1]["_entity_update"]["after"]["model_tasks"] == ["$second", "$first"]
+
+
 # @matrix ai-report : correction ownership supersession
 def test_correction_snapshot_and_approval_reject_changed_source(monkeypatch):
     from lagniappe.core.tools.ai.reporting.corrections import link_correction, approve_correction
@@ -326,12 +366,8 @@ def test_correction_snapshot_and_approval_reject_changed_source(monkeypatch):
 # @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
 # @matrix entity-patch : integration review dependencies stale-state
 # @matrix ai-report : execute idempotency skip-action validation
-@pytest.mark.parametrize("skip_form,conflicts,concurrent_change", [
-    (False, 0, None), (True, 0, None), (False, 1, None),
-    (False, 2, None), (False, 3, None),
-    (False, 1, "description"), (False, 1, "completed"), (False, 1, "permission"),
-])
-def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_form, conflicts, concurrent_change):
+@pytest.mark.parametrize("skip_form", [False, True])
+def test_form_creation_and_task_update_batch_preserves_dependencies_and_retry(monkeypatch, skip_form):
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
     from lagniappe.core.tools.ai.reporting.execution.runner import run_report
     from lagniappe.core.tools.database import utility as database_utility
@@ -345,27 +381,7 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
         return reference if hasattr(reference, "entity_kind") else store.get(reference)
     monkeypatch.setattr(Entities, "fetch_one", fetch)
     writes = []
-    rejected = []
-    original_allowed = Entities.TASK.allowed
-    def allowed(self, action, user=None):
-        if concurrent_change == "permission" and rejected:
-            return False
-        return original_allowed(self, action, user=user)
-    monkeypatch.setattr(Entities.TASK, "allowed", allowed)
     def save(*items):
-        if len(rejected) < conflicts and any(item.entity_kind == "task" for item in items):
-            rejected.append(True)
-            # Replace the saved root so retry must fetch again, not reuse its
-            # rejected candidate. Unreviewed metadata must survive that reload.
-            fresh = Entities.TASK(deepcopy(store[task.urlsafe_key].db))
-            fresh.attach(task.related_entities)
-            fresh.db["concurrent_marker"] = len(rejected)
-            if concurrent_change == "description":
-                fresh.description = "Changed by another editor"
-            elif concurrent_change == "completed":
-                fresh.completed = True
-            store[task.urlsafe_key] = fresh
-            raise MutationConflict("Saved state changed while saving; reload and retry.")
         writes.append(items)
         for item in items:
             store[item.urlsafe_key] = item
@@ -381,26 +397,9 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
     prepare_entity_updates(report.proposal, actor)
     report.proposal["actions"][0]["skip"] = skip_form
     result = run_report(report, actor)
-    if conflicts == 3:
-        assert result["status"] == "failed"
-        assert report.status == "failed"
-        assert result["actions"][0]["status"] == "complete"
-        assert result["actions"][1]["status"] == "failed"
-        assert not result["actions"][1].get("expected")
-        assert result["actions"][1]["attempts"] == 3
-        assert store[task.urlsafe_key].description == "Long original description"
-        assert sum(item.entity_kind == "form" for item in store.values()) == 2
-        result = run_report(report, actor)
-    assert result["status"] == ("failed" if concurrent_change == "permission" else "complete"), [record.get("error") for record in result["actions"]]
+    assert result["status"] == "complete", [record.get("error") for record in result["actions"]]
     current = store[task.urlsafe_key]
-    if concurrent_change:
-        assert len(rejected) == 1
-        assert result["actions"][1]["status"] == ("failed" if concurrent_change == "permission" else "skipped")
-        assert current.form.key == old_form.key
-        assert current.submission == task.submission
-        assert current.description == ("Changed by another editor" if concurrent_change == "description" else task.description)
-        assert current.completed == (concurrent_change == "completed")
-    elif skip_form:
+    if skip_form:
         assert result["actions"][1]["status"] == "skipped"
         assert current.description == "Long original description"
     else:
@@ -408,10 +407,10 @@ def test_reviewed_creation_and_task_migration_execute_once(monkeypatch, skip_for
         assert current.submission == {"summary": "Migrated"}
         assert current.description == "Short"
         assert current.db["history"] is True
-        if conflicts:
-            assert current.db["concurrent_marker"] == conflicts
-            assert result["actions"][1]["attempts"] == conflicts + 1
         assert current.due_date == task.due_date
+        batches = [batch for batch in writes if any(item.entity_kind == "task" for item in batch)]
+        assert len(batches) == 1
+        assert any(item.entity_kind == "form" for item in batches[0])
         count = sum(any(item.entity_kind == "form" for item in batch) for batch in writes)
         assert run_report(report, actor)["status"] == "complete"
         assert sum(any(item.entity_kind == "form" for item in batch) for batch in writes) == count
@@ -443,6 +442,8 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
     from lagniappe.core.tools.ai.reporting.execution.runner import run_report
     from lagniappe.core.tools.database import get as database_get
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
+    from lagniappe.core.properties import common_entity
+    monkeypatch.setattr(common_entity.cache, "check_hash", lambda *_args, **_kwargs: False)
     actor, first_task, old_form, page = case()
     project = entity("PROJECT", "promotion")
     labels = ["Readiness", "Discovery", "Outreach", "Results"]
@@ -469,17 +470,21 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
     monkeypatch.setattr(database_get, "entity", lambda key, **kwargs: next((item.db for item in store.values() if item.key == key), None))
     keys = iter(range(300, 400))
     monkeypatch.setattr(database_utility, "create_key", lambda kind, parent=None: Key("activity", str(next(keys)), project="test-project"))
+    saved_commit = None
     def save(*items):
+        nonlocal saved_commit
         # Enforce the database preconditions before accepting any batch writes.
         for item in items:
             for key, expected in getattr(item, "_form_additional_guards", []):
                 current = next((saved.db for saved in store.values() if saved.key == key), None)
-                if current is None or dict(current) != expected:
+                actual = {"execution_commit": saved_commit} if key == report.key else current
+                if actual is None or any(actual.get(name) != value for name, value in expected.items()):
                     raise MutationConflict("Saved state changed while saving; reload and retry.")
         for item in items:
             item._form_additional_guards = []
             store[item.urlsafe_key] = item
             item.db.setdefault("hash", "saved-" + item.key.name)
+        saved_commit = report.db.get("execution_commit")
         # Model lists are datastore relationships in production; refresh the fake cache.
         current_project = store[project.urlsafe_key]
         current_project.properties.model_tasks._value = sorted([item for item in store.values() if item.entity_kind == "model" and item.project.key == project.key], key=lambda item: item.order)
@@ -500,6 +505,7 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
     report.proposal = {"summary": "Generalize Promotion", "confidence": 1, "actions": actions}
     prepare_entity_updates(report.proposal, actor)
     result = run_report(report, actor)
+    assert report.status == "complete", report.error
     assert all(record["status"] == "complete" for record in result["actions"]), [(record["id"], record.get("error")) for record in result["actions"] if record["status"] != "complete"]
     assert store[project.urlsafe_key].name == "Promotion workflow"
     assert [model.name for model in store[project.urlsafe_key].model_tasks] == labels

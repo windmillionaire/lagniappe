@@ -11,6 +11,8 @@ from testing.utility.test_entities import TestEntities
 
 def _attach_report_process(report):
     report.db = {}
+    report.key = FakeKey(report.urlsafe_key)
+    report.mutation_intents = []
     report.available = True
     class Process:
         def begin_execution(self, result=None):
@@ -60,6 +62,14 @@ class FakeKey:
 
 
 def _patch_fake_keys(monkeypatch):
+    from contextlib import nullcontext
+    from lagniappe.core.tools.cache import documents
+    from lagniappe.core.tools.ai.reporting.execution.actions import documents as document_actions
+
+    monkeypatch.setattr(documents, "document_write_lock", lambda *_: nullcontext())
+    monkeypatch.setattr(document_actions, "document_write_lock", lambda *_: nullcontext())
+    monkeypatch.setattr(documents, "current_document_state", lambda _id, *, seed, **_kwargs: {**seed, "updates": []})
+    monkeypatch.setattr(documents, "publish_document_checkpoint", lambda *_args, **_kwargs: None)
     counter = {"value": 0}
 
     def create_key(kind, parent=None):

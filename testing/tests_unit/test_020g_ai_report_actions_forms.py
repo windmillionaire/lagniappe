@@ -186,7 +186,7 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
 
     result = report_runner.run_report(report, user)
 
-    assert result["status"] == "complete"
+    assert result["status"] == "complete", [(record.get("id"), record.get("error")) for record in result["actions"]]
     assert report.status == "complete"
     assert report.pending is False
     created_kinds = [
@@ -261,6 +261,9 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     assert grouped[2]["attachments"][0]["entity"]["name"] == "july-receipt"
     assert grouped[2]["attachments"][0]["file_summary"]["complete"] is True
     assert saved_batches[0] == ["report"]
+    assert len(saved_batches) == 3
+    assert saved_batches[0] == ["report"]
+    assert saved_batches[1][-1] == "report"
     assert saved_batches[-1] == ["report"]
 
 

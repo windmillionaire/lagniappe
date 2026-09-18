@@ -1221,6 +1221,7 @@ def public_execution_receipt(report, user):
 
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_public_plan_proposal_round_trips_hash_references_and_markdown
+# @tests tests_unit/test_032_agent_api.py::test_public_plan_omits_preview_references_before_loading_entities
 # @matrix agent-api ai-report : markdown public-reference round-trip stored-execution
 def public_plan_proposal(report, user=None):
     """Project stored execution state back into the public submission contract."""
@@ -1228,6 +1229,15 @@ def public_plan_proposal(report, user=None):
     if not isinstance(proposal, dict):
         return proposal
     public = deepcopy(proposal)
+    # Review snapshots can reference virtual entities that exist only during
+    # preparation. They are private metadata, not workspace references to load.
+    for action in public.get("actions") or []:
+        action.pop("_schema_change", None)
+        action.pop("_entity_update", None)
+        data = action.get("data") if isinstance(action, dict) else None
+        if isinstance(data, dict) and action.get("type") in {"create_page", "append_page_document"}:
+            data.pop("document", None)
+    public.pop("answer_html", None)
     if user is not None:
         from lagniappe.core.tools import form_schema_updates
 
@@ -1270,16 +1280,6 @@ def public_plan_proposal(report, user=None):
     )
     public = _replace_internal_references(public, replacements)
 
-    for action in public.get("actions") or []:
-        action.pop("_schema_change", None)
-        action.pop("_entity_update", None)
-        data = action.get("data") if isinstance(action, dict) else None
-        if not isinstance(data, dict):
-            continue
-        if action.get("type") in {"create_page", "append_page_document"}:
-            data.pop("document", None)
-
-    public.pop("answer_html", None)
     return public
 
 

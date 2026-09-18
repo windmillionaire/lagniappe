@@ -2071,7 +2071,37 @@ def test_api_report_revision_is_provider_blocked(monkeypatch):
     )
 
     assert response.status_code == 422, response.get_data(as_text=True)
-    assert "cannot be revised with the AI provider" in response.get_data(as_text=True)
+    assert "Revise an unexecuted external plan through its originating assistant." in response.get_data(as_text=True)
+
+
+# @pair ai-access:provider-boundary
+@pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
+@pytest.mark.parametrize("origin,executed", [("api", True), ("web", True), ("web", False)])
+def test_browser_correction_requires_create_access(monkeypatch, tier, origin, executed):
+    actor = Actor()
+    actor.access = tier.implies
+    report = _report(actor)
+    report.origin, report.pending = origin, False
+    report.status = "complete" if executed else "ready"
+    report.proposal = {"summary": "Saved proposal", "actions": []}
+    if executed:
+        report.result = {"status": "complete", "actions": []}
+    else:
+        report.db["correction"] = {"source": "original-plan"}
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", False)
+    monkeypatch.setattr(Entities, "REPORT", Plan)
+    monkeypatch.setattr(Entities, "fetch_one", lambda _identifier, **_kwargs: report)
+    monkeypatch.setattr(Entities, "save", lambda *_args: pytest.fail("Unauthorized or invalid request saved a report"))
+    monkeypatch.setattr(DeferredJobs, "start", lambda *_args: pytest.fail("Unauthorized or invalid request queued provider work"))
+
+    response = _authenticated_client(monkeypatch, actor).post(
+        "/tools/reports/report-key/revise",
+        data={"feedback": "Change it" if tier is not AI.CREATE else ""},
+    )
+
+    assert response.status_code == (422 if tier is AI.CREATE else 403)
+    if tier is AI.CREATE:
+        assert "Add feedback before revising" in response.get_data(as_text=True)
 
 
 # @matrix agent-api ai-report : browser-review cas delete skip-action

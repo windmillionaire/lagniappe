@@ -334,7 +334,7 @@ def _resolve_entity(reference, created, expected=None, optional=False):
     key = _reference_key(reference)
     entity = created.get(key)
     if entity is None:
-        entity = _fetch_report_entity(key)
+        entity = created.resolve(key) if hasattr(created, "resolve") else _fetch_report_entity(key)
 
     if entity is None:
         if optional:

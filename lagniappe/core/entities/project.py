@@ -67,10 +67,14 @@ class Project(Entity, AssetMixin):
     def index(self, *args, **kwargs):
         return TaskIndex(*args, entity=self, **kwargs)
 
+    # @testable true
+    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
+    # @matrix ai-report : batching identity dependencies
     @classmethod
     def create(cls, data):
         new_project = cls()
         new_project.kind = cls.entity_kind
+        new_project.properties.model_tasks._value = []
         new_project.update(data)
 
         return new_project

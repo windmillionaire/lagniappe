@@ -4,7 +4,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, MutationIntent, Resource
 from lagniappe.core.entities import Entities
 
-from .common import _category_form, _data, _first_data_reference, _require_allowed, _unique_entities
+from .common import _category_form, _data, _first_data_reference, _require_allowed
 from .results import (
     _entity_result,
     _submission_result,
@@ -121,7 +121,7 @@ def _create_model_task(action, _report, user, created):
             "form": form,
         },
     )
-    return model_task, [model_task, project]
+    return model_task, [model_task]
 
 
 # @testable true
@@ -175,6 +175,10 @@ def _create_page(action, _report, user, created, context=None):
         from .documents import document_source_quote
 
         record = (context or {}).get("action_record") or {}
+        from .checkpoints import _assign_preallocated_key
+        _assign_preallocated_key(page, record, context or {})
+        if context and context.get("batch"):
+            context["batch"].add_document(page)
         timestamp = record.get("document_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         html = document_source_quote(_report, timestamp) + data["document"]
         snapshot, _receipt = append_fragment(None, html, record.get("idempotency_key") or "creation")
@@ -187,7 +191,7 @@ def _create_page(action, _report, user, created, context=None):
             page,
             data.get("submission_empty_reason"),
         )
-    return page, [page, category], metadata
+    return page, [page], metadata
 
 
 # @testable true
@@ -240,7 +244,7 @@ def _move_task(action, _report, user, created):
             "page": _entity_result(previous_page) if previous_page else None,
         },
     }
-    return task, _unique_entities([task, page, *previous_owners]), metadata
+    return task, [task], metadata
 
 
 # @testable true

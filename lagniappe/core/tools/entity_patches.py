@@ -4,14 +4,13 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone as utc_timezone
 
-from lagniappe.core.definitions import Action, MutationIntent
+from lagniappe.core.definitions import Action, Fetch, MutationIntent
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.properties.form_special import HTML
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools import dates
-from lagniappe.core.tools.database.utility import ExactEntityState
 
 
 PATCH_FIELDS = {
@@ -28,13 +27,14 @@ PATCH_FIELDS = {
 # @tests tests_unit/test_032g_entity_patches.py::test_patch_rejects_completed_locked_invalid_and_unauthorized_targets
 # @tests tests_unit/test_032g_entity_patches.py::test_model_and_project_patches_preserve_defaults_and_validate_order
 # @tests tests_unit/test_032g_entity_patches.py::test_page_patch_preserves_omitted_membership
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_guards_reject_concurrent_completion_and_form_changes
+# @tests tests_unit/test_032g_entity_patches.py::test_patch_checks_completion_and_migrations_without_owner_guards
 # @tests tests_unit/test_032g_entity_patches.py::test_patch_validates_classification_assignee_and_explicit_clears
 # @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_is_detached_and_pending_checklist_stays_unchecked
+# @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_preserves_unloaded_category_forms
 # @tests tests_unit/test_032g_entity_patches.py::test_patch_schedule_and_form_type_and_permission_validation
 # @matrix entity-patch : preservation validation preparation permissions
 def prepare_patch(entity, changes, actor):
-    """Return detached writes and source guards for one reviewed edit.
+    """Return detached writes and before/after values for one reviewed edit.
 
     Relationship values are resolved entities, never names. Callers resolve exact
     saved references or earlier-action outputs before entering this boundary.
@@ -170,6 +170,14 @@ def prepare_patch(entity, changes, actor):
             if category.name == UNCATEGORIZED_PAGES_NAME:
                 continue
             sources[category.key] = category
+            # A Category reached through a Task/Page may have stored Form keys
+            # without loaded Forms. Resolve only those missing members before
+            # extending the list; an empty attachment is not an empty list.
+            attached = category.related_entities
+            missing = [key for key in category.properties.forms.keys if key not in attached]
+            if missing:
+                loaded = Entities.fetch(*missing, request=Fetch.root())
+                category.properties.forms.attach({**attached, **{form.key: form for form in loaded}})
             updated = _copy_entity(category)
             if updated.properties.forms.add(candidate.form):
                 candidate.add_mutation_intents(
@@ -187,8 +195,10 @@ def prepare_patch(entity, changes, actor):
             raise ValidationError(f"{field} must be text or null.")
         setattr(candidate, field, value)
     _require(candidate, actor, Action.EDIT)
-    guards = [(source.key, ExactEntityState(deepcopy(dict(source.db)))) for source in sources.values()]
-    candidate._form_additional_guards = guards
+    # Ordinary edits have the same overwrite semantics as the editor. The
+    # mutation executor fences Form generations and completion transitions;
+    # incidental owner touches are not content conflicts.
+    guards = []
     return PreparedPatch(candidate, tuple(writes), tuple(guards), before, _projection(candidate), removed, tuple(source for source in sources.values() if source.entity_kind == "form"))
 
 
@@ -214,6 +224,9 @@ def _copy_entity(entity):
     result = cls(entity.key)
     result._db = deepcopy(entity.db)
     result.attach(entity.related_entities)
+    result._mutation_intents = list(entity.mutation_intents)
+    if entity.entity_kind == "project":
+        result.properties.model_tasks._value = list(entity.model_tasks)
     return result
 
 

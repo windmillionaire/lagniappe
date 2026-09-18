@@ -133,17 +133,17 @@ partial-extraction note.
 
 The cohesive-update preparation service is
 `lagniappe/core/tools/entity_patches.py::prepare_patch`. It accepts resolved
-entity references and returns detached writes, exact source guards, complete
-before/after values, and removed answers. Omitted fields are preserved. A Form
+entity references and returns detached writes, complete before/after values,
+and removed answers. Omitted fields are preserved. A Form
 reassignment requires every target answer field explicitly; an unchanged Form
 accepts selected answer patches. Completed tasks and pending Form migrations
 are rejected. Project ordering must contain each existing model task once.
-The writes use the ordinary mutation executor so source changes, including
-concurrent completion, invalidate the commit. Preparation itself does not save.
+The writes use the ordinary mutation executor, including its Form migration and
+completion-transition checks. Preparation itself does not save.
 `reporting/entity_updates.py` resolves exact references and successful earlier
-action outputs through this service. Its review snapshot binds both action
-content and source records; its execution handler rejects missing dependencies,
-changed proposals, and stale sources before returning any writes. The report
+action outputs through this service. Its review snapshot binds action content
+and Form definitions; execution rejects missing dependencies, changed proposals,
+and changed Form schemas before returning any writes. The report
 runner must persist those writes together with its execution receipt.
 The native planner, REST/MCP submission, browser review, and forward runner use
 this preparation layer. Earlier Form/model creations are previewed without
@@ -207,8 +207,8 @@ Each action records its idempotency key, before-state, expected committed state,
 attempt count, and lifecycle status. Retry validates completed work and
 reconciles interrupted writes. Changes are atomic per action, not across a plan.
 
-After execution begins, **Revise Plan** creates a new linked report. The source
-must belong to the creator and have stopped; ambiguous writes and active Form
+After execution begins, **Create corrective plan** creates a new linked report.
+The source must belong to the creator and have stopped; ambiguous writes and active Form
 migrations must be reconciled first. The new report contains a bounded snapshot
 of proposal/outcomes and reads current state to propose additional changes.
 All embedded snapshot properties are excluded from Datastore indexes, including
@@ -216,8 +216,11 @@ long answer HTML, task descriptions, and execution notes.
 Draft corrections leave source retry available. Browser approval checks the
 source snapshot and atomically supersedes its execution; subsequent retries of
 the source are rejected. External `start_plan`/REST creation accepts
-`revises_plan_id` without provider access. Browser corrections require Ask access
-and create a site-origin report even when the original came from MCP. Shared
+`revises_plan_id` without provider access. Browser corrections require Create
+access and create a site-origin report even when the original came from MCP.
+The correction controls, generation/revision routes, and queued jobs enforce this
+entitlement, including retries and revisions of the corrective proposal. Ordinary
+answer revisions still require Ask access. Shared
 evidence survives deletion while another linked report still references it.
 Automatic record deletion is unsupported; identify manual cleanup explicitly.
 
@@ -282,18 +285,46 @@ conversion values are preserved. Schema-impact review uses the original action
 positions, matching the skip controls, so opening an ID-less report does not
 mutate it or require regeneration.
 
-Cohesive execution resolves earlier action outputs back to their saved entities
-before preparing each update. Project ordering and relation touches can change
-those records within the same plan; detached preview objects are not execution
-baselines. Cohesive updates retry a rejected atomic write up to twice, fetching
-fresh records and repeating review and permission checks each time. Rejected
-attempts discard their staged receipt and output references. Continued contention
-marks execution failed and retains Retry, without treating the uncommitted
-success receipt as an ambiguous write. Other actions and ambiguous failures do
-not use this retry loop. Actions still commit separately with their receipts;
-the whole plan is not one transaction. Already
-completed actions remain resumable and are not recreated. For a report already
-completed with skipped updates, use Create corrective plan to propose only the
-remaining changes against the current workspace. The post-execution control
+Report execution prepares actions in proposal order against one working entity
+map. Earlier creations and edits are immediately available to dependent actions
+without an intermediate save or reload. Each entity's final state is written once;
+shared owner touches and property masks are merged by the mutation planner.
+Model creation loads the existing Project order before appending, while new
+Projects start with an empty list. Category Form registration resolves any stored
+but unloaded Form members before extending the list, preserving sibling Forms.
+Groups commit at 50 actions or approximately 4 MiB of prepared root data. These
+are general size boundaries, not boundaries between entity types or dependencies.
+Form migrations flush prepared work before starting their asynchronous child job.
+
+The report and its action results commit with the workspace writes in a guarded
+transaction. A batch receipt distinguishes rejected writes from a lost commit
+response. Retry resumes uncommitted groups; it does not replay successful creates
+or reject completed work because it was subsequently edited. A preparation failure
+discards that group's staged writes; recoverable skips rebuild only the uncommitted
+group. There is no automatic per-action save/reload retry loop.
+
+Approved patches have ordinary editor overwrite semantics. They apply the selected
+fields to the working entity and retain omitted fields. Execution checks permissions,
+values and Form definitions, but does not compare every field with the review's
+before-state or guard whole linked Pages, Projects, and model tasks. Shared Form
+migration/generation and completion fences still protect answer interpretation.
+Transaction guards are consumed after a successful save, including guards on
+Reports and Tasks reused in memory.
+
+Public plan reads remove internal review snapshots before resolving references.
+Temporary preview entity IDs never enter workspace lookups; public proposals
+retain the original action references for round trips.
+
+Document HTML and CRDT snapshots upload to isolated Storage objects during
+preparation and populate the working entity's assets dictionary. Document references,
+named pre-edit history, and action receipts join the batch. An existing Page receives
+an assets/history/modified mask unless another action also edits its fields. One
+pre-edit document version is retained per Page per batch. Collaborative state and
+asset references are checked before committing; unsaved collaborative edits still
+require reconciliation. A durable pending-publication list lets recovery finish
+collaborative publication after a committed batch without appending text again.
+
+For a report completed with skipped updates, use Create corrective plan to propose
+only the remaining changes against the current workspace. The post-execution control
 explains that this creates a separate linked report requiring review and approval;
 unexecuted proposals retain the Revise Plan control.

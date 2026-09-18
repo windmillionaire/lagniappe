@@ -30,10 +30,10 @@ RELATION_FIELDS = {
 
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
-# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_rejects_changed_source_and_changed_proposal
+# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
 # @tests tests_unit/test_032g_entity_patches.py::test_update_missing_dependencies_never_fall_back_to_entity_lookup
 # @matrix entity-patch : integration review dependencies stale-state
-def prepare_update_action(action, user, outputs=None, *, refresh_outputs=False):
+def prepare_update_action(action, user, outputs=None):
     """Resolve one action against current entities or earlier successful outputs."""
     kind = UPDATE_TARGETS.get(action.get("type"))
     data = action.get("data")
@@ -42,8 +42,8 @@ def prepare_update_action(action, user, outputs=None, *, refresh_outputs=False):
     changes = data["changes"]
     if not isinstance(changes, dict):
         raise ValidationError("Changes must be an object.")
-    outputs = outputs or {}
-    target = _resolve(data["entity"], kind, outputs, refresh=refresh_outputs)
+    outputs = outputs if outputs is not None else {}
+    target = _resolve(data["entity"], kind, outputs)
     resolved = deepcopy(changes)
     for field, expected in RELATION_FIELDS.items():
         if field not in changes:
@@ -52,15 +52,15 @@ def prepare_update_action(action, user, outputs=None, *, refresh_outputs=False):
         if field in {"categories", "model_tasks"}:
             if not isinstance(value, list):
                 raise ValidationError(f"{field} must be a list of exact references.")
-            resolved[field] = [_resolve(item, expected, outputs, refresh=refresh_outputs) for item in value]
+            resolved[field] = [_resolve(item, expected, outputs) for item in value]
         else:
-            resolved[field] = None if value is None else _resolve(value, expected, outputs, refresh=refresh_outputs)
+            resolved[field] = None if value is None else _resolve(value, expected, outputs)
     return prepare_patch(target, resolved, user)
 
 
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
-# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_rejects_changed_source_and_changed_proposal
+# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
 # @matrix entity-patch : integration review dependencies stale-state
 def review_update_action(action, user, outputs=None):
     """Replace any submitted review metadata with a server-prepared snapshot."""
@@ -79,7 +79,7 @@ def review_update_action(action, user, outputs=None):
 
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
-# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_rejects_changed_source_and_changed_proposal
+# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
 # @tests tests_unit/test_032g_entity_patches.py::test_update_missing_dependencies_never_fall_back_to_entity_lookup
 # @matrix entity-patch : integration review dependencies stale-state
 def execute_update_action(action, report, user, created, context=None):
@@ -87,9 +87,9 @@ def execute_update_action(action, report, user, created, context=None):
     reviewed = action.get("_entity_update")
     if not isinstance(reviewed, dict) or reviewed.get("proposal") != _fingerprint({"type": action.get("type"), "data": action.get("data")}):
         raise ValidationError("This update needs a fresh review before execution.")
-    prepared = prepare_update_action(action, user, created, refresh_outputs=True)
-    if reviewed.get("sources") != _sources(prepared, created) or reviewed.get("comparison") != _comparison(prepared.before, created) or _comparison(reviewed.get("after"), created) != _comparison(prepared.after, created):
-        raise ValidationError("The reviewed source changed. Revise this update before execution.")
+    prepared = prepare_update_action(action, user, created)
+    if reviewed.get("sources") != _sources(prepared, created):
+        raise ValidationError("The reviewed Form changed. Revise this update before execution.")
     return prepared.entity, list(prepared.writes), {
         "previous": deepcopy(prepared.before),
         "entity_update_after": deepcopy(prepared.after),
@@ -101,7 +101,7 @@ def execute_update_action(action, report, user, created, context=None):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_update_action
 # @reason strict dependency resolution is exercised through preparation and execution
-def _resolve(reference, kind, outputs, *, refresh=False):
+def _resolve(reference, kind, outputs):
     if not isinstance(reference, str) or not reference:
         raise ValidationError("Use an exact entity reference or an earlier action reference.")
     if reference.startswith(("$", "action:")):
@@ -114,13 +114,7 @@ def _resolve(reference, kind, outputs, *, refresh=False):
 
         entity = outputs.get(reference)
         if entity is None:
-            entity = _fetch_report_entity(reference)
-    if refresh and entity is not None and (reference.startswith(("$", "action:")) or reference in outputs):
-        # Earlier actions may have rewritten this output or touched its relations.
-        # Keep the action identity, but bind guards to the current saved entity.
-        from .execution.actions.references import _fetch_report_entity
-
-        entity = _fetch_report_entity(entity.urlsafe_key)
+            entity = outputs.resolve(reference) if hasattr(outputs, "resolve") else _fetch_report_entity(reference)
     if entity is None or entity.entity_kind != kind:
         raise ValidationError(f"Expected an exact {kind} reference.")
     return entity
@@ -164,6 +158,7 @@ def _fingerprint(value):
 
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_proposal_prepares_new_forms_and_model_order
+# @tests tests_unit/test_032g_entity_patches.py::test_proposal_orders_models_on_a_new_project
 # @matrix entity-patch : integration review dependencies stale-state
 def prepare_entity_updates(proposal, user):
     """Prepare updates in proposal order without creating workspace records."""
@@ -209,6 +204,7 @@ def prepare_entity_updates(proposal, user):
                 entity.order = len(project.model_tasks) + 1
                 project.properties.model_tasks._value = [*project.model_tasks, entity]
             outputs[action_id] = entity
+            outputs[entity.urlsafe_key] = entity
         elif kind in UPDATE_TARGETS:
             prepared = review_update_action(action, user, outputs)
             target_id = prepared.entity.urlsafe_key

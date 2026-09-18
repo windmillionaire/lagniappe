@@ -18,6 +18,32 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 pytestmark = pytest.mark.unit
 
 
+# @pair ai-access:provider-boundary
+@pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
+@pytest.mark.parametrize("corrective", [False, True])
+def test_corrective_report_generation_requires_create_access(monkeypatch, tier, corrective):
+    class Actor:
+        access = staticmethod(tier.implies)
+
+    class Report:
+        available = True
+        db = {"correction": {"source": "original"}} if corrective else {}
+
+        def allowed(self, _action, *, user):
+            return isinstance(user, Actor)
+
+    monkeypatch.setattr(report_adapters.Entities, "USER", Actor)
+    monkeypatch.setattr(report_adapters.Entities, "REPORT", Report)
+    context = SimpleNamespace(actor=Actor(), input=lambda _name: Report())
+    adapter = report_adapters.AIReportAdapter()
+
+    if tier is AI.NONE or (corrective and tier is AI.ASK):
+        with pytest.raises(report_adapters.exceptions.ValidationError, match="AI access"):
+            adapter.authorize(context)
+    else:
+        adapter.authorize(context)
+
+
 # @matrix ai-report : input-files no-extra-read fresh-read
 @pytest.mark.parametrize(
     "phase",

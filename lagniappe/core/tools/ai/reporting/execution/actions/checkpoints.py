@@ -1,6 +1,5 @@
-"""Before-state and post-commit checkpoints for report actions."""
+"""Action identities, completion decisions, and committed result receipts."""
 
-import copy
 from datetime import datetime, timezone
 
 from lagniappe.core.entities import Entities
@@ -18,13 +17,9 @@ from .common import (
     _first_data_reference,
 )
 from .references import (
-    _file_attached_to_endpoint,
     _load_result_entity,
     _reference_key,
     _resolve_entity,
-    _resolve_file_endpoint,
-    _resolve_file_entity,
-    _resolve_report_file,
 )
 from .task_completion import _completion_state
 from .documents import prepare_document_append
@@ -34,7 +29,6 @@ from .completed_tasks import (
     _is_completed_task_event,
     _parse_completed_task_completed_on,
     _should_archive_live_completion,
-    _snapshot_entity,
     _task_state_fingerprint,
     _task_checkpoint_state,
     _value_fingerprint,
@@ -93,8 +87,6 @@ def _allocate_action_output_key(action, created, context):
 def _capture_action_before(action, report, user, created, context=None):
     action_type = action.get("type")
     data = _data(action)
-    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
-        return {"review": copy.deepcopy(action.get("_entity_update"))}
     if action_type == "complete_task":
         task = _resolve_entity(data.get("task"), created, expected=Entities.TASK)
         return {"entity": _entity_result(task), "completion_state": _completion_state(task), "task": _task_checkpoint_state(task)}
@@ -105,65 +97,6 @@ def _capture_action_before(action, report, user, created, context=None):
             user,
             created,
         )
-    if action_type.startswith("create_"):
-        return {"entity_exists": False}
-    if action_type == "move_task":
-        root = "task"
-        expected = Entities.PAGE if root == "page" else Entities.TASK
-        entity = _resolve_entity(
-            _first_data_reference(data, root), created, expected=expected
-        )
-        previous = entity.model if root == "page" else entity.page
-        return {
-            "entity": _snapshot_entity(entity),
-            "parent": _snapshot_entity(previous),
-        }
-    if action_type == "move_file":
-        source = _resolve_file_endpoint(data, created, endpoint="source")
-        target = _resolve_file_endpoint(data, created, endpoint="target")
-        file = _resolve_file_entity(data, created, source=source)
-        return {
-            "entity": _snapshot_entity(file),
-            "source": _snapshot_entity(source),
-            "target": _snapshot_entity(target),
-        }
-    if action_type in {"update_form_schema"}:
-        form = _resolve_entity(
-            _first_data_reference(data, "form"), created, expected=Entities.FORM
-        )
-        return {
-            "entity": _entity_result(form),
-            "schema": copy.deepcopy(form.schema or []),
-        }
-    if action_type == "attach_file":
-        target = _resolve_entity(_first_data_reference(data, "entity"), created)
-        file = _resolve_report_file(
-            data.get("file") or data.get("file_id") or data.get("file_ref"),
-            report,
-        )
-        return {
-            "entity": _entity_result(file),
-            "target": _entity_result(target),
-            "linked": _file_attached_to_endpoint(file, target),
-        }
-    if action_type == "summarize_file":
-        file = _resolve_report_file(
-            data.get("file") or data.get("file_id") or data.get("file_ref"),
-            report,
-        )
-        summarize = file.properties.summarize
-        return {
-            "entity": _entity_result(file),
-            "summary": file.summary,
-            "summarize": {
-                "enabled": summarize.enabled,
-                "search": summarize.search,
-                "status": summarize.status,
-                "error": summarize.error,
-                "complete": summarize.complete,
-                "retrieval_terms": summarize.retrieval_terms,
-            },
-        }
     return {}
 
 
@@ -177,16 +110,18 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
         return
     if action.get("type") == "create_page" and _data(action).get("document"):
         record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    record["before"] = _capture_action_before(
-        action,
-        report,
-        user,
-        created,
-        context,
+    # Only completion preparation needs a prior completion to decide whether
+    # to create history. Ordinary writes commit their receipt with the batch;
+    # they no longer need a second copy of the reviewed proposal/before-state.
+    record["before"] = (
+        _capture_action_before(action, report, user, created, context)
+        if action.get("type") == "complete_task" or (
+            action.get("type") == "create_task" and _is_completed_task_event(_data(action))
+        ) else {}
     )
     output_key = None
     if action.get("type") == "complete_task":
-        task = _load_result_entity(record["before"].get("entity"))
+        task = _resolve_entity(_data(action).get("task"), created, expected=Entities.TASK)
         history_key = database_utility.create_key("task_history", task)
         record["history_output_key"] = database_get.urlsafe_key(history_key)
         context.setdefault("prepared_keys", {})[
