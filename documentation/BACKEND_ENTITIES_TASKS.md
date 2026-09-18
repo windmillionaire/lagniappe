@@ -72,7 +72,7 @@ remain the current values. Ordinary Task views, tables, filters, and AI projecti
 use that current submission with the current Form, even while the Task is
 completed. Completion does not create a FormHistory record or copy Form assets.
 
-`tools/form_definitions.py` separates current reads from explicitly requested
+`tools/forms/definitions.py` separates current reads from explicitly requested
 originals. **View Original Submission** is offered to editors only when a completed
 Task's current submission has advanced beyond the envelope's generation and its
 values differ. The live Task's completion-details endpoint also requires edit

@@ -20,7 +20,7 @@ from .entity import Entity
 from . import Entities
 from lagniappe.core.tools.database import get as database_get
 from ..tools.tasks import scheduling
-from ..tools.form_definitions import (
+from lagniappe.core.tools.forms.definitions import (
     capture_completed_submission,
     completed_envelope,
     immutable_submission,

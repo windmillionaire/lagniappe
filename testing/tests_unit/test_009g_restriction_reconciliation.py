@@ -143,7 +143,7 @@ def test_reconciliation_change_detection_and_forced_retry(monkeypatch, cached, r
     from google.cloud import datastore
     from lagniappe.core.definitions import MutationEffectType
     from lagniappe.core.mutations.executor import consume_mutation_intents
-    from lagniappe.core.tools.form_drafts import prepare_form_publication
+    from lagniappe.core.tools.forms.drafts import prepare_form_publication
 
     row = datastore.Entity(key=datastore.Key("models", "changed-form", project="unit-project"))
     row.update(type="form", form_type="task", name="Restricted Form", hash="changed-form",
@@ -220,7 +220,7 @@ def test_form_creation_and_content_edits_do_not_queue_reconciliation(monkeypatch
     from google.cloud import datastore
     from lagniappe.core.definitions import MutationEffectType
     from lagniappe.core.mutations.executor import consume_mutation_intents
-    from lagniappe.core.tools.form_drafts import prepare_form_publication
+    from lagniappe.core.tools.forms.drafts import prepare_form_publication
 
     row = datastore.Entity(key=datastore.Key("models", "content-form", project="unit-project"))
     row.update(type="form", form_type="task", name="Content Form", hash="content-form",

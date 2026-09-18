@@ -1239,7 +1239,7 @@ def public_plan_proposal(report, user=None):
             data.pop("document", None)
     public.pop("answer_html", None)
     if user is not None:
-        from lagniappe.core.tools import form_schema_updates
+        from lagniappe.core.tools.forms import schema_updates as form_schema_updates
 
         for action in proposal.get("actions", []):
             if action.get("type") == "update_form_schema":

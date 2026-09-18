@@ -9,7 +9,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
 from lagniappe.core.tools import ai
-from lagniappe.core.tools import form_drafts
+from lagniappe.core.tools.forms import drafts as form_drafts
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import permission, require_ai_access
@@ -126,7 +126,7 @@ def rows():
 def view(key, **kwargs):
     form = kwargs["entity"]
 
-    from lagniappe.core.tools import form_changes, form_conversions
+    from lagniappe.core.tools.forms import changes as form_changes, conversions as form_conversions
     draft = form_drafts.builder_draft(form)
     if form.db.get(form_changes.PENDING):
         result = form_changes.change_response(form, current_user)
@@ -141,7 +141,7 @@ def view(key, **kwargs):
 @forms.route("/<key>/change", methods=["GET", "POST"])
 @permission(Resource.FORM, Action.EDIT, no_store=True)
 def form_change(key, **kwargs):
-    from lagniappe.core.tools import form_changes
+    from lagniappe.core.tools.forms import changes as form_changes
     try:
         result = (form_changes.change_response(kwargs["entity"], current_user) if request.method == "GET"
                   else form_changes.recover_change(kwargs["entity"], current_user,

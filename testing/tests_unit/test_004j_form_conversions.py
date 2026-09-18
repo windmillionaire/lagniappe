@@ -5,7 +5,7 @@ from copy import deepcopy
 import pytest
 
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools.form_conversions import (
+from lagniappe.core.tools.forms.conversions import (
     MISSING,
     classify_changes,
     conversion_catalog,

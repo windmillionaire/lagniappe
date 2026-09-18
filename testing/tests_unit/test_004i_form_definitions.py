@@ -9,7 +9,7 @@ import json
 import pytest
 
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import form_definitions as definitions
+from lagniappe.core.tools.forms import definitions
 from lagniappe.core.entities.history import TaskHistory
 from lagniappe.core.entities.task import Task
 from testing.utility.test_entities import TestEntities
@@ -31,19 +31,19 @@ def _record(*, completed=True, generation=0, kind="task_history"):
 def test_completed_definition_uses_recorded_version_and_reports_missing_schema():
     record = _record()
     old = SimpleNamespace(schema=[{"id": "note", "type": "input", "title": "Original label"}], content_available=False)
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=old) as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=old) as resolve:
         result = definitions.definition_for(record)
         assert result.schema[0]["title"] == "Original label"
         assert result.content_available is False
         assert definitions.definition_for(record) is result
         resolve.assert_called_once_with("form-key", 0)
     record.generation = 9
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=None):
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=None):
         result = definitions.definition_for(record)
         assert result.schema == []
         assert "unavailable" in result.error
     record.generation = 1
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve:
         assert definitions.definition_for(record).source is record.form
         resolve.assert_not_called()
 
@@ -52,7 +52,7 @@ def test_completed_definition_uses_recorded_version_and_reports_missing_schema()
 @pytest.mark.unit
 def test_active_definition_uses_latest_metadata():
     record = _record(completed=False, kind="task")
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve:
         assert definitions.definition_for(record).schema[0]["title"] == "Current label"
         record.form.schema[0]["title"] = "Later label"
         assert definitions.definition_for(record).schema[0]["title"] == "Later label"
@@ -77,7 +77,7 @@ def test_completed_task_resolves_saved_generation_after_form_deletion(generation
     archived = SimpleNamespace(schema=[{
         "id": "note", "type": "input", "input": "number", "title": "Quantity",
     }]) if available else None
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=archived) as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=archived) as resolve:
         assert definitions.definition_for(record).schema == []
         resolve.assert_not_called()
         definition = definitions.definition_for(record, archived=True)
@@ -101,7 +101,7 @@ def test_completed_task_resolves_saved_generation_after_form_deletion(generation
 def test_active_submission_does_not_restore_deleted_form(kind):
     record = _record(kind=kind, completed=False)
     record.form = None
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve:
         definition = definitions.definition_for(record, archived=True)
         assert definition.schema == []
         assert definition.error is None
@@ -115,14 +115,14 @@ def test_completed_task_without_an_attached_form_stays_empty():
     record.form = None
     record.properties.form.key = None
     record.properties.submission = SimpleNamespace(value={})
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve:
         definition = definitions.definition_for(record, archived=True)
         assert definition.schema == []
         assert definition.error is None
         resolve.assert_not_called()
 
 
-# @source lagniappe/core/tools/form_definitions.py::history_groups
+# @source lagniappe/core/tools/forms/definitions.py::history_groups
 # @matrix tasks task-completion : history ordering schema-version
 @pytest.mark.unit
 def test_history_orders_same_day_completions_by_archive_time():
@@ -136,7 +136,7 @@ def test_history_orders_same_day_completions_by_archive_time():
     with patch("lagniappe.core.entities.task.database_get.task_history", return_value=[]):
         ordered = Task.history.fget(task)
     assert ordered == [records[2], records[1], records[0], records[3]]
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generations", side_effect=lambda pairs: {
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generations", side_effect=lambda pairs: {
         pair: SimpleNamespace(schema=[]) for pair in pairs
     }):
         groups = definitions.history_groups(ordered)
@@ -193,7 +193,7 @@ def test_original_answers_are_available_only_after_completed_values_change(
 
     with (
         patch("lagniappe.core.entities.task.completed_envelope", wraps=definitions.completed_envelope) as read_original,
-        patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve,
+        patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve,
         patch.object(definitions.database_get, "entity") as fetch,
     ):
         assert task.has_converted_completion is expected
@@ -252,7 +252,7 @@ def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
     historical = _record(kind="task_history")
     historical.properties.form.key = live.properties.form.key
     historical.properties.submission = SimpleNamespace(value={"note": "Exact prior answer"})
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=SimpleNamespace(schema=live.form.schema)):
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=SimpleNamespace(schema=live.form.schema)):
         assert definitions.history_values_for(live, historical, "note") == {"note": "Exact prior answer"}
         historical.properties.form.key = "other-form"
         with pytest.raises(ValidationError, match="different form"):
@@ -270,7 +270,7 @@ def test_history_fill_converts_one_field_without_changing_history():
     source = [{"id": key, "type": "input", "input": "text", "title": key}
               for key in original]
     live.form.schema = [{**field, "input": "number"} for field in source]
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=SimpleNamespace(schema=source)):
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=SimpleNamespace(schema=source)):
         assert definitions.history_values_for(live, historical, "note") == {"note": 7}
         assert definitions.history_values_for(live, historical, "zero") == {"zero": 0}
         with pytest.raises(ValidationError, match='"invalid" cannot be converted'):
@@ -286,7 +286,7 @@ def test_history_fill_converts_one_field_without_changing_history():
     historical = _record(kind="task_history")
     historical.properties.form.key = live.properties.form.key
     historical.properties.submission = SimpleNamespace(value={"items": {"rows": [{"count": "bad"}]}})
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=SimpleNamespace(schema=source)):
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=SimpleNamespace(schema=source)):
         with pytest.raises(ValidationError, match='"Count" cannot be converted'):
             definitions.history_values_for(live, historical, "items")
         historical.properties.submission.value["items"]["rows"][0]["count"] = "12"
@@ -309,7 +309,7 @@ def test_history_groups_share_generation_tables_and_preserve_row_order(last_form
     if last_form_key != "form-key":
         identities.append((last_form_key, 0))
         grouped_records = [records[:2], [records[2]], [records[3]]]
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generations", side_effect=lambda pairs: {
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generations", side_effect=lambda pairs: {
         (key, generation): SimpleNamespace(schema=[{"id": "note", "title": generation}])
         for key, generation in pairs
     }) as resolve:
@@ -334,7 +334,7 @@ def test_history_html_uses_authorized_record_asset_urls():
         get_asset=lambda name: asset,
         get_html_field=lambda field: '<p>Original</p><img src="/assets/snapshot/image_intro_photo.png">',
     )
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=source):
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=source):
         html = definitions.rendered_html_fields(record)["intro"]
         assert "/assets/completion-key/form-generation/0/image_intro_photo.png" in html
         assert "/assets/snapshot/" not in html
@@ -518,7 +518,7 @@ def test_completion_rejects_unrepresented_values_without_rewriting_answers():
     task.db["submission"] = json.dumps({"note": "Preserved answer"})
     task.properties.submission.value = {"note": "Preserved answer"}
     task.form.db["generation"] = 1
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve:
         with pytest.raises(ValidationError, match="transfer"):
             task.complete()
         resolve.assert_not_called()
@@ -561,7 +561,7 @@ def test_task_construction_does_not_hydrate_or_copy_whole_rows():
             assert "_completion_identity" not in lazy.__dict__
 
 
-# @source lagniappe/core/tools/form_definitions.py::preload_definitions
+# @source lagniappe/core/tools/forms/definitions.py::preload_definitions
 # @source lagniappe/core/properties/form_submission.py::FormSubmission.value
 # @matrix submission task-completion : schema-version
 # @matrix task-completion : current-definition no-extra-read
@@ -576,7 +576,7 @@ def test_completed_envelope_uses_matching_current_definition_without_history_rea
     task.completed = True
     task.db["schema_version"] = "ignored-old-version"
     task.db["submission"] = '{"note":"Current answer"}'
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation") as resolve, patch("lagniappe.core.tools.form_drafts.resolve_form_generations") as resolve_many:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation") as resolve, patch("lagniappe.core.tools.forms.definitions.resolve_form_generations") as resolve_many:
         assert task.schema_version == "ignored-old-version"
         assert task.submission == {"note": "Current answer"}
         assert task.submission_definition.source is task.form
@@ -592,7 +592,7 @@ def test_completed_envelope_uses_matching_current_definition_without_history_rea
     assert definitions.original_completion(task)["definition"].schema[0]["title"] == "New presentation"
     task.form.db["generation"] = 1
     old = SimpleNamespace(schema=[{"id": "note", "type": "input", "title": "Archived"}], content_available=True)
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=old) as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=old) as resolve:
         assert task.submission_definition.source is task.form
         resolve.assert_not_called()
         original = definitions.original_completion(task)
@@ -628,7 +628,7 @@ def test_envelope_write_guard_rejects_raw_mutation_and_stale_active_overwrite():
         definitions.validate_completion_write(task, concurrent)
 
 
-# @source lagniappe/core/tools/form_definitions.py::original_completion
+# @source lagniappe/core/tools/forms/definitions.py::original_completion
 # @matrix submission task-completion : schema-version missing-schema raw-values
 @pytest.mark.unit
 def test_legacy_original_completion_uses_generation_zero_and_preserves_missing_answers():
@@ -637,7 +637,7 @@ def test_legacy_original_completion_uses_generation_zero_and_preserves_missing_a
     task.db["schema_version"] = "legacy-version-never-used-for-history"
     assert definitions.original_completion(task)["generation"] == 0
     task.form.db["generation"] = 2
-    with patch("lagniappe.core.tools.form_drafts.resolve_form_generation", return_value=None) as resolve:
+    with patch("lagniappe.core.tools.forms.definitions.resolve_form_generation", return_value=None) as resolve:
         original = definitions.original_completion(task)
     resolve.assert_called_once_with(task.properties.form.key, 0)
     assert original["submission"] == {"note": "Preserved answer"}

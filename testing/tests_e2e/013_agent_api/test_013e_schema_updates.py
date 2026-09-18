@@ -9,7 +9,7 @@ from flask_login import login_user
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import form_changes
+from lagniappe.core.tools.forms import changes as form_changes
 from lagniappe.core.tools.ai import external_api, form_conversion
 from lagniappe.core.tools.ai.reporting import schema_updates
 from lagniappe.core.tools.auth import agent_api as agent_auth
@@ -27,7 +27,7 @@ pytestmark = pytest.mark.e2e
 # @source lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
 # @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter.prepare_ai_target
-# @source lagniappe/core/tools/form_changes.py::prepare_target
+# @source lagniappe/core/tools/forms/changes.py::prepare_target
 # @source lagniappe/core/tools/ai/reporting/schema_updates.py::report_impact
 # @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal

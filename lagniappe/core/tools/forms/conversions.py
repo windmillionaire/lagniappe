@@ -10,7 +10,8 @@ from zoneinfo import ZoneInfo
 
 import phonenumbers
 
-from ..exceptions import ValidationError
+from ...exceptions import ValidationError
+from .contracts import needs_ai_value
 
 
 VERSION = 2
@@ -51,7 +52,7 @@ FALSE = frozenset({"false", "no", "0", "off"})
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_conversions.py::classify_changes
+# @covered-by lagniappe/core/tools/forms/conversions.py::classify_changes
 # @reason effective kinds are shared by schema classification and pure conversion
 def field_kind(field):
     kind = field.get("type")
@@ -125,7 +126,7 @@ def conversion_catalog():
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_conversions.py::classify_changes
+# @covered-by lagniappe/core/tools/forms/conversions.py::classify_changes
 # @reason fingerprints exclude presentation and only identify representation changes
 def representation(field):
     return {
@@ -224,7 +225,7 @@ def classify_changes(previous, proposed, mappings=None):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_conversions.py::convert_value
+# @covered-by lagniappe/core/tools/forms/conversions.py::convert_value
 # @reason text extraction is a provider-free part of the conversion contract
 def _text(value, source, zone):
     kind = field_kind(source)
@@ -288,7 +289,7 @@ def _text(value, source, zone):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_conversions.py::convert_value
+# @covered-by lagniappe/core/tools/forms/conversions.py::convert_value
 # @reason destination parsing is deliberately separate from coercing AI/import validators
 def _parse(text, target, zone):
     kind = field_kind(target)
@@ -460,8 +461,6 @@ def convert_submission(
         field_id = change["id"]
         before = values.get(field_id, MISSING)
         if change["rule"] == "ai":
-            from .form_schema_updates import needs_ai_value
-
             if before is MISSING or not needs_ai_value(before):
                 after, reason = MISSING, "unset"
             else:

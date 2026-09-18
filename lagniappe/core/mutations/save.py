@@ -1,7 +1,7 @@
 """Kind-specific save planners."""
 
 from ..definitions import Fetch, FetchReason
-from ..tools.form_definitions import validate_completion_write
+from lagniappe.core.tools.forms.definitions import validate_completion_write
 from .base import StandardMutation
 
 
@@ -123,7 +123,7 @@ class FormMutation(StandardMutation):
     # @matrix forms mutations : guarded-save publication
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         entity.properties.restricted_to.materialize()
-        from ..tools.form_drafts import prepare_form_publication
+        from lagniappe.core.tools.forms.drafts import prepare_form_publication
 
         prepare_form_publication(entity, builder)
 

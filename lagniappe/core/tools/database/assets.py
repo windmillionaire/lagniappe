@@ -31,8 +31,8 @@ DIRECT_UPLOAD_ASSET_NONCE = re.compile(r"^[a-f0-9]{32}$")
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/form_drafts.py::copy_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason attempt ownership bounds cleanup to newly allocated objects
 def record_attempt_asset(owner, definition):
     owned = getattr(owner, "_form_attempt_assets", None)

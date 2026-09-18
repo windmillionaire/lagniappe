@@ -17,7 +17,7 @@ from lagniappe.core.definitions import Action, Fetch, MutationOperation
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.form import Form
 from lagniappe.core.mutations import executor, plan_mutation
-from lagniappe.core.tools import form_drafts as drafts
+from lagniappe.core.tools.forms import definitions, drafts
 from lagniappe.core.tools.cache import restrictions as restriction_cache
 from lagniappe.core.tools.database import assets, get as database_get, utility as database_utility
 
@@ -109,7 +109,7 @@ def memory_forms(monkeypatch):
     monkeypatch.setattr(assets, "save_file", save_file)
     monkeypatch.setattr(assets, "copy_file", copy_file)
     monkeypatch.setattr(assets, "delete_file_generation", lambda path, visibility, generation: blobs.pop(path, None) is not None)
-    monkeypatch.setattr(drafts, "Query", lambda kind: SimpleNamespace(
+    monkeypatch.setattr(definitions, "Query", lambda kind: SimpleNamespace(
         ancestor=lambda key: SimpleNamespace(filter=lambda query: SimpleNamespace(fetch_all=lambda: []))
     ))
     return SimpleNamespace(rows=rows, blobs=blobs, commits=commits, key=key,
@@ -248,7 +248,7 @@ def test_compatible_saves_update_version_without_archiving_generation(memory_for
     assert len(memory_forms.rows) == 1
 
 
-# @source lagniappe/core/tools/form_drafts.py::prepare_form_publication
+# @source lagniappe/core/tools/forms/drafts.py::prepare_form_publication
 # @source lagniappe/core/mutations/executor.py::execute_post_commit
 # @matrix html-field : isolated-assets cleanup
 # @matrix mutations : durable-first rejected-save
@@ -336,9 +336,9 @@ def test_exact_publication_guard_rejects_new_properties_but_document_guard_is_su
 # @matrix form-schema : history generation
 def test_generation_resolution_ignores_legacy_versions(memory_forms, monkeypatch):
     form = memory_forms.form()
-    monkeypatch.setattr(drafts, "Query", lambda *args, **kwargs: pytest.fail("Matching generation queried history"))
-    assert drafts.resolve_form_generation(form, 0) is form
-    assert drafts.resolve_form_generation(form.key, 0).schema == form.schema
+    monkeypatch.setattr(definitions, "Query", lambda *args, **kwargs: pytest.fail("Matching generation queried history"))
+    assert definitions.resolve_form_generation(form, 0) is form
+    assert definitions.resolve_form_generation(form.key, 0).schema == form.schema
     assert form.version == "legacy-version"
 
 
@@ -353,10 +353,10 @@ def test_generation_resolution_loads_only_the_requested_archive(memory_forms, mo
     def stored(key, generation):
         calls.append((key, generation))
         return archived if generation == 0 else None
-    monkeypatch.setattr(drafts, "_stored_generation", stored)
-    assert drafts.resolve_form_generation(current, 0) is archived
-    assert drafts.resolve_form_generation(current, 1) is current
-    assert drafts.resolve_form_generation(current, 99) is None
+    monkeypatch.setattr(definitions, "_stored_generation", stored)
+    assert definitions.resolve_form_generation(current, 0) is archived
+    assert definitions.resolve_form_generation(current, 1) is current
+    assert definitions.resolve_form_generation(current, 99) is None
     assert calls == [(source.key, 0), (source.key, 99)]
 
 
@@ -416,7 +416,7 @@ def test_generation_resolution_batches_current_forms(memory_forms, monkeypatch):
         calls.append(keys)
         return actual_fetch(*keys, request=request)
     monkeypatch.setattr(Entities, "fetch", fetch)
-    result = drafts.resolve_form_generations([(form.key, 0), (form.key, 0)])
+    result = definitions.resolve_form_generations([(form.key, 0), (form.key, 0)])
     assert list(result) == [(form.key, 0)]
     assert result[(form.key, 0)].schema == form.schema
     assert calls == [(form.key,)]
@@ -495,7 +495,7 @@ def test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_th
         assert memory_forms.blobs == original_blobs
 
 
-# @source lagniappe/core/tools/form_drafts.py::save_form_draft
+# @source lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @matrix forms : draft conflict publication
 # @pair mutations:conflict
 @pytest.mark.parametrize("race_timing", ["after-initial-fetch", "before-commit"])

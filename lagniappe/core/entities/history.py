@@ -16,7 +16,7 @@ from ..properties import (
 from ..tools.files.html import strip_tags
 from ..tools.auth.restrictions import permission_relation
 from ..tools.database.assets import cleanup_rejected_attempt, record_attempt_asset
-from ..tools import form_definitions
+from lagniappe.core.tools.forms import definitions as form_definitions
 from ..tools.database import get as database_get
 
 

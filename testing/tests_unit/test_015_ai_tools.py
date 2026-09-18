@@ -3186,7 +3186,7 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
 def test_get_task_history_original_answers_use_saved_schema_and_permissions(monkeypatch):
     from copy import deepcopy
     from lagniappe.core.definitions import Action
-    from lagniappe.core.tools import form_drafts, form_definitions
+    from lagniappe.core.tools.forms import definitions as form_definitions
 
     monkeypatch.setattr(form_definitions.database_get, "urlsafe_key", lambda key: key)
     user = TestEntities.get("USER", {"name": "Owner", "owner": True, "hash": "original-owner"})
@@ -3212,7 +3212,7 @@ def test_get_task_history_original_answers_use_saved_schema_and_permissions(monk
     })
     monkeypatch.setattr(ai_get_task_history.Entities, "fetch_one", lambda *a, **k: task)
     monkeypatch.setattr(task.__class__, "history", property(lambda self: []))
-    monkeypatch.setattr(form_drafts, "resolve_form_generation", lambda *args: SimpleNamespace(schema=old_schema))
+    monkeypatch.setattr(form_definitions, "resolve_form_generation", lambda *args: SimpleNamespace(schema=old_schema))
     before = deepcopy(task.db)
     result = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)
     assert result["task"]["Count"] == 7
@@ -3226,7 +3226,7 @@ def test_get_task_history_original_answers_use_saved_schema_and_permissions(monk
     assert "task" in ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key}, user)
     monkeypatch.setattr(task, "allowed", lambda *a, **k: True)
     task._submission_definition = None
-    monkeypatch.setattr(form_drafts, "resolve_form_generation", lambda *args: None)
+    monkeypatch.setattr(form_definitions, "resolve_form_generation", lambda *args: None)
     unavailable = ai_get_task_history.execute_get_task_history({"id": task.urlsafe_key, "include_original": True}, user)["original_completion"]
     assert unavailable["schema_available"] is False
     assert unavailable["values"] is None

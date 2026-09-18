@@ -5,7 +5,7 @@ import json
 
 from ...definitions import AI
 from ...exceptions import ValidationError
-from ..form_conversions import validate_ai_candidate
+from lagniappe.core.tools.forms.conversions import validate_ai_candidate
 from .core import ai_model
 from .prompt import Prompt
 

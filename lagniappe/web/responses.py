@@ -28,7 +28,11 @@ from lagniappe.core.definitions import (
 from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.tools.form_definitions import definition_for, original_completion, rendered_html_fields
+from lagniappe.core.tools.forms.definitions import (
+    definition_for,
+    original_completion,
+    rendered_html_fields,
+)
 from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility

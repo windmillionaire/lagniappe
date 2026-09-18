@@ -268,7 +268,7 @@ def execute_mutation(plan, *, guards=None):
         effect for effect in durable if effect.effect is MutationEffectType.DELETE
     ]
 
-    from ..tools.form_changes import mutation_guards
+    from lagniappe.core.tools.forms.changes import mutation_guards
     form_change_guards = mutation_guards(writes, deletes)
 
     if writes or (deletes and (guards or form_change_guards)):

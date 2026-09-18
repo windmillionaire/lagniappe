@@ -1,12 +1,16 @@
-"""Current submission fields and explicitly requested original completions."""
+"""Current, pending, and historical Form definitions and original completions."""
 
 from copy import deepcopy
 from dataclasses import dataclass
 import json
 
-from ..exceptions import ValidationError
-from .database import get as database_get
-from .files.html import sanitize_form_content_html
+from ...definitions import Fetch
+from ...exceptions import ValidationError
+from ..database.core import KINDS
+from ..database.filter import Filter, Query
+from ..database import get as database_get
+from ..files.html import sanitize_form_content_html
+from .contracts import PENDING, json_value
 
 
 _ORIGINAL_UNAVAILABLE = (
@@ -41,7 +45,7 @@ class SubmissionDefinition:
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+# @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
 # @covered-by lagniappe/core/entities/history.py::TaskHistory.create
 # @reason only original-completion reads and archives parse the saved envelope
 def completed_envelope(entity):
@@ -60,7 +64,7 @@ def completed_envelope(entity):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::require_mutable_submission
+# @covered-by lagniappe/core/tools/forms/definitions.py::require_mutable_submission
 # @reason ordinary edit paths require reopening even though current values are separate from original answers
 def immutable_submission(entity):
     return entity.entity_kind == "task_history" or (
@@ -71,16 +75,16 @@ def immutable_submission(entity):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::definition_for
-# @covered-by lagniappe/core/tools/form_definitions.py::history_groups
+# @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
+# @covered-by lagniappe/core/tools/forms/definitions.py::history_groups
 # @reason only explicit generations qualify historical definitions; old schema versions are cache metadata
 def definition_identity(entity):
     return entity.properties.form.key, getattr(entity, "generation", 0) or 0
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::definition_for
-# @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+# @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
+# @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
 # @reason already-loaded matching Forms avoid historical storage reads
 def _current_definition(entity, identity):
     prop = entity.properties.form
@@ -97,8 +101,8 @@ def _current_definition(entity, identity):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::definition_for
-# @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+# @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
+# @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
 # @reason only mismatched historical generations need cached resolution
 def _historical_definition(entity, identity):
     current = _current_definition(entity, identity)
@@ -107,7 +111,6 @@ def _historical_definition(entity, identity):
     cached = getattr(entity, "_submission_definition", None)
     if cached is not None and cached[0] == identity:
         return cached[1]
-    from .form_drafts import resolve_form_generation
 
     source = resolve_form_generation(*identity) if identity[0] else None
     result = SubmissionDefinition(
@@ -138,7 +141,6 @@ def definition_for(entity, *, archived=False):
             return SubmissionDefinition(generation=identity[1], immutable=True)
         return _historical_definition(entity, identity)
     form = entity.form
-    from .form_changes import effective_definition
     form = effective_definition(entity, form)
     return SubmissionDefinition(form, getattr(form, "generation", 0) or 0)
 
@@ -185,7 +187,7 @@ def require_mutable_submission(entity):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::validate_completion_write
+# @covered-by lagniappe/core/tools/forms/definitions.py::validate_completion_write
 # @reason completion CAS captures only fields owned by the operation, including absent values
 def _completion_projection(raw):
     if raw is None:
@@ -277,7 +279,7 @@ def stage_completion_guards(task, *, transition=None):
 # @matrix task-completion submission : schema-version incompatible-value preservation
 def validate_completion_values(task):
     """Do not capture answers that the current schema cannot losslessly read."""
-    from ..properties.schema import SchemaFields
+    from ...properties.schema import SchemaFields
 
     values = task.properties.submission.value
     current = task.form
@@ -326,7 +328,7 @@ def capture_completed_submission(task):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::compatible_values
+# @covered-by lagniappe/core/tools/forms/definitions.py::compatible_values
 # @reason representation comparison is exercised by history/default transfer tests
 def _representation(field):
     return (
@@ -391,10 +393,10 @@ def history_values_for(task, history, field_id=None, *, zone="UTC"):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_definitions.py::history_values_for
+# @covered-by lagniappe/core/tools/forms/definitions.py::history_values_for
 # @reason history reuse applies existing deterministic rules without clearing invalid answers
 def _history_value(source, target, value, zone):
-    from .form_conversions import MISSING, conversion_rule, convert_value
+    from .conversions import MISSING, conversion_rule, convert_value
 
     label = (target or source or {}).get("title", "this field")
     error = f'The saved value for "{label}" cannot be converted to the current field type.'
@@ -439,7 +441,6 @@ def history_groups(histories):
 # @matrix tasks task-completion : history schema-version ordering
 def preload_definitions(records):
     """Batch mismatched generations only when a history collection is requested."""
-    from .form_drafts import resolve_form_generations
 
     pending = {}
     for record in records:
@@ -497,3 +498,91 @@ def rendered_html_fields(entity, *, original=False, definition=None):
                         )
         result[field_id] = html
     return result
+
+
+# @testable true
+# @tests tests_unit/test_004k_form_changes.py::test_pending_definition_resolves_each_generation
+# @matrix form-migration : partial-read generation
+def target_definition(form, change=None):
+    from ...entities import Entities
+
+    change = change or json_value(form.db, PENDING)
+    if not change:
+        return form
+    target = change["target"]
+    row = deepcopy(form.db)
+    row.pop(PENDING, None)
+    for name in ("schema", "assets"):
+        row[name] = json.dumps(target[name])
+    for name in ("name", "generation", "version"):
+        row[name] = target[name]
+    result = Entities.FORM(row)
+    result._pending_html = deepcopy(target["html_fields"])
+    return result
+
+
+# @testable true
+# @tests tests_unit/test_004k_form_changes.py::test_pending_definition_resolves_each_generation
+# @matrix form-migration : partial-read generation
+def effective_definition(entity, form):
+    if not form:
+        return form
+    change = json_value(getattr(form, "db", {}), PENDING)
+    if change and entity.generation == change["target"]["generation"]:
+        return target_definition(form, change)
+    return form
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/forms/definitions.py::resolve_form_generation
+# @reason historical definitions are queried only for an explicitly requested generation
+def _stored_generation(form_key, generation):
+    from ...entities import Entities
+
+    rows = Query(KINDS.history).ancestor(form_key).filter(
+        Filter().eq("type", "form_history").eq("generation", generation)
+    ).fetch_all()
+    if not rows:
+        return None
+    return Entities.fetch_one(rows[0], request=Fetch.root())
+
+
+# @testable true
+# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_ignores_legacy_versions
+# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_loads_only_the_requested_archive
+# @matrix form-schema : history generation
+def resolve_form_generation(form_or_key, generation):
+    """Use the current Form when possible; otherwise load its archived generation."""
+    from ...entities import Entities
+
+    form = form_or_key if hasattr(form_or_key, "schema") else None
+    key = form.key if form is not None else form_or_key
+    if not key:
+        return None
+    if form is None:
+        form = Entities.fetch_one(key, request=Fetch.root())
+    if form is not None and form.generation == generation:
+        return form
+    return _stored_generation(key, generation)
+
+
+# @testable true
+# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_batches_current_forms
+# @matrix form-schema : history generation batch-read
+def resolve_form_generations(pairs):
+    """Load each current Form once, then resolve the distinct older generations."""
+    from ...entities import Entities
+
+    requested = set(pairs)
+    keys = {key for key, _generation in requested if key}
+    current = {
+        form.key: form
+        for form in Entities.fetch(*keys, request=Fetch.root())
+    }
+    return {
+        (key, generation): (
+            current[key] if key in current and current[key].generation == generation
+            else _stored_generation(key, generation)
+        )
+        for key, generation in requested if key
+    }

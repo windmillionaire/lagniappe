@@ -610,7 +610,7 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
         if kind == "form":
             # Preserve the last generation at the explicit delete boundary,
             # including Forms that never needed a submission transfer.
-            from ..tools.form_drafts import archive_form_generation
+            from lagniappe.core.tools.forms.drafts import archive_form_generation
 
             source = registry.fetch_one(entity.key, request=Fetch.root())
             if source is not None:

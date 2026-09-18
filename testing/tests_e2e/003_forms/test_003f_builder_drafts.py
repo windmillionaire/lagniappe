@@ -16,8 +16,8 @@ from werkzeug.datastructures import FileStorage
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
-from lagniappe.core.tools.form_definitions import rendered_html_fields
-from lagniappe.core.tools.form_drafts import archive_form_generation, resolve_form_generation
+from lagniappe.core.tools.forms.definitions import rendered_html_fields, resolve_form_generation
+from lagniappe.core.tools.forms.drafts import archive_form_generation
 from testing.definitions import Pages, SitePages, Uploads, Users
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields

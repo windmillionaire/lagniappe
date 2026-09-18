@@ -9,7 +9,7 @@ from ..mixins import (
     RelatedEntityListMixin,
     RelatedEntityMixin,
 )
-from ..tools.form_definitions import immutable_submission
+from lagniappe.core.tools.forms.definitions import immutable_submission
 from .base_db import DBProperty
 from .base_property import Property
 

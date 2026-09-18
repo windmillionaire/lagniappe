@@ -12,10 +12,11 @@ from lagniappe.core.definitions import DeferredJobType
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import (
-    form_changes,
-    form_conversions as conversions,
-    form_schema_updates as updates,
+from lagniappe.core.tools.forms import (
+    population,
+    changes as form_changes,
+    conversions,
+    schema_updates as updates,
 )
 from lagniappe.core.tools.ai import core as ai_core, form_conversion, observability, planner
 from lagniappe.core.tools.ai.prompt import Prompt
@@ -99,7 +100,7 @@ def scope(monkeypatch):
         )
 
     monkeypatch.setattr(Entities, "fetch_one", fetch)
-    monkeypatch.setattr(form_changes, "target_batch", batch)
+    monkeypatch.setattr(population, "target_batch", batch)
     monkeypatch.setattr(Entities.FORM, "allowed", lambda self, action, user=None: True)
     monkeypatch.setattr(
         Entities.TASK,
@@ -194,7 +195,7 @@ def test_scope_is_exhaustive_permission_checked_and_projects_only_affected_value
         updates.inspect_scope(scope.form, scope.changes[1:], scope.actor)
 
 
-# @source lagniappe/core/tools/form_schema_updates.py::inspect_scope
+# @source lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @matrix form-migration : affected-values pagination
 @pytest.mark.parametrize("before, after, clears", [("000", 0, False), ("007", 7, False), ("unknown", None, True)])
 def test_scalar_preview_reports_exact_conversion_and_clearing(scope, before, after, clears):

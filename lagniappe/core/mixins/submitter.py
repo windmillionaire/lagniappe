@@ -6,7 +6,7 @@ import json
 from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
-from ..tools.form_definitions import (
+from lagniappe.core.tools.forms.definitions import (
     definition_for,
     require_mutable_submission,
 )
@@ -328,21 +328,21 @@ class SubmitterMixin:
         self.save_submission()
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+    # @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
     # @reason cache revision metadata remains independent from original-completion generation
     @property
     def schema_version(self):
         return self.db.get("schema_version")
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
     # @reason missing generation is the shared legacy baseline for flat submissions
     @property
     def generation(self):
         return self.db.get("generation", 0) or 0
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
     # @reason shared read boundary delegates exact-version resolution
     @property
     def submission_definition(self):
@@ -379,11 +379,11 @@ class SubmitterMixin:
             self.description = submission_value["description"]
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_changes.py::notice_projection
+    # @covered-by lagniappe/core/tools/forms/changes.py::notice_projection
     # @reason shared Page and Task read-only template projection
     @property
     def migration_notice(self):
-        from ..tools.form_changes import notice_projection
+        from lagniappe.core.tools.forms.changes import notice_projection
         return notice_projection(self) if self.db.get("pre_migration") else []
 
     # @testable true

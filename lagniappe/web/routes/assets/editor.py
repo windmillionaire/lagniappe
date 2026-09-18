@@ -7,7 +7,11 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import sanitize_form_content_html
-from lagniappe.core.tools.form_definitions import definition_for, original_completion, rendered_html_fields
+from lagniappe.core.tools.forms.definitions import (
+    definition_for,
+    original_completion,
+    rendered_html_fields,
+)
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,

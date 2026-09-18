@@ -6,10 +6,10 @@ import json
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import (
-    form_conversions,
-    form_drafts,
-    form_schema_updates as updates,
+from lagniappe.core.tools.forms import (
+    conversions as form_conversions,
+    drafts as form_drafts,
+    schema_updates as updates,
 )
 
 
@@ -286,7 +286,7 @@ def migration_pending(report):
             continue
         form = Entities.fetch_one(record.get("migration_form"), request=Fetch.direct())
         if form:
-            from lagniappe.core.tools.form_changes import json_value, PENDING
+            from lagniappe.core.tools.forms.contracts import json_value, PENDING
 
             if json_value(form.db, PENDING).get("id") == record["migration_id"]:
                 return True

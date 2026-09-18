@@ -4,11 +4,12 @@ from copy import deepcopy
 import hashlib
 import json
 
-from ..definitions import Action, Fetch, FetchReason
-from ..entities import Entities
-from ..exceptions import ValidationError
-from ..properties.schema import SchemaValidationError
-from . import form_conversions as conversions, form_drafts
+from ...definitions import Action, Fetch, FetchReason
+from ...entities import Entities
+from ...exceptions import ValidationError
+from ...properties.schema import SchemaValidationError
+from . import conversions, drafts, population
+from .contracts import json_value, needs_ai_value
 
 
 RESTRICTED_MESSAGE = (
@@ -138,13 +139,13 @@ def apply_operations(schema, operations, form_type):
                 else:
                     field[name] = deepcopy(value)
     try:
-        return form_drafts.validate_draft_schema(result, form_type)
+        return drafts.validate_draft_schema(result, form_type)
     except SchemaValidationError as error:
         raise ValidationError(str(error)) from error
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_schema_updates.py::inspect_scope
+# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason canonical fingerprints are shared by preview, approval and worker preflight
 def fingerprint(value):
     return hashlib.sha256(
@@ -154,19 +155,9 @@ def fingerprint(value):
     ).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/form_schema_updates.py::inspect_scope
-# @reason blank collection envelopes should never require a provider call
-def needs_ai_value(value):
-    if value is None or value == "" or value == [] or value == {}:
-        return False
-    if isinstance(value, dict) and (value == {"rows": []} or value == {"items": []}):
-        return False
-    return True
-
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_schema_updates.py::inspect_scope
+# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason value preconditions bind an exact entity, generation and schema pair
 def value_fingerprint(entity, change, values):
     return fingerprint(
@@ -183,7 +174,7 @@ def value_fingerprint(entity, change, values):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_schema_updates.py::inspect_scope
+# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason scope checks materialize the relations needed by normal permission rules
 def require_visible(entity, actor):
     entity = Entities.fetch_one(
@@ -202,7 +193,7 @@ def require_visible(entity, actor):
 # @matrix form-migration : complete-scope permissions affected-values pagination
 def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=None):
     """Check every attached live row; never mistake a filtered page for full scope."""
-    from . import dates, form_changes
+    from .. import dates
 
     if not form.allowed(Action.EDIT, user=actor) or form.reserved:
         raise ValidationError("You do not have permission to update this Form.")
@@ -211,15 +202,15 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
         return {"scope_fingerprint": fingerprint([]), "instances": [], "total": 0}
     cursor = None
     while True:
-        batch = form_changes.target_batch(form, cursor)
+        batch = population.target_batch(form, cursor)
         for raw in batch:
             if ensure_active:
                 ensure_active()
-            entity = form_changes.load_target(raw)
+            entity = population.load_target(raw)
             if not entity:
                 continue
             entity = require_visible(entity, actor)
-            values = form_changes.json_value(entity.db, "submission")
+            values = json_value(entity.db, "submission")
             fields, hashes = [], []
             for change in changes:
                 source_hash = value_fingerprint(entity, change, values)

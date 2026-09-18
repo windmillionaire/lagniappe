@@ -207,16 +207,20 @@ owner diagnostic JSON and its safe references.
 
 ## Form changes
 
-`form_changes.py` and `adapters/form_change.py` implement one Form update without
-a separate migration subsystem. Builder Save uses `start_writes()` to persist the
+`tools/forms/changes.py` and `deferred_jobs/adapters/form_change.py` implement one
+Form update without a separate migration subsystem. Builder Save uses
+`start_writes()` to persist the
 Form's `pending_form_change`, DeferredJob, Notification and Form-scoped lock in
 one guarded transaction. The pending payload owns the proposed schema/content,
 conversion operations, actor timezone and source/target generations. Selection
 in the builder does not query submissions. AI Save and AI report preparation
 check complete population visibility before reservation.
 
-The worker enumerates all live Page/Task rows attached to the Form, including
-completed Tasks, in cursor batches of 50. Edit access to the Form authorizes its
+The worker and schema previews share `tools/forms/population.py` to enumerate
+all live Page/Task rows attached to the Form, including completed Tasks, in
+cursor batches of 50. `tools/forms/contracts.py` owns the persisted keys and
+payload helpers shared by publication, previews, locks, and execution. Edit
+access to the Form authorizes its
 deterministic schema migration across all attached submissions, including those
 on restricted Pages. The job rechecks Form edit access; it does not require the
 actor to view or edit each Page/Task. Submission restrictions still govern viewing

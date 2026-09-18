@@ -21,11 +21,11 @@ from .references import _resolve_entity
 # @matrix ai-report submission : persistence
 def _update_form_schema(action, report, user, created, context):
     from lagniappe.core.definitions import Fetch
-    from lagniappe.core.tools import (
-        form_changes,
-        form_conversions,
-        form_drafts,
-        form_schema_updates,
+    from lagniappe.core.tools.forms import (
+        changes as form_changes,
+        conversions as form_conversions,
+        drafts as form_drafts,
+        schema_updates as form_schema_updates,
     )
     from lagniappe.core.tools.deferred_jobs.errors import (
         DeferredJobDependencyPendingError,

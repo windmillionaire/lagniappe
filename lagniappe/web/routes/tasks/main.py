@@ -17,7 +17,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import ai, dates
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.tools.form_definitions import history_groups, history_values_for
+from lagniappe.core.tools.forms.definitions import history_groups, history_values_for
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools import collaboration
 from lagniappe.core.tools.auth.references import (

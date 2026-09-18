@@ -18,10 +18,11 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database.assets import cleanup_rejected_attempt, record_attempt_asset
 from lagniappe.core.tools.database.core import KINDS
-from lagniappe.core.tools.database.filter import Filter, Query
 from lagniappe.core.tools.database.utility import ExactEntityState
 from lagniappe.core.tools.files.html import sanitize_form_content_html
 from lagniappe.core.properties.form import requires_submission_conversion
+
+from .contracts import PENDING, json_value
 
 CONTENT_VERSION = 1
 IMAGE_ID = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
@@ -33,8 +34,8 @@ class FormDraftConflict(exceptions.ValidationError):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::builder_draft
-# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::builder_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @reason canonical digest helper owned by draft revision and receipt contracts
 def _digest(value):
     return hashlib.sha256(json.dumps(
@@ -105,7 +106,7 @@ def validate_compatible_schema(previous, proposed, form_type=None):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::builder_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::builder_draft
 # @reason HTML field enumeration is part of the complete builder projection
 def _html_ids(form):
     return {field["id"] for field in form.schema if field.get("type") == "html"}
@@ -130,53 +131,7 @@ def builder_draft(form):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::resolve_form_generation
-# @reason historical definitions are queried only for an explicitly requested generation
-def _stored_generation(form_key, generation):
-    rows = Query(KINDS.history).ancestor(form_key).filter(
-        Filter().eq("type", "form_history").eq("generation", generation)
-    ).fetch_all()
-    if not rows:
-        return None
-    return Entities.fetch_one(rows[0], request=Fetch.root())
 
-
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_ignores_legacy_versions
-# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_loads_only_the_requested_archive
-# @matrix form-schema : history generation
-def resolve_form_generation(form_or_key, generation):
-    """Use the current Form when possible; otherwise load its archived generation."""
-    form = form_or_key if hasattr(form_or_key, "schema") else None
-    key = form.key if form is not None else form_or_key
-    if not key:
-        return None
-    if form is None:
-        form = Entities.fetch_one(key, request=Fetch.root())
-    if form is not None and form.generation == generation:
-        return form
-    return _stored_generation(key, generation)
-
-
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_generation_resolution_batches_current_forms
-# @matrix form-schema : history generation batch-read
-def resolve_form_generations(pairs):
-    """Load each current Form once, then resolve the distinct older generations."""
-    requested = set(pairs)
-    keys = {key for key, _generation in requested if key}
-    current = {
-        form.key: form
-        for form in Entities.fetch(*keys, request=Fetch.root())
-    }
-    return {
-        (key, generation): (
-            current[key] if key in current and current[key].generation == generation
-            else _stored_generation(key, generation)
-        )
-        for key, generation in requested if key
-    }
 
 
 # @testable true
@@ -242,7 +197,6 @@ def prepare_form_publication(form, builder):
             raise exceptions.MutationConflict("This Form changed before saving; reload and retry.")
         if source.form_type != form.form_type:
             raise exceptions.ValidationError("A saved Form's type cannot be changed.")
-        from .form_changes import PENDING, json_value
         change = json_value(source.db, PENDING)
         if change and getattr(form, "_form_change_publication", None) == change["id"]:
             if form.schema != change["target"]["schema"] or not change["applied"]:
@@ -273,8 +227,8 @@ def prepare_form_publication(form, builder):
     if not getattr(form, "_form_change_publication", None):
         stage_form_content(form)
 
-    # Ordinary Step 1 saves are compatible. The existing migration guard stays
-    # in place until the later transfer workflow can convert affected values.
+    # Ordinary saves are compatible. A generation change is published only
+    # after the guarded change workflow has converted the affected values.
     if changed_generation:
         history = archive_form_generation(source, attempt_owner=form)
         builder.plan_standard(history, reason="form-generation-history")
@@ -290,8 +244,8 @@ def prepare_form_publication(form, builder):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::prepare_form_publication
-# @covered-by lagniappe/core/tools/form_changes.py::start_change
+# @covered-by lagniappe/core/tools/forms/drafts.py::prepare_form_publication
+# @covered-by lagniappe/core/tools/forms/changes.py::start_change
 # @reason explicit Save stages isolated content for immediate or deferred publication
 def stage_form_content(form):
     for field_id, content in getattr(form, "_pending_html", {}).items():
@@ -309,7 +263,7 @@ def stage_form_content(form):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @reason save response projection is shared by accepted requests and their receipts
 def _saved_response(form, image_urls, *, post_commit_complete=True):
     accepted = builder_draft(form)
@@ -319,8 +273,8 @@ def _saved_response(form, image_urls, *, post_commit_complete=True):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/form_drafts.py::copy_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason exact draft image references are part of draft validation
 def _validate_content(schema, html, images):
     html_ids = {field["id"] for field in schema if field["type"] == "html"}
@@ -341,8 +295,8 @@ def _validate_content(schema, html, images):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/form_drafts.py::copy_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason exact image URL replacement is owned by publication
 def _rewrite_images(content, replacements):
     soup = BeautifulSoup(content, "html.parser")
@@ -354,8 +308,8 @@ def _rewrite_images(content, replacements):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/form_drafts.py::copy_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason private attempt assets are prepared only after full draft validation
 def _stage_content(form, html, images):
     image_urls = {}
@@ -374,7 +328,7 @@ def _stage_content(form, html, images):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/form_drafts.py::copy_form_draft
+# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason copying source images is part of independent draft publication
 def _stage_copy_content(copied, source, html, images):
     replacements = {}
@@ -436,7 +390,7 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     name = draft.get("name")
     if not isinstance(name, str) or not name.strip():
         raise exceptions.ValidationError("Please enter a Form name.")
-    from .form_changes import PENDING, start_change, change_response, json_value
+    from .changes import start_change, change_response
     pending = json_value(current.db, PENDING)
     if pending:
         if pending["id"] == save_id and pending["digest"] == payload_digest:

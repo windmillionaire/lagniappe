@@ -403,7 +403,10 @@ def run_report(key):
         return responses.error("Only ready or recoverable failed reports can be run.")
 
     from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
-    from lagniappe.core.tools import form_changes, form_schema_updates
+    from lagniappe.core.tools.forms import (
+        changes as form_changes,
+        schema_updates as form_schema_updates,
+    )
 
     try:
         if not retryable:
