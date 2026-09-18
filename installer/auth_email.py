@@ -943,7 +943,8 @@ def configure_auth_email():
     prepare_existing_installation()
 
     from config import SETTINGS
-    from installer import FORMATTER, utils
+    from installer import FORMATTER
+    from installer.deploy import deploy_to_app_engine
 
     f = FORMATTER.initialize()
     if str(SETTINGS.APP.get("CUSTOM_DOMAIN") or "").strip():
@@ -954,7 +955,7 @@ def configure_auth_email():
         format_prompt("Deploy the updated email settings now? [Y/n]: ")
     )
     if consent.strip().casefold() != "n":
-        utils.deploy_to_app_engine(print_final_summary=False)
+        deploy_to_app_engine(print_final_summary=False)
         print(f.success(wrap_text("Authentication email settings deployed.")))
     else:
         print(

@@ -23,7 +23,8 @@ from config.locations import (
     normalize_resource_region,
 )
 from installer import wrap_text
-from installer.utils import run_gcloud_command, validate_input
+from installer.commands import run_gcloud_command
+from installer.utils import validate_input
 from installer.errors import GCLOUD_TIMEOUT, SetupCancelled, SetupError
 
 GCLOUD_VALUE_SUCCESS = "success"

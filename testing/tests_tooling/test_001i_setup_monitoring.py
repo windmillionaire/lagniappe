@@ -185,7 +185,7 @@ def test_reconcile_reuses_owner_channel_preserves_operator_channels_and_is_idemp
         lambda project, session=None: (session or globals()["session"], {"auth": "x"}),
     )
     monkeypatch.setattr(
-        "installer.utils.run_gcloud_command",
+        "installer.commands.run_gcloud_command",
         lambda command, **kwargs: enabled.append(command),
     )
 
@@ -234,7 +234,7 @@ def test_reconcile_creates_owner_channel_and_detaches_obsolete_managed_channels(
         lambda project, session=None: (session or globals()["session"], {"auth": "x"}),
     )
     monkeypatch.setattr(
-        "installer.utils.run_gcloud_command", lambda *args, **kwargs: None
+        "installer.commands.run_gcloud_command", lambda *args, **kwargs: None
     )
 
     reconciled = monitoring.reconcile_memory_alert(
@@ -266,7 +266,7 @@ def test_reconcile_creates_exactly_one_policy_and_tolerates_provider_condition_n
         lambda project, session=None: (session or globals()["session"], {"auth": "x"}),
     )
     monkeypatch.setattr(
-        "installer.utils.run_gcloud_command", lambda *args, **kwargs: None
+        "installer.commands.run_gcloud_command", lambda *args, **kwargs: None
     )
 
     policy = monitoring.reconcile_memory_alert(

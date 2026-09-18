@@ -453,7 +453,7 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
         },
     )
     monkeypatch.setattr(
-        "installer.utils.deploy_to_app_engine",
+        "installer.deploy.deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     monkeypatch.setattr(ai_email.webbrowser, "open_new_tab", lambda _url: True)
@@ -617,7 +617,7 @@ def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
 
     monkeypatch.setattr(ai_email, "ResendSetupClient", Client)
     monkeypatch.setattr(
-        "installer.utils.deploy_to_app_engine",
+        "installer.deploy.deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
     monkeypatch.setattr(builtins, "input", lambda _prompt="": "")

@@ -2220,9 +2220,9 @@ def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch
         }
     )
 
-    import installer.utils as setup_utils
+    from installer import commands
 
-    monkeypatch.setattr(setup_utils, "check_gcloud_cli", lambda: None)
+    monkeypatch.setattr(commands, "check_gcloud_cli", lambda: None)
     switcher = types.ModuleType("runner.gcloud")
     switcher.config_gcloud = lambda **kwargs: calls.append("activate")
     monkeypatch.setitem(sys.modules, "runner.gcloud", switcher)

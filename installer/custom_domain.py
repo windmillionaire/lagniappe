@@ -17,7 +17,8 @@ def add_custom_domain():
     prepare_existing_installation()
 
     from config import SETTINGS
-    from installer import FORMATTER, utils
+    from installer import FORMATTER
+    from installer.deploy import deploy_to_app_engine
 
     f = FORMATTER.initialize()
     if not _setup_custom_domain():
@@ -37,7 +38,7 @@ def add_custom_domain():
         format_prompt("Deploy app now", hint="y/N")
     )
     if consent.casefold() == "y":
-        utils.deploy_to_app_engine(print_final_summary=False)
+        deploy_to_app_engine(print_final_summary=False)
         print(ui.success("Custom domain settings deployed"))
         print(
             ui.value(

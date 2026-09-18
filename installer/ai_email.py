@@ -566,7 +566,7 @@ def _prerequisites(settings):
 # @matrix ai-email setup : deploy disable disabled-first provider-state secrets setup
 def _disable(existing):
     from config import SETTINGS
-    from installer import utils
+    from installer.deploy import deploy_to_app_engine
 
     client = ResendSetupClient(existing["resend"]["inboundApiKey"])
     endpoint = f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}{WEBHOOK_PATH}"
@@ -591,7 +591,7 @@ def _disable(existing):
         .casefold()
         != "n"
     ):
-        utils.deploy_to_app_engine(print_final_summary=False)
+        deploy_to_app_engine(print_final_summary=False)
         print(ui.success(wrap_text("The disabled AI email configuration has been deployed.")))
     else:
         print(
@@ -748,7 +748,7 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
 
         prepare_existing_installation()
     from config import SETTINGS
-    from installer import utils
+    from installer.deploy import deploy_to_app_engine
 
     f = FORMATTER.initialize()
     custom_domain = _prerequisites(SETTINGS.APP)
@@ -913,7 +913,7 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
         )
         return 0
 
-    utils.deploy_to_app_engine(print_final_summary=False)
+    deploy_to_app_engine(print_final_summary=False)
     activate_ai_email(candidate)
     return 0
 

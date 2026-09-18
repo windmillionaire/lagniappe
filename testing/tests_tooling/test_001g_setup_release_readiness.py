@@ -480,7 +480,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
         calls.append(("memory-alert", settings, project))
         return {"state": "AVAILABLE", "details": {"policy": "current"}}
 
-    monkeypatch.setattr("installer.utils.run_gcloud_command", gcloud)
+    monkeypatch.setattr("installer.commands.run_gcloud_command", gcloud)
     monkeypatch.setattr(
         "installer.recovery.verify_recovery_resources",
         verify_resources,

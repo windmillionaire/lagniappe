@@ -161,8 +161,13 @@ def _install_harness(
     _module(
         monkeypatch,
         setup_package,
-        "utils",
+        "commands",
         check_gcloud_cli=step("check_gcloud_cli"),
+    )
+    _module(
+        monkeypatch,
+        setup_package,
+        "deploy",
         deploy_to_app_engine=deploy_to_app_engine,
     )
     _module(monkeypatch, setup_package, "mcp", requested=mcp_module.requested)
@@ -378,7 +383,7 @@ def test_recovery_is_announced_before_dependency_or_provider_mutation(
         lambda: events.append(("pip", capsys.readouterr().out)),
     )
     monkeypatch.setattr(
-        "installer.utils.check_gcloud_cli",
+        "installer.commands.check_gcloud_cli",
         lambda: (_ for _ in ()).throw(RuntimeError("stop after announcement")),
     )
 
@@ -484,7 +489,7 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
 def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch):
     import config
     from installer import __main__ as setup_cli
-    from installer import optional, package_install, utils
+    from installer import commands, optional, package_install
     from runner import deploy, gcloud
 
     events = []
@@ -498,7 +503,7 @@ def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch)
         gcloud, "config_gcloud",
         lambda **kwargs: pytest.fail("the handler repeated gcloud activation"),
     )
-    monkeypatch.setattr(utils, "check_gcloud_cli", lambda: None)
+    monkeypatch.setattr(commands, "check_gcloud_cli", lambda: None)
     monkeypatch.setattr(config, "verify_generation_manifest", lambda: events.append("generation"))
     monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: events.append("deploy-surface"))
     monkeypatch.setattr(optional, "configure_ai_features", lambda: events.append("AI prompt") or False)

@@ -20,7 +20,7 @@ from runner.console import format_prompt
 from installer import iam, wrap_text
 from installer.errors import ProviderTransientError, SetupError, retry_provider_call
 from installer.state import record_mutation, record_step
-from installer.utils import run_gcloud_command
+from installer.commands import run_gcloud_command
 from runner.context import REPOSITORY_ROOT, setup_command
 
 SERVICE = "lagniappe-mcp"
@@ -626,7 +626,7 @@ def handoff_access(settings, *, owner=None, remove_installer=None):
 # @matrix mcp-install : cli-routing retry confirmation default-no no-mutation
 def configure_mcp():
     from installer.verify import prepare_existing_installation
-    from installer.utils import deploy_to_app_engine
+    from installer.deploy import deploy_to_app_engine
     prepare_existing_installation()
     if not requested(SETTINGS.APP) and not SETTINGS.APP.get("MCP_RESOURCE"):
         raise SetupError(f"External AI is disabled. Choose it with {setup_command('ai')} first.")

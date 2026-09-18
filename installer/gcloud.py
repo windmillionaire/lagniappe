@@ -10,7 +10,7 @@ from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
 from installer import iam as iam_access
 from .package_install import install_if_missing
-from .utils import run_gcloud_command
+from .commands import run_gcloud_command
 from .errors import (
     ProviderConflict,
     ProviderNotFound,

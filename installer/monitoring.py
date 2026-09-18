@@ -356,7 +356,7 @@ def reconcile_memory_alert(*, settings=None, project=None, session=None):
     """Enable Monitoring and reconcile one managed policy and owner channel."""
     from config import SETTINGS
     from installer.google_provider import _api_request
-    from installer.utils import run_gcloud_command
+    from installer.commands import run_gcloud_command
 
     settings = settings or SETTINGS.APP
     project = str(project or settings.get("GOOGLE_CLOUD_PROJECT") or "").strip()

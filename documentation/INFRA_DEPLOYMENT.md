@@ -22,7 +22,8 @@ When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are
 enabled.
 
-Installer deployment calls the same helper in publish-only mode. It uses the
+`installer/deploy.py` owns the interactive deployment workflow and calls the
+same runner helper in publish-only mode. It uses the
 generated assets already present in the checkout and does not run npm or change
 the application version. The same manifest validation runs before any gcloud
 operation, so a missing, partial, corrupt, or stale prebuilt frontend is
@@ -36,6 +37,15 @@ a standard green checked “MCP server is ready” line, without the endpoint UR
 connection details remain available in the app's external-AI instructions. Routine
 service-account reconciliation and individual restored-image filenames are
 silent; provider retries and restore warnings remain visible.
+
+The installer workflow also reconciles monitoring, verifies custom-domain TLS,
+and prints the requested completion summary and upgrade maintenance steps.
+Generic gcloud execution belongs to `installer/commands.py`; saved deployment
+settings remain in `installer/deployment.py`. Update/upgrade reloads the command
+module before its configuration/provider consumers and reloads the deployment
+workflow before offering deployment from the replaced checkout.
+The old `installer.utils.deploy_to_app_engine` entry point forwards lazily for
+upgrade processes that retain their old caller after replacing source.
 
 ## Release preparation
 

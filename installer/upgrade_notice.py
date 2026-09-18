@@ -57,7 +57,7 @@ def legacy_upgrade_deploy_notice_required(settings):
 
 # @testable false
 # @covered-by installer/upgrade.py::_apply_update
-# @covered-by installer/utils.py::deploy_to_app_engine
+# @covered-by installer/deploy.py::deploy_to_app_engine
 # @reason shared terminal presentation is asserted through both deployment workflows
 def print_post_upgrade_maintenance_notice(formatter, installed_version, target_version):
     """Explain required owner work before a major-version deployment."""
@@ -85,7 +85,7 @@ def print_post_upgrade_maintenance_notice(formatter, installed_version, target_v
 
 # @testable false
 # @covered-by installer/upgrade.py::_apply_update
-# @covered-by installer/utils.py::deploy_to_app_engine
+# @covered-by installer/deploy.py::deploy_to_app_engine
 # @reason shared terminal presentation is asserted through both deployment workflows
 def print_post_upgrade_maintenance_steps(formatter):
     """Repeat the required in-app work after a major deployment succeeds."""
@@ -113,7 +113,7 @@ def print_post_upgrade_maintenance_steps(formatter):
 
 
 # @testable false
-# @covered-by installer/utils.py::deploy_to_app_engine
+# @covered-by installer/deploy.py::deploy_to_app_engine
 # @reason compatibility confirmation is exercised through the deployment helper
 def confirm_legacy_upgrade_deployment(formatter, target_version):
     """Give old upgrade orchestration one final stop before deploying 1.0+."""

@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from config.locations import normalize_app_engine_location, normalize_resource_region
 from config.storage import recovery_bucket_name, storage_bucket_names
-from installer.utils import run_gcloud_command
+from installer.commands import run_gcloud_command
 
 
 ABSENT = "ABSENT"
