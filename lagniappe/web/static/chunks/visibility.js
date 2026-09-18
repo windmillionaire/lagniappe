@@ -1,76 +1,123 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as ConditionTarget } from './base2.js?v=bc80da50';
-import './styles.js?v=bc80da50';
-import './icons.js?v=bc80da50';
-import './foundation.js?v=bc80da50';
-import './upstreamUnavailable.js?v=bc80da50';
-import './connectivity.js?v=bc80da50';
-import './primitives.js?v=bc80da50';
-import './select2.js?v=bc80da50';
-import './combobox.js?v=bc80da50';
-import './results.js?v=bc80da50';
-import './storage.js?v=bc80da50';
-import './formatting.js?v=bc80da50';
-import './submitter.js?v=bc80da50';
-import './controller.js?v=bc80da50';
-import './loader.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bf6747aa';
+import { T as TableVisibilityState } from './index-foundation.js?v=bf6747aa';
+import './styles.js?v=bf6747aa';
+import './icons.js?v=bf6747aa';
+import './foundation.js?v=bf6747aa';
+import './upstreamUnavailable.js?v=bf6747aa';
+import './connectivity.js?v=bf6747aa';
+import './core-foundation.js?v=bf6747aa';
+import './storage.js?v=bf6747aa';
 
 /**
- * @testable true
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility_select_multiple_values
- * @matrix forms : builder-field-visibility select-or-values
+ * @testable infrastructure
  */
-class Visibility extends ConditionTarget {
-	constructor(builder) {
-		super(builder);
-		this.key = "visibility";
-		this.targetSelectTitle = "Show this element when";
-		this.messages = {
-			submit: "Add Visibility Condition",
-		};
+class TableVisibility {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.selected = this.component.preload("selected") || [];
+		this.columns = this.component.preload("columns") || [];
+		this.state =
+			this.view.TableVisibilityState ||
+			new TableVisibilityState({
+				component: this.component,
+				view: this.view,
+				selected: this.selected,
+				columns: this.columns,
+			});
+		this._ownsState = !this.view.TableVisibilityState;
+		this._preservedEditor = null;
 	}
 
 	init() {
-		if (this.index !== -1) {
-			this.setTitle("Edit Visibility Condition");
-			this.messages.submit = "Update Visibility Condition";
-			this.setting = { ...this.element.schema.visibility?.[this.index] };
-		} else {
-			this.setTitle("Create Visibility Condition");
-			this.setting = {};
-		}
-
-		super.init();
-
-		const targets = this.builder.getEligibleConditionTargets();
-		if (targets.length === 0) {
-			this.form.showError(
-				"Visibility cannot be set using available components. " +
-					"Please add a radio button, checkbox, or select menu to the form before " +
-					"setting the visibility of this element.",
-			);
-		} else {
-			super.addTargetSelect();
-		}
-
-		this.showProgress();
+		this.state.init();
+		this._createController();
 	}
 
-	showProgress() {
-		const target = this.builder.elements.get(this.setting.id);
-		if (!target) return;
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
+	 * @matrix table-controls : columns mobile-controls
+	 */
+	get visibleColumns() {
+		return this.state.visibleColumns;
+	}
 
-		if (target.schema.type === "checkbox") {
-			this.addCheckboxTarget();
-			this.complete = true;
-		} else {
-			this.addChooseValue();
-			if (this.setting.value) this.complete = true;
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_visibility_toggle_hides_column
+	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_keeps_revealed_completed_column_editable
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_hiding_column_updates_visible_headers_and_cells
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_visibility_toggle_hides_column
+	 * @matrix table-controls : checkbox-cell column-visibility mobile-controls quick-edit
+	 */
+	_toggleColumn(column, visible) {
+		this.state.toggle(column, visible);
+	}
+
+	/**
+	 * Keep quick edit active while the column picker is temporarily displayed.
+	 *
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_keeps_revealed_completed_column_editable
+	 * @matrix table-controls task-index : checkbox-cell column-visibility quick-edit
+	 */
+	preserveEditor(editor) {
+		this._preservedEditor = editor;
+	}
+
+	postreconcile() {
+		if (this.visible || !this._preservedEditor) return;
+
+		const editor = this._preservedEditor;
+		this._preservedEditor = null;
+		if (!editor.visible) return;
+
+		if (!this.component.active || this.component.active === this) {
+			this.component.active = editor;
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_column_visibility_panel_opens
+	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
+	 * @matrix table-controls : columns form-columns visibility-panel
+	 */
+	_createController() {
+		const cell = this.target.appendChild(document.createElement("td"));
+		cell.colSpan = this.component.elt.querySelectorAll("th").length;
+		cell.className = `p-3 border-t bg-kind-bg border-slate-300 group`;
+
+		const container = cell.appendChild(document.createElement("div"));
+		container.className = "flex flex-wrap gap-3";
+
+		const visibleColumns = this.visibleColumns;
+
+		for (const column of this.columns) {
+			const checkbox = container.appendChild(
+				primitives.checkbox({
+					name: column.field,
+					checked: visibleColumns.includes(column.field),
+					kind: this.kind,
+					label: column.title,
+				}),
+			);
+
+			checkbox.dataset.role = "selector";
 		}
 
-		super.showProgress();
+		cell.addEventListener("change", (e) => {
+			if (!e.target.matches("input[type='checkbox']")) return;
+			this._toggleColumn(e.target.name, e.target.checked);
+		});
+	}
+
+	destroy() {
+		if (this._ownsState) this.state.destroy();
 	}
 }
 
-export { Visibility as default };
+export { TableVisibility };

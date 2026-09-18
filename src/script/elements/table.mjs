@@ -1,6 +1,8 @@
 import { STYLES } from "styles";
-import { captureError, ENDPOINTS, request } from "../shared";
+import { ENDPOINTS } from "../shared/endpoints";
+import { captureError } from "../shared/errors";
 import { setIcon } from "../shared/icons";
+import { request } from "../shared/request";
 import { withTransition } from "../shared/transitions";
 import { areEqual } from "../shared/utilities";
 import { BaseElement } from "./base/baseElement";

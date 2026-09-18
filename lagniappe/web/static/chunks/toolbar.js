@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bc80da50';
-import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=bc80da50';
-import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=bc80da50';
-import './connectivity.js?v=bc80da50';
-import { Q as QueryLifecycle } from './queryLifecycle.js?v=bc80da50';
-import { s as setIcon } from './icons.js?v=bc80da50';
-import { Dropdown } from './dropdown.js?v=bc80da50';
-import { b as buttons } from './buttons.js?v=bc80da50';
+import { STYLES } from './styles.js?v=bf6747aa';
+import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=bf6747aa';
+import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=bf6747aa';
+import './connectivity.js?v=bf6747aa';
+import { Q as QueryLifecycle } from './queryLifecycle.js?v=bf6747aa';
+import { s as setIcon } from './icons.js?v=bf6747aa';
+import { Dropdown } from './dropdown.js?v=bf6747aa';
+import { b as buttons } from './buttons.js?v=bf6747aa';
 
 /**
  * Utility module to work with key-value stores.
@@ -48927,53 +48927,53 @@ class MarkdownPastePrompt {
 }
 
 const OPTION_REGISTRY = {
-	toggleFocus: () => import('./toolbarButtons.js?v=bc80da50'),
-	toggleBold: () => import('./toolbarButtons.js?v=bc80da50'),
-	toggleItalic: () => import('./toolbarButtons.js?v=bc80da50'),
-	toggleBulletList: () => import('./menuItems.js?v=bc80da50'),
-	toggleOrderedList: () => import('./menuItems.js?v=bc80da50'),
-	toggleTaskList: () => import('./menuItems.js?v=bc80da50'),
-	insertTable: () => import('./menuItems.js?v=bc80da50'),
-	toggleHeaderRow: () => import('./menuItems.js?v=bc80da50'),
-	addRowBefore: () => import('./menuItems.js?v=bc80da50'),
-	addRowAfter: () => import('./menuItems.js?v=bc80da50'),
-	addColumnBefore: () => import('./menuItems.js?v=bc80da50'),
-	addColumnAfter: () => import('./menuItems.js?v=bc80da50'),
-	deleteRow: () => import('./menuItems.js?v=bc80da50'),
-	deleteColumn: () => import('./menuItems.js?v=bc80da50'),
-	deleteTable: () => import('./menuItems.js?v=bc80da50'),
-	undo: () => import('./toolbarButtons.js?v=bc80da50'),
-	redo: () => import('./toolbarButtons.js?v=bc80da50'),
-	documentHistory: () => import('./documentHistory.js?v=bc80da50'),
-	setFontFamily: () => import('./menuItems.js?v=bc80da50'),
-	setColor: () => import('./menuItems.js?v=bc80da50'),
-	toggleUnderline: () => import('./menuItems.js?v=bc80da50'),
-	toggleStrike: () => import('./menuItems.js?v=bc80da50'),
-	toggleCode: () => import('./menuItems.js?v=bc80da50'),
-	toggleSuperscript: () => import('./menuItems.js?v=bc80da50'),
-	toggleSubscript: () => import('./menuItems.js?v=bc80da50'),
-	clearFormat: () => import('./menuItems.js?v=bc80da50'),
-	toggleHeading: () => import('./menuItems.js?v=bc80da50'),
-	setParagraph: () => import('./menuItems.js?v=bc80da50'),
-	addLink: () => import('./menuItems.js?v=bc80da50'),
-	addImage: () => import('./menuItems.js?v=bc80da50'),
-	addYouTube: () => import('./menuItems.js?v=bc80da50'),
-	generateText: () => import('./menuItems.js?v=bc80da50'),
-	setHorizontalRule: () => import('./menuItems.js?v=bc80da50'),
-	toggleCodeBlock: () => import('./menuItems.js?v=bc80da50'),
-	toggleBlockquote: () => import('./menuItems.js?v=bc80da50'),
-	setTextAlign: () => import('./menuItems.js?v=bc80da50'),
+	toggleFocus: () => import('./toolbarButtons.js?v=bf6747aa'),
+	toggleBold: () => import('./toolbarButtons.js?v=bf6747aa'),
+	toggleItalic: () => import('./toolbarButtons.js?v=bf6747aa'),
+	toggleBulletList: () => import('./menuItems.js?v=bf6747aa'),
+	toggleOrderedList: () => import('./menuItems.js?v=bf6747aa'),
+	toggleTaskList: () => import('./menuItems.js?v=bf6747aa'),
+	insertTable: () => import('./menuItems.js?v=bf6747aa'),
+	toggleHeaderRow: () => import('./menuItems.js?v=bf6747aa'),
+	addRowBefore: () => import('./menuItems.js?v=bf6747aa'),
+	addRowAfter: () => import('./menuItems.js?v=bf6747aa'),
+	addColumnBefore: () => import('./menuItems.js?v=bf6747aa'),
+	addColumnAfter: () => import('./menuItems.js?v=bf6747aa'),
+	deleteRow: () => import('./menuItems.js?v=bf6747aa'),
+	deleteColumn: () => import('./menuItems.js?v=bf6747aa'),
+	deleteTable: () => import('./menuItems.js?v=bf6747aa'),
+	undo: () => import('./toolbarButtons.js?v=bf6747aa'),
+	redo: () => import('./toolbarButtons.js?v=bf6747aa'),
+	documentHistory: () => import('./documentHistory.js?v=bf6747aa'),
+	setFontFamily: () => import('./menuItems.js?v=bf6747aa'),
+	setColor: () => import('./menuItems.js?v=bf6747aa'),
+	toggleUnderline: () => import('./menuItems.js?v=bf6747aa'),
+	toggleStrike: () => import('./menuItems.js?v=bf6747aa'),
+	toggleCode: () => import('./menuItems.js?v=bf6747aa'),
+	toggleSuperscript: () => import('./menuItems.js?v=bf6747aa'),
+	toggleSubscript: () => import('./menuItems.js?v=bf6747aa'),
+	clearFormat: () => import('./menuItems.js?v=bf6747aa'),
+	toggleHeading: () => import('./menuItems.js?v=bf6747aa'),
+	setParagraph: () => import('./menuItems.js?v=bf6747aa'),
+	addLink: () => import('./menuItems.js?v=bf6747aa'),
+	addImage: () => import('./menuItems.js?v=bf6747aa'),
+	addYouTube: () => import('./menuItems.js?v=bf6747aa'),
+	generateText: () => import('./menuItems.js?v=bf6747aa'),
+	setHorizontalRule: () => import('./menuItems.js?v=bf6747aa'),
+	toggleCodeBlock: () => import('./menuItems.js?v=bf6747aa'),
+	toggleBlockquote: () => import('./menuItems.js?v=bf6747aa'),
+	setTextAlign: () => import('./menuItems.js?v=bf6747aa'),
 };
 
 const FORM_REGISTRY = {
-	pinVersion: () => import('./pinVersion.js?v=bc80da50'),
-	setColor: () => import('./setColor.js?v=bc80da50'),
-	setFontFamily: () => import('./setFontFamily.js?v=bc80da50'),
-	setImage: () => import('./setImage.js?v=bc80da50'),
-	addLink: () => import('./addLink.js?v=bc80da50'),
-	addImage: () => import('./addImage.js?v=bc80da50'),
-	addYouTube: () => import('./addYouTube.js?v=bc80da50'),
-	generateText: () => import('./generateText.js?v=bc80da50'),
+	pinVersion: () => import('./pinVersion.js?v=bf6747aa'),
+	setColor: () => import('./setColor.js?v=bf6747aa'),
+	setFontFamily: () => import('./setFontFamily.js?v=bf6747aa'),
+	setImage: () => import('./setImage.js?v=bf6747aa'),
+	addLink: () => import('./addLink.js?v=bf6747aa'),
+	addImage: () => import('./addImage.js?v=bf6747aa'),
+	addYouTube: () => import('./addYouTube.js?v=bf6747aa'),
+	generateText: () => import('./generateText.js?v=bf6747aa'),
 };
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";

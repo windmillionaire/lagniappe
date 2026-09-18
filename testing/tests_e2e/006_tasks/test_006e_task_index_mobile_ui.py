@@ -4,9 +4,9 @@ Tests for the task index mobile table controls.
 Verified against:
 - lagniappe/web/templates/tasks/index.html
 - lagniappe/web/templates/table.html
-- src/script/widgets/mobileTableControls.mjs
-- src/script/widgets/tableVisibility.mjs
-- src/script/widgets/tableSorting.mjs
+- src/script/widgets/tables/mobileControls.mjs
+- src/script/widgets/tables/visibility.mjs
+- src/script/widgets/tables/sorting.mjs
 """
 
 import pytest

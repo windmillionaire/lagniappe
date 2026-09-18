@@ -116,7 +116,7 @@ process.on("beforeExit", () => {
 
 
 # @matrix reconnect-refresh : manifest
-# @source src/script/widgets/tables.mjs::IndexTable.refreshDescriptor
+# @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDescriptor
 def test_collection_manifests_include_hash_and_fingerprint(run_node):
     run_node(r'''
 const fs = require("node:fs");
@@ -124,7 +124,7 @@ const vm = require("node:vm");
 const context = { console, document: {} };
 vm.createContext(context);
 for (const [path, base, exported] of [
-  ["src/script/widgets/tables.mjs", "class BaseTable {} class EmbeddedTable {}", "IndexTable"],
+  ["src/script/widgets/tables/indexTable.mjs", "class BaseTable {}", "IndexTable"],
   ["src/script/widgets/pageTaskList.mjs", "class BaseList {}", "PageTaskList"],
 ]) {
   let source = fs.readFileSync(path, "utf8").replace(/^import [\s\S]*?(?=\/\*\*)/, base + "\n");
@@ -156,10 +156,10 @@ const vm = require("node:vm");
 const context = { console, document: {} };
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/widgets/tables.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/tables/indexTable.mjs", "utf8");
 source = source.replace(
-  'import { BaseTable, EmbeddedTable } from "../elements/base/baseTable";',
-  "class BaseTable {} class EmbeddedTable {}",
+  'import { BaseTable } from "../../elements/base/baseTable";',
+  "class BaseTable {}",
 );
 source = source.replace(/^import .*;\n/gm, "");
 source = source.replaceAll("export class ", "class ").replaceAll("export async function ", "async function ");

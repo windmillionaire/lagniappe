@@ -1,9 +1,7 @@
-/*! Third-party licenses: /third-party-licenses.txt */
-import { g as getFormElement } from './loader.js?v=bc80da50';
-import { s as setIcon } from './icons.js?v=bc80da50';
-import { w as withTransition, r as request } from './foundation.js?v=bc80da50';
-import './upstreamUnavailable.js?v=bc80da50';
-import './connectivity.js?v=bc80da50';
+import { getFormElement } from "../../elements/loader";
+import { setIcon } from "../../shared/icons";
+import { request } from "../../shared/request";
+import { withTransition } from "../../shared/transitions";
 
 const SAVED_STATE_MS = 1200;
 
@@ -20,7 +18,7 @@ const ROUTES = {
  * @matrix category-index : checkbox-cell quick-edit
  * @matrix task-index : checkbox-cell column-visibility editable-cell link-affordance quick-edit
  */
-class TableEditor {
+export class TableEditor {
 	constructor(attributes) {
 		Object.assign(this, attributes);
 
@@ -482,5 +480,3 @@ class TableEditor {
 		if (this.visible) this._commitPreparedCheckboxes();
 	}
 }
-
-export { TableEditor };

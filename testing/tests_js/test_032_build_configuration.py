@@ -217,7 +217,7 @@ assert.equal(
   "entity-foundation",
 );
 for (const module of [
-  "views/base/index.mjs", "widgets/tableVisibilityState.mjs",
+  "views/base/index.mjs", "widgets/tables/visibilityState.mjs",
 ]) {
   assert.equal(
     interactionFoundationChunk(`${root}${module}`),

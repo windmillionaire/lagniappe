@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { p as primitives } from './primitives.js?v=bc80da50';
-import { c as createIcon } from './icons.js?v=bc80da50';
-import { g as generateElementId, w as withTransition, c as captureError, s as showBriefly } from './foundation.js?v=bc80da50';
-import { g as getFormElement } from './loader.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bf6747aa';
+import { c as createIcon } from './icons.js?v=bf6747aa';
+import { g as generateElementId, w as withTransition, c as captureError, s as showBriefly } from './foundation.js?v=bf6747aa';
+import { g as getFormElement } from './loader.js?v=bf6747aa';
 
 const CONTROLS = {
-	"permission-sections": () => import('./permissionSections.js?v=bc80da50'),
-	"access-restrictions": () => import('./accessRestrictions.js?v=bc80da50'),
+	"permission-sections": () => import('./permissionSections.js?v=bf6747aa'),
+	"access-restrictions": () => import('./accessRestrictions.js?v=bf6747aa'),
 };
 
 /**

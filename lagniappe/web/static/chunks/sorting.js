@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { p as primitives } from './primitives.js?v=bc80da50';
-import { w as withTransition } from './foundation.js?v=bc80da50';
-import './connectivity.js?v=bc80da50';
-import { sessionStore } from './storage.js?v=bc80da50';
-import './styles.js?v=bc80da50';
-import './icons.js?v=bc80da50';
-import './upstreamUnavailable.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bf6747aa';
+import { sessionStore } from './storage.js?v=bf6747aa';
+import { w as withTransition } from './foundation.js?v=bf6747aa';
+import './styles.js?v=bf6747aa';
+import './icons.js?v=bf6747aa';
+import './upstreamUnavailable.js?v=bf6747aa';
+import './connectivity.js?v=bf6747aa';
 
 /**
  * @testable infrastructure
@@ -109,8 +109,8 @@ class TableSorting {
 	 * Rebuild row-value caches after server row replacement while preserving active sorts.
 	 *
 	 * @testable infrastructure
-	 * @covered-by src/script/widgets/tables.mjs::IndexTable.refreshDelta
-	 * @covered-by src/script/widgets/tables.mjs::IndexTable.refresh
+	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
+	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refresh
 	 */
 	refreshRows() {
 		if (!this.initialized) return;
@@ -453,7 +453,7 @@ class TableSorting {
 
 /**
  * @testable false
- * @covered-by src/script/widgets/tableSorting.mjs::TableSorting.sort
+ * @covered-by src/script/widgets/tables/sorting.mjs::TableSorting.sort
  * @reason private sort strategy exercised through the TableSorting orchestrator
  */
 class RadioSort {
@@ -668,7 +668,7 @@ const OPTIONS = Symbol("options");
 
 /**
  * @testable false
- * @covered-by src/script/widgets/tableSorting.mjs::TableSorting.sort
+ * @covered-by src/script/widgets/tables/sorting.mjs::TableSorting.sort
  * @reason private sort strategy exercised through the TableSorting orchestrator
  */
 class CheckboxSort {

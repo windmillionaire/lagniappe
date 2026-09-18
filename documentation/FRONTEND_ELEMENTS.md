@@ -151,8 +151,9 @@ ignores responses after the field is replaced or the user enters a new value.
 
 Foundational controls import shared helpers from their concrete owners, such as
 `shared/request`, `shared/errors`, `shared/utilities`, and
-`shared/queryLifecycle`. Combobox internals follow this convention. Import
-`withTransition` directly from `shared/transitions` and recent-search cleanup
+`shared/queryLifecycle`. Combobox internals and shared table elements follow this
+convention; index sorting imports `sessionStore` directly from `shared/storage`.
+Import `withTransition` directly from `shared/transitions` and recent-search cleanup
 from `shared/storage`; neither is re-exported by utilities or the facade.
 Application composition may retain deliberate imports from the shared facade. Preserve
 existing lazy-loading boundaries and shared instances when narrowing imports;

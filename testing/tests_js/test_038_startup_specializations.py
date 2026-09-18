@@ -186,7 +186,7 @@ const context = {
 vm.createContext(context);
 
 let source = fs.readFileSync(
-  "src/script/widgets/tableVisibilityState.mjs",
+  "src/script/widgets/tables/visibilityState.mjs",
   "utf8",
 );
 source = source.replace(

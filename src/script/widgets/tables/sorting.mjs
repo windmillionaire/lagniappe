@@ -1,6 +1,6 @@
-import { primitives } from "../elements/primitives";
-import { sessionStore } from "../shared";
-import { withTransition } from "../shared/transitions";
+import { primitives } from "../../elements/primitives";
+import { sessionStore } from "../../shared/storage";
+import { withTransition } from "../../shared/transitions";
 
 /**
  * @testable infrastructure
@@ -104,8 +104,8 @@ export class TableSorting {
 	 * Rebuild row-value caches after server row replacement while preserving active sorts.
 	 *
 	 * @testable infrastructure
-	 * @covered-by src/script/widgets/tables.mjs::IndexTable.refreshDelta
-	 * @covered-by src/script/widgets/tables.mjs::IndexTable.refresh
+	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
+	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refresh
 	 */
 	refreshRows() {
 		if (!this.initialized) return;
@@ -448,7 +448,7 @@ export class TableSorting {
 
 /**
  * @testable false
- * @covered-by src/script/widgets/tableSorting.mjs::TableSorting.sort
+ * @covered-by src/script/widgets/tables/sorting.mjs::TableSorting.sort
  * @reason private sort strategy exercised through the TableSorting orchestrator
  */
 class RadioSort {
@@ -663,7 +663,7 @@ const OPTIONS = Symbol("options");
 
 /**
  * @testable false
- * @covered-by src/script/widgets/tableSorting.mjs::TableSorting.sort
+ * @covered-by src/script/widgets/tables/sorting.mjs::TableSorting.sort
  * @reason private sort strategy exercised through the TableSorting orchestrator
  */
 class CheckboxSort {

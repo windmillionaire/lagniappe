@@ -93,10 +93,18 @@ saved documents retain the document surface.
 `views/base/index.mjs` extends Core for User, Form, Category, and Task indexes.
 It owns the tools component, inline table editing, and mobile controls.
 
+`widgets/tables/` owns `IndexTable` and its sorting, editing, visibility, and
+mobile controls. Each has a focused module loaded through the existing widget
+registry names. `widgets/taskHistory.mjs` and `widgets/filterResults.mjs` own
+their feature-specific embedded tables; both reuse `EmbeddedTable` from
+`elements/base/baseTable.mjs`, which also owns the shared `BaseTable`.
+
 Large tables have two readiness stages. `TableVisibilityState` applies saved
 column visibility before first paint. The interactive checkbox panel and
 sorting controls remain lazy; sorting appears only after chained row loading
-and `TableSorting` initialization complete.
+and `TableSorting` initialization complete. `widgets/tables/visibilityState.mjs`
+stays in the build's `index-foundation` chunk and is imported directly by the
+index view and the lazy visibility panel, which shares the view's state instance.
 
 ## Specialized views
 

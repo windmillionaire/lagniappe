@@ -50,7 +50,7 @@ const CORE_FOUNDATION_MODULES = new Set([
 ]);
 const INDEX_FOUNDATION_MODULES = new Set([
 	"views/base/index.mjs",
-	"widgets/tableVisibilityState.mjs",
+	"widgets/tables/visibilityState.mjs",
 ]);
 
 /**

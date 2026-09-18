@@ -1,6 +1,7 @@
 import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../shared";
+import { ENDPOINTS } from "../shared/endpoints";
 import { setIcon } from "../shared/icons";
+import { request } from "../shared/request";
 import { withTransition } from "../shared/transitions";
 import { primitives } from "./primitives";
 import { TableElement } from "./table";

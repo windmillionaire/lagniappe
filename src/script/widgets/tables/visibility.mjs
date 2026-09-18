@@ -1,5 +1,5 @@
-import { primitives } from "../elements/primitives";
-import { TableVisibilityState } from "./tableVisibilityState";
+import { primitives } from "../../elements/primitives";
+import { TableVisibilityState } from "./visibilityState";
 
 /**
  * @testable infrastructure
