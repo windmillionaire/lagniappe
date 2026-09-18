@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=b560d96b';
-import { c as connectivity } from './connectivity.js?v=b560d96b';
+import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=b0bb4d7e';
+import { c as connectivity } from './connectivity.js?v=b0bb4d7e';
 
 /**
  * @testable false
@@ -110,7 +110,7 @@ const getErrorText = (error) => {
  * transitions, and cross-document transitions. They should not be reported.
  *
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason transition-noise predicate is exercised through the transition wrapper
  */
 const isSkippedViewTransitionError = (error) => {
@@ -323,15 +323,7 @@ const applyNotificationStateHeader = (headers) => {
 
 /**
  * @testable false
- * @reason browser element ID helper is exercised through renderer/combobox wiring
- */
-const generateElementId = (type) => {
-	return `${type}-${crypto.randomUUID().split("-")[0]}`;
-};
-
-/**
- * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason no-transition fallback is part of the transition wrapper
  */
 const runWithoutTransition = async (callback, label = "unlabeled") => {
@@ -354,7 +346,7 @@ const runWithoutTransition = async (callback, label = "unlabeled") => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason transition queue prevents concurrent View Transitions API aborts
  */
 let transitionQueue = Promise.resolve();
@@ -363,7 +355,7 @@ let pendingTransitionBatch = null;
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason development-only timing diagnostic is part of the transition wrapper
  */
 const reportSlowCommit = (label, started) => {
@@ -373,7 +365,7 @@ const reportSlowCommit = (label, started) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason exact-once commit execution is exercised through the public transition wrapper
  */
 const runCommit = (callback, label) => {
@@ -410,7 +402,7 @@ const runCommit = (callback, label) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason same-turn commit batching is exercised through the public transition wrapper
  */
 const runTransitionBatch = (entries) => {
@@ -446,7 +438,7 @@ const runTransitionBatch = (entries) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason single-transition runner is private to the queued wrapper
  */
 const executeTransition = async (entries) => {
@@ -454,7 +446,7 @@ const executeTransition = async (entries) => {
 	let updateStarted = false;
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @covered-by src/script/shared/transitions.mjs::withTransition
 	 * @reason browser update callback is private transition-wrapper plumbing
 	 */
 	const update = () => {
@@ -483,7 +475,7 @@ const executeTransition = async (entries) => {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @covered-by src/script/shared/transitions.mjs::withTransition
 	 * @reason transition promise observation is exercised through public error handling
 	 */
 	const observeTransitionError = (error) => {
@@ -538,6 +530,14 @@ const withTransition = (callback, { label = "unlabeled" } = {}) => {
 		}
 		pendingTransitionBatch.push({ callback, label, resolve });
 	});
+};
+
+/**
+ * @testable false
+ * @reason browser element ID helper is exercised through renderer/combobox wiring
+ */
+const generateElementId = (type) => {
+	return `${type}-${crypto.randomUUID().split("-")[0]}`;
 };
 
 /**
@@ -696,33 +696,6 @@ const uint8ArrayToBase64 = (bytes) => {
 		bin += String.fromCharCode(bytes[i]);
 	return btoa(bin);
 };
-
-/**
- * @testable false
- * @reason browser cache cleanup helper is exercised through service-worker and polling refresh flows
- */
-const clearRecentSearchResults = () => {
-	const recentKeys = Array.from({ length: localStorage.length }, (_, index) =>
-		localStorage.key(index),
-	).filter((key) => key?.startsWith("recent-"));
-
-	recentKeys.forEach((key) => {
-		localStorage.removeItem(key);
-	});
-};
-
-var utilities = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	areEqual: areEqual,
-	base64ToUint8Array: base64ToUint8Array,
-	clearRecentSearchResults: clearRecentSearchResults,
-	debounce: debounce,
-	generateElementId: generateElementId,
-	showBriefly: showBriefly,
-	uint8ArrayToBase64: uint8ArrayToBase64,
-	waitForAttribute: waitForAttribute,
-	withTransition: withTransition
-});
 
 const ENDPOINTS = {
 	CollaborativeDocument: (settings) => {
@@ -1449,7 +1422,7 @@ class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import('./polling.js?v=b560d96b');
+				const { PollingCoordinator } = await import('./polling.js?v=b0bb4d7e');
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -1459,7 +1432,7 @@ class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import('./search.js?v=b560d96b');
+			const { SearchBox } = await import('./search.js?v=b0bb4d7e');
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -1474,7 +1447,7 @@ class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import('./notifications.js?v=b560d96b');
+				const { Notifications } = await import('./notifications.js?v=b0bb4d7e');
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();
@@ -1806,4 +1779,4 @@ class ShellView {
 	}
 }
 
-export { ENDPOINTS as E, ShellView as S, clearRecentSearchResults as a, whenIdle as b, captureError as c, debounce as d, applyNotificationStateHeader as e, areEqual as f, generateElementId as g, renderNotificationBadge as h, waitForAttribute as i, base64ToUint8Array as j, errors as k, utilities as l, markPerformance as m, request$1 as n, request as r, showBriefly as s, uint8ArrayToBase64 as u, withTransition as w };
+export { ENDPOINTS as E, ShellView as S, whenIdle as a, applyNotificationStateHeader as b, captureError as c, debounce as d, areEqual as e, renderNotificationBadge as f, generateElementId as g, waitForAttribute as h, base64ToUint8Array as i, errors as j, request$1 as k, markPerformance as m, request as r, showBriefly as s, uint8ArrayToBase64 as u, withTransition as w };

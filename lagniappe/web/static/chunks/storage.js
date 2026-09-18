@@ -77,4 +77,19 @@ class StorageAdapter {
 const localStore = new StorageAdapter("localStorage");
 const sessionStore = new StorageAdapter("sessionStorage");
 
-export { localStore as l, sessionStore as s };
+/**
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_safe_storage_adapters_handle_browser_failures_and_json
+ * @matrix browser-storage : recent-search-cleanup
+ */
+const clearRecentSearchResults = () => {
+	const recentKeys = Array.from({ length: localStorage.length }, (_, index) =>
+		localStorage.key(index),
+	).filter((key) => key?.startsWith("recent-"));
+
+	recentKeys.forEach((key) => {
+		localStorage.removeItem(key);
+	});
+};
+
+export { clearRecentSearchResults, localStore, sessionStore };

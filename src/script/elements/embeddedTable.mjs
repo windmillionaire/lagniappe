@@ -1,7 +1,8 @@
 import { STYLES } from "styles";
 import { primitives } from "../elements/primitives";
-import { ENDPOINTS, request, withTransition } from "../shared";
+import { ENDPOINTS, request } from "../shared";
 import { setIcon } from "../shared/icons";
+import { withTransition } from "../shared/transitions";
 import { TableElement } from "./table";
 
 /**

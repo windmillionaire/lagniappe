@@ -428,6 +428,7 @@ function startErrorHandling() {
  * @matrix connectivity service-worker : controller-replacement state-publication version
  * @matrix request-errors service-worker : upstream-unavailable validation
  * @pairs service-worker:registration startup:interaction-ready
+ * @pair service-worker:recent-search-cleanup
  */
 function startServiceWorker() {
 	if (!("serviceWorker" in navigator)) return;
@@ -442,7 +443,7 @@ function startServiceWorker() {
 				? "controlled"
 				: "uncontrolled",
 		});
-		const { clearRecentSearchResults } = await import("./shared/utilities");
+		const { clearRecentSearchResults } = await import("./shared/storage");
 		clearRecentSearchResults();
 		syncView();
 	});

@@ -3,7 +3,8 @@ import { FormRevisionModal, WholeFormRevisionModal } from "./editRevisionModal";
 import { captureError } from "./errors";
 import { incompatibleSchema } from "./formRepresentation";
 import { request } from "./request";
-import { areEqual, withTransition } from "./utilities";
+import { withTransition } from "./transitions";
+import { areEqual } from "./utilities";
 
 /**
  * Per-marker authoritative revision probing, comparison, and resolution for

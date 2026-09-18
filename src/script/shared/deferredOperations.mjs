@@ -1,6 +1,6 @@
 import { captureError } from "./errors";
 import { createIcon } from "./icons";
-import { withTransition } from "./utilities";
+import { withTransition } from "./transitions";
 
 /**
  * @testable false

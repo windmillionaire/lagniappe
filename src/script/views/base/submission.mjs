@@ -1,6 +1,6 @@
 import { captureError } from "../../shared/errors";
 import { request } from "../../shared/request";
-import { withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/transitions";
 
 /**
  * Coordinates the view-scoped form submission lifecycle.

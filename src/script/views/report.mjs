@@ -1,6 +1,6 @@
 import { createIcon, setIcon } from "../shared/icons";
 import { request } from "../shared/request";
-import { withTransition } from "../shared/utilities";
+import { withTransition } from "../shared/transitions";
 import Core from "./base/core";
 
 const REPORT_FORM_SELECTOR =

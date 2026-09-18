@@ -1,7 +1,8 @@
 import { BaseUpload } from "../../elements/base/baseUpload";
 import { UploadMenu, uploadElement } from "../../elements/upload";
-import { request, withTransition } from "../../shared";
+import { request } from "../../shared";
 import { setIcon } from "../../shared/icons";
+import { withTransition } from "../../shared/transitions";
 import { SiteSetting } from "./base";
 
 const SPLASH_PREFIX = "splash-";

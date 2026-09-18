@@ -1,6 +1,6 @@
 import { BaseList } from "../../elements/base/baseList";
 import { localStore } from "../../shared/storage";
-import { withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/transitions";
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 

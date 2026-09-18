@@ -203,7 +203,8 @@ import { interactionFoundationChunk } from "./build/utility.mjs";
 const root = "/checkout/src/script/";
 for (const module of [
   "shared/endpoints.mjs", "shared/errors.mjs", "shared/notificationState.mjs",
-  "shared/request.mjs", "shared/utilities.mjs", "views/base/shell.mjs",
+  "shared/request.mjs", "shared/transitions.mjs", "shared/utilities.mjs",
+  "views/base/shell.mjs",
 ]) {
   assert.equal(interactionFoundationChunk(`${root}${module}`), "foundation");
 }

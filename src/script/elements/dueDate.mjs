@@ -1,5 +1,5 @@
 import { STYLES } from "styles";
-import { withTransition } from "../shared";
+import { withTransition } from "../shared/transitions";
 import { buttons } from "./buttons";
 import { primitives } from "./primitives";
 

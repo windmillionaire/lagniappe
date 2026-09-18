@@ -204,7 +204,7 @@ source = source.replaceAll(
   "Promise.resolve({{ updateUserData: globalThis.updateUserData }})",
 );
 source = source.replaceAll(
-  'import("./shared/utilities")',
+  'import("./shared/storage")',
   "Promise.resolve({{ clearRecentSearchResults: globalThis.clearRecentSearchResults }})",
 );
 source = source.replaceAll(
@@ -606,6 +606,7 @@ if (workerState.server !== "online") throw new Error("Settled health result was 
 
 
 # @matrix connectivity service-worker : controller-replacement state-publication version
+# @pair service-worker:recent-search-cleanup
 def test_controller_replacement_receives_current_versioned_connectivity_state(run_node):
     run_main_check(
         run_node,
@@ -616,16 +617,20 @@ const firstController = {
 const secondController = {
   postMessage(message) { controllerMessages.push({ owner: "second", message }); },
 };
+let cleanupCalls = 0;
+context.clearRecentSearchResults = () => { cleanupCalls += 1; };
 context.navigator.serviceWorker.controller = firstController;
 initialize();
 await flushPaint();
 await syncView();
 
+if (cleanupCalls !== 0) throw new Error("Startup unexpectedly cleared recent searches");
 context.navigator.serviceWorker.controller = secondController;
 const replace = serviceWorkerListeners.get("controllerchange");
 if (!replace) throw new Error("Controller replacement listener was not registered");
-replace();
+await replace();
 await syncView();
+if (cleanupCalls !== 1) throw new Error("Controller replacement did not clear recent searches once");
 
 const replacement = controllerMessages.find(({ owner }) => owner === "second");
 if (!replacement) throw new Error("Replacement controller did not receive state");
@@ -637,6 +642,8 @@ if (message.protocol !== "lagniappe-browser" ||
     message.state.visibility !== "visible") {
   throw new Error(`Replacement state was malformed: ${JSON.stringify(message)}`);
 }
+await replace();
+if (cleanupCalls !== 2) throw new Error("Repeated controller replacement did not clear recent searches");
 """,
     )
 

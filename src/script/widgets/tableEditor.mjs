@@ -1,7 +1,7 @@
 import { getFormElement } from "../elements/loader";
 import { setIcon } from "../shared/icons";
 import { request } from "../shared/request";
-import { withTransition } from "../shared/utilities";
+import { withTransition } from "../shared/transitions";
 
 const SAVED_STATE_MS = 1200;
 

@@ -809,7 +809,7 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
-source = source.replace('import { withTransition } from "../shared";\n', "");
+source = source.replace('import { withTransition } from "../shared/transitions";\n', "");
 source = source.replace(
   'import { BaseForm } from "./base/baseForm";',
   "const BaseForm = class {};",

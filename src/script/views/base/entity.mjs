@@ -1,5 +1,6 @@
 import { NavElement } from "../../elements/nav";
-import { debounce, withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/transitions";
+import { debounce } from "../../shared/utilities";
 import Core from "./core";
 
 /**

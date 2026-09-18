@@ -1,6 +1,6 @@
 import { NavElement } from "../../elements/nav";
 import { captureError } from "../../shared/errors";
-import { withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/transitions";
 import { loadWidget } from "../../widgets/loader";
 
 /**

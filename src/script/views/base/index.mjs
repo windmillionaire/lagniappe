@@ -1,4 +1,4 @@
-import { withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/transitions";
 import { TableVisibilityState } from "../../widgets/tableVisibilityState";
 import Core from "./core";
 

@@ -1,6 +1,7 @@
 import { buttons } from "../../elements/buttons";
 import { SelectBox } from "../../elements/combobox";
-import { request, withTransition } from "../../shared";
+import { request } from "../../shared";
+import { withTransition } from "../../shared/transitions";
 import { SiteSetting } from "./base";
 
 /**

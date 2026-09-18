@@ -1,6 +1,6 @@
 import { STYLES } from "styles";
-import { withTransition } from "../shared";
 import { iconDefinition, setIcon } from "../shared/icons";
+import { withTransition } from "../shared/transitions";
 import { FacetsBox } from "./combobox/facets";
 import { DueDate } from "./dueDate";
 import { formatting } from "./formatting";

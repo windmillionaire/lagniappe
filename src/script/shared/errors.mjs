@@ -106,7 +106,7 @@ const getErrorText = (error) => {
  * transitions, and cross-document transitions. They should not be reported.
  *
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason transition-noise predicate is exercised through the transition wrapper
  */
 export const isSkippedViewTransitionError = (error) => {

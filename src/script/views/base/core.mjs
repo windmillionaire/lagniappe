@@ -2,7 +2,7 @@ import { connectivity } from "../../shared/connectivity";
 import { ENDPOINTS } from "../../shared/endpoints";
 import { captureError } from "../../shared/errors";
 import { request } from "../../shared/request";
-import { withTransition } from "../../shared/utilities";
+import { withTransition } from "../../shared/transitions";
 import ViewComponent from "./component";
 import {
 	collectRefreshTargets,

@@ -47,7 +47,7 @@ const context = {{
 }};
 
 vm.createContext(context);
-let source = fs.readFileSync("src/script/shared/utilities.mjs", "utf8");
+let source = fs.readFileSync("src/script/shared/transitions.mjs", "utf8");
 source = source.replace(
   'import {{ captureError, isSkippedViewTransitionError }} from "./errors";',
   `
@@ -56,7 +56,6 @@ const isSkippedViewTransitionError = () => false;
 `,
 );
 source = source.replaceAll("export const ", "const ");
-source = source.replace("export function waitForAttribute", "function waitForAttribute");
 source += "\\nglobalThis.withTransition = withTransition;";
 vm.runInContext(source, context);
 const withTransition = context.withTransition;
@@ -172,7 +171,7 @@ const context = {
   setTimeout,
 };
 vm.createContext(context);
-let source = fs.readFileSync("src/script/shared/utilities.mjs", "utf8");
+let source = fs.readFileSync("src/script/shared/transitions.mjs", "utf8");
 source = source.replace(
   'import { captureError, isSkippedViewTransitionError } from "./errors";',
   `
@@ -181,7 +180,6 @@ const isSkippedViewTransitionError = (error) => /skipped/i.test(error?.message |
 `,
 );
 source = source.replaceAll("export const ", "const ");
-source = source.replace("export function waitForAttribute", "function waitForAttribute");
 source += "\nglobalThis.withTransition = withTransition;";
 vm.runInContext(source, context);
 

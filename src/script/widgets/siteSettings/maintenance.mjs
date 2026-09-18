@@ -1,11 +1,8 @@
 import { STYLES } from "styles";
 import { buttons } from "../../elements/buttons";
-import {
-	clearRecentSearchResults,
-	Modal,
-	request,
-	withTransition,
-} from "../../shared";
+import { Modal, request } from "../../shared";
+import { clearRecentSearchResults } from "../../shared/storage";
+import { withTransition } from "../../shared/transitions";
 import { SiteSetting } from "./base";
 
 /**

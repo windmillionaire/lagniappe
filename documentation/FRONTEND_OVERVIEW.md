@@ -74,8 +74,10 @@ stable root, so AJAX section replacement does not discard its listeners.
 
 ## Shared Utilities (`shared/`)
 
-Public shared APIs are re-exported from `shared/index.mjs` as a single import
-point; internal implementation modules are noted below. Modules:
+Internal modules import shared helpers from their concrete owners. The
+`shared/index.mjs` facade still exposes other shared APIs for application
+composition; transitions and recent-search cleanup use direct imports only.
+Modules:
 
 | Module | Purpose |
 |---|---|
@@ -96,7 +98,9 @@ point; internal implementation modules are noted below. Modules:
 | `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |
 | `protocol.mjs` | Connectivity worker-message validation and construction. Server state does not cross the service-worker boundary. |
 | `user.mjs` | `updateUserData()` performs the retryable startup timezone update without browser geolocation. `updateUserLocation()` is started by `LocationBox`, requests geolocation on demand, and serializes its session write after the timezone update so client-side session-cookie responses cannot overwrite one another. |
-| `utilities.mjs` | `withTransition()` (View Transitions API wrapper with debug mode), `debounce()`, `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
+| `transitions.mjs` | `withTransition()` and its shared queue: batches same-turn DOM commits, joins nested calls, and resolves after the update without waiting for the animation. |
+| `storage.mjs` | Best-effort `localStore` and `sessionStore` adapters; `clearRecentSearchResults()` synchronously removes `recent-` keys from local storage and propagates storage errors. |
+| `utilities.mjs` | `debounce()`, `showBriefly()` (transient feedback using the shared transition scheduler), `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
 
 ## Styles and build output
 

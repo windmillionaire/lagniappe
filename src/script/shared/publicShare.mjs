@@ -1,4 +1,4 @@
-import { withTransition } from "./utilities";
+import { withTransition } from "./transitions";
 
 /**
  * @testable false

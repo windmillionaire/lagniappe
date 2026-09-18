@@ -2,7 +2,7 @@ import { STYLES } from "styles";
 import { ENDPOINTS } from "./endpoints";
 import { captureError } from "./errors";
 import { request } from "./request";
-import { withTransition } from "./utilities";
+import { withTransition } from "./transitions";
 
 /**
  * @testable true

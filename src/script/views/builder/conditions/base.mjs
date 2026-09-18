@@ -2,8 +2,8 @@ import { STYLES } from "styles";
 import { BaseForm } from "../../../elements/base/baseForm";
 import { SelectBox } from "../../../elements/combobox";
 import { primitives } from "../../../elements/primitives";
-import { withTransition } from "../../../shared";
 import { setIcon } from "../../../shared/icons";
+import { withTransition } from "../../../shared/transitions";
 
 /**
  * @testable infrastructure

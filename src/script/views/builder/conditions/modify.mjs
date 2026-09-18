@@ -2,7 +2,7 @@ import { STYLES } from "styles";
 import { CONFIG } from "../../../config/builder";
 import { SelectBox } from "../../../elements/combobox";
 import { primitives } from "../../../elements/primitives";
-import { withTransition } from "../../../shared";
+import { withTransition } from "../../../shared/transitions";
 import { fieldKind } from "../migrations";
 import { Condition } from "./base";
 

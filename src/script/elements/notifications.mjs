@@ -2,7 +2,7 @@ import { STYLES } from "styles";
 import { ENDPOINTS, request } from "../shared";
 import { createIcon } from "../shared/icons";
 import { renderNotificationBadge } from "../shared/notificationState";
-import { withTransition } from "../shared/utilities";
+import { withTransition } from "../shared/transitions";
 import { Dropdown } from "./combobox/dropdown";
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";

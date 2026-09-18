@@ -30,12 +30,10 @@ export { updateUserData, updateUserLocation } from "./user";
 export {
 	areEqual,
 	base64ToUint8Array,
-	clearRecentSearchResults,
 	debounce,
 	generateElementId,
 	showBriefly,
 	simpleHash,
 	uint8ArrayToBase64,
 	waitForAttribute,
-	withTransition,
 } from "./utilities";

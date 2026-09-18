@@ -1,5 +1,5 @@
 import { request } from "../shared/request";
-import { withTransition } from "../shared/utilities";
+import { withTransition } from "../shared/transitions";
 import EntityIndex from "./base/index";
 
 /**

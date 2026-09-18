@@ -230,7 +230,8 @@ const context = {{
 vm.createContext(context);
 let source = fs.readFileSync("src/script/views/base/entity.mjs", "utf8");
 source = source.replace('import {{ NavElement }} from "../../elements/nav";\\n', "");
-source = source.replace('import {{ debounce, withTransition }} from "../../shared/utilities";\\n', "");
+source = source.replace('import {{ debounce }} from "../../shared/utilities";\\n', "");
+source = source.replace('import {{ withTransition }} from "../../shared/transitions";\\n', "");
 source = source.replace('import Core from "./core";\\n', "");
 source = source.replace(
   "export default class Entity extends Core",

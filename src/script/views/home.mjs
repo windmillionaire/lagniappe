@@ -1,4 +1,4 @@
-import { withTransition } from "../shared";
+import { withTransition } from "../shared/transitions";
 import Core from "./base/core";
 
 const HOME_CHANNELS = Object.freeze({

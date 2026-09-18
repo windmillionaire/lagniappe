@@ -65,7 +65,9 @@ successful stage responses replace the controls from server state.
 ## Transition policy
 
 Cross-document navigation uses the CSS View Transition opt-in. In-page
-structural changes use `withTransition()` with a synchronous callback.
+structural changes use `withTransition()` from `shared/transitions.mjs` with a
+synchronous callback. That module owns the single shared queue; consumers,
+including the `showBriefly()` utility, import it directly.
 
 Before that callback, finish:
 

@@ -1,4 +1,4 @@
-import { withTransition } from "../shared";
+import { withTransition } from "../shared/transitions";
 import { SitePublicPages } from "./siteSettings/publicPages";
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";

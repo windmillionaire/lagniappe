@@ -2,7 +2,8 @@ import { BaseList } from "../elements/base/baseList";
 import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { SectionToggle } from "../elements/sectionToggle";
-import { request, withTransition } from "../shared";
+import { request } from "../shared";
+import { withTransition } from "../shared/transitions";
 
 /**
  * @testable infrastructure

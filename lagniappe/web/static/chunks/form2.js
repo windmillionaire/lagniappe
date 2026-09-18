@@ -1,10 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=b560d96b';
-import './connectivity.js?v=b560d96b';
-import { c as compatibleField } from './formRepresentation.js?v=b560d96b';
-import { STYLES } from './styles.js?v=b560d96b';
-import { Modal } from './modal.js?v=b560d96b';
-import { B as BaseForm } from './baseForm.js?v=b560d96b';
+import { STYLES } from './styles.js?v=b0bb4d7e';
+import { Modal } from './modal.js?v=b0bb4d7e';
+import { c as compatibleField } from './formRepresentation.js?v=b0bb4d7e';
+import { w as withTransition } from './foundation.js?v=b0bb4d7e';
+import { B as BaseForm } from './baseForm.js?v=b0bb4d7e';
 
 /**
  * @testable true

@@ -1,6 +1,7 @@
 import { STYLES } from "styles";
-import { ENDPOINTS, request, withTransition } from "../shared";
+import { ENDPOINTS, request } from "../shared";
 import { createIcon, setIcon } from "../shared/icons";
+import { withTransition } from "../shared/transitions";
 import { BaseUpload } from "./base/baseUpload";
 import { UploadMenu, uploadElement } from "./upload";
 

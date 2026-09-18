@@ -1,6 +1,7 @@
 import { STYLES } from "styles";
-import { captureError, ENDPOINTS, request, withTransition } from "../shared";
+import { captureError, ENDPOINTS, request } from "../shared";
 import { setIcon } from "../shared/icons";
+import { withTransition } from "../shared/transitions";
 import { areEqual } from "../shared/utilities";
 import { BaseElement } from "./base/baseElement";
 import { CheckboxElement } from "./checkbox";

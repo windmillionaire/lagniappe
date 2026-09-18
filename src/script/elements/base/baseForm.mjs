@@ -1,5 +1,6 @@
-import { showBriefly, withTransition } from "../../shared";
+import { showBriefly } from "../../shared";
 import { createIcon } from "../../shared/icons";
+import { withTransition } from "../../shared/transitions";
 import { primitives } from "../primitives";
 import { Renderer } from "../renderer";
 

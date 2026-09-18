@@ -1,4 +1,4 @@
-import { withTransition } from "../shared";
+import { withTransition } from "../shared/transitions";
 import { BaseUpload } from "./base/baseUpload";
 import { UploadMenu, uploadElement } from "./upload";
 

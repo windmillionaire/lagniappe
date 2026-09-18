@@ -359,7 +359,11 @@ source = source.replace(
 );
 source = source.replace(
   /import \{[\s\S]*?\} from "\.\.\/shared";/,
-  "const { areEqual, captureError, generateElementId, withTransition } = globalThis;",
+  "const { areEqual, captureError, generateElementId } = globalThis;",
+);
+source = source.replace(
+  'import { withTransition } from "../shared/transitions";',
+  "const withTransition = globalThis.withTransition;",
 );
 source = source.replace("export class Renderer", "class Renderer");
 source += "\nglobalThis.Renderer = Renderer;";

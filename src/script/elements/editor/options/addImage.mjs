@@ -1,4 +1,5 @@
-import { Modal, request, withTransition } from "../../../shared";
+import { Modal, request } from "../../../shared";
+import { withTransition } from "../../../shared/transitions";
 import { BaseUpload } from "../../base/baseUpload";
 import { buttons } from "../../buttons";
 import { UploadMenu, uploadElement } from "../../upload";

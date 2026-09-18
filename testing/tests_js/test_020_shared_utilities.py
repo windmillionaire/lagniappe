@@ -107,8 +107,8 @@ const context = {{
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/utilities.mjs", "utf8");
 source = source.replace(
-  'import {{ captureError, isSkippedViewTransitionError }} from "./errors";',
-  "const captureError = () => undefined; const isSkippedViewTransitionError = () => false;",
+  'import {{ withTransition }} from "./transitions";',
+  "",
 );
 source = source.replaceAll("export const ", "const ");
 source = source.replaceAll("export function ", "function ");
@@ -194,11 +194,12 @@ if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
 
 
 # @matrix browser-storage : availability json
+# @pair browser-storage:recent-search-cleanup
 def test_safe_storage_adapters_handle_browser_failures_and_json(run_node):
     run_node(
         """
 import assert from "node:assert/strict";
-import { localStore, sessionStore } from "./src/script/shared/storage.mjs";
+import { clearRecentSearchResults, localStore, sessionStore } from "./src/script/shared/storage.mjs";
 
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
@@ -207,9 +208,12 @@ Object.defineProperty(globalThis, "localStorage", {
 assert.equal(localStore.get("missing", "fallback"), "fallback");
 assert.equal(localStore.set("key", "value"), false);
 assert.equal(localStore.remove("key"), false);
+assert.throws(() => clearRecentSearchResults(), /blocked/);
 
 const values = new Map();
 const storage = {
+  get length() { return values.size; },
+  key(index) { return [...values.keys()][index] ?? null; },
   getItem(key) { return values.get(key) ?? null; },
   setItem(key, value) { values.set(key, String(value)); },
   removeItem(key) { values.delete(key); },
@@ -233,6 +237,20 @@ assert.deepEqual(localStore.getJSON("broken", []), []);
 assert.equal(values.has("broken"), false);
 assert.equal(sessionStore.setJSON("state", { active: true }), true);
 assert.deepEqual(sessionStore.getJSON("state"), { active: true });
+
+values.set("recent-pages", "pages");
+values.set("recent-tasks", "tasks");
+values.set("other-recent-key", "keep");
+values.set("recent", "keep-too");
+assert.equal(clearRecentSearchResults(), undefined);
+assert.deepEqual([...values], [
+  ["state", '{"active":true}'], ["other-recent-key", "keep"], ["recent", "keep-too"],
+]);
+clearRecentSearchResults();
+assert.equal(values.size, 3);
+values.clear();
+assert.equal(clearRecentSearchResults(), undefined);
+assert.equal(values.size, 0);
 
 const circular = {};
 circular.self = circular;

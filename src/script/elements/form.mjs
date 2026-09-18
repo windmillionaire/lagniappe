@@ -1,6 +1,6 @@
-import { withTransition } from "../shared";
 import { installMigrationNotice } from "../shared/formMigrationNotice";
 import { compatibleField } from "../shared/formRepresentation";
+import { withTransition } from "../shared/transitions";
 import { BaseForm } from "./base/baseForm";
 
 /**

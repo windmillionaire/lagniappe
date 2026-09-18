@@ -1,5 +1,6 @@
 import { primitives } from "../elements/primitives";
-import { sessionStore, withTransition } from "../shared";
+import { sessionStore } from "../shared";
+import { withTransition } from "../shared/transitions";
 
 /**
  * @testable infrastructure

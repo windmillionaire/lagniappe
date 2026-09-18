@@ -35,6 +35,7 @@ const INTERACTION_FOUNDATION_MODULES = new Set([
 	"shared/errors.mjs",
 	"shared/notificationState.mjs",
 	"shared/request.mjs",
+	"shared/transitions.mjs",
 	"shared/utilities.mjs",
 	"views/base/shell.mjs",
 ]);

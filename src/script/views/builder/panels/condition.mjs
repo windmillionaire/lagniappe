@@ -1,4 +1,4 @@
-import { withTransition } from "../../../shared";
+import { withTransition } from "../../../shared/transitions";
 
 /**
  * @testable infrastructure

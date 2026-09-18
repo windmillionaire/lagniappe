@@ -951,7 +951,7 @@ const getErrorText = (error) => {
  * transitions, and cross-document transitions. They should not be reported.
  *
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason transition-noise predicate is exercised through the transition wrapper
  */
 const isSkippedViewTransitionError = (error) => {
@@ -3177,7 +3177,7 @@ const initializeLogoutForms = (root = document) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason no-transition fallback is part of the transition wrapper
  */
 const runWithoutTransition = async (callback, label = "unlabeled") => {
@@ -3200,7 +3200,7 @@ const runWithoutTransition = async (callback, label = "unlabeled") => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason transition queue prevents concurrent View Transitions API aborts
  */
 let transitionQueue = Promise.resolve();
@@ -3209,7 +3209,7 @@ let pendingTransitionBatch = null;
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason development-only timing diagnostic is part of the transition wrapper
  */
 const reportSlowCommit = (label, started) => {
@@ -3225,7 +3225,7 @@ const reportSlowCommit = (label, started) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason exact-once commit execution is exercised through the public transition wrapper
  */
 const runCommit = (callback, label) => {
@@ -3263,7 +3263,7 @@ const runCommit = (callback, label) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason same-turn commit batching is exercised through the public transition wrapper
  */
 const runTransitionBatch = (entries) => {
@@ -3299,7 +3299,7 @@ const runTransitionBatch = (entries) => {
 
 /**
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason single-transition runner is private to the queued wrapper
  */
 const executeTransition = async (entries) => {
@@ -3307,7 +3307,7 @@ const executeTransition = async (entries) => {
 	let updateStarted = false;
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @covered-by src/script/shared/transitions.mjs::withTransition
 	 * @reason browser update callback is private transition-wrapper plumbing
 	 */
 	const update = () => {
@@ -3336,7 +3336,7 @@ const executeTransition = async (entries) => {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @covered-by src/script/shared/transitions.mjs::withTransition
 	 * @reason transition promise observation is exercised through public error handling
 	 */
 	const observeTransitionError = (error) => {

@@ -8,9 +8,9 @@ import {
 	HelpModal,
 	OfflineModal,
 	request,
-	withTransition,
 } from "../../shared";
 import { directUpload } from "../../shared/directUpload";
+import { withTransition } from "../../shared/transitions";
 import { FormChangeStatus } from "./changeStatus";
 import { loadCondition } from "./conditions/loader";
 import { BuilderDraft } from "./draft";

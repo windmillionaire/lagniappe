@@ -3,7 +3,8 @@ import { InputElement } from "../elements/input";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
-import { captureError, request, withTransition } from "../shared";
+import { captureError, request } from "../shared";
+import { withTransition } from "../shared/transitions";
 
 /**
  * @testable infrastructure

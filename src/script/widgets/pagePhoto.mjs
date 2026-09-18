@@ -1,8 +1,9 @@
 import { BaseUpload } from "../elements/base/baseUpload";
 import { sections } from "../elements/sections";
 import { UploadMenu, uploadElement } from "../elements/upload";
-import { request, withTransition } from "../shared";
+import { request } from "../shared";
 import { createIcon } from "../shared/icons";
+import { withTransition } from "../shared/transitions";
 
 /**
  * @testable true

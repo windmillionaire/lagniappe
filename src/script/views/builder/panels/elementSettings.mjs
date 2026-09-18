@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
 import { CONFIG } from "../../../config/builder";
 import { primitives } from "../../../elements/primitives";
-import { withTransition } from "../../../shared";
+import { withTransition } from "../../../shared/transitions";
 
 /**
  * @testable infrastructure

@@ -75,7 +75,10 @@ const context = {
   isSkippedViewTransitionError: () => false,
 };
 vm.createContext(context);
-for (const path of ["src/script/shared/utilities.mjs", "src/script/views/base/component.mjs"]) {
+for (const path of [
+  "src/script/shared/transitions.mjs", "src/script/shared/utilities.mjs",
+  "src/script/views/base/component.mjs",
+]) {
   const source = fs.readFileSync(path, "utf8")
     .replace(/^import .*;\n/gm, "")
     .replace(/export (?:default )?/g, "");

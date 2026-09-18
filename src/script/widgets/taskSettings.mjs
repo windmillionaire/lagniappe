@@ -2,7 +2,7 @@ import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
-import { withTransition } from "../shared";
+import { withTransition } from "../shared/transitions";
 
 const TASK_BUTTONS = {
 	selectUser: "facet",

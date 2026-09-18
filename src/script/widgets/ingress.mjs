@@ -1,7 +1,8 @@
 import { buttons } from "../elements/buttons.mjs";
 import { FacetsBox, SelectBox } from "../elements/combobox";
 import { primitives } from "../elements/primitives";
-import { captureError, Modal, request, withTransition } from "../shared";
+import { captureError, Modal, request } from "../shared";
+import { withTransition } from "../shared/transitions";
 
 /**
  * @testable infrastructure

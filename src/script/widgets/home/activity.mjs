@@ -1,7 +1,8 @@
 import { STYLES } from "styles";
 import { BaseList } from "../../elements/base/baseList";
-import { request, withTransition } from "../../shared";
+import { request } from "../../shared";
 import { setIcon } from "../../shared/icons";
+import { withTransition } from "../../shared/transitions";
 
 /**
  * @testable infrastructure

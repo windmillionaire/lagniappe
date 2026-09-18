@@ -2,7 +2,8 @@ import { BaseList } from "../elements/base/baseList";
 import { buttons } from "../elements/buttons";
 import { FacetsBox, SelectBox } from "../elements/combobox";
 import { primitives } from "../elements/primitives";
-import { request, withTransition } from "../shared";
+import { request } from "../shared";
+import { withTransition } from "../shared/transitions";
 
 /**
  * @testable infrastructure

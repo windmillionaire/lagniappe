@@ -1,10 +1,6 @@
 import { Renderer } from "../../../elements/renderer";
-import {
-	areEqual,
-	captureError,
-	request,
-	withTransition,
-} from "../../../shared";
+import { areEqual, captureError, request } from "../../../shared";
+import { withTransition } from "../../../shared/transitions";
 
 /**
  * @testable infrastructure

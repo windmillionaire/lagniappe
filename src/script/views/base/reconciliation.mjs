@@ -1,6 +1,6 @@
 import { captureError } from "../../shared/errors";
 import { request } from "../../shared/request";
-import { clearRecentSearchResults } from "../../shared/utilities";
+import { clearRecentSearchResults } from "../../shared/storage";
 
 const COLLECTION_ONLY_CHANGE_TYPES = new Set(["delete", "star", "unstar"]);
 const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([

@@ -1,5 +1,5 @@
-import { withTransition } from "../shared";
 import { setIcon } from "../shared/icons";
+import { withTransition } from "../shared/transitions";
 import Entity from "./base/entity";
 
 /**

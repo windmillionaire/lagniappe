@@ -12,8 +12,8 @@ import {
 import { IdentityPlatformClient } from "./login/identity";
 import { initializeLogoutForms } from "./shared/logout.mjs";
 import { request } from "./shared/request.mjs";
+import { withTransition } from "./shared/transitions.mjs";
 import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.mjs";
-import { withTransition } from "./shared/utilities.mjs";
 
 initializeLogoutForms();
 installUpstreamUnavailableBanner();

@@ -1,5 +1,5 @@
 import { STYLES } from "styles";
-import { withTransition } from "../shared";
+import { withTransition } from "../shared/transitions";
 import { BaseForm } from "./base/baseForm";
 import { FacetsBox } from "./combobox";
 import { FormElement } from "./form";
