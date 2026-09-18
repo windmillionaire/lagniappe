@@ -1,8 +1,8 @@
 """Safety limits and the supported shared AI contract version."""
 
 API_VERSION = "v1"
-CONTRACT_VERSION_MIN = 9
-CONTRACT_VERSION_MAX = 9
+CONTRACT_VERSION_MIN = 10
+CONTRACT_VERSION_MAX = 10
 
 MAX_CATALOG_BYTES = 1 * 1024 * 1024
 MAX_TOOL_COUNT = 64

@@ -2,6 +2,7 @@
 {% extends "layouts/base.html" %}
 {% from "common.html" import format_name %}
 {% import "controls.html" as controls %}
+{% from "home/tools.html" import generation_controls with context %}
 {% macro proposal_details(details, classes="pl-5") %}
   {% if details %}
     <dl class="{{ classes }} flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-medium">
@@ -252,12 +253,12 @@
   {% set report_icon = "generate" %}
   {% set can_ask_ai = current_user.access(AI.ASK) %}
   {% set can_create_ai = current_user.access(AI.CREATE) %}
-  {% set can_revise = report.origin != "api" and report.proposal and (report.status == "ready" or (is_ask and report.status == "complete")) and not report.result and can_ask_ai %}
+  {% set can_revise = report.proposal and not report.pending and not report.db.get("superseded_by") and not migration_pending and (can_create_ai if report.result or report.db.get("correction") else can_ask_ai) and ((report.result and report.status in ["complete", "failed"]) or (report.origin != "api" and not report.result and (report.status == "ready" or (is_ask and report.status == "complete")))) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
-  {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
-  {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone and not migration_started %}
-  {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
-  {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
+  {% set can_retry = not report.db.get("superseded_by") and report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
+  {% set creates_correction = report.result %}
+  {% set revise_button_label = "Create corrective plan" if creates_correction else ("Revise Response" if is_ask else "Revise Plan") %}
+  {% set revise_heading = "Create a corrective plan" if creates_correction else ("Revise Response" if is_ask else "Revise Proposal") %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
   {% set operation_status = report._operation_status|default(none) %}
   <main lp-view
@@ -370,6 +371,7 @@
                   <span data-role="deferred-elapsed">just now</span>
                 </p>
               {% endif %}
+              {{ generation_controls(report) }}
             </div>
           {% endif %}
           {% if report.proposal and (is_ask or report.properties.proposal.answer_html) %}
@@ -511,19 +513,10 @@
             <div data-role="report-result" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">Result</h2>
               {% if report.result.status == "complete" %}
-                {% if report.properties.result.submission_issues %}
-                  <p class="text-delete-default">Some submission updates were not applied.</p>
-                {% else %}
-                  <p class="text-base-dark">Work done.</p>
-                {% endif %}
-              {% elif report.result.status == "undone" %}
-                <p class="text-base-dark">Work undone.</p>
+                <p class="text-base-dark">Work done.</p>
               {% elif report.result.status == "failed" %}
                 <p class="text-delete-default">This report stopped before all actions were completed.</p>
               {% endif %}
-              {% for issue in report.properties.result.submission_issues %}
-                <p class="text-sm text-delete-default">{{ issue.action_label }}{% if issue.schema_id %} ({{ issue.schema_id }}){% endif %}: {{ issue.reason }}</p>
-              {% endfor %}
               {% if report.result.actions %}
                 <ul class="flex flex-col gap-1 text-sm">
                   {% for action in report.properties.result.grouped_actions %}
@@ -541,38 +534,22 @@
                         Existing Page: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "attach_file" %}
                         Attached {{ format_name(action.entity, parent=False) }}{% if action.target %} to {{ format_name(action.target, parent=False) }}{% endif %}
-                      {% elif action.status == "complete" and action.entity and action.type == "add_page_category" %}
-                        {% if action.previous and action.previous.had_category %}
-                          Category already present:
-                        {% else %}
-                          Added category
-                        {% endif %}
-                        {% if action.target %}{{ format_name(action.target, parent=False) }} to{% endif %}
-                        {{ format_name(action.entity, parent=False) }}
-                      {% elif action.status == "complete" and action.entity and action.type in ["move_page", "move_task", "move_file"] %}
+                      {% elif action.status == "complete" and action.entity and action.type in ["move_task", "move_file"] %}
                         Moved {{ format_name(action.entity, parent=False) }}{% if action.target %} to {{ format_name(action.target, parent=False) }}{% endif %}
-                      {% elif action.status == "complete" and action.entity and action.type == "rename_entity" %}
-                        Renamed to {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "suggest_page_deletion" %}
                         Cleanup suggested:
                         {{ format_name(action.entity, parent=False) }}
                         <span class="ml-2 inline-flex align-middle">
                           {{ controls.delete(label='Delete ' ~ action.entity.name) }}
                         </span>
-                      {% elif action.status == "complete" and action.type == "update_form_values" %}
-                        {% for entity in action.updated_entities %}
-                          <span data-role="submission-update-target"{% if not loop.first %} class="block pl-5"{% endif %}>
-                            {{ entity.kind|title }} Updated: {{ format_name(entity, parent=False) }}
-                          </span>
-                        {% else %}
-                          {{ "Updated submissions" if action.updates.applied else "No submission changes applied" }}
-                        {% endfor %}
                       {% elif action.status == "complete" and action.entity and action.type == "update_form_schema" %}
                         Updated schema for {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "append_page_document" %}
                         Page Document Updated: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.type == "complete_task" %}
                         Completed Task: {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type in ["update_task", "update_page", "update_project", "update_model_task"] %}
+                        {{ action.entity.kind|title }} Updated: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity and action.created is sameas false %}
                         Reused {{ action.entity.kind|title }}: {{ format_name(action.entity, parent=False) }}
                       {% elif action.status == "complete" and action.entity %}
@@ -608,35 +585,33 @@
                      data-visible="false"
                      class="overflow-auto rounded-md bg-base-bg p-3 text-xs">{{ report.result|tojson(indent=2) }}</pre>
               </div>
-              {% if can_undo %}
-                {% set undo_label = "Resume Undo" if report.status == "undo_failed" else "Undo Completed Actions" if report.status == "failed" else "Undo Report" %}
-                <form method="post"
-                      action="{{ url_for('tools.undo_report', key=report.urlsafe_key) }}"
-                      data-role="{{ 'recovery-undo-report-form' if report.status in ['failed', 'undo_failed'] else 'undo-report-form' }}"
-                      data-submit="{{ undo_label }}"
-                      data-submitting="{{ 'Resuming Undo' if report.status == 'undo_failed' else 'Undoing Completed Actions' if report.status == 'failed' else 'Undoing Report' }}"
-                      data-submitted="Report Undone"
-                      class="flex">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                  <button type="submit"
-                          data-kind="delete"
-                          class="{{ styles.button.submit }}">{{ undo_label }}</button>
-                </form>
-              {% endif %}
+
             </div>
           {% endif %}
 
+          {% if report.db.get("correction") %}
+            <p>This plan corrects <a href="{{ url_for('tools.report', key=report.db.correction.source) }}">the original execution</a>. Only additional changes will be applied.</p>
+          {% endif %}
+          {% for correction_id in report.db.get("correction_children", []) %}
+            <p>A separate corrective plan was created. <a class="{{ styles.link.default }}" href="{{ url_for('tools.report', key=correction_id) }}">Open corrective plan</a></p>
+          {% endfor %}
+          {% if report.db.get("superseded_by") %}
+            <p>This execution was superseded by <a href="{{ url_for('tools.report', key=report.db.superseded_by) }}">an approved correction</a>.</p>
+          {% endif %}
           {% if can_revise %}
             <form method="post"
                   action="{{ url_for('tools.revise_report', key=report.urlsafe_key) }}"
                   data-role="revise-report-form"
                   data-submit="{{ revise_button_label }}"
-                  data-submitting="{{ 'Revising Response' if is_ask else 'Revising Plan' }}"
-                  data-submitted="Revision Started"
+                  data-submitting="{{ 'Creating corrective plan' if creates_correction else ('Revising Response' if is_ask else 'Revising Plan') }}"
+                  data-submitted="{{ 'Corrective plan started' if creates_correction else 'Revision Started' }}"
                   data-icon="generate"
                   class="flex flex-col gap-2 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">
               <label for="report-feedback"
                      class="text-sm font-semibold text-base-dark">{{ revise_heading }}</label>
+              {% if creates_correction %}
+                <p class="text-sm">Creates a new linked plan for additional changes. Completed work is kept. Review and approve the new plan before it runs.</p>
+              {% endif %}
               <textarea id="report-feedback"
                         name="feedback"
                         required

@@ -94,6 +94,71 @@ window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture
+def live_ai_quota(request, monkeypatch):
+    """Force only the two live HTTP attempts; exercise the actual fallback UI."""
+    from contextlib import contextmanager
+    from ..utility import live_ai
+    from ..utility.network import scoped_browser_route
+
+    forced = bool(getattr(request, "param", False))
+    @contextmanager
+    def configure(user, path):
+        if not forced:
+            yield
+            return
+        calls = []
+        monkeypatch.setattr(live_ai, "LIVE_AI_QUOTA_BACKOFF_SECONDS", 0)
+        def quota(route):
+            if route.request.method == "POST" and len(calls) < 2:
+                calls.append(route.request.url)
+                prefix = "Generation failed. Please try again.  " if len(calls) == 2 else ""
+                route.fulfill(status=422, content_type="text/plain", body=f"{prefix}AI quota is temporarily exhausted. The report can retry shortly.")
+            else:
+                route.fallback()
+        with scoped_browser_route(user.page.context, f"**{path}", quota):
+            yield
+        assert len(calls) == 2
+    return configure
+
+
+@pytest.fixture
+def live_ai_job_quota(request, monkeypatch):
+    """Drive real job failure/retry/publication with a deterministic provider quota."""
+    forced = bool(getattr(request, "param", False))
+    if not forced:
+        return False
+    from lagniappe.core import exceptions
+    from lagniappe.core.definitions import Fetch
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.tools import ai
+    from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+    from lagniappe.web import app
+    from ..utility import hosted_deferred_jobs, live_ai
+
+    calls = []
+    def quota(*_args, **_kwargs):
+        calls.append(True)
+        message = "AI quota is temporarily exhausted. The report can retry shortly."
+        context = {"ai_provider": {"quota_exhausted": True, "code": 429, "status": "RESOURCE_EXHAUSTED"}}
+        if len(calls) == 2:
+            raise exceptions.AIException(
+                f"Generation failed. Please try again.  {message}", context=context,
+            ) from exceptions.AIQuotaError(message, context=context)
+        raise exceptions.AIQuotaError(message, context=context)
+    monkeypatch.setattr(ai, "generate_report", quota)
+    monkeypatch.setattr(ai, "generate_autofilled_submission", quota)
+    monkeypatch.setattr(live_ai, "LIVE_AI_QUOTA_BACKOFF_SECONDS", 0)
+
+    def deliver(_page, job, **_kwargs):
+        with app.test_request_context("/"):
+            DeferredJobs.run(job.urlsafe_key, now=job.next_attempt_at)
+        saved = Entities.fetch_one(job.key, request=Fetch.direct())
+        return saved, [{"attempt": saved.attempt, "status": saved.status, "error": saved.error}]
+    monkeypatch.setattr(hosted_deferred_jobs, "dispatch_hosted_deferred_job", deliver)
+    return True
+
+
 @dataclass(frozen=True)
 class E2ERuntime:
     """Browser-facing state shared by every context in one pytest session."""

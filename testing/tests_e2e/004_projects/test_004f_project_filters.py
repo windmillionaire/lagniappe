@@ -197,6 +197,26 @@ def test_filter_by_task_name_exact(get_user):
     expect(row).to_be_visible()
 
 
+# @matrix filters : escaping punctuation regex-literal run-results string-condition
+@pytest.mark.parametrize("comparator", ["matches", "contains"])
+def test_filter_string_punctuation_matches_literal_values(get_user, comparator):
+    """Prove literal regex values against Redis through the browser filter UI."""
+    user = get_user(Users.OWNER)
+    needle = f'Literal {uuid4().hex} Dr. René [a+b] ("x") \\folder ^$.?*|{{2}}'
+    name = needle if comparator == "matches" else f"Before {needle} after"
+    base = Tasks.test_filter_by_task_name.value.definition
+    matching = Task(user=user, definition=replace(base, name=name)).create()
+    distractor = Task(user=user, definition=replace(base, name=name.replace("Dr.", "DrX"))).create()
+    project = user.go(matching.project)
+    filters = Filters(user, project)
+    filters.set_condition(ProjectFilterConditions.NAME)
+    filters.text(comparator, needle.upper(), field="name").add_filter()
+
+    results = filters.run()
+    expect(results.locator(f"tr[data-key='{matching.key}']")).to_be_visible()
+    expect(results.locator(f"tr[data-key='{distractor.key}']")).to_have_count(0)
+
+
 # --- Timestamp conditions (Due Date) ---
 
 

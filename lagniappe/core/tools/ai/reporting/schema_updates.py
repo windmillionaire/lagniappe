@@ -273,16 +273,6 @@ def report_impact(report, user, *, page=1):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
-# @reason irreversible migrations must be detected before any compensating write
-def migration_started(report):
-    return any(
-        record.get("migration_id")
-        for record in (getattr(report, "result", None) or {}).get("actions", [])
-    )
-
-
-# @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason report ownership protects candidates until a linked migration publishes
 def migration_pending(report):

@@ -9,7 +9,7 @@ from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
 
 # @matrix ai-report : delete file-cleanup guarded-delete
 def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch):
-    orphan = SimpleNamespace(has_references=False)
+    orphan = SimpleNamespace(has_references=False, db={})
     attached = SimpleNamespace(has_references=True)
     report = SimpleNamespace(
         available=True,
@@ -31,9 +31,6 @@ def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch
     )
     monkeypatch.setattr(Entities, "delete", lambda *entities: effects.append(entities))
 
-    assert report_history.delete_report_record(report) == "committed"
-    assert effects == ["cancel", "uploads", (report, orphan)]
-
     for outcome in ("busy", "stale", "missing", "committed"):
         effects.clear()
 
@@ -46,10 +43,27 @@ def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch
         monkeypatch.setattr(
             report_history.external_operations, "delete_plan_if_idle", commit
         )
-        assert report_history.delete_report_record(report, guarded=True) == outcome
+        assert report_history.delete_report_record(report) == outcome
         assert effects == (
             ["fence", "cancel", "uploads"] if outcome == "committed" else ["fence"]
         )
+
+    # The first correction can link after a plain native deletion was loaded.
+    # A stale source snapshot must retain both the report and its evidence.
+    effects.clear()
+
+    def concurrent_correction(current, snapshot, *entities):
+        current.db["correction_children"] = ["new-correction"]
+        assert snapshot == {"status": "complete"}
+        assert snapshot != current.db
+        effects.append("fence")
+        return "stale"
+
+    monkeypatch.setattr(
+        report_history.external_operations, "delete_plan_if_idle", concurrent_correction
+    )
+    assert report_history.delete_report_record(report) == "stale"
+    assert effects == ["fence"]
 
     report.origin = "api"
     report.deferred_job = {"key": "active-job"}
@@ -91,8 +105,7 @@ def test_bulk_delete_scopes_ownership_state_snapshot_and_partial_failures(monkey
         lambda error, **kwargs: errors.append(error),
     )
 
-    def delete(item, *, guarded):
-        assert guarded is True
+    def delete(item):
         if item is rows["broken"]:
             raise RuntimeError("storage unavailable")
         if item is rows["busy"]:

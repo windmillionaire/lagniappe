@@ -2765,6 +2765,7 @@ def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
     from runner import gcloud as switcher
 
     calls = []
+    shared_configuration = {"account": "owner@example.com", "project": "project-1"}
     monkeypatch.setattr(
         config,
         "SETTINGS",
@@ -2780,10 +2781,7 @@ def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
     monkeypatch.setattr(
         switcher,
         "get_configuration_value",
-        lambda key, configuration=None: {
-            "account": "owner@example.com",
-            "project": "project-1",
-        }[key],
+        lambda key, configuration=None: shared_configuration[key],
     )
     monkeypatch.setattr(
         switcher,
@@ -2807,6 +2805,8 @@ def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
     )
 
     for key in [
+        "CLOUDSDK_CORE_ACCOUNT",
+        "CLOUDSDK_CORE_PROJECT",
         "CLOUDSDK_ACTIVE_CONFIG_NAME",
         "GOOGLE_CLOUD_PROJECT",
         "GCLOUD_PROJECT",
@@ -2824,3 +2824,13 @@ def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
     assert os.environ["GOOGLE_CLOUD_PROJECT"] == "project-1"
     assert os.environ["GCLOUD_PROJECT"] == "project-1"
     assert os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] == "project-1"
+
+    # A different checkout switches the same named configuration after startup.
+    # Children must retain the verified operator, not follow the changed file.
+    shared_configuration.update(account="other@example.com", project="other-project")
+    import subprocess
+    result = subprocess.run(
+        [sys.executable, "-c", "import os, json; print(json.dumps([os.environ['CLOUDSDK_CORE_ACCOUNT'], os.environ['CLOUDSDK_CORE_PROJECT']]))"],
+        capture_output=True, text=True, check=True,
+    )
+    assert json.loads(result.stdout) == ["owner@example.com", "project-1"]

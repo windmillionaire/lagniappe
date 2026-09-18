@@ -44,10 +44,10 @@ from testing.elements import (
     SpinnerButtons,
 )
 from testing.utility.network import expect_successful_response
-from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
+from testing.utility.live_ai import submit_live_ai
 
 
-def _create_category(user, home, definition):
+def _create_category(user, home, definition, *, results=None, browser_failures=None, live_ai_quota=None):
     create_form = home.create_category_form()
     if not definition.description_for_ai:
         create_form.locator(FormElements.NAME).fill(definition.name)
@@ -61,16 +61,26 @@ def _create_category(user, home, definition):
         category_form = definition.form.get(user)
         FormSelect(create_form).select(category_form)
 
-    with expect_successful_response(
-        user.page,
-        method="POST",
-        path="/categories/create",
-        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS if definition.description_for_ai else None,
-    ) as response_info:
-        SpinnerButtons.CREATE.click(create_form)
+    def manual_submit():
+        with expect_successful_response(user.page, method="POST", path="/categories/create") as response:
+            SpinnerButtons.CREATE.click(create_form)
+        return response.value
 
+    if definition.description_for_ai:
+        def fallback():
+            create_form.locator(Buttons.MANUAL_MODE).click()
+            create_form.locator(FormElements.NAME).fill(definition.name)
+            results.record("alternate_verification", "Manual creation validates the same save and list workflow; AI content remains unverified.")
+            return manual_submit()
+        with live_ai_quota(user, "/categories/create"):
+            response = submit_live_ai(
+                user, path="/categories/create", submit=lambda: SpinnerButtons.CREATE.click(create_form),
+                results=results, browser_failures=browser_failures, fallback=fallback,
+            )
+    else:
+        response = manual_submit()
     expect(create_form).not_to_be_visible()
-    new_category_key = home.entity_key_from_response(response_info.value)
+    new_category_key = home.entity_key_from_response(response)
     category_list = home.category_list
     new_category = category_list.list.locator(f"li[data-key='{new_category_key}']")
     expect(new_category).to_be_visible()
@@ -191,7 +201,8 @@ def test_create_category_manual_mode(get_user):
 
 # @matrix categories : ai-create ai-generated
 @pytest.mark.ai
-def test_create_category_ai_mode(get_user, results):
+@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+def test_create_category_ai_mode(get_user, results, browser_failures, live_ai_quota):
     """
     Verify category creation in AI mode.
 
@@ -202,7 +213,10 @@ def test_create_category_ai_mode(get_user, results):
     category = Categories.test_create_category_ai_mode.get(user, create=False)
     home = user.go(SitePages.HOME)
 
-    category.key = _create_category(user, home, category.definition)
+    category.key = _create_category(
+        user, home, category.definition, results=results,
+        browser_failures=browser_failures, live_ai_quota=live_ai_quota,
+    )
     results.record("category", category.entity.db)
 
 

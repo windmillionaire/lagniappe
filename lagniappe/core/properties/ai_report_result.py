@@ -13,22 +13,6 @@ class Result(ReportProcessValue):
 
     _id = "result"
 
-    # @testable true
-    # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_report_result_exposes_legacy_skipped_submission_errors
-    # @matrix ai-report : validation result
-    @property
-    def submission_issues(self):
-        """Surface skipped patches, including reports saved by older runners."""
-        if not isinstance(self.value, dict):
-            return []
-        return [
-            {**update, "action_label": action.get("display_label") or "Submission update"}
-            for action in self.value.get("actions") or []
-            if action.get("type") == "update_form_values"
-            for update in (action.get("updates") or {}).get("skipped") or []
-            if update.get("reason") not in {"Value did not change.", "Value did not change after validation."}
-        ]
-
     @property
     def grouped_actions(self):
         if not isinstance(self.value, dict):
@@ -45,11 +29,6 @@ class Result(ReportProcessValue):
             entity = item.get("entity") or {}
             action_type = item.get("type")
 
-            if (
-                action_type == "update_form_values"
-                and item.get("status") == "complete"
-            ):
-                item["updated_entities"] = self._submission_update_entities(item)
 
             if action_type == "attach_file" and target.get("kind") in {"page", "user"}:
                 page_group = self._result_page_group(target, grouped, page_groups)
@@ -123,25 +102,6 @@ class Result(ReportProcessValue):
                     task_groups[entity["id"]] = item
 
         return grouped
-
-    # @testable false
-    # @covered-by lagniappe/core/properties/ai_report_result.py::Result
-    def _submission_update_entities(self, action):
-        """List applied targets once, without changing the execution/undo ledger."""
-        updates = action.get("updates")
-        if not isinstance(updates, dict):
-            return []
-        entities = {}
-        for update in updates.get("applied") or []:
-            entity = update.get("entity") if isinstance(update, dict) else None
-            if (
-                isinstance(entity, dict)
-                and entity.get("kind") in {"page", "task"}
-                and isinstance(entity.get("id"), str)
-                and entity["id"]
-            ):
-                entities.setdefault(entity["id"], entity)
-        return list(entities.values())
 
     def _result_page_group(self, page, grouped, page_groups):
         if not isinstance(page, dict) or not page.get("id"):

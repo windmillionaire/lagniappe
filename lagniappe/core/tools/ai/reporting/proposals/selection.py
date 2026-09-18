@@ -39,7 +39,6 @@ def toggle_proposal_action_skip(proposal, index):
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
-# @tests tests_unit/test_020g_ai_report_actions_entities.py::test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependencies
 # @matrix ai-report : dependencies exact-indexes grouped-display proposal restore schema-section skip
 def toggle_proposal_action_indexes(proposal, index, indexes, include_dependencies=True):
     """Toggle skipped state for a display group of proposal actions."""

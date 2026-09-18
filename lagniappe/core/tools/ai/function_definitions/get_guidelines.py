@@ -71,32 +71,19 @@ unless the user requests a separate field. Prefer useful repeatable data over
 generic filler. Mark a field required only when its answer is necessary.
 """
 ACTION_GUIDELINES = {
-    "set_task_due_date": "Set an exact editable, incomplete Task's calendar due date with data.task and data.due_date (YYYY-MM-DD in the acting user's timezone, or null to clear). Resolve relative wording to a date using the plan's current date/timezone. Preserve recurrence rules, completion state, and form values. This uses the Task editor's calendar-date behavior. Browser review, fresh permissions, retry, and undo apply.",
-    "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry; undo stops if content has since changed.",
-    "complete_task": "Check off one exact existing Task via data.task at the current execution time. No name-based matching, replacement submission, or historical completed_on override. For a source-dated completed occurrence, use create_task with completed=true, completed_on, and the exact task reference when reusing a Task. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_form_values first and list its action id in depends_on when completing with details. An already-completed Task is a no-op. Undo reverses only this completion, not a reopen/reset of its form.",
+    **{name: 'Use data.entity and data.changes with exact references. Omitted fields are unchanged. Patch selected answers with changes.submission keyed by exact field IDs. Reassigning a Form requires a complete target submission, including empty values. Pair answer migration and description cleanup in one action. Use $action_id to refer to an earlier created Form or model task. Only active tasks can be restructured. Model defaults affect future tasks only. Project model_tasks must include every model exactly once. Example data: {"entity":"hash:012345abcdef","changes":{"submission":{"textarea-notes":"Updated notes"}}}.' for name in ("update_task", "update_page", "update_project", "update_model_task")},
+    "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry. Inline edits belong in the editor.",
+    "complete_task": "Check off one exact existing Task via data.task at the current execution time. No name-based matching, replacement submission, or historical completed_on override. For a source-dated completed occurrence, use create_task with completed=true, completed_on, and the exact task reference when reusing a Task. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_task first and list its action id in depends_on when completing with details. An already-completed Task is a no-op.",
     "create_form": "Create forms before actions that reference them; use the matching page_form or task_form bundle.",
     "create_category": "Create a category only for a durable collection; reference an earlier default page-form action only when the collection is homogeneous.",
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
     "create_model_task": "Create a model task after its Project and optional task Form; model tasks describe reusable work types.",
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
     "create_task": "Use an editable Page or earlier page action, a stable work name, and task Forms only. For one source-dated completed occurrence, use one create_task with completed=true and completed_on from the source; supply the exact task reference to reuse an existing Task, plus the required name and page/page_action. Do not invent a second completion for today. To check off existing work now while preserving its details, use complete_task. Only when evidence contains multiple occurrences, create the latest dated completion first, then another create_task with task_action pointing to that earlier action and the older completed_on date. Both actions supply name and page/page_action; the older occurrence leaves the latest completion intact.",
-    "add_form_to_page": "Reference one editable existing Page and one page Form; this does not require a Category.",
-    "add_page_category": "Reference both the editable existing Page and additional existing Category; readable names are not executable references.",
     "update_form_schema": "Preview exact-ID schema operations, explain destructive changes, and place the update before actions that use it. The user reviews the plan.",
-    "update_form_values": (
-        "Put the target inside every data.updates row, alongside schema_id and "
-        "new_value. Each row requires exactly one of page, task, page_action, or "
-        "task_action; action references identify earlier creation actions. "
-        "Top-level data.page/data.task are not valid proposal targets. "
-        "Include only grounded field changes. "
-        'Example data: {"updates":[{"task":"hash:012345abcdef",'
-        '"schema_id":"textarea-notes","new_value":"Updated notes"}]}.'
-    ),
     "attach_file": "Attach the exact report file ref to data.entity (an editable existing Page, Task or task history) or data.entity_action (an earlier create_page/create_task action). This links the file; it does not convert it into document text. Use the completed occurrence as the target for its evidence.",
-    "move_page": "Use exact editable source and destination references; propose only requested moves.",
     "move_task": "Use exact editable source and destination references; propose only requested moves.",
     "move_file": "Use an exact file and editable source/destination; preserve evidence attachments required by the plan.",
-    "rename_entity": "Use one exact editable target and a concise stable name supported by the request.",
     "suggest_page_deletion": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
     "summarize_file": "Use each exact report file ref once with a grounded full-file summary, two distinct broad retrieval terms, and normally search=true.",
     "skip": "Use only when an artifact truly should not be saved or the user explicitly excluded it.",
@@ -173,8 +160,8 @@ EXTERNAL_FORM_AUTOFILL_BUNDLE = {
     "description": "Final form submissions and grounded field updates for external proposals.",
     "instructions": (
         "Author final values in the current external action schema. For "
-        "update_form_values, return only the selected grounded updates; "
-        "do not copy unrelated existing values into data.updates."
+        "update_task, return only the selected grounded updates; "
+        "do not copy unrelated existing values into data.changes.submission."
     ),
     "sections": (
         FORM_AUTOFILL_RULES.replace(
@@ -188,7 +175,7 @@ EXTERNAL_FORM_AUTOFILL_BUNDLE = {
         SUBMISSION_OUTPUT_REQUIREMENTS.replace(
             "- Submission objects should contain all properties from the partial submission (if provided) unaltered.",
             "- New submission objects retain supplied partial values unless a "
-            "grounded correction is required. For update_form_values, "
+            "grounded correction is required. For update_task, "
             "include only grounded changes using exact schema field ids.",
         ),
         SCHEMA_TYPE_GUIDELINES,
@@ -205,9 +192,9 @@ SUBMISSION_PATCH_BUNDLE = {
         "requested, evidence-supported changes; omitted fields remain unchanged. "
         "Do not invent missing facts or silently resolve conflicting evidence. "
         "For newly added fields, depend on the preceding update_form_schema action. "
-        "Every data.updates row must include its own page/task (or "
-        "page_action/task_action), schema_id, and new_value; a top-level target "
-        "does not apply to the rows.",
+        "Use data.entity for the exact target and data.changes.submission for an "
+        "object keyed by field IDs. Form reassignment requires all target fields; "
+        "an unchanged Form accepts selected fields only.",
         SCHEMA_TYPE_GUIDELINES,
     ),
 }
@@ -249,7 +236,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
                 "description": (
                     "For task=report_actions, require a nonempty selection and return exact schemas and rules for "
                     "proposal action types. For task=form_autofill, select "
-                    "[update_form_values] for patch guidance instead of full autofill."
+                    "[update_task] for patch guidance instead of full autofill."
                 ),
             },
         },
@@ -274,6 +261,7 @@ def execute_get_guidelines(args, _user):
 # @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
 # @matrix ai agent-api : guidelines tool-dispatch
 # @matrix ai guidelines : action-selection field-type-selection payload-size
+# @matrix ai-report submission : preservation validation
 def execute_external_get_guidelines(args, _user):
     """Compose external authoring guidance from trusted API dispatch context."""
     return _guidelines_result(args, external=True)
@@ -314,8 +302,8 @@ def _guidelines_result(args, *, external):
     if task == "report_actions" and not actions:
         return {"error": "report_actions requires a nonempty actions array."}
     if actions is not None and task == "form_autofill":
-        if actions != ["update_form_values"]:
-            return {"error": "form_autofill actions must be [update_form_values]."}
+        if not actions or not set(actions) <= {"update_task", "update_page"}:
+            return {"error": "form_autofill actions must select update_task and/or update_page."}
         bundle = SUBMISSION_PATCH_BUNDLE
     elif actions is not None and task != "report_actions":
         return {"error": "actions is supported only for task=report_actions or form_autofill."}

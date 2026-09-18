@@ -71,9 +71,16 @@ A delivery claims the job with a lease token. The worker:
 9. completes cleanup, notification, and terminal visibility markers.
 
 The five-minute lease is renewed every 60 seconds during blocking work. A job
-attempt has a 24-minute application deadline inside the 30-minute Cloud Tasks
-delivery deadline. Execution control is checked between provider rounds and
+attempt has a nine-minute application deadline, below App Engine automatic
+scaling’s ten-minute request limit. Cloud Tasks retains its 30-minute delivery
+deadline. Report planning also has a ten-minute total lifetime from job creation,
+including queue waits; each attempt uses the earlier deadline. Execution control is checked between provider rounds and
 tool calls and immediately before apply.
+
+Site generation of corrective plans requires AI.CREATE, including retries and
+proposal revisions. The report adapter rechecks that entitlement before provider
+preparation and publication. External corrective proposals and their approved
+execution remain independent of site provider access.
 
 Autofill uses a form-specific revision and active lock, so unrelated target
 settings do not cause false drift. Other mutation adapters use their declared
@@ -99,7 +106,16 @@ due time, and dispatches the continuation with the same delay. These checks do
 not consume the provider retry budget. The existing job leases, publication
 guards and per-action ledger still protect dependent actions and repeated work.
 
-Provider calls inside jobs make at most two SDK attempts; durable retry owns
+Report planning uses generation-owned asynchronous clients behind the synchronous
+workflow interface. Blocking requests are cancelled at execution-control boundaries;
+SDK retries are disabled. At most one transient retry is recorded durably per job
+and repeats the current request with its existing conversation. After 16 retrieval
+rounds or with three minutes remaining, the model must finalize without tools.
+A lost report worker without a validated proposal checkpoint requires manual Retry;
+recovery never restarts discovery. Saved proposals can resume publication within
+the job lifetime.
+
+Other provider-backed jobs make at most two SDK attempts; durable retry owns
 longer outages. Quota failures use 60- and 300-second delays plus positive
 jitter. Other retryable provider failures use 60, 180, and 600 seconds.
 
@@ -136,8 +152,14 @@ authoritative destination route. See
 ## Cancellation, replacement, and retention
 
 Cancellation and report replacement write terminal tombstones, revoke the
-lease, and delete known deterministic tasks. An in-flight request stops at its
-next execution-control boundary. Terminal jobs remain available to the Owner's
+lease, and delete known deterministic tasks. Report list/detail views and Analytics runs expose **Cancel generation**, bound
+to the exact job and operation identity. The creator or an existing Analytics
+administrator can cancel without AI entitlement. Cancelling initial generation
+leaves a cancelled report with **Retry generation**; cancelling revision restores
+the saved proposal. Cleanup and notification delivery are durable recovery steps.
+Proposal publication checks the report snapshot and active job lease in one
+transaction. An in-flight planning request is cancelled at its next
+execution-control boundary. Terminal jobs remain available to the Owner's
 AI Analytics diagnostics until explicit age-based retention cleanup. Cleanup
 preserves active and delivery-pending work.
 
@@ -233,8 +255,9 @@ and Form membership. Existing errors containing only column IDs are translated
 using the pending schema. Retry continues unfinished work and preserves receipts
 for already-converted answers.
 
-`update_form_schema` report actions record the child migration ID before starting
-it. The report runner raises the existing dependency-pending signal and releases
+`update_form_schema` report actions flush their current execution batch and record
+the child migration ID before starting it. The report runner raises the existing
+dependency-pending signal and releases
 its worker while the child runs. Retry checks the pending owner/publication
 receipt, and dependent actions proceed only after publication. Candidates remain
 inside the linked report, whose fingerprint is rechecked by the worker. No bulk
@@ -276,3 +299,14 @@ When adding a deferred adapter:
 6. reauthorize and check target drift immediately before mutation;
 7. define compensation, terminal notification, and browser destination;
 8. add claim, retry, duplicate, cancellation, drift, and recovery tests.
+
+Analytics and exported operation diagnostics reconcile running report telemetry
+against durable terminal job state, replacement attempts, and the ten-minute
+limit. Orphaned attempts appear as interrupted, rather than remaining in-flight.
+
+Report execution uses general batches with a shared working entity map; action
+dependencies do not require intermediate commits. Workspace writes and their report
+results share a transaction and a batch receipt. Recovery reads that receipt before
+replaying a failed group. A completed report with pending document publications is
+still considered unfinished by the execution adapter until those publications have
+been reconciled. See [AI workflows](AI_WORKFLOWS.md) for batching and overwrite semantics.

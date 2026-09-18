@@ -3,16 +3,13 @@
 import re
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
-from lagniappe.core.entities import Entities
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.properties.form_table import validate_ai_table
 from lagniappe.core.tools import dates
 
 from ...debug import ai_debug
 from ...references import normalize_hash_references, render_ai_markdown
 from ..contracts.actions import ALLOWED_ACTIONS
-from ..schedules import validate_task_due_date, validate_task_schedule
+from ..schedules import validate_task_schedule
 from .references import (
     _data_action_reference,
     _data_action_references,
@@ -24,9 +21,6 @@ from .references import (
 )
 
 ENTITY_PAIR_ACTION_REFERENCES = {
-    "add_form_to_page": ("page", ("form",)),
-    "add_page_category": ("page", ("category", "model")),
-    "move_page": ("page", ("category", "model")),
     "move_task": ("task", ("to_page", "page")),
 }
 
@@ -59,12 +53,8 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 
 
 # @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unknown_actions_and_bad_dependencies
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_completed_root_task_targets
-# @tests tests_unit/test_020f_ai_report_completion.py::test_validate_proposal_accepts_add_form_to_page_without_category
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_move_entity_references*
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_rename_and_move_task_target_aliases
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_every_report_file_attachment
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_external_file_summaries
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_treats_action_like_submission_fields_as_content
@@ -72,15 +62,12 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_organize_conversation_validation_preserves_complete_proposal
 # @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
-# @matrix ai-report : action-reference-namespace canonical-target completed-task dependencies explicit-task-identity file-placement file-summary future-date legacy-target move-references no-category page-form proposal rename schema-update submission task-page validation
+# @matrix ai-report : action-reference-namespace completed-task explicit-task-identity file-placement file-summary future-date proposal schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
     proposal,
     allowed_actions=None,
-    allow_empty_submission_updates=False,
-    require_pending_submission_target=False,
     allow_pending_submissions=False,
     required_file_refs=None,
     require_file_summaries=False,
@@ -88,9 +75,7 @@ def validate_proposal(
     user=None,
     preserve_document_markdown=False,
     resolved_reference_details=None,
-    allow_legacy_schema=False,
     prepare_schema_changes=False,
-    validate_table_values=False,
     require_response=False,
 ):
     """Validate the JSON action proposal returned by the organize prompt."""
@@ -149,10 +134,9 @@ def validate_proposal(
             raise exceptions.AIException("Each report action must be an object.")
 
         action_type = action.get("type")
-        legacy_schema = allow_legacy_schema and action_type == "extend_form_schema"
-        if action_type not in ALLOWED_ACTIONS and not legacy_schema:
+        if action_type not in ALLOWED_ACTIONS:
             raise exceptions.AIException(f"Unknown report action: {action_type}")
-        if action_type not in allowed and not legacy_schema:
+        if action_type not in allowed:
             raise exceptions.AIException(
                 f"Report action not allowed for this user: {action_type}"
             )
@@ -167,13 +151,9 @@ def validate_proposal(
                 )
 
         action_label = f"{action_id or index + 1} ({action_type})"
-        if legacy_schema and any(operation.get("op") not in {"add_field", "add_select_option"} for operation in action.get("data", {}).get("operations", [])):
-            raise exceptions.AIException("Legacy schema actions only support additive operations.")
         _validate_action_data_shape(
-            {**action, "type": "update_form_schema"} if legacy_schema else action,
+            action,
             action_label,
-            allow_empty_submission_updates=allow_empty_submission_updates,
-            require_pending_submission_target=require_pending_submission_target,
             allow_pending_submissions=allow_pending_submissions,
             require_file_summary_terms=require_file_summaries,
             user=user,
@@ -286,66 +266,12 @@ def validate_proposal(
 
         try:
             prepare_schema_updates(proposal, user)
+            from ..entity_updates import prepare_entity_updates
+            prepare_entity_updates(proposal, user)
         except exceptions.ValidationError as error:
             raise exceptions.AIException(f"update_form_schema: {error}") from error
 
-    if validate_table_values:
-        validate_existing_table_updates(proposal, user)
     return proposal
-
-
-# @testable true
-# @matrix ai-report form-table : validation internal-link schema-update
-def validate_existing_table_updates(proposal, user):
-    """Preflight existing table patches on detached fields, without saving values."""
-    from lagniappe.core.tools.form_schema_updates import apply_operations
-
-    schemas = {}
-    reassigned_pages = set()
-    for action in proposal.get("actions", []):
-        if action.get("skip"):
-            continue
-        data = action.get("data") or {}
-        if action.get("type") == "add_form_to_page":
-            page_reference = _first_data_reference(data, "page")
-            if isinstance(page_reference, str):
-                reassigned_pages.add(page_reference)
-        if action.get("type") == "update_form_schema" and data.get("form"):
-            form = Entities.fetch_one(data["form"], request=Fetch.direct())
-            if isinstance(form, Entities.FORM) and form.allowed(Action.EDIT, user=user):
-                schemas[form.key] = apply_operations(
-                    form.schema, data["operations"], form.form_type
-                )
-        if action.get("type") != "update_form_values":
-            continue
-        for index, update in enumerate(data.get("updates", []), 1):
-            value = update.get("new_value")
-            if not isinstance(value, dict) or "rows" not in value:
-                continue
-            # New targets and newly assigned forms are checked during execution.
-            if any(_data_action_reference(update, root) for root in ("page", "task")):
-                continue
-            reference = next((update[key] for key in (
-                "page", "page_id", "page_ref", "task", "task_id", "task_ref"
-            ) if update.get(key)), None)
-            if reference is None or reference in reassigned_pages:
-                continue
-            label = f"Action {action.get('id')} data.updates[{index}]"
-            entity = Entities.fetch_one(reference, request=Fetch.direct())
-            if not isinstance(entity, (Entities.PAGE, Entities.TASK)) or not entity.allowed(
-                Action.EDIT, user=user
-            ):
-                raise exceptions.AIException(f"{label}: table target is not editable.")
-            form = entity.form
-            schema_id = update.get("schema_id") or update.get("field_id")
-            schema = schemas.get(form.key, form.schema) if form else []
-            definition = next((field for field in schema if field.get("id") == schema_id), None)
-            if not definition or definition.get("type") != "table":
-                raise exceptions.AIException(f"{label}: {schema_id} is not a table in the target schema.")
-            try:
-                SchemaFields.prepare_ai_field(definition, value, entity, user=user)
-            except (ValueError, TypeError, AttributeError, exceptions.ValidationError) as error:
-                raise exceptions.AIException(f"{label}, field {schema_id}: {error}") from error
 
 
 # @testable false
@@ -356,26 +282,12 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
     rules = {
         "create_page": (("category", {"category"}),),
         "complete_task": (("task", {"task"}),),
-        "set_task_due_date": (("task", {"task"}),),
         "create_task": (
             ("page", {"page"}),
             ("task", {"task"}),
             ("project", {"project"}),
             ("model", {"model"}),
             ("form", {"form"}),
-        ),
-        "add_form_to_page": (
-            ("page", {"page"}),
-            ("category", {"category"}),
-            ("form", {"form"}),
-        ),
-        "add_page_category": (
-            ("page", {"page"}),
-            ("category", {"category"}),
-        ),
-        "move_page": (
-            ("page", {"page"}),
-            ("category", {"category"}),
         ),
         "move_task": (
             ("task", {"task", "task_history"}),
@@ -386,10 +298,6 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         "attach_file": (("entity", {"page", "task", "task_history"}),),
         "append_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
-        "update_form_values": (
-            ("page", {"page"}),
-            ("task", {"task"}),
-        ),
         "suggest_page_deletion": (("page", {"page"}),),
     }
     data = action.get("data") if isinstance(action, dict) else None
@@ -479,8 +387,6 @@ def _clean_action_dependencies(proposal, action, seen_ids, action_label):
 def _validate_action_data_shape(
     action,
     action_label,
-    allow_empty_submission_updates=False,
-    require_pending_submission_target=False,
     allow_pending_submissions=True,
     require_file_summary_terms=False,
     user=None,
@@ -519,14 +425,6 @@ def _validate_action_data_shape(
             raise exceptions.AIException(
                 f"Action {action_label} only accepts task and task_name; use separate submission patches before completion."
             )
-    if action_type == "set_task_due_date":
-        if not _proposal_string(data.get("task")):
-            raise exceptions.AIException(f"Action {action_label} requires an exact data.task reference.")
-        if "due_date" not in data:
-            raise exceptions.AIException(f"Action {action_label} requires data.due_date; use null to clear it.")
-        if set(data) - {"task", "task_name", "due_date"}:
-            raise exceptions.AIException(f"Action {action_label} only accepts task, task_name, and due_date.")
-        validate_task_due_date(data["due_date"])
     entity_pair = ENTITY_PAIR_ACTION_REFERENCES.get(action_type)
     if entity_pair:
         source_root, target_roots = entity_pair
@@ -538,20 +436,11 @@ def _validate_action_data_shape(
         )
     if action_type == "move_file":
         _validate_move_file_action_data(data, action_label)
-    if action_type == "rename_entity":
-        _validate_rename_entity_action_data(data, action_label)
     if action_type == "summarize_file":
         _validate_file_summary_action_data(
             data,
             action_label,
             require_retrieval_terms=require_file_summary_terms,
-        )
-    if action_type == "update_form_values":
-        _validate_submission_update_action_data(
-            data,
-            action_label,
-            allow_empty=allow_empty_submission_updates,
-            require_pending_target=require_pending_submission_target,
         )
 
 
@@ -581,16 +470,6 @@ def _validate_file_summary_action_data(
         raise exceptions.AIException(
             f"Action {action_label} requires exactly two distinct retrieval terms."
         )
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason rename shape errors are exercised through proposal validation tests
-def _validate_rename_entity_action_data(data, action_label):
-    if not _first_data_reference(data, "entity"):
-        raise exceptions.AIException(f"Action {action_label} requires data.entity.")
-    if not _proposal_string(data.get("name")):
-        raise exceptions.AIException(f"Action {action_label} requires data.name.")
 
 
 # @testable false
@@ -896,72 +775,3 @@ def _validate_entity_pair_action_data(
         raise exceptions.AIException(
             f"Action {action_label} requires data.{target_label}."
         )
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason update-shape errors are exercised through proposal validation tests
-def _validate_submission_update_action_data(
-    data,
-    action_label,
-    allow_empty=False,
-    require_pending_target=False,
-):
-    updates = data.get("updates")
-    if not isinstance(updates, list) or not updates:
-        if allow_empty and (updates is None or updates == []):
-            if require_pending_target:
-                page_reference = _first_data_reference(data, "page")
-                task_reference = _first_data_reference(data, "task")
-                if bool(page_reference) == bool(task_reference):
-                    raise exceptions.AIException(
-                        f"Action {action_label} requires exactly one top-level page or "
-                        "task while submission values are pending."
-                    )
-            return
-        raise exceptions.AIException(
-            f"Action {action_label} requires at least one data.updates row."
-        )
-
-    top_level_page = _first_data_reference(data, "page")
-    top_level_task = _first_data_reference(data, "task")
-    if top_level_page and top_level_task:
-        raise exceptions.AIException(
-            f"Action {action_label} may use only one top-level page or task."
-        )
-
-    for index, update in enumerate(updates, 1):
-        row_label = f"data.updates[{index}]"
-        if not isinstance(update, dict):
-            raise exceptions.AIException(
-                f"Action {action_label} {row_label} must be an object."
-            )
-        targets = [
-            update[field]
-            for field in (
-                "page", "page_id", "page_ref", "page_action",
-                "task", "task_id", "task_ref", "task_action",
-            )
-            if field in update
-        ]
-        if len(targets) != 1 or not _proposal_string(targets[0]):
-            raise exceptions.AIException(
-                f"Action {action_label} {row_label} requires exactly one page or task. "
-                "Put the target in every update row; top-level targets do not apply."
-            )
-        if not _proposal_string(update.get("schema_id") or update.get("field_id")):
-            raise exceptions.AIException(
-                f"Action {action_label} {row_label} requires schema_id."
-            )
-        if "new_value" not in update:
-            raise exceptions.AIException(
-                f"Action {action_label} {row_label} requires new_value."
-            )
-        value = update["new_value"]
-        if isinstance(value, dict) and "rows" in value:
-            try:
-                validate_ai_table(value)
-            except ValueError as error:
-                raise exceptions.AIException(
-                    f"Action {action_label} {row_label}: {error}"
-                ) from error

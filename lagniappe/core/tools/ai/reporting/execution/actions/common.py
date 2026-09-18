@@ -6,7 +6,6 @@ from lagniappe.core.entities import Entities
 
 TASK_FORM_TYPE_ERROR = "Create task actions require a task form."
 PAGE_FORM_TYPE_ERROR = "Add form to page actions require a page form."
-SUBMISSION_UPDATE_ROWS_ERROR = "Submission update action requires at least one update."
 
 
 # @testable false
@@ -100,7 +99,6 @@ def _safe_entity_relation(entity, name):
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/entities.py::_add_form_to_page
 # @reason mismatched form type behavior is covered through public report runner tests
 def _require_form_type(form, expected_type, message):
     if form is None:

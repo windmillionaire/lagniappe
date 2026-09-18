@@ -360,7 +360,7 @@ const Core = class {
   async init() {}
 };
 const REPORT_FORM_SELECTOR =
-  "[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='revise-report-form']";
+  "[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
 `,
 );
 source = source.replace(
@@ -377,14 +377,12 @@ const createTarget = (role) => ({
 });
 const targets = {
   run: createTarget("run-report-form"),
-  undo: createTarget("undo-report-form"),
   revise: createTarget("revise-report-form"),
 };
 const formsRoot = {
   querySelector(selector) {
     if (selector.includes(",")) return targets.run;
     if (selector.includes("run-report-form")) return targets.run;
-    if (selector.includes("undo-report-form")) return targets.undo;
     if (selector.includes("revise-report-form")) return targets.revise;
     return null;
   },
@@ -398,7 +396,7 @@ const formsRoot = {
   const report = new context.Report(formsRoot);
   const initializing = report.init();
   for (let index = 0; index < 4; index += 1) await Promise.resolve();
-  if (formLoads !== 1 || events.length !== 3) {
+  if (formLoads !== 1 || events.length !== 2) {
     throw new Error(`Report forms did not start concurrently: ${events}`);
   }
   for (const resolve of pending.values()) resolve();

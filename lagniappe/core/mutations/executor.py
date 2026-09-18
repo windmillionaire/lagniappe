@@ -53,6 +53,7 @@ def _prepare_write(effect):
 # @matrix permissions : invalidation-retry
 # @matrix permissions cache : cache-miss source-intent programmatic-save
 # @matrix permissions cache : new-form content-only no-queue
+# @matrix mutations : repeated-save property-mask guards
 def consume_mutation_intents(plan):
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
@@ -61,6 +62,8 @@ def consume_mutation_intents(plan):
             intent for intent in current if id(intent) not in captured_ids
         ]
     for effect in plan.effects:
+        if effect.effect is MutationEffectType.UPSERT:
+            effect.entity._form_additional_guards = []
         if effect.effect is MutationEffectType.UPSERT and effect.property_mask is None:
             # Form publication distinguishes restriction changes from content
             # changes; both invalidate submissions, but only restrictions queue work.

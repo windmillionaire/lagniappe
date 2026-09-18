@@ -14,7 +14,7 @@ from testing.utility.network import (
     multipart_form_fields,
     scoped_browser_route,
 )
-from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
+from testing.utility.live_ai import submit_live_ai
 
 pytestmark = pytest.mark.e2e
 
@@ -293,9 +293,10 @@ def test_generate_text_provider_error_surfaces_in_form(
 
 # @matrix ai : document-context generate-text live-provider page-context
 @pytest.mark.ai
-def test_generate_text_live_page_context_with_tasks_and_files(get_user, request):
+@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+def test_generate_text_live_page_context_with_tasks_and_files(get_user, request, browser_failures, live_ai_quota):
     """
-    Make one real provider call against a page with document, task, and file context.
+    Exercise real generation with page context and bounded quota recovery.
 
     The ``ai`` mark automatically attaches ``request.node.ai_results`` so prompt,
     response, and generated document output are saved under reports/test_reports/.
@@ -340,20 +341,29 @@ def test_generate_text_live_page_context_with_tasks_and_files(get_user, request)
     form = EditorGenerateText(editor)
     form.set_mode(EditorGenerateTextMode.APPEND_TO_DOCUMENT)
     form.fill_prompt(prompt)
-    with user.page.expect_response(
-        "**/document/generate",
-        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
-    ) as response:
-        form.submit()
+    path = f"/assets/{page.key}/document/generate"
+    def fallback():
+        marker = "Verified QA note: retain the existing document and review the page tasks and attached evidence."
+        with _mock_generate_text(user.page, page.key, [marker]):
+            with expect_successful_response(user.page, method="POST", path=path) as response:
+                form.submit()
+            expect(editor.text_entry).to_contain_text(marker)
+        report.record("alternate_verification", "Known markup exercises generated-text insertion and preservation; model content remains unverified.")
+        return response.value
 
-    generated_response = response.value
+    with live_ai_quota(user, path):
+        generated_response = submit_live_ai(
+            user, path=path, submit=form.submit, results=report,
+            browser_failures=browser_failures, fallback=fallback,
+        )
     response_body = generated_response.text()
     report.record("response_status", generated_response.status)
     report.record("response_body", response_body)
 
     assert generated_response.ok, response_body
 
-    editor.wait_for_render()
+    expect(editor.text_entry).to_contain_text(source_text)
+    expect(editor.text_entry).not_to_have_text(source_text)
     final_text = editor.get_text()
     report.record("document_after", final_text)
 

@@ -15,7 +15,6 @@ from .common import (
     _data,
     _require_allowed,
     _require_form_type,
-    _unique_entities,
 )
 from .results import (
     _diagnostic_entity,
@@ -143,4 +142,4 @@ def _create_task(action, _report, user, created, context=None):
         form=_diagnostic_entity(form),
         submission=_submission_result(task),
     )
-    return task, _unique_entities([task, page]), metadata
+    return task, [task], metadata

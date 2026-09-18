@@ -550,8 +550,8 @@ def test_schema_preparation_assigns_missing_ids_without_collisions(scope):
             "form": scope.form.urlsafe_key, "operations": scope.operations,
             "scope_fingerprint": preview["scope_fingerprint"], "conversions": candidates,
         }},
-        {"id": "schema_change_1", "type": "rename_entity", "data": {
-            "entity": scope.tasks[0].urlsafe_key, "name": "After migration",
+        {"id": "schema_change_1", "type": "complete_task", "data": {
+            "task": scope.tasks[0].urlsafe_key,
         }},
         {"id": "schema_change_1_2", "type": "complete_task", "data": {
             "task": scope.tasks[1].urlsafe_key,

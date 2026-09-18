@@ -6,6 +6,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.tools.filters import compile_filter_contract
+from lagniappe.core.tools.entity_patches import prepare_patch
 from lagniappe.core.tools.tasks.ordering import sort_tasks
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.web.auth import permission
@@ -117,6 +118,33 @@ def update_model(key, task_key, **kwargs):
     model_task.save()
 
     return responses.new_model_task(model_task)
+
+
+# @testable true
+# @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_task_arrows_preserve_open_edits_and_saved_order
+# @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_order_rejects_invalid_membership_and_readonly_users
+# @matrix model-tasks : ordering persistence permission-gates parent-membership
+@projects.route("<key>/reorder-models", methods=["PUT"])
+@permission(Resource.PROJECT, Action.EDIT)
+def reorder_models(key, **kwargs):
+    project = kwargs["entity"]
+    data = request.get_json(silent=True)
+    references = data.get("model_tasks") if isinstance(data, dict) else None
+    if not isinstance(references, list) or not all(isinstance(ref, str) for ref in references):
+        return responses.error("Model ordering must be a list of model task references.")
+    models = {model.urlsafe_key: model for model in project.model_tasks}
+    if any(ref not in models for ref in references):
+        return responses.error("Model task not found in this Project.")
+    try:
+        prepared = prepare_patch(project, {"model_tasks": [models[ref] for ref in references]}, current_user)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+    changed = [model for model in prepared.writes[1:] if model.order != models[model.urlsafe_key].order]
+    if changed:
+        Entities.save(*changed)
+    return responses.entity_response(
+        responses.json_response({"model_tasks": references}), project, *changed,
+    )
 
 
 # @testable true

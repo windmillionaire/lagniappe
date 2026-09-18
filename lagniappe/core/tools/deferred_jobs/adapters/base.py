@@ -33,6 +33,8 @@ class DeferredJobAdapter:
     success_message = "Work is ready."
     failure_prefix = "Work failed."
     notification_policy = "pending"
+    max_lifetime_seconds = None
+    resume_preparation = True
 
     # @testable infrastructure
     def authorization(self, spec):

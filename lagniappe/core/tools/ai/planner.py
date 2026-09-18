@@ -138,6 +138,9 @@ def report_prompt(report, user, feedback=None):
     prompt.add_context(
         "user_instructions", report.instructions or "Organize the uploaded files."
     )
+    if report.db.get("correction"):
+        prompt.add_context("corrected_execution", report.db["correction"])
+        prompt.add_instructions("This is a corrective plan. Read current workspace state. Propose only additional changes needed; do not replay successful creations. Automatic deletion is unsupported; identify manual cleanup. Documents are append-only; existing text must be edited manually.")
     prompt.add_context("personal_page", personal_page_reference(user))
     prompt.add_instructions(PERSONAL_PAGE_GUIDELINES)
     prompt.add_context(
@@ -211,7 +214,10 @@ or unreadable artifacts visible with issues; never silently discard a file.
 
 # @testable true
 # @tests tests_unit/test_020b_ai_planner.py::test_generate_report_validates_answers_actions_and_file_usage
-# @matrix ai-report : generate validation file-placement repair
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @matrix ai-report : generate validation file-placement
+# @matrix ai-report : ask live-provider usable-answer
 def generate_report(prompt):
     """Validate final output in the same provider conversation, including repairs."""
 
@@ -240,7 +246,6 @@ def generate_report(prompt):
             user=prompt.user,
             validate_reference_kinds=True,
             prepare_schema_changes=True,
-            validate_table_values=True,
         )
         return {"proposal": proposal, "file_usage": usage}
 

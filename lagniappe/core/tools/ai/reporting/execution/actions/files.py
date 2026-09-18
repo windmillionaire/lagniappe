@@ -15,7 +15,6 @@ from .references import (
 from .common import (
     _data,
     _require_allowed,
-    _unique_entities,
 )
 from .results import (
     _entity_result,
@@ -24,10 +23,10 @@ from .results import (
 
 
 # @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
 # @matrix ai-report : deterministic-run move-file readable-file-fallback
-# @matrix files : deterministic-run manual-cleanup move-file readable-file-fallback undo
+# @matrix files : deterministic-run manual-cleanup move-file readable-file-fallback
 def _move_file(action, _report, user, created):
     data = _data(action)
     source = _resolve_file_endpoint(data, created, endpoint="source")
@@ -62,7 +61,7 @@ def _move_file(action, _report, user, created):
         },
         "file_summary": _file_summary_result(file),
     }
-    return file, _unique_entities([file, source, target]), metadata
+    return file, [file], metadata
 
 
 # @testable true
@@ -93,7 +92,8 @@ def _attach_file(action, report, user, created):
     if file.has_references:
         _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to move this file.")
     _add_file_to_endpoint(file, target)
-    return file, [file, target], {"file_summary": _file_summary_result(file)}
+    writes = [file, target] if isinstance(target, Entities.TASK_HISTORY) else [file]
+    return file, writes, {"file_summary": _file_summary_result(file), "target": _entity_result(target)}
 
 
 # @testable true

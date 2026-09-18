@@ -33,7 +33,10 @@
 
 {% macro model_task_list(project) %}
   <ul data-widget="ModelTaskList"
+      lp-prefetch
+      loaded
       data-route="{{ url_for('projects.view', key=project.urlsafe_key) }}"
+      data-reorder-route="{{ url_for('projects.reorder_models', key=project.urlsafe_key) }}"
       data-title="Model Tasks"
       data-visible="true"
       data-persistent="true"
@@ -42,6 +45,8 @@
       class="{{ styles.list.container }}">
     {% for t in project.model_tasks|sort(attribute='order') if t.allowed(Action.VIEW, current_user) %}{{ model_task(t) }}{% endfor %}
   </ul>
+  <p data-role="model-order-error" role="alert" data-visible="false"
+     class="text-delete-default text-sm mt-2"></p>
 {% endmacro %}
 
 {% macro card_controls(t) %}
@@ -66,6 +71,7 @@
       data-nav="{{ t.hash }}"
       data-kind="model-task"
       data-title="{{ t.name }}"
+      data-order="{{ t.order or 0 }}"
       class="group">
     <div lp-nav
          data-nav="{{ t.hash }}"
@@ -76,8 +82,19 @@
         <span data-role="title">{{ t.name }}</span>
         {{ card_controls(t) }}
       </div>
-      <nav data-nav="{{ t.hash }}">
-        {% if t.allowed(Action.EDIT) %}{{ controls.delete() }}{% endif %}
+      <nav data-nav="{{ t.hash }}" class="flex shrink-0 items-center gap-1">
+        {% if t.allowed(Action.EDIT) %}
+          {% for direction in ['down', 'up'] %}
+            <button type="button" data-role="move-model" data-direction="{{ direction }}"
+                    data-kind="project"
+                    aria-label="Move {{ t.name }} {{ direction }}"
+                    title="Move {{ direction }}"
+                    class="{{ styles.builder.settings.toggle.container }} disabled:opacity-50">
+              {{ render_icon(direction, styles.builder.settings.toggle.icon) }}
+            </button>
+          {% endfor %}
+          {{ controls.delete() }}
+        {% endif %}
       </nav>
     </div>
     <form lp-update

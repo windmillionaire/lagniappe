@@ -87,8 +87,7 @@ class Instructions(DBProperty):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
-# @matrix activity notes notifications : body html-stripping
+# @matrix activity notes : body html-stripping
 class Body(DBProperty):
     """Plain-text body for notes and notifications."""
 

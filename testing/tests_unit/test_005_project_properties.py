@@ -17,7 +17,6 @@ Out of scope for this file: ``public_id``, ``ai_generated``, ``save`` /
 """
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from google.cloud import datastore
@@ -31,6 +30,26 @@ from lagniappe.core.entities.project import Project
 from lagniappe.core.mutations import plan_mutation
 
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
+
+
+# @pair model-task:reference-links
+def test_model_task_reference_retains_project_without_loading_relations():
+    project = Project(testing=True)
+    project._key = datastore.Key("models", "link-project", project="test")
+    project.db.update({"type": "project", "name": "Link Project", "hash": "link-project"})
+    model = ModelTask(testing=True)
+    model._key = datastore.Key("models", "link-model", parent=project.key)
+    model.db.update({"type": "model", "name": "Link Model", "hash": "link-model", "project": project.key})
+
+    details = model.reference_details
+    assert details["id"] == model.urlsafe_key
+    assert details["parent"] == {"id": project.urlsafe_key, "kind": "project"}
+    assert not model.properties.project.is_set
+
+    model.project = project
+    assert model.reference_details["parent"]["id"] == project.urlsafe_key
+    assert model.reference_details["parent"]["name"] == "Link Project"
+    assert project.reference_details["id"] == project.urlsafe_key
 
 
 # @matrix project : ai-value cache column description filter-value html-stripping
@@ -419,14 +438,15 @@ def test_project_update_sets_identity_and_description():
 def test_model_task_entity_create_update_order_and_save_relations():
     """ModelTask.create/update/order/save remain focused on model-task relations."""
     project = Project(testing=True)
-    project._key = "prj005b"
+    project._key = datastore.Key("models", "prj005b", project="test")
     project.db.update({"hash": "prj005b", "name": "Project"})
+    project.properties.model_tasks._value = []
     form = TestEntities.get("FORM", {"name": "Task Form", "hash": "frm005b"})
     created_db = {}
 
     with patch(
         "lagniappe.core.entities.entity.database_utility.create_key",
-        return_value=SimpleNamespace(parent=project.key),
+        return_value=datastore.Key("models", "model005b", parent=project.key),
     ):
         with patch("lagniappe.core.entities.entity.database_get.entity", return_value=None):
             with patch(

@@ -61,6 +61,7 @@ annotated_source_roots:
   - config/remote_mcp.py
   - testing/utility/runtime_outbound_http.py
   - testing/utility/hosted_deferred_jobs.py
+  - testing/utility/live_ai.py
   - run.py
   - runner/context.py
   - runner/console.py

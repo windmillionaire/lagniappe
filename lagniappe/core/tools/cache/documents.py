@@ -55,10 +55,10 @@ def publish_document_checkpoint(sync_id, *, seed):
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
 # @matrix editor sync : document append cache-recovery offline-replay
-def current_document_state(sync_id, *, seed):
-    """Called under the write lock with a fresh durable seed, not a cached Page."""
+def current_document_state(sync_id, *, seed, reconcile=True):
+    """Read under the write lock; only reconcile a freshly loaded durable seed."""
     state = _read_document_state(sync_id, seed)
-    if state.get("fingerprint") != seed.get("fingerprint") and seed.get("ydoc"):
+    if reconcile and state.get("fingerprint") != seed.get("fingerprint") and seed.get("ydoc"):
         state = publish_document_checkpoint(sync_id, seed=seed)
     return state
 

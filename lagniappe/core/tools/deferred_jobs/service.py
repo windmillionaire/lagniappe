@@ -470,7 +470,9 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             job.key,
             {
                 "status": status.value,
-                "dispatch_state": status.value,
+                "dispatch_state": "delivery_pending",
+                "delivery": json.dumps({"cleanup": False, "notification": False}),
+                "error": json.dumps({"message": message, "retryable": False}),
                 "lease_token": None,
                 "lease_expires": None,
                 "next_attempt_at": None,
@@ -494,11 +496,8 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         if task_identity:
             task_queue.delete_task(task_identity)
         task_queue.delete_task(task_queue.task_name(_feedback_task_id(job)))
-        adapter = self.adapter(job.job_type)
-        context = self._context(job)
         try:
-            context = adapter.load(context)
-            adapter.cleanup(context, terminal=True)
+            self._finish_stale_delivery(job)
         except Exception as error:
             exceptions.capture(
                 error,
@@ -510,11 +509,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                 },
                 level="warning",
             )
-        notification = getattr(job, "notification", None)
-        if notification is not None:
-            notification.body = message
-            notification.pending = False
-        Entities.save(*[entity for entity in (job, notification) if entity])
         return True
 
     # @testable false

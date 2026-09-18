@@ -33,7 +33,11 @@ through SDK retries, tool turns, and a structured-final call. File summary
 prepasses and later durable attempts are separate generations and may
 resolve different saved settings.
 
-Foreground calls use the normal SDK retry profile. Deferred jobs use at most
+Report planning owns an asynchronous client and event loop for each generation,
+uses no SDK retries, and permits one durable transient retry of the current request.
+Retrieval stops at 16 rounds or three minutes remaining in the bounded attempt.
+
+Foreground calls use the normal SDK retry profile. Other deferred jobs use at most
 two SDK attempts so durable job backoff owns longer outages. See
 [BACKEND_JOBS.md](BACKEND_JOBS.md).
 
@@ -114,7 +118,7 @@ field types and action rules to selected action types; filtered and full calls
 remain different arguments in the normal exact-call cache.
 
 For an existing-submission patch, the same tool accepts `task="form_autofill"`
-with `actions=["update_form_values"]` and actual `field_types`; this returns
+with `actions=["update_task"]` or `["update_page"]` and actual `field_types`; this returns
 patch-specific guidance in both native and external flows, without the blank-only
 Autofill/file-reading workflow. `get_schema(include_values=true)` joins current
 AI-readable values to exact schema ids in one read. Neither option adds a tool

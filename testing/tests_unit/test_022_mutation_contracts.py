@@ -129,6 +129,30 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
     assert source._permission_sources_changed is False
 
 
+# @source lagniappe/core/mutations/executor.py::consume_mutation_intents
+# @matrix mutations : repeated-save property-mask guards
+@pytest.mark.parametrize("mask", [None, ("modified",)])
+def test_successful_save_consumes_guards_before_reusing_entity(monkeypatch, mask):
+    source = TestEntities.get("PROJECT", {"hash": "guarded-working-entity"})
+    source._form_additional_guards = [(source.key, {"name": "Original"})]
+    attempted = []
+    def save(_writes, **kwargs):
+        attempted.append(kwargs.get("guards", []))
+        if len(attempted) == 1:
+            raise RuntimeError("Commit rejected")
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save)
+    monkeypatch.setattr(mutation_executor, "execute_post_commit", lambda _plan: ([], []))
+    with pytest.raises(RuntimeError, match="Commit rejected"):
+        execute_mutation(plan_root(source, property_mask=mask))
+    assert source._form_additional_guards
+    execute_mutation(plan_root(source, property_mask=mask))
+    assert source._form_additional_guards == []
+    source.name = "Another edit"
+    execute_mutation(plan_root(source, property_mask=mask))
+    assert attempted[0] == attempted[1] == [(source.key, {"name": "Original"})]
+    assert attempted[2] == []
+
+
 # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind):

@@ -2,6 +2,7 @@ import re
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
+import pytest
 from playwright.sync_api import expect
 
 from lagniappe import CONFIG
@@ -17,7 +18,7 @@ from testing.elements import (
 )
 from testing.utility.network import scoped_browser_route, expect_successful_response
 from testing.utility.reconnect import expect_reconnect_refresh
-from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
+from testing.utility.live_ai import run_hosted_autofill
 
 
 def _create_page(user, page, create_form):
@@ -221,7 +222,8 @@ def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_us
 # @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
 # @matrix polling : operation owner progress timing
 # @template categories/tools.html::create_page
-def test_create_page_autofill_is_deferred(get_user, monkeypatch):
+@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_ai_job_quota):
     user = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(user)
     user.go(category)
@@ -256,9 +258,13 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch):
     )
 
     job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
-    if CONFIG.hosted_e2e_runner:
-        completed, attempts = dispatch_hosted_deferred_job(user.page, job)
-        assert completed.status == DeferredJobStatus.SUCCEEDED.value, attempts
+    if CONFIG.hosted_e2e_runner or live_ai_job_quota:
+        def verify_submission():
+            assert expected_text in job.parameters["user_context"]
+            results.record("independent_workspace_verification", {"instruction": job.parameters["user_context"], "expected": expected_text})
+            return {"input-textab12": expected_text}
+        completed = run_hosted_autofill(user, job, results=results, verify_submission=verify_submission)
+        assert completed.status == DeferredJobStatus.SUCCEEDED.value
 
         user.page.reload()
         page_form = user.page.locator("[data-widget='PageInfo']")

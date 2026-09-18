@@ -87,7 +87,7 @@ export default [
 				preventAssignment: true,
 				values: {
 					"process.env.NODE_ENV": JSON.stringify("production"),
-					__VERSION__: settings.VERSION,
+					__VERSION__: packageMetadata.version,
 				},
 			}),
 			...sentryPlugins("lagniappe-frontend", {}),
@@ -122,7 +122,7 @@ export default [
 				preventAssignment: true,
 				values: {
 					"process.env.NODE_ENV": JSON.stringify("production"),
-					__VERSION__: settings.VERSION,
+					__VERSION__: packageMetadata.version,
 				},
 			}),
 			...sentryPlugins("lagniappe-frontend", {}),
@@ -178,7 +178,7 @@ export default [
 				values: {
 					"process.env.NODE_ENV": JSON.stringify("production"),
 					__BUILD_ID__: JSON.stringify(buildId),
-					__VERSION__: settings.VERSION,
+					__VERSION__: packageMetadata.version,
 				},
 			}),
 			buildStyles(),
@@ -200,7 +200,7 @@ export default [
 				final: true,
 				buildId,
 				mode: "production",
-				version: settings.VERSION,
+				version: packageMetadata.version,
 				extraArtifacts: [
 					"lagniappe/web/start/styles/icons.py",
 					"lagniappe/web/start/styles/fonts.py",

@@ -41,8 +41,8 @@ def merge_documents(*snapshots):
 
 
 # @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_and_undo_preserve_content
-# @matrix ai-report editor : document append retry undo conflict
+# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
+# @matrix ai-report editor : document append retry conflict
 def document_structure(snapshot):
     # @testable false
     # @covered-by lagniappe/core/tools/document_crdt.py::document_structure
@@ -232,7 +232,7 @@ def _append_nodes(parent, nodes, marks=None):
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
 # @tests tests_unit/test_010b_document_append.py::test_append_converts_supported_markdown_blocks
-# @matrix editor sync : document append idempotency offline-replay browser-interop undo
+# @matrix editor sync : document append idempotency offline-replay browser-interop
 # @matrix editor markdown : document append formatting
 def append_fragment(snapshot, html, operation_id, *, html_after=None):
     """Return a new snapshot and a durable retry receipt; never reset old IDs."""
@@ -241,9 +241,8 @@ def append_fragment(snapshot, html, operation_id, *, html_after=None):
     if operation_id in receipts:
         return snapshot, receipts[operation_id]
     root = doc["default"]
-    start = len(root.children)
     _append_nodes(root, BeautifulSoup(html, "html.parser").contents)
-    receipt = {"state": "applied", "start": start, "count": len(root.children) - start}
+    receipt = {"state": "applied"}
     if html_after is not None:
         receipt["signature"] = {
             "html": hashlib.md5(html_after.strip().encode()).hexdigest()
@@ -255,20 +254,3 @@ def append_fragment(snapshot, html, operation_id, *, html_after=None):
         }
     receipts[operation_id] = receipt
     return encode_document(doc), receipt
-
-
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_undo_emits_tombstones_without_resetting_existing_nodes
-# @matrix editor sync : document append undo tombstones browser-interop offline-replay
-def undo_fragment(snapshot, operation_id):
-    """Delete this append's unchanged tail; caller must fence against edits."""
-    doc = load_document(snapshot)
-    receipt = doc["lagniappeReports"].get(operation_id)
-    if not receipt or receipt["state"] == "undone":
-        return snapshot
-    start, count = int(receipt["start"]), int(receipt["count"])
-    if len(doc["default"].children) != start + count:
-        raise ValueError("Document changed after the append; undo stopped.")
-    del doc["default"].children[start : start + count]
-    doc["lagniappeReports"][operation_id] = {**receipt, "state": "undone"}
-    return encode_document(doc)

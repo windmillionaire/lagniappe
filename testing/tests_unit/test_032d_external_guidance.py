@@ -187,7 +187,7 @@ def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
     assert "preserve unresolved conflicts for review" in external_form["guidelines"]
     assert "assigned evidence clearly supersedes it" in external_form["guidelines"]
     assert (
-        "do not copy unrelated existing values into data.updates"
+        "do not copy unrelated existing values into data.changes.submission"
         in external_form["guidelines"]
     )
     assert "exact schema field ids" in external_form["guidelines"]
@@ -198,7 +198,7 @@ def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
 def test_submission_patch_guidance_is_shared_and_omits_autofill_workflow():
     args = {
         "task": "form_autofill",
-        "actions": ["update_form_values"],
+        "actions": ["update_task"],
         "field_types": ["input", "textarea"],
     }
     actor = SimpleNamespace()

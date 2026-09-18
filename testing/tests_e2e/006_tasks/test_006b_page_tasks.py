@@ -267,6 +267,8 @@ def test_create_page_task_with_project(get_user):
 
 
 # @matrix tasks : attach-form badge create model-task-link
+# @template pages/tasks.html::task_details
+# @template pages/tasks.html::action_buttons
 def test_create_page_task_with_model_task(get_user):
     user = get_user(Users.OWNER)
 
@@ -293,8 +295,30 @@ def test_create_page_task_with_model_task(get_user):
 
     task.key = _submit_create_task_form(user, page, task, create_form)
 
-    Badges.PROJECT.visible(task.element, project)
-    Badges.MODEL_TASK.visible(task.element, model_beta)
+    project_badge = Badges.PROJECT.visible(task.element, project)
+    model_badge = Badges.MODEL_TASK.visible(task.element, model_beta)
+    project_path = f"/projects/{project.key}"
+    model_path = f"{project_path}/status/{model_beta.key}?completed=false"
+    expect(project_badge.locator("a")).to_have_attribute("href", project_path)
+    expect(model_badge.locator("a")).to_have_attribute("href", model_path)
+
+    page.reload()
+    expect(project_badge.locator("a")).to_have_attribute("href", project_path)
+    expect(model_badge.locator("a")).to_have_attribute("href", model_path)
+    for badge, path in ((project_badge, project_path), (model_badge, model_path)):
+        with user.page.expect_navigation() as navigation:
+            badge.locator("a").click()
+        assert navigation.value.ok
+        expect(user.page).to_have_url(re.compile(re.escape(path) + "$"))
+        user.go(page).wait_for_interaction_readiness()
+
+    settings = task.settings_form
+    model_link = settings.locator('[data-role="project-select"] a')
+    expect(model_link).to_have_attribute("href", re.compile(re.escape(model_path) + "$"))
+    with user.page.expect_navigation() as navigation:
+        model_link.click()
+    assert navigation.value.ok
+    expect(user.page).to_have_url(re.compile(re.escape(model_path) + "$"))
 
 
 # @matrix tasks : attach-form create model-task-link retained-draft

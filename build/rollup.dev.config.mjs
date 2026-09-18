@@ -3,7 +3,6 @@ import json from "@rollup/plugin-json";
 import resolve from "@rollup/plugin-node-resolve";
 import replace from "@rollup/plugin-replace";
 import tailwindcss from "@tailwindcss/postcss";
-import * as yaml from "js-yaml";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
 import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
@@ -36,9 +35,7 @@ const mainInputs = {
 	),
 };
 const devVersion = new Date().toISOString();
-const settings = yaml.load(
-	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
-);
+const packageMetadata = JSON.parse(readFileSync("./package.json", "utf8"));
 const buildId = process.env.LAGNIAPPE_FRONTEND_BUILD_ID || generateBuildId();
 
 export default [
@@ -153,7 +150,7 @@ export default [
 				final: true,
 				buildId,
 				mode: "development",
-				version: settings.VERSION,
+				version: packageMetadata.version,
 				extraArtifacts: [
 					"lagniappe/web/start/styles/icons.py",
 					"lagniappe/web/start/styles/fonts.py",

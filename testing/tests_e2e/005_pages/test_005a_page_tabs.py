@@ -1,4 +1,6 @@
 import re
+from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 
 import pytest
@@ -18,7 +20,9 @@ from testing.elements import (
     Table,
     Tabs,
 )
-from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
+from testing.utility.live_ai import (
+    LIVE_AI_RESPONSE_TIMEOUT_MS, ProviderQuotaBlocked, is_quota_message, run_live_ai,
+)
 from testing.utility.network import expect_successful_response
 from testing.utility.test_file import TestFile as UploadTestFile
 
@@ -386,27 +390,60 @@ def test_add_multiple_files_to_page_without_existing_file_select(get_user, reque
     }
     assert set(created_keys) == {"sample_notes", "sample_document"}
 
+    files = [Entities.fetch_one(key, request=Fetch.direct()) for key in created_keys.values()]
+    retried = False
+
+    def check_summaries(number):
+        nonlocal retried
+        if number > 1:
+            from lagniappe.core.tools import ai
+            from lagniappe.core.tools.ai.core import ai_model
+            ai_model.initialize()
+            # Retry summary generation for the already uploaded identities.
+            # Reposting the upload would duplicate files after a partial success.
+            ai.summarize_report_input_files(SimpleNamespace(input_files=files), search=True, raise_quota=False)
+            Entities.save(*files)
+            retried = True
+        quota_errors = []
+        for file in files:
+            summary = file.properties.summarize
+            if summary.error and is_quota_message(summary.error):
+                quota_errors.append(summary.error)
+            else:
+                assert file.summary and summary.complete and not summary.error, dict(file.db)
+        if quota_errors:
+            raise ProviderQuotaBlocked(quota_errors[0])
+        return False
+
+    def fallback():
+        for file in files:
+            saved = Entities.fetch_one(file.key, request=Fetch.direct())
+            assert saved.name in created_keys and saved.page.key == page.entity.key
+            assert saved.file.get() == Path(UploadTestFile(saved.filename).path).read_bytes()
+            if not saved.properties.summarize.complete:
+                assert is_quota_message(saved.properties.summarize.error)
+        report.record("alternate_verification", "Original uploaded bytes and identities are intact; quota-blocked summaries remain incomplete and are not fabricated.")
+        return True
+
+    quota_fallback = run_live_ai(check_summaries, results=report, fallback=fallback)
+    if retried:
+        page = user.go(page)
+        files_tab = page.files_tab
     file_list = files_tab.locator("[data-widget='BaseList']")
     summaries = []
     for expected_name, file_key in created_keys.items():
         item = file_list.locator(f"li[data-key='{file_key}']")
         expect(item).to_be_visible()
-        expect(item.locator("p")).not_to_be_empty()
-
         file_entity = Entities.fetch_one(file_key, request=Fetch.direct())
         assert file_entity.name == expected_name
-        assert file_entity.summary
-        assert file_entity.properties.summarize.enabled is True
-        assert file_entity.properties.summarize.complete is True
-        assert file_entity.properties.summarize.search is True
-        assert file_entity.properties.summarize.error is None
-        summaries.append(
-            {
-                "file": file_entity.filename,
-                "summary": file_entity.summary,
-                "search": file_entity.properties.summarize.search,
-            }
-        )
+        processing = file_entity.properties.summarize
+        if not (quota_fallback and is_quota_message(processing.error)):
+            expect(item.locator("p")).not_to_be_empty()
+            assert file_entity.summary
+            assert processing.enabled is True and processing.complete is True
+            assert processing.search is True and processing.error is None
+        summaries.append({"file": file_entity.filename, "summary": file_entity.summary,
+                          "search": processing.search, "error": processing.error})
 
     report.record("persisted_file_summaries", summaries)
 

@@ -251,6 +251,10 @@ def verify_active_configuration(name, account, project, *, announce=True):
         )
 
     os.environ["CLOUDSDK_ACTIVE_CONFIG_NAME"] = name
+    # Another checkout may rewrite the same named gcloud configuration while
+    # a long-running deployment is between provider calls. Pin this process.
+    os.environ["CLOUDSDK_CORE_ACCOUNT"] = account
+    os.environ["CLOUDSDK_CORE_PROJECT"] = project
     os.environ["GOOGLE_CLOUD_PROJECT"] = project
     os.environ["GCLOUD_PROJECT"] = project
     os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] = project
@@ -309,6 +313,10 @@ def config_gcloud(*, announce=True):
     expected_account = config.get("ACCOUNT")
     expected_project = config.get("PROJECT")
 
+    # Re-activation must inspect the saved configuration without overrides
+    # inherited from an earlier activation in this process or its parent.
+    os.environ.pop("CLOUDSDK_CORE_ACCOUNT", None)
+    os.environ.pop("CLOUDSDK_CORE_PROJECT", None)
     active = get_active_configuration()
     check_account_authentication(expected_account)
 

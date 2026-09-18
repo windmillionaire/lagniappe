@@ -4,12 +4,12 @@ import { withTransition } from "../shared/utilities";
 import Core from "./base/core";
 
 const REPORT_FORM_SELECTOR =
-	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='recovery-undo-report-form'], [data-role='revise-report-form']";
+	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
 
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_preserves_completed_work
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
@@ -51,7 +51,6 @@ export default class Report extends Core {
 				if (this._destroyed) return null;
 				await Promise.all([
 					this._initRunReportForm(BaseForm),
-					this._initUndoReportForm(BaseForm),
 					this._initReviseReportForm(BaseForm),
 				]);
 				if (this._destroyed) return null;
@@ -118,26 +117,6 @@ export default class Report extends Core {
 		});
 		await this.RunReportForm.init();
 		target.addEventListener("submit", this._runReport.bind(this));
-	}
-
-	async _initUndoReportForm(BaseForm) {
-		const target = this.elt.querySelector(
-			"[data-role='undo-report-form'], [data-role='recovery-undo-report-form']",
-		);
-		if (!target) return;
-
-		this.UndoReportForm = new BaseForm({
-			target,
-			view: this,
-			messages: {
-				submit: target.dataset.submit || "Undo Report",
-				submitting: target.dataset.submitting || "Undoing Report",
-				submitted: target.dataset.submitted || "Report Undone",
-			},
-			icon: "undo",
-		});
-		await this.UndoReportForm.init();
-		target.addEventListener("submit", this._undoReport.bind(this));
 	}
 
 	async _initReviseReportForm(BaseForm) {
@@ -215,29 +194,6 @@ export default class Report extends Core {
 			this._showDeferredReportStatus("running", "Saving report changes...");
 			return;
 		}
-		window.setTimeout(() => window.location.reload(), 250);
-	}
-
-	async _undoReport(event) {
-		event.preventDefault();
-		event.stopPropagation();
-		if (this._undoingReport) return;
-
-		this._undoingReport = true;
-		const form = event.currentTarget;
-		const data = new FormData(form);
-		this.UndoReportForm?.submitting();
-
-		const response = await request.post(form.action, data);
-		this._undoingReport = false;
-		if (!response?.ok) {
-			this.UndoReportForm?.showError(
-				response?.error || "This report could not be undone.",
-			);
-			return;
-		}
-
-		this.UndoReportForm?.success();
 		window.setTimeout(() => window.location.reload(), 250);
 	}
 
@@ -346,7 +302,6 @@ export default class Report extends Core {
 			this._receiveDeferredOperation,
 		);
 		this.RunReportForm?.destroy?.();
-		this.UndoReportForm?.destroy?.();
 		this.ReviseReportForm?.destroy?.();
 		super.destroy();
 	}

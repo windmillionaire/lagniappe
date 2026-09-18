@@ -54,15 +54,18 @@ const tel = (telValue) => {
 /**
  * @testable true
  * @tests tests_js/test_023_entity_name_formatting.py::test_group_name_uses_canonical_user_index_url
+ * @tests tests_js/test_023_entity_name_formatting.py::test_model_task_link_opens_in_progress_filter
+ * @pair model-task:reference-links
  * @pair user-groups:query-route
  */
 const url = (data) => {
 	let url = null;
 	if (data.kind === "model" && data.parent) {
 		url = new URL(
-			`${ROUTES[data.parent.kind]}/${data.parent.id}`,
+			`projects/${data.parent.id}/status/${data.id}`,
 			window.location.origin,
 		);
+		url.searchParams.set("completed", "false");
 	} else if (data.kind === "task" && data.parent) {
 		url = new URL(
 			`${ROUTES[data.parent.kind]}/${data.parent.id}`,

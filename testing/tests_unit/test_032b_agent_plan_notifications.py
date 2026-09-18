@@ -10,6 +10,7 @@ import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
+from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.database import agent_api as plan_database
 from lagniappe.core.tools.database import get as database_get
@@ -77,7 +78,7 @@ def test_publication_notification_commits_with_plan_and_survives_replay(publicat
     now = datetime.now(timezone.utc)
     row = DatastoreEntity(key=store.key("activity", "plan", parent=user.key))
     row.update({
-        "type": "report", "origin": "api", "format_version": 1,
+        "type": "report", "origin": "api", "format_version": REPORT_FORMAT_VERSION,
         "user": user.key, "parent": user.key,
         "agent_manifest": json.dumps({"source": "remote_mcp"}),
         "process": json.dumps({"report": {"status": "draft"}}),
@@ -90,7 +91,10 @@ def test_publication_notification_commits_with_plan_and_survives_replay(publicat
         "phase": "submit", "operation_id": "submit-aaaaaaaaaaaaaaaa",
         "claim_token": "a" * 32, "expires_at": now + timedelta(minutes=5),
     })
-    store.put(claim)
+    assert plan_database.claim_plan_operation(
+        row.key, phase=claim["phase"], operation_id=claim["operation_id"],
+        claim_token=claim["claim_token"], now=now,
+    ) == plan_database.PLAN_OPERATION_CLAIMED
     expected = dict(row)
     published = deepcopy(row)
     published["process"] = json.dumps({
@@ -102,6 +106,13 @@ def test_publication_notification_commits_with_plan_and_survives_replay(publicat
         "claim_token": claim["claim_token"], "expected_report": expected,
         "writes": [(report, None)], "notification_user": user, "now": now,
     }
+
+    for obsolete_version in (None, REPORT_FORMAT_VERSION - 1, REPORT_FORMAT_VERSION + 1):
+        report.db["format_version"] = obsolete_version
+        with pytest.raises(ValueError, match="creator"):
+            plan_database.commit_plan_operation(row.key, **options)
+        assert store.get(aggregate_key)["ordinary_count"] == 0
+    report.db["format_version"] = REPORT_FORMAT_VERSION
 
     with pytest.raises(ValueError, match="creator"):
         plan_database.commit_plan_operation(
@@ -159,7 +170,7 @@ def test_publication_delivery_retries_cache_and_email_without_recreating_dismiss
     now = datetime.now(timezone.utc)
     user = user_row("creator", now)
     report_row = DatastoreEntity(key=store.key("activity", "plan"))
-    report_row.update({"type": "report", "format_version": 1, "name": "Published plan"})
+    report_row.update({"type": "report", "format_version": REPORT_FORMAT_VERSION, "name": "Published plan"})
     report = Entities.REPORT(report_row)
     key = notification_database.ordinary_notification_key(user, "published-plan")
     row = notification_database.prepare_ordinary_notification(
@@ -206,3 +217,23 @@ def test_publication_delivery_retries_cache_and_email_without_recreating_dismiss
     assert len(projected) == 2
     assert len(scheduled) == previous_tasks
     assert store.get(key) is None
+
+
+# @source lagniappe/core/tools/database/agent_api.py::claim_plan_operation
+# @pair agent-api:claim
+@pytest.mark.parametrize("phase", ["create", "finalize", "submit"])
+@pytest.mark.parametrize("version", [None, REPORT_FORMAT_VERSION - 1, REPORT_FORMAT_VERSION + 1])
+def test_unavailable_report_formats_cannot_claim_plan_operations(publication_store, phase, version):
+    store = publication_store
+    row = DatastoreEntity(key=store.key("activity", "unavailable-plan"))
+    row.update({
+        "type": "report", "origin": "api", "format_version": version,
+        "process": json.dumps({"report": {"status": "draft"}}),
+    })
+    store.put(row)
+    before = deepcopy(store.rows)
+    assert plan_database.claim_plan_operation(
+        row.key, phase=phase, operation_id="batch-aaaaaaaaaaaaaaaa",
+        claim_token="a" * 32,
+    ) == plan_database.PLAN_OPERATION_INVALID
+    assert store.rows == before

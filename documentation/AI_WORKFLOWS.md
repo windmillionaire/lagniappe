@@ -47,16 +47,27 @@ A proposal contains summary, optional answer_markdown, confidence, issues, and
 actions. Markdown is sanitized by the server. `output_kind` is derived from
 actions: empty means answer, otherwise proposal. Answers complete immediately;
 proposals become ready for browser review. Revisions may cross that boundary
-until execution begins. Approval, execution ledgers, skip controls, and undo use
+until execution begins. Approval, execution ledgers, and skip controls use
 the existing deterministic report runner.
+
+Generation and revision can be cancelled from report list/detail views or AI
+Analytics. The control is bound to the exact operation; it requires the creator
+or Analytics administrator, without a provider entitlement. Initial cancellation
+retains a visible cancelled report with **Retry generation**. Revision cancellation
+restores the saved response. Retry creates a fresh job and planning lifetime.
+
+Report planning has a ten-minute lifetime, including queue waits, and each worker
+attempt is limited to nine minutes. Provider calls are cancellable, with one
+transient retry in the current conversation. Interrupted jobs without a validated
+proposal require manual Retry. See [Backend Jobs](BACKEND_JOBS.md) for recovery.
 
 ## Upgrade boundary
 
 Pause intake and drain deferred report/email jobs before upgrading. Do not
 migrate saved reports, proposals, or old job checkpoints. New reports carry
-format_version=1. Leftover old or structurally incompatible reports render
+format_version=2. Leftover old or structurally incompatible reports render
 `this plan is no longer available` in lists and details, with the normal Delete
-control and no polling, execution, revision, or undo. Deleting a report preserves
+control and no polling, execution, or revision. Deleting a report preserves
 files that have workspace references.
 
 Email routing uses the code-defined `ai` alias. Installation settings retain
@@ -64,7 +75,7 @@ operator choices and provider credentials; workflow changes neither migrate
 their email envelope nor require rewriting generated settings. Runtime ignores
 saved workflow policy metadata and uses code-defined routing and limits.
 There are no old route, MCP starter, or worker aliases. External contract version
-9 requires file_usage and rejects old submission contracts. Upgrade the app and
+10 requires file_usage and rejects old submission contracts. Upgrade the app and
 MCP service together.
 
 ## Autofill
@@ -120,9 +131,35 @@ partial-extraction note.
 
 ## Reviewed report execution
 
+The cohesive-update preparation service is
+`lagniappe/core/tools/entity_patches.py::prepare_patch`. It accepts resolved
+entity references and returns detached writes, complete before/after values,
+and removed answers. Omitted fields are preserved. A Form
+reassignment requires every target answer field explicitly; an unchanged Form
+accepts selected answer patches. Completed tasks and pending Form migrations
+are rejected. Project ordering must contain each existing model task once.
+The writes use the ordinary mutation executor, including its Form migration and
+completion-transition checks. Preparation itself does not save.
+`reporting/entity_updates.py` resolves exact references and successful earlier
+action outputs through this service. Its review snapshot binds action content
+and Form definitions; execution rejects missing dependencies, changed proposals,
+and changed Form schemas before returning any writes. The report
+runner must persist those writes together with its execution receipt.
+The native planner, REST/MCP submission, browser review, and forward runner use
+this preparation layer. Earlier Form/model creations are previewed without
+writing workspace records. Failed or skipped dependencies prevent dependent
+updates, including paired description cleanup. Read `view="edit"` for complete
+descriptions, exact answer IDs, revisions, and ordered Project models. Task
+edit reads are paginated and share schemas within each response.
+
+Document scope remains append-only for AI/MCP. Inline changes, replacement, and
+removal of existing document content belong in the editor. The cohesive-update
+upgrade does not add `update_document` or new block-editing/replay machinery;
+plans requiring existing text to change must identify that manual editor step.
+
 The homepage Plans & Reports panel has independent Active, Executed, and Answers
 filters. Active includes unfinished proposals and pending requests (including
-failed, revising, and undone states); Executed includes completed proposals.
+failed and revising states); Executed includes completed proposals.
 Saved answers appear under Answers. Counts include hidden reports. The browser
 remembers each user's choices, initially Active and Answers, and reveals a newly
 created report's category. Unavailable old reports remain visible under Active
@@ -147,7 +184,7 @@ and returns `deleted`, `skipped`, and `failed` key lists. The server rechecks
 creator ownership and current completion, then guards each deletion against a
 changed report or active API claim. Only the confirmed keys are considered;
 later completions are retained. Cleanup shares the individual report-delete
-path: report-only uploads and undo history are removed, while workspace changes
+path: unreferenced report-only uploads are removed, while workspace changes
 and attached files remain. Missing, changed, busy, or ineligible reports are
 skipped; individual failures do not stop the remaining deletions.
 
@@ -156,28 +193,36 @@ attach, schema, and submission actions. `reporting/execution/` owns deterministi
 application; the model is not called during execution.
 
 Because execution is provider-free, viewing, skipping actions, running,
-retrying, undoing, and deleting a saved report do not require `User.ai_access`.
+retrying and deleting a saved report do not require `User.ai_access`.
 They remain creator-bound browser operations, and every action rechecks current
 resource permissions. Generating or revising an internal report still calls the
 configured provider and therefore retains its Ask or Create entitlement.
 
-Supported action families include:
+Supported action families include creation, cohesive `update_task`,
+`update_model_task`, `update_project`, `update_page`, schema migration,
+completion, document append, file attachment/movement, and explicit manual
+cleanup suggestions. Superseded atomic update contracts and Undo are removed.
 
-- creating Pages, Tasks, Forms, Projects, and Categories;
-- attaching or moving Files;
-- moving Pages or Tasks;
-- adding a Category or Form to a Page;
-- renaming one exact entity;
-- updating exact existing submission fields;
-- completing one exact existing Task with `complete_task`;
-- adding fields or missing options to a Form schema; and
-- recording a manual Page-deletion suggestion instead of deleting it directly.
+Each action records its idempotency key, before-state, expected committed state,
+attempt count, and lifecycle status. Retry validates completed work and
+reconciles interrupted writes. Changes are atomic per action, not across a plan.
 
-Each action records its idempotency key, before-state, preallocated outputs,
-expected committed state, attempt count, and lifecycle status. Retry validates
-the completed prefix and reconciles an interrupted action. Undo restores prior
-parents, schemas, submissions, and relationships and deletes only report-created
-entities/links. Interrupted undo resumes from its own checkpoints.
+After execution begins, **Create corrective plan** creates a new linked report.
+The source must belong to the creator and have stopped; ambiguous writes and active Form
+migrations must be reconciled first. The new report contains a bounded snapshot
+of proposal/outcomes and reads current state to propose additional changes.
+All embedded snapshot properties are excluded from Datastore indexes, including
+long answer HTML, task descriptions, and execution notes.
+Draft corrections leave source retry available. Browser approval checks the
+source snapshot and atomically supersedes its execution; subsequent retries of
+the source are rejected. External `start_plan`/REST creation accepts
+`revises_plan_id` without provider access. Browser corrections require Create
+access and create a site-origin report even when the original came from MCP.
+The correction controls, generation/revision routes, and queued jobs enforce this
+entitlement, including retries and revisions of the corrective proposal. Ordinary
+answer revisions still require Ask access. Shared
+evidence survives deletion while another linked report still references it.
+Automatic record deletion is unsupported; identify manual cleanup explicitly.
 
 Task actions with completion evidence may reuse exactly one matching editable
 Task; the newest event stays on the live Task and earlier dates become history.
@@ -196,15 +241,7 @@ retry safety. Put field updates before completion and make it depend on them.
 The existing scheduling policy is unchanged: near-term tasks reopen immediately
 so the next occurrence appears on the homepage; other production completions
 retain their midnight reopening job. Nonproduction still reopens immediately.
-Already-completed Tasks are unchanged. Undo reopens through the normal archive
-boundary and restores compatible prior active answers and
-attachments. The original completion remains in history, including for an
-occurrence that recurrence already reopened. Later edits or incompatible form
-changes stop the undo. Repeating an undo after an interrupted save recognizes
-the restored active state without deleting or duplicating the completion.
-
-Undoing an imported event on a reused Task would rewrite a recorded completion;
-that correction remains unavailable and fails before changing answer assets.
+Already-completed Tasks are unchanged. Corrections preserve recorded completion history.
 New imported completion events save their answers before capturing the original
 answers and Form generation. Unknown generated field IDs are rejected before
 existing values are reset. Normal Task AI reads use flat current values and the
@@ -247,3 +284,47 @@ an action ID, including when approving an older saved proposal. Existing IDs and
 conversion values are preserved. Schema-impact review uses the original action
 positions, matching the skip controls, so opening an ID-less report does not
 mutate it or require regeneration.
+
+Report execution prepares actions in proposal order against one working entity
+map. Earlier creations and edits are immediately available to dependent actions
+without an intermediate save or reload. Each entity's final state is written once;
+shared owner touches and property masks are merged by the mutation planner.
+Model creation loads the existing Project order before appending, while new
+Projects start with an empty list. Category Form registration resolves any stored
+but unloaded Form members before extending the list, preserving sibling Forms.
+Groups commit at 50 actions or approximately 4 MiB of prepared root data. These
+are general size boundaries, not boundaries between entity types or dependencies.
+Form migrations flush prepared work before starting their asynchronous child job.
+
+The report and its action results commit with the workspace writes in a guarded
+transaction. A batch receipt distinguishes rejected writes from a lost commit
+response. Retry resumes uncommitted groups; it does not replay successful creates
+or reject completed work because it was subsequently edited. A preparation failure
+discards that group's staged writes; recoverable skips rebuild only the uncommitted
+group. There is no automatic per-action save/reload retry loop.
+
+Approved patches have ordinary editor overwrite semantics. They apply the selected
+fields to the working entity and retain omitted fields. Execution checks permissions,
+values and Form definitions, but does not compare every field with the review's
+before-state or guard whole linked Pages, Projects, and model tasks. Shared Form
+migration/generation and completion fences still protect answer interpretation.
+Transaction guards are consumed after a successful save, including guards on
+Reports and Tasks reused in memory.
+
+Public plan reads remove internal review snapshots before resolving references.
+Temporary preview entity IDs never enter workspace lookups; public proposals
+retain the original action references for round trips.
+
+Document HTML and CRDT snapshots upload to isolated Storage objects during
+preparation and populate the working entity's assets dictionary. Document references,
+named pre-edit history, and action receipts join the batch. An existing Page receives
+an assets/history/modified mask unless another action also edits its fields. One
+pre-edit document version is retained per Page per batch. Collaborative state and
+asset references are checked before committing; unsaved collaborative edits still
+require reconciliation. A durable pending-publication list lets recovery finish
+collaborative publication after a committed batch without appending text again.
+
+For a report completed with skipped updates, use Create corrective plan to propose
+only the remaining changes against the current workspace. The post-execution control
+explains that this creates a separate linked report requiring review and approval;
+unexecuted proposals retain the Revise Plan control.

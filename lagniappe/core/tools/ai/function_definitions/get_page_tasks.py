@@ -24,6 +24,7 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
     parameters={
         "type": "object",
         "properties": {
+            "view": {"type": "string", "enum": ["default", "edit"]},
             "id": {
                 "type": "string",
                 "description": "The page hash token from prompt context or search results.",
@@ -60,11 +61,12 @@ def execute_get_page_tasks(args, user):
     if not page.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
 
-    if args.get("compact"):
+    if args.get("compact") or args.get("view") == "edit":
         listing = compact_task_list(
             page,
             user,
             include_completed=True,
+            view=args.get("view"),
             limit=args.get("limit", DEFAULT_TASK_LIMIT),
             cursor=args.get("cursor"),
         )

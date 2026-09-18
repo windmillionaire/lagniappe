@@ -1,5 +1,6 @@
 from ..properties import project
 from ..exceptions import PropertyError
+from ..tools.database.get import urlsafe_key
 from .entity import Entity
 
 
@@ -9,6 +10,21 @@ from .entity import Entity
 # @matrix model-task permissions project : attached-form create ordering relation-save restricted-access update
 class ModelTask(Entity):
     entity_kind = "model"
+
+    # @testable true
+    # @tests tests_unit/test_005_project_properties.py::test_model_task_reference_retains_project_without_loading_relations
+    # @pair model-task:reference-links
+    @property
+    def reference_details(self):
+        details = super().reference_details
+        project = self.properties.project
+        if project.key:
+            details["parent"] = (
+                project.value.reference_details
+                if project.is_set and project.value
+                else {"id": urlsafe_key(project.key), "kind": "project"}
+            )
+        return details
 
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_model_task_required_reports_unloaded_project_relation

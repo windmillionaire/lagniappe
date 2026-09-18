@@ -238,3 +238,12 @@ File ownership updates use explicit empty `MutationIntent.depends_on` tuples
 for reverse links and owner touches. Those key-list writes do not depend on the
 File's computed fields; the File's `requires` calculation depends on its owner.
 Other patch/touch intents retain their default dependency on the emitting entity.
+
+AI report batches reuse working entities and submit their final states together.
+Additional transaction guards are consumed after every successful upsert, including
+masked writes; they must not remain attached to an in-memory entity and reject its
+next save. Report document appends stage Storage uploads and merge masked document
+writes and named history into that same commit before publishing collaborative state.
+The working map also adopts staged relationship patches and keeps their targets
+bound to the same entity instance. Related Form registration refreshes its attached
+entity cache immediately, so later edits in a batch retain earlier registrations.

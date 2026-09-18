@@ -105,7 +105,7 @@ def _data_action_references(value, key=None):
     # Form field ids are user-defined and may legitimately be ``action`` or end
     # in ``_action``. Submission values are content, never proposal references,
     # so keep that namespace opaque to the dependency walk.
-    if key == "submission":
+    if key in {"submission", "description", "name"}:
         return
 
     if isinstance(value, dict):

@@ -2085,56 +2085,41 @@ def test_remote_schema_rejects_unreviewed_formats(format_name, monkeypatch) -> N
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 # @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 # @source mcp/src/lagniappe_mcp/schema.py::validate_value
-@pytest.mark.parametrize("action_type,value,valid", [
-    ("update_form_values", "Keep these notes", True),
-    ("set_task_due_date", None, True),
-    ("set_task_due_date", "2026-09-12", True),
-    ("set_task_due_date", "2028-02-29", True),
-    ("set_task_due_date", "2026-02-29", False),
-    ("set_task_due_date", "2026-13-01", False),
-    ("set_task_due_date", "2026-9-12", False),
-    ("set_task_due_date", "20260912", False),
-    ("set_task_due_date", "2026-09-12T00:00:00Z", False),
-    ("set_task_due_date", "tomorrow", False),
-    ("set_task_due_date", "", False),
-    ("set_task_due_date", False, False),
+@pytest.mark.parametrize("field,value,valid", [
+    ("submission", {"textarea-notes": "Keep these notes"}, True),
+    ("due_date", None, True),
+    ("due_date", "2026-09-12", True),
+    ("due_date", "2028-02-29", True),
+    ("due_date", "2026-02-29", False),
+    ("due_date", "2026-13-01", False),
+    ("due_date", "2026-9-12", False),
+    ("due_date", "20260912", False),
+    ("due_date", "2026-09-12T00:00:00Z", False),
+    ("due_date", "tomorrow", False),
+    ("due_date", "", False),
+    ("due_date", False, False),
 ])
-def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(
-    action_type, value, valid,
-) -> None:
-    # The full contract includes due dates even when the proposal only patches
-    # a field. Previously its format keyword blocked every Organize submission.
-    definitions = {}
-    for name, data in {
-        "set_task_due_date": {
-            "task": {"type": "string"},
-            "due_date": {"type": ["string", "null"], "format": "date"},
-        },
-        "update_form_values": {
-            "updates": {
-                "type": "array", "minItems": 1,
-                "items": {
-                    "type": "object", "additionalProperties": False,
-                    "properties": {
-                        "task": {"type": "string"},
-                        "schema_id": {"type": "string"}, "new_value": {},
+def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(field, value, valid) -> None:
+    definitions = {"update_task": {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "type": {"type": "string", "const": "update_task"},
+            "data": {
+                "type": "object", "required": ["entity", "changes"], "additionalProperties": False,
+                "properties": {
+                    "entity": {"type": "string"},
+                    "changes": {
+                        "type": "object", "minProperties": 1, "additionalProperties": False,
+                        "properties": {
+                            "due_date": {"type": ["string", "null"], "format": "date"},
+                            "submission": {"type": "object"},
+                        },
                     },
-                    "required": ["task", "schema_id", "new_value"],
                 },
             },
         },
-    }.items():
-        definitions[name] = {
-            "type": "object", "additionalProperties": False,
-            "properties": {
-                "type": {"type": "string", "const": name},
-                "data": {
-                    "type": "object", "properties": data,
-                    "required": list(data), "additionalProperties": False,
-                },
-            },
-            "required": ["type", "data"],
-        }
+        "required": ["type", "data"],
+    }}
 
     class DateContractREST(_WorkflowREST):
         async def request_json(self, method, target, *, body=None, **kwargs):
@@ -2158,11 +2143,10 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(
             return result, request_id
 
     task = "hash:abcdefghijkl"
-    data = ({"task": task, "due_date": value} if action_type == "set_task_due_date"
-            else {"updates": [{"task": task, "schema_id": "textarea-notes", "new_value": value}]})
+    data = {"entity": task, "changes": {field: value}}
     proposal = {
         "summary": "Update the existing task", "confidence": 1,
-        "actions": [{"type": action_type, "data": data}],
+        "actions": [{"type": "update_task", "data": data}],
     }
     body = {"contract_version": CONTRACT_VERSION_MAX, "proposal": proposal, "file_usage": []}
 

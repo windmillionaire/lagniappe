@@ -594,6 +594,8 @@ def _plan_payload(report, *, include_proposal=True):
             payload["execution"] = external_api.public_execution_receipt(
                 report, g.agent_api_user
             )
+        payload["correction"] = report.db.get("correction")
+        payload["superseded_by"] = report.db.get("superseded_by")
         payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
     if report.output_kind == "proposal":
         payload["action_summary"] = summarize_actions(report.proposal, maximum=external_api.MAX_PROPOSAL_ACTIONS)
@@ -1802,7 +1804,7 @@ def create_plan():
         *PLAN_START_RATE_LIMIT,
     )
     data = _json_body()
-    unsupported_fields = sorted(set(data) - {"instructions", "name"})
+    unsupported_fields = sorted(set(data) - {"instructions", "name", "revises_plan_id"})
     if unsupported_fields:
         raise APIProblem(
             "unsupported_field",
@@ -1811,7 +1813,7 @@ def create_plan():
             details={
                 "path": "$",
                 "fields": unsupported_fields,
-                "allowed_fields": ["instructions", "name"],
+                "allowed_fields": ["instructions", "name", "revises_plan_id"],
             },
         )
     instructions = data.get("instructions", "")
@@ -1836,6 +1838,7 @@ def create_plan():
         instructions=instructions,
         name=name,
         remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)),
+        revises_plan_id=data.get("revises_plan_id"),
     )
     return _plan_payload(report), 201
 

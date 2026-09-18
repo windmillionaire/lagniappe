@@ -277,12 +277,14 @@ def test_related_forms_add_skips_primary_form_and_registers_relation():
     assert forms.value == []
     assert category.db.get("forms", []) == []
     assert category.mutation_intents == []
+    assert related.key not in category.related_entities
 
     forms.add(related)
     forms.add(related)
 
     assert forms.value == [related]
     assert category.db["forms"] == [related.key]
+    assert category.related_entities[related.key] is related
     assert len(category.mutation_intents) == 1
     assert category.mutation_intents[0].intent is MutationIntentType.TOUCH
     assert category.mutation_intents[0].entity is related

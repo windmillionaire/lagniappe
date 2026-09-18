@@ -30,7 +30,7 @@ def report_snapshot(report):
 # @covered-by lagniappe/core/tools/ai/external_operations.py::save_plan_if_idle
 # @covered-by lagniappe/core/tools/ai/external_operations.py::delete_plan_if_idle
 # @reason shared mutation execution is exercised through save and delete races
-def _commit_plan_if_idle(report, expected_report, plan):
+def _commit_plan_if_idle(report, expected_report, plan, *, active_job=None):
     writes = prepare_durable_writes(plan)
     deletes = [
         effect.entity
@@ -38,11 +38,13 @@ def _commit_plan_if_idle(report, expected_report, plan):
         if effect.phase is MutationPhase.DURABLE
         and effect.effect is MutationEffectType.DELETE
     ]
+    guard = {"active_job": active_job} if active_job is not None else {}
     outcome = agent_api_store.commit_plan_mutation_if_idle(
         report.key,
         expected_report=expected_report,
         writes=[(effect.entity, effect.property_mask) for effect in writes],
         deletes=deletes,
+        **guard,
     )
     if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
         return outcome
@@ -68,13 +70,13 @@ def _commit_plan_if_idle(report, expected_report, plan):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_browser_plan_save_and_delete_use_idle_transaction
 # @matrix agent-api ai-report : browser-review cas save
-def save_plan_if_idle(report, expected_report, *entities):
+def save_plan_if_idle(report, expected_report, *entities, active_job=None):
     """Save a browser change without racing an external API Plan operation."""
     plan = plan_mutation(
         MutationOperation.SAVE,
         *(entities or (report,)),
     )
-    return _commit_plan_if_idle(report, expected_report, plan)
+    return _commit_plan_if_idle(report, expected_report, plan, active_job=active_job)
 
 
 # @testable true

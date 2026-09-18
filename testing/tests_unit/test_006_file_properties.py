@@ -999,27 +999,6 @@ def test_unattached_upload_is_private_to_its_uploader_and_admin():
     assert file.allowed(Action.EDIT, user=admin)
 
 
-# @matrix ai-report files : undo parent-key
-@pytest.mark.unit
-def test_report_undo_distinguishes_primary_page_link_from_task_ancestry():
-    from lagniappe.core.tools.ai.reporting.execution.actions import compensation
-
-    page = TestEntities.get("PAGE", {"hash": "report-undo-page"})
-    task = TestEntities.get("TASK", {"hash": "report-undo-task"}, page=page)
-    file = TestEntities.get("FILE", {"hash": "report-undo-file"})
-    file.task = task
-    report = SimpleNamespace(input_files=[file])
-
-    # Undo of an earlier direct Page attachment must preserve a later Task move.
-    assert not compensation._remove_file_page_reference(file, page)
-    assert file.owner is task and file.page is None and file.task_page is page
-
-    # Undo of Page creation preserves its report input across both delete cascades.
-    assert compensation._detach_report_files_before_delete(page, {}, report) == [file]
-    file.normalize_owner()
-    assert file.page is None and file.task is None and file.task_page is None and not file.searchable
-
-
 # @matrix files tasks : task-history parent-key restrictions
 # @pair tasks:single-batch
 @pytest.mark.unit

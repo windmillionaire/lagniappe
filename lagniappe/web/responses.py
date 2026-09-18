@@ -722,12 +722,12 @@ def tool_report(report):
     if not report.available:
         return render_template("tools/report.html", report=report), 200
     render_operation_statuses((report,), current_user)
-    from lagniappe.core.tools.ai.reporting.schema_updates import report_impact, migration_started
+    from lagniappe.core.tools.ai.reporting.schema_updates import report_impact, migration_pending
 
     page = max(1, request.args.get("schema_page", 1, type=int))
     return render_template("tools/report.html", report=report,
                            schema_impacts=report_impact(report, current_user, page=page),
-                           migration_started=migration_started(report)), 200
+                           migration_pending=migration_pending(report)), 200
 
 
 # @testable true

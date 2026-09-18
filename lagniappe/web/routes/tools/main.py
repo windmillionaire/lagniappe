@@ -7,6 +7,8 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import (
     AI,
+    Action,
+    Resource,
     DeferredJobSpec,
     DeferredJobType,
     Fetch,
@@ -23,9 +25,71 @@ from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
-from lagniappe.web.auth import ai_access, logged_in
+from lagniappe.web.auth import ai_access, logged_in, require_ai_access
 
 from . import tools
+
+
+# @testable true
+# @matrix ai-report : cancellation revision reload
+@tools.route("/operations/<job_key>/cancel", methods=["POST"])
+@logged_in
+def cancel_generation(job_key):
+    job = Entities.fetch_one(job_key, request=Fetch.direct())
+    if not isinstance(job, Entities.DEFERRED_JOB) or job.job_type != DeferredJobType.REPORT_AI.value:
+        abort(404)
+    if job.actor.key != current_user.key and not current_user.has_permission(Resource.SITE, Action.EDIT):
+        abort(403)
+    if request.form.get("operation-id") != job.idempotency_key:
+        abort(409, description="This generation control is stale. Refresh before trying again.")
+    reference = (job.inputs or {}).get("report") or {}
+    report = Entities.fetch_one(reference.get("id"), request=Fetch.direct())
+    if not isinstance(report, Entities.REPORT):
+        abort(404)
+    if not report.available:
+        abort(410, description="this plan is no longer available")
+    if (report.deferred_job or {}).get("key") != job.urlsafe_key:
+        abort(409, description="This report operation has changed.")
+    DeferredJobs.cancel(job)
+    if job.actor.key != current_user.key:
+        return redirect(url_for("analytics.index"))
+    return redirect(url_for("tools.report", key=report.urlsafe_key))
+
+
+# @testable true
+# @matrix ai-report : cancellation revision reload
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access
+# @pair ai-access:provider-boundary
+@tools.route("/reports/<key>/retry-generation", methods=["POST"])
+@ai_access(AI.ASK)
+def retry_generation(key):
+    report = _get_report(key)
+    if report is None:
+        abort(404)
+    if report.db.get("correction"):
+        require_ai_access(AI.CREATE)
+    if report.origin == "api" or report.status not in {"failed", "cancelled"} or report.proposal or report.deferred_job:
+        abort(409, description="This report cannot restart generation.")
+    snapshot = external_operations.report_snapshot(report)
+    report.properties.process.retry(None)
+    outcome = external_operations.save_plan_if_idle(report, snapshot)
+    if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
+        abort(409, description="This report changed. Refresh before trying again.")
+    try:
+        DeferredJobs.start(DeferredJobSpec(
+            job_type=DeferredJobType.REPORT_AI,
+            actor=current_user._get_current_object(),
+            idempotency_key=request.form.get("operation-id"),
+            inputs={"report": report},
+            notification_body="Creating AI report...",
+            notification_target=report,
+            client={"source_widget": "CreateToolReport", "destination": "tools:ToolReportList"},
+        ))
+    except Exception:
+        report.properties.process.fail("Generation could not be started. Retry to start again.")
+        Entities.save(report, current_user)
+        raise
+    return redirect(url_for("tools.report", key=report.urlsafe_key))
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
@@ -108,6 +172,7 @@ def _preview_report_files():
 # @reason explain modal shares the real organize prompt assembly
 def _explain_ai_prompt():
     report = SimpleNamespace(
+        db={},
         origin="web",
         instructions=request.form.get("instructions"),
         input_files=_preview_report_files(),
@@ -272,7 +337,7 @@ def _external_plan_mutation_error(outcome):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
@@ -290,19 +355,22 @@ def report(key):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_preserves_completed_work
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_run_start_error_does_not_save_stale_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery
 # @matrix ai-report : detail deterministic-run entitlement-independent idempotent recovery repeat-run retry
 # @matrix ai-report : browser-review stale-proposal
 # @matrix agent-api ai-report : browser-review error-isolation report-execution
+# @matrix ai-report : failed-prefix failure reload
 @tools.route("/reports/<key>/run", methods=["POST"])
 @logged_in
 def run_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
+    if report.db.get("superseded_by"):
+        return responses.error("This execution was superseded by an approved correction.")
     result = report.result if isinstance(report.result, dict) else {}
     retryable = (
         report.status == "failed"
@@ -361,6 +429,12 @@ def run_report(key):
         return responses.error(str(error))
 
     try:
+        from lagniappe.core.tools.ai.reporting.corrections import approve_correction
+        approve_correction(report, current_user)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+
+    try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
                 job_type=DeferredJobType.REPORT_EXECUTION,
@@ -401,76 +475,26 @@ def run_report(key):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_undo_delete_first_fence_stops_before_compensation
-# @matrix ai-report : deterministic-undo entitlement-independent failed-prefix recovery undo
-# @matrix agent-api ai-report : browser-review cas compensation delete undo
-@tools.route("/reports/<key>/undo", methods=["POST"])
-@logged_in
-def undo_report(key):
-    report = _get_report(key)
-    if not report:
-        return responses.not_found("Report not found")
-    result = report.result if isinstance(report.result, dict) else {}
-    has_completed_actions = any(
-        action.get("status") == "complete" for action in result.get("actions") or []
-    )
-    if (
-        report.status not in {"complete", "failed", "undo_failed"}
-        or not has_completed_actions
-    ):
-        return responses.error(
-            "Only complete or partially completed reports can be undone."
-        )
-
-    save = None
-    if report.origin == "api":
-        expected_report = external_operations.report_snapshot(report)
-
-        # @testable false
-        # @covered-by lagniappe/web/routes/tools/main.py::undo_report
-        # @reason the callback delegates undo checkpoints to the guarded route workflow
-        def save(current):
-            nonlocal expected_report
-            outcome = external_operations.save_plan_if_idle(
-                current,
-                expected_report,
-            )
-            if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
-                raise exceptions.ValidationError(
-                    "This plan changed while undo was in progress. Refresh it "
-                    "before trying again."
-                )
-            expected_report = external_operations.report_snapshot(current)
-
-    try:
-        ai.undo_report(report, current_user, save=save)
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-    Entities.touch(current_user)
-    if not request.headers.get("X-Lagniappe-Request"):
-        return redirect(url_for("tools.report", key=report.urlsafe_key))
-    return responses.tool_report(report)
-
-
-# @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access
+# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_browser_correction_requires_create_access
 # @matrix ai-report : async completed-state feedback live-submit organize ready-state revision route-guard
 # @pair agent-api:provider-free-revision
+# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
-    if report.origin == "api":
-        return responses.error(
-            "Externally submitted plans cannot be revised with the AI provider."
-        )
-    can_revise = bool(report.proposal) and (report.status == "ready" or (report.output_kind == "answer" and report.status == "complete")) and not report.result
+    correcting = bool(report.result)
+    if correcting or report.db.get("correction"):
+        require_ai_access(AI.CREATE)
+    if report.origin == "api" and not correcting:
+        return responses.error("Revise an unexecuted external plan through its originating assistant.")
+    can_revise = bool(report.proposal) and not report.pending and (report.status in {"complete", "failed"} if correcting else report.status == "ready" or (report.output_kind == "answer" and report.status == "complete"))
     if not can_revise:
         return responses.error("Only reports with saved responses can be revised.")
 
@@ -478,8 +502,18 @@ def revise_report(key):
     if not feedback:
         return responses.error("Add feedback before revising the report.")
 
-    report.properties.process.revise()
-    Entities.save(report, current_user)
+    if correcting:
+        from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction
+        source = report
+        report = Entities.REPORT.create({"user": current_user._get_current_object(), "name": "Correction: " + source.name, "instructions": feedback, "origin": "web"})
+        try:
+            link_correction(report, source, current_user)
+            save_correction(report, source)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+    else:
+        report.properties.process.revise()
+        Entities.save(report, current_user)
 
     try:
         job, notification = DeferredJobs.start(
@@ -488,7 +522,7 @@ def revise_report(key):
                 actor=current_user._get_current_object(),
                 idempotency_key=request.form.get("operation-id"),
                 inputs={"report": report},
-                parameters={"mode": "revise", "feedback": feedback},
+                parameters={"mode": "generate" if correcting else "revise", "feedback": feedback},
                 notification_body="Revising AI report...",
                 notification_target=report,
                 client={
@@ -498,9 +532,12 @@ def revise_report(key):
             )
         )
     except Exception as e:
-        report.properties.process.revision_failed(
-            "AI report revision could not be started. Please try again."
-        )
+        if correcting:
+            report.properties.process.fail("AI report correction could not be started. Please try again.")
+        else:
+            report.properties.process.revision_failed(
+                "AI report revision could not be started. Please try again."
+            )
         Entities.save(report, current_user)
         exceptions.capture(
             e,
@@ -568,9 +605,8 @@ def skip_report_action(key, action_index):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_browser_mutations_reject_fenced_state_without_side_effects
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_delete_rejects_active_execution_without_side_effects
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_delete_rejects_undo_in_progress_without_side_effects
 # @matrix ai-report : delete delete-modal entitlement-independent file-cleanup
-# @matrix agent-api ai-report : browser-review cas delete report-execution undo
+# @matrix agent-api ai-report : browser-review cas delete report-execution
 @tools.route("/reports/<key>", methods=["DELETE"])
 @logged_in
 def delete_report(key):

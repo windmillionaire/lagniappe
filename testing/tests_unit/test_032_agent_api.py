@@ -11,7 +11,7 @@ import pytest
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.entities.ai_report import AIReport
+from lagniappe.core.entities.ai_report import AIReport, REPORT_FORMAT_VERSION
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
@@ -211,6 +211,42 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     assert report.note == "Waiting for external plan"
 
 
+# @source lagniappe/core/tools/ai/external_api.py::create_plan
+# @pair agent-api:entitlement-independent
+@pytest.mark.unit
+@pytest.mark.parametrize("source_origin", ["web", "api"])
+def test_external_correction_does_not_require_provider_access(monkeypatch, source_origin):
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("external-correction-owner")
+    actor.ai_access = "NONE"
+    actor.access = lambda _required: pytest.fail("External correction checked site AI access")
+    source = external_api.Entities.REPORT.create({
+        "user": actor,
+        "origin": source_origin,
+        "status": "complete",
+        "pending": False,
+        "proposal": {"summary": "Original work", "actions": []},
+        "result": {"status": "complete", "actions": []},
+    })
+    saved = []
+    monkeypatch.setattr(external_api.Entities, "fetch_one", _fetch_one_from({source.urlsafe_key: source}))
+    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+
+    correction = external_api.create_plan(
+        actor, instructions="Adjust the completed work", remote_mcp=True,
+        revises_plan_id=source.urlsafe_key,
+    )
+
+    assert correction.origin == "api"
+    assert correction.status == "draft"
+    assert correction.pending is False
+    assert correction.db["correction"]["source"] == source.urlsafe_key
+    assert correction.db["correction"]["result"] == source.result
+    assert source.db["correction_children"] == [correction.urlsafe_key]
+    assert not source.db.get("superseded_by")
+    assert saved == [source, correction]
+
+
 # @matrix agent-api ai-report : upload-batch-identity upload-manifest
 @pytest.mark.unit
 def test_external_upload_batch_identity_is_preserved_in_every_record():
@@ -307,7 +343,7 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         {
             "type": "report",
             "origin": "api",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "process": json.dumps({"report": {"status": "draft"}}),
             "agent_manifest": json.dumps({"contract_version": 1}),
         }
@@ -580,7 +616,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
         {
             "type": "report",
             "origin": "api",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "process": json.dumps({"report": {"status": "draft"}}),
             "agent_manifest": json.dumps({"contract_version": 1}),
         }
@@ -706,7 +742,7 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
         {
             "type": "report",
             "origin": "api",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "process": json.dumps({"report": {"status": "ready"}}),
             "proposal": json.dumps({"summary": "API proposal"}),
         }
@@ -877,7 +913,7 @@ def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch)
             "parent": user,
             "user": user,
             "name": "External browser mutation",
-            "format_version": 1,
+            "format_version": REPORT_FORMAT_VERSION,
             "origin": "api",
             "status": "ready",
             "input_files": [file],
@@ -1156,7 +1192,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
                     "entity": {"id": "visible-key", "name": "Stale title"},
                     "prepared": True,
                     "error": "private diagnostic",
-                    "updates": {"applied": [{"schema_id": "input-private", "value": "secret"}], "skipped": [{"reason": "private diagnostic"}]},
+                    "schema_updates": {"applied": [{"schema_id": "input-private", "value": "secret"}], "skipped": [{"reason": "private diagnostic"}]},
                 },
                 {
                     "id": "second",
@@ -1169,7 +1205,6 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
                     "type": "create_page",
                     "status": "complete",
                     "entity": {"id": "deleted-key", "name": "Deleted name"},
-                    "undo": {"status": "complete"},
                 },
                 {
                     "id": "fourth",
@@ -1189,9 +1224,8 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         "url": "/tasks/visible-key",
     }
     assert result["actions"][1]["entity"] is None
-    assert result["actions"][0]["updates"] == {"applied": 1, "skipped": 1}
+    assert result["actions"][0]["schema_updates"] == {"applied": 1, "skipped": 1}
     assert result["actions"][2]["entity"] is None
-    assert result["actions"][2]["undo_status"] == "complete"
     assert result["actions"][3]["entity"] == {
         "hash": "hash:history12345", "kind": "task_history", "name": None, "url": None
     }
@@ -1817,6 +1851,36 @@ def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypat
     assert report.proposal["actions"][0]["data"]["category"] == entity.urlsafe_key
 
 
+# @matrix agent-api ai-report : public-reference round-trip stored-execution
+@pytest.mark.unit
+def test_public_plan_omits_preview_references_before_loading_entities(monkeypatch):
+    from google.cloud.datastore import Key
+
+    preview = Key("form", "proposal-form", project="proposal-preview").to_legacy_urlsafe().decode()
+    saved = Key("models", "saved-page", project="test-project").to_legacy_urlsafe().decode()
+    entity = SimpleNamespace(urlsafe_key=saved, hash="abcdef123456")
+    reads = []
+
+    def fetch(*identifiers, request):
+        reads.extend(identifiers)
+        assert preview not in identifiers
+        return [entity]
+
+    monkeypatch.setattr(external_api.Entities, "fetch", fetch)
+    report = SimpleNamespace(agent_manifest={}, proposal={"actions": [{
+        "id": "update", "type": "update_page",
+        "data": {"entity": saved, "changes": {"form": "$new_form"}},
+        "_entity_update": {"display_after": {"form": {"id": preview, "name": "New"}}},
+    }]})
+    public = external_api.public_plan_proposal(report)
+    assert reads == [saved]
+    assert public["actions"][0]["data"] == {
+        "entity": "hash:abcdef123456", "changes": {"form": "$new_form"},
+    }
+    assert "_entity_update" not in public["actions"][0]
+    assert report.proposal["actions"][0]["_entity_update"]["display_after"]["form"]["id"] == preview
+
+
 # @matrix agent-api files : complete-inventory deterministic-fingerprint seven-file-regression
 @pytest.mark.unit
 def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatch):
@@ -2189,3 +2253,46 @@ def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
     report.result = {"actions": [{"status": "complete"}]}
     with pytest.raises(exceptions.ValidationError, match="execution has begun"):
         external_api.submit_plan(report, actor, answer, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)
+
+
+# @source lagniappe/core/tools/database/agent_api.py::commit_plan_mutation_if_idle
+# @matrix agent-api ai-report : browser-review cas claim fencing transaction
+@pytest.mark.parametrize("state,lease,expired,expected", [
+    ("running", "active", False, "committed"),
+    ("cancelled", None, False, "lost"),
+    ("running", "replacement", False, "lost"),
+    ("running", "active", True, "lost"),
+])
+def test_generation_publication_checks_job_in_report_transaction(monkeypatch, state, lease, expired, expected):
+    report_key = Key("activity", "report", project="test-project")
+    job_key = Key("jobs", "generation", project="test-project")
+    now = datetime.now(timezone.utc)
+    original = {"type": "report", "process": "pending"}
+    report = DatastoreEntity(key=report_key)
+    report.update({**original, "process": "ready"})
+    rows = {report_key: original, job_key: {
+        "status": state, "lease_token": lease,
+        "deadline_at": now + timedelta(seconds=-1 if expired else 60),
+    }}
+    writes = []
+
+    class Transaction:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def delete(self, key): pass
+        def put(self, row): writes.append(row)
+
+    transaction = Transaction()
+    monkeypatch.setattr(credential_store.DATA, "_datastore_client", SimpleNamespace(
+        transaction=lambda: transaction,
+        get=lambda key, transaction: rows.get(key),
+    ))
+    monkeypatch.setattr(credential_store, "plan_operation_claim_key", lambda key: "claim")
+    monkeypatch.setattr(credential_store.database_utility, "update_site_fingerprints", lambda *rows: [])
+    monkeypatch.setattr(credential_store.database_utility, "_put_mutation", lambda tx, row, mask: writes.append(row))
+    outcome = credential_store.commit_plan_mutation_if_idle(
+        report_key, expected_report=original, writes=[(SimpleNamespace(db=report, key=report_key), None)],
+        active_job=(job_key, "active"), now=now,
+    )
+    assert outcome == expected
+    assert writes == ([report] if expected == "committed" else [])

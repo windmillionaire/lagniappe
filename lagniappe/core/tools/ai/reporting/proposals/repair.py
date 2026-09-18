@@ -148,69 +148,13 @@ def _complete_form_schema_fields(proposal):
     return repaired if changed else proposal
 
 
-# @testable true
-# @matrix ai-report : deterministic-repair page-form references
-def _complete_unambiguous_add_form_references(proposal):
-    """Link a form-less page-form action when one earlier page form can fit."""
-    if not isinstance(proposal, dict) or not isinstance(proposal.get("actions"), list):
-        return proposal
-
-    repaired = copy.deepcopy(proposal)
-    page_form_actions = []
-    changed = False
-    for action in repaired["actions"]:
-        if not isinstance(action, dict):
-            continue
-        data = action.get("data")
-        if not isinstance(data, dict):
-            continue
-
-        if action.get("type") == "create_form":
-            form_type = data.get("form_type") or data.get("form-type")
-            action_id = action.get("id")
-            form_name = data.get("name")
-            if (
-                form_type == "page"
-                and _proposal_string(action_id)
-                and _proposal_string(form_name)
-            ):
-                page_form_actions.append((action_id, form_name.strip()))
-            continue
-
-        if action.get("type") != "add_form_to_page" or _first_data_reference(
-            data, "form"
-        ):
-            continue
-
-        declared_name = next(
-            (
-                data[key].strip()
-                for key in ("form_name", "form_display", "form_label")
-                if _proposal_string(data.get(key))
-            ),
-            None,
-        )
-        candidates = page_form_actions
-        if declared_name:
-            candidates = [
-                candidate
-                for candidate in candidates
-                if candidate[1].casefold() == declared_name.casefold()
-            ]
-        if len(candidates) == 1:
-            data["form_action"] = candidates[0][0]
-            changed = True
-
-    return repaired if changed else proposal
-
-
 
 # @testable true
 # @tests tests_unit/test_020b_ai_planner.py::test_generate_report_validates_answers_actions_and_file_usage
 # @matrix ai-report : validation generate
 def complete_proposal_structure(proposal):
     """Fill unambiguous schema IDs and references without another model call."""
-    repaired = _complete_unambiguous_add_form_references(_complete_form_schema_fields(proposal))
+    repaired = _complete_form_schema_fields(proposal)
     if repaired != proposal:
         mark_outcome("local_repair")
     return repaired

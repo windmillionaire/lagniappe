@@ -84,6 +84,8 @@ class DeferredJobRunner:
                 if job.status in {
                     DeferredJobStatus.SUCCEEDED.value,
                     DeferredJobStatus.FAILED.value,
+                    DeferredJobStatus.CANCELLED.value,
+                    DeferredJobStatus.SUPERSEDED.value,
                 }:
                     self._finish_terminal_delivery(job, adapter)
                     self._release(job, getattr(job, "lease_token", None))
@@ -98,6 +100,12 @@ class DeferredJobRunner:
         _publish_operation_projection(job, operation="claim_projection")
 
         deadline_at = now + timedelta(seconds=DEFERRED_JOB_ATTEMPT_DEADLINE_SECONDS)
+        created = _datetime(getattr(job, "created", None))
+        if adapter.max_lifetime_seconds and created:
+            deadline_at = min(
+                deadline_at,
+                created + timedelta(seconds=adapter.max_lifetime_seconds),
+            )
         self._persist_claimed(
             job,
             lease_token,
@@ -118,6 +126,8 @@ class DeferredJobRunner:
             ),
         )
         context = self._context(job)
+        control.report_planning = not adapter.resume_preparation
+        control.provider_retry_callback = lambda: self._claim_provider_retry(job, lease_token, context)
         context.active_check = lambda: self._claim_active(job, lease_token)
         context.execution_control = control
         context.checkpoint_callback = lambda checkpoint, progress=None: (
@@ -135,14 +145,6 @@ class DeferredJobRunner:
                 raise exceptions.ValidationError(
                     "Deferred job version is not supported."
                 )
-            created = _datetime(getattr(job, "created", None))
-            if (
-                created
-                and (now - created).total_seconds() >= DEFERRED_JOB_MAX_AGE_SECONDS
-            ):
-                raise exceptions.AIException(
-                    "This operation exceeded its automatic recovery window. Try again."
-                )
             authorization = job.authorization or {}
             if (
                 authorization.get("policy") != job.job_type
@@ -156,6 +158,15 @@ class DeferredJobRunner:
             if context.actor is None:
                 raise exceptions.ValidationError("Deferred job actor is missing.")
             adapter.authorize(context)
+            created = _datetime(getattr(job, "created", None))
+            if (
+                created
+                and (now - created).total_seconds() >= DEFERRED_JOB_MAX_AGE_SECONDS
+            ):
+                raise exceptions.AIException(
+                    "This operation exceeded its automatic recovery window. Try again."
+                )
+            control.ensure_active()
             if getattr(job, "start_completed", None) is False:
                 adapter.started(context)
                 self._persist_claimed(
@@ -167,6 +178,11 @@ class DeferredJobRunner:
             self._heartbeat(job, lease_token)
 
             if not adapter.checkpoint_ready(context):
+                if not adapter.resume_preparation and int(job.attempt or 0) > 1:
+                    raise exceptions.AIException(
+                        "Report generation was interrupted before a proposal was saved. "
+                        "Retry to start a new generation."
+                    )
                 from lagniappe.core.tools.ai.observability import ai_execution_context
 
                 with ai_execution_context(
@@ -290,7 +306,7 @@ class DeferredJobRunner:
                 raise DeferredJobInfrastructureError(
                     "Deferred job terminal delivery is incomplete."
                 ) from error
-            if _retryable(error) and _provider_retry_attempt(job) <= len(
+            if adapter.resume_preparation and _retryable(error) and _provider_retry_attempt(job) <= len(
                 _retry_delays(error)
             ):
                 return self._schedule_retry(
@@ -309,6 +325,18 @@ class DeferredJobRunner:
         finally:
             lease_guard.__exit__()
 
+
+    # @testable infrastructure
+    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
+    def _claim_provider_retry(self, job, lease_token, context):
+        parameters = dict(job.parameters or {})
+        if parameters.get("_provider_retry_used"):
+            return False
+        parameters["_provider_retry_used"] = True
+        parameters["_provider_retry_reason"] = "Transient provider error"
+        self._persist_claimed(job, lease_token, parameters=parameters)
+        context.parameters.update(parameters)
+        return True
 
     # @testable infrastructure
     def _context(self, job):

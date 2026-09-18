@@ -23,6 +23,38 @@ class _MinimalImportProcess:
     separator = ","
 
 
+# @source lagniappe/core/properties/row_submission.py::TableColumnFields.create_field
+# @pair form-table:timezone
+@pytest.mark.unit
+@pytest.mark.parametrize("zone, day", [
+    ("America/Los_Angeles", "2026-09-24"),
+    ("America/Los_Angeles", "2026-01-24"),
+    ("Asia/Tokyo", "2026-09-24"),
+])
+def test_table_date_columns_keep_explicit_actor_timezone(monkeypatch, zone, day):
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    from lagniappe import CONFIG
+    from testing.utility.ai_report_fakes import _test_user
+
+    monkeypatch.setattr(CONFIG, "TEST_CURRENT_USER", None)
+    actor = _test_user("table-date-owner")
+    actor.db["timezone"] = zone
+    page = TestEntities.get("PAGE", {"name": "Schedule"})
+    definition = {"id": "dates", "type": "table", "title": "Dates", "columns": [
+        {"id": "day", "type": "input", "input": "date", "title": "Day"},
+    ]}
+    table = Table(definition, entity=page, user=actor)
+    table.validate_ai({"rows": [{"day": day}]})
+
+    expected = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(zone)).astimezone(timezone.utc)
+    assert table.rows[0].fields["day"].value == expected
+    restored = Table(definition, entity=page, user=actor)
+    restored.db_value = table.db_value
+    assert restored.ai_value == {"rows": [{"day": day}]}
+    assert restored.rows[0].fields["day"].column_value.date().isoformat() == day
+
+
 def _run_row_submission_case(entity, get_schema):
     entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
     mock = entity.test_spec.get("mock_link_attributes")

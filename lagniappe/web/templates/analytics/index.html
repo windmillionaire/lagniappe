@@ -136,6 +136,13 @@
         </summary>
         <div class="flex min-w-0 flex-col gap-4 border-t border-base-light/50 p-3 text-sm">
           <div class="flex flex-wrap items-center gap-3">
+            {% if operation.type == 'report-ai' and not operation.terminal %}
+              <form method="post" action="{{ url_for('tools.cancel_generation', job_key=operation.key) }}" data-role="cancel-generation-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="operation-id" value="{{ operation.operation_id }}" />
+                <button type="submit" class="{{ styles.button.submit }}">Cancel generation</button>
+              </form>
+            {% endif %}
             {% if report and report.id in own_report_keys %}
               <a class="font-semibold text-base-default" data-role="ai-run-report"
                  href="{{ url_for('tools.report', key=report.id) }}">Open report</a>
@@ -153,6 +160,9 @@
           <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {{ run_metric("User", operation.actor) }}
             {{ run_metric("Job elapsed", operation.elapsed_seconds ~ " s") }}
+            {% if operation.remaining_seconds is not none %}{{ run_metric("Remaining", operation.remaining_seconds ~ " s") }}{% endif %}
+            {% if operation.retry_reason %}{{ run_metric("Retry reason", operation.retry_reason) }}{% endif %}
+            {% if operation.last_progress_at %}{{ run_metric("Last progress", operation.last_progress_at) }}{% endif %}
             {{ run_metric("Attempt", operation.attempt) }}
             {{ run_metric("Phase", operation.phase_label) }}
           </dl>

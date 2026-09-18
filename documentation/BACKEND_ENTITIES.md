@@ -69,6 +69,11 @@ Important methods and values:
 - `modified` is a dependency-invalidation timestamp. It advances when the
   entity or a dependent view represented by it changes.
 
+Model-task references retain the parent Project key so badges and selectors can
+link to `/projects/<project>/status/<model>?completed=false`. This compact
+projection reads the stored relation key without loading the Project; when the
+Project is already attached, it also supplies its display name.
+
 ## Entity registry
 
 `lagniappe/core/entities/__init__.py` exposes the `Entities` singleton. Its

@@ -388,3 +388,15 @@ successful application deployment.
 - Do not rebuild inside hosted test creation.
 - Keep setup update and source replacement as distinct commands.
 - Document any command, generated-file, handler, or release workflow change.
+
+
+## Report contract 10 cutover
+
+For `next/2.2.1`, pause report/email intake and drain existing work before
+`upgrade --branch next/2.2.1`. Deploy the application and MCP service from the
+same candidate. Report format 2 makes older reports unavailable and deletable;
+it does not delete or migrate their workspace records. No legacy execution or
+Undo compatibility path remains. Resume intake after the coordinated upgrade,
+then validate native/MCP planning, approval, cancellation, linked corrections,
+and retry against isolated live fixtures. Inline document editing remains an
+editor operation; AI/MCP document append is unchanged.

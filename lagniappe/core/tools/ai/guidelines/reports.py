@@ -57,7 +57,7 @@ FILE_ORGANIZATION_GUIDELINES = """
   Reuse schemas already returned by get_entity or get_schema. Do not rely on a
   later form-completion stage. Preserve existing values that the evidence does
   not replace, and retain unresolved source conflicts for review. Fetch
-  form_autofill with actions=["update_form_values"] and the actual field types
+  form_autofill with actions=["update_task", "update_page"] and the actual field types
   for patch guidance. Every updates row needs its own exact target and schema_id.
   Table rows must be objects keyed by exact column ids. Internal link cells must
   resolve to existing workspace records; a hotel name is not free text in a link

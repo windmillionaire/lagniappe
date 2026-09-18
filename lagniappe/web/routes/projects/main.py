@@ -1,4 +1,4 @@
-from flask import request
+from flask import abort, request
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai, filters
@@ -20,11 +20,15 @@ from . import projects
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_is_forbidden_without_model_permission
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_can_read_document_content
+# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_url_rejects_model_task_key
+# @pair projects:wrong-entity-type
 # @matrix projects : document-tab load navigate permission-gates readonly
 @projects.route("/<key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def view(key, **kwargs):
     project = kwargs["entity"]
+    if not isinstance(project, Entities.PROJECT):
+        abort(404)
     filters.FilterCache(project).update()
 
     return responses.project_view(project)

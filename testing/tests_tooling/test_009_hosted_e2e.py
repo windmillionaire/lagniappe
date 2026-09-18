@@ -1275,6 +1275,61 @@ def test_hosted_result_directory_import_requires_the_exact_source(
         hosted_e2e.import_result_directory(result_dir)
 
 
+# @matrix hosted-e2e traceability : evidence merge
+# @matrix hosted-e2e : suite-scope failure-retention
+@pytest.mark.parametrize("suite,status,remote_status,targets", [
+    ("all", 0, 0, False),
+    ("all", 1, 1, False),
+    ("all", 0, 1, False),
+    ("all", 1, 0, False),
+    ("focused", 0, 0, True),
+    ("full", 0, 0, False),
+    ("all", 0, 0, True),
+])
+def test_hosted_complete_import_replaces_retired_parameter_results(
+    tmp_path, monkeypatch, suite, status, remote_status, targets,
+):
+    source = "a" * 40
+    (tmp_path / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+    snapshot, paths = behavior_snapshot(tmp_path)
+    evidence_path = tmp_path / traceability_common.LATEST_TEST_RUN
+    bare = "tests_e2e/test_live.py::test_provider"
+    local = _evidence("old", {"source.py": "old"}, bare, outcome="failed")
+    local["tests"][f"{bare}[removed]"] = dict(local["tests"][bare])
+    local["tests"]["tests_unit/test_other.py::test_other"] = dict(local["tests"][bare])
+    traceability_common.write_json(evidence_path, local)
+    remote = _evidence(snapshot, paths, f"{bare}[live]")
+    remote["exit_status"] = remote_status
+    remote["tests"][f"{bare}[quota-fallback]"] = dict(remote["tests"][f"{bare}[live]"])
+    manifest = {
+        "schema_version": 1, "kind": "hosted-e2e-result",
+        "execution": "lagniappe-e2e-result1", "source": source,
+        "source_snapshot": snapshot, "suite": suite, "exit_status": status,
+    }
+    if targets:
+        manifest["targets"] = [bare]
+    result_dir = tmp_path / "reports/result"
+    traceability_common.write_json(result_dir / "manifest.json", manifest)
+    traceability_common.write_json(result_dir / "evidence.json", remote)
+    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
+    monkeypatch.setattr(
+        hosted_e2e, "_git",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(["git"], 0, stdout=source, stderr=""),
+    )
+
+    hosted_e2e.import_result_directory(result_dir)
+
+    merged = traceability_common.load_json(evidence_path)
+    complete = suite == "all" and not status and not remote_status and not targets
+    expected = set(remote["tests"]) if complete else set(local["tests"]) | set(remote["tests"])
+    assert set(merged["tests"]) == expected
+    assert ("old" in decode_test_run_snapshots(merged)) is not complete
+    if not complete:
+        assert merged["tests"][bare]["outcome"] == "failed"
+        assert merged["tests"]["tests_unit/test_other.py::test_other"]["outcome"] == "failed"
+    assert merged["provenance"] == remote["provenance"]
+
+
 def test_source_archive_snapshot_falls_back_when_git_is_not_installed(
     tmp_path,
     monkeypatch,

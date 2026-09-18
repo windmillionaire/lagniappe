@@ -41,7 +41,7 @@ from testing.elements import (
     SpinnerButtons,
 )
 from testing.utility.network import expect_successful_response
-from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
+from testing.utility.live_ai import submit_live_ai
 
 pytestmark = pytest.mark.e2e
 
@@ -123,7 +123,8 @@ def test_create_project_manual_mode(get_user):
 # @template home/projects.html::create
 # @template home/projects.html::project
 @pytest.mark.ai
-def test_create_project_ai_mode(get_user, results):
+@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+def test_create_project_ai_mode(get_user, results, browser_failures, live_ai_quota):
     """
     Verify project creation in AI mode.
 
@@ -153,16 +154,21 @@ def test_create_project_ai_mode(get_user, results):
     modal.close()
     expect(create_form).to_be_visible()
 
-    with expect_successful_response(
-        user.page,
-        method="POST",
-        path="/projects/create",
-        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
-    ) as response_info:
-        SpinnerButtons.CREATE.click(create_form)
+    def fallback():
+        create_form.locator(Buttons.MANUAL_MODE).click()
+        create_form.locator(FormElements.NAME).fill(project.definition.name)
+        with expect_successful_response(user.page, method="POST", path="/projects/create") as response:
+            SpinnerButtons.CREATE.click(create_form)
+        results.record("alternate_verification", "Manual creation validates the same save and list workflow; AI content remains unverified.")
+        return response.value
 
+    with live_ai_quota(user, "/projects/create"):
+        response = submit_live_ai(
+            user, path="/projects/create", submit=lambda: SpinnerButtons.CREATE.click(create_form),
+            results=results, browser_failures=browser_failures, fallback=fallback,
+        )
     expect(create_form).not_to_be_visible()
-    project.key = home.entity_key_from_response(response_info.value)
+    project.key = home.entity_key_from_response(response)
     project_list = home.project_list
     new_project = project_list.get_item(project)
     expect(new_project).to_be_visible()

@@ -37,7 +37,7 @@ def fresh_document(entity, user):
 def checkpointed_document(entity):
     seed = document_seed(entity)
     state = documents.current_document_state(
-        entity.properties.document.sync_id, seed=seed
+        entity.properties.document.sync_id, seed=seed, reconcile=False
     )
     if seed["markup"]:
         raise exceptions.ValidationError(
