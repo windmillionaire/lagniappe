@@ -112,7 +112,8 @@ def live_ai_quota(request, monkeypatch):
         def quota(route):
             if route.request.method == "POST" and len(calls) < 2:
                 calls.append(route.request.url)
-                route.fulfill(status=422, content_type="text/plain", body="AI quota is temporarily exhausted. The report can retry shortly.")
+                prefix = "Generation failed. Please try again.  " if len(calls) == 2 else ""
+                route.fulfill(status=422, content_type="text/plain", body=f"{prefix}AI quota is temporarily exhausted. The report can retry shortly.")
             else:
                 route.fallback()
         with scoped_browser_route(user.page.context, f"**{path}", quota):
@@ -135,8 +136,16 @@ def live_ai_job_quota(request, monkeypatch):
     from lagniappe.web import app
     from ..utility import hosted_deferred_jobs, live_ai
 
+    calls = []
     def quota(*_args, **_kwargs):
-        raise exceptions.AIQuotaError("AI quota is temporarily exhausted. The report can retry shortly.")
+        calls.append(True)
+        message = "AI quota is temporarily exhausted. The report can retry shortly."
+        context = {"ai_provider": {"quota_exhausted": True, "code": 429, "status": "RESOURCE_EXHAUSTED"}}
+        if len(calls) == 2:
+            raise exceptions.AIException(
+                f"Generation failed. Please try again.  {message}", context=context,
+            ) from exceptions.AIQuotaError(message, context=context)
+        raise exceptions.AIQuotaError(message, context=context)
     monkeypatch.setattr(ai, "generate_report", quota)
     monkeypatch.setattr(ai, "generate_autofilled_submission", quota)
     monkeypatch.setattr(live_ai, "LIVE_AI_QUOTA_BACKOFF_SECONDS", 0)

@@ -26,6 +26,8 @@ def _results():
 @pytest.mark.parametrize("message,expected", [
     ("AI quota is temporarily exhausted. The report can retry shortly.", True),
     ("429 RESOURCE_EXHAUSTED. Resource exhausted, please try again later.", True),
+    ("Generation failed. Please try again.  AI quota is temporarily exhausted. The report can retry shortly.", True),
+    ("Generation failed. Please try again.  Invalid answer: 429 RESOURCE_EXHAUSTED was not expected", False),
     ("Invalid answer: the phrase RESOURCE_EXHAUSTED was not expected", False),
     ("Invalid answer: 429 RESOURCE_EXHAUSTED was not expected", False),
     ("The saved entity changed; retry", False),
@@ -94,8 +96,38 @@ def _jobs():
 
 
 # @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
-def test_quota_fallback_injects_resumable_report_checkpoint(monkeypatch):
+@pytest.mark.parametrize("error_type,provider,expected", [
+    ("AIException", {"quota_exhausted": True, "code": 429, "status": "RESOURCE_EXHAUSTED"}, True),
+    ("AIException", {"quota_exhausted": True, "code": "429"}, True),
+    ("AIException", {"quota_exhausted": True, "status": "RESOURCE_EXHAUSTED"}, True),
+    ("AIException", {"quota_exhausted": False, "code": 429}, False),
+    ("AIException", {"quota_exhausted": True, "code": 403, "status": "PERMISSION_DENIED"}, False),
+    ("AIException", {"quota_exhausted": True}, False),
+    ("AIException", None, False),
+    ("AIException", "429 RESOURCE_EXHAUSTED", False),
+    ("ValidationError", {"quota_exhausted": True, "code": 429}, False),
+])
+def test_job_quota_classification_requires_provider_evidence(error_type, provider, expected):
+    failed, _retry = _jobs()
+    failed.error = {
+        "type": error_type,
+        "message": "Generation failed. Please try again.  AI quota is temporarily exhausted.",
+        "context": {"ai_provider": provider},
+    }
+    assert live_ai.quota_blocked_job(failed) is expected
+    failed.status = "running"
+    assert live_ai.quota_blocked_job(failed) is False
+    failed.status = "failed"
+    failed.checkpoint = {"stage": "ready_to_apply"}
+    assert live_ai.quota_blocked_job(failed) is False
+
+
+# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_quota_fallback_injects_resumable_report_checkpoint(monkeypatch, wrapped):
     failed, retry = _jobs()
+    if wrapped:
+        failed.error = {"type": "AIException", "context": {"ai_provider": {"quota_exhausted": True, "code": 429}}}
     saved = []
     proposal = {"summary": "Verified answer", "confidence": 1, "answer_html": "<p>Verified answer</p>", "actions": []}
     original = deepcopy(proposal)
@@ -138,11 +170,14 @@ def test_quota_fallback_rejects_non_quota_job(change):
 
 # @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 @pytest.mark.parametrize("failure", [None, "non_quota", "terminal", "wrong_type", "permission", "drift"])
-def test_autofill_fallback_retains_preparation_and_rejects_unrelated_failures(monkeypatch, failure):
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_autofill_fallback_retains_preparation_and_rejects_unrelated_failures(monkeypatch, failure, wrapped):
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     job = SimpleNamespace(job_type=DeferredJobType.AUTOFILL.value, status="retry_wait",
                           error={"type": "AIQuotaError"}, checkpoint={}, next_attempt_at=None)
+    if wrapped:
+        job.error = {"type": "AIException", "context": {"ai_provider": {"quota_exhausted": True, "code": 429}}}
     context = SimpleNamespace(checkpoint={})
     calls, saved = [], []
     def authorize(_context):

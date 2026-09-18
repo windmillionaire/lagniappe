@@ -255,6 +255,11 @@ error, and allow one more live attempt. This is provider backoff, not a browser
 synchronization delay. Do not retry assertions, invalid model output, permission
 errors, ordinary HTTP 5xx responses, or failed workspace writes. Production
 retry budgets are unchanged. Deferred work also honors its saved retry time.
+Generation wrappers may retain quota as an `AIException`: recognize it only
+with structured provider quota metadata. HTTP-only helpers remove the known
+generation-error prefix before matching the canonical quota message. Forced
+quota stories exercise both direct and wrapped errors; arbitrary messages
+that merely mention a quota error still fail.
 
 If both attempts hit quota, a test may use an explicit independent verification:
 query the real workspace tools before publishing a known report answer, validate

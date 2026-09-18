@@ -33,6 +33,7 @@ class ProviderQuotaBlocked(RuntimeError):
 def is_quota_message(message):
     message = str(message or "").strip()
     message = message.removeprefix("AI unable to generate summary: ")
+    message = message.removeprefix("Generation failed. Please try again.").strip()
     return message.startswith("AI quota is temporarily exhausted.") or bool(
         re.match(r"429\s+RESOURCE_EXHAUSTED\b", message)
     )
@@ -99,11 +100,24 @@ def submit_live_ai(user, *, path, submit, results, browser_failures, fallback,
 
 # @testable true
 # @tests tests_unit/test_023g_live_ai_test_helper.py::test_quota_fallback_rejects_non_quota_job
+# @tests tests_unit/test_023g_live_ai_test_helper.py::test_job_quota_classification_requires_provider_evidence
 # @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 def quota_blocked_job(job):
+    error = job.error or {}
+    context = error.get("context") or {}
+    provider = context.get("ai_provider", {}) if isinstance(context, dict) else {}
+    wrapped_quota = (
+        error.get("type") == "AIException"
+        and isinstance(provider, dict)
+        and provider.get("quota_exhausted") is True
+        and (
+            str(provider.get("code")) == "429"
+            or provider.get("status") == "RESOURCE_EXHAUSTED"
+        )
+    )
     return (
         job.status in {DeferredJobStatus.FAILED.value, DeferredJobStatus.RETRY_WAIT.value}
-        and (job.error or {}).get("type") == "AIQuotaError"
+        and (error.get("type") == "AIQuotaError" or wrapped_quota)
         and (job.checkpoint or {}).get("stage") != "ready_to_apply"
     )
 
