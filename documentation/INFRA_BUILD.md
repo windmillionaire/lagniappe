@@ -26,6 +26,15 @@ The application version in build metadata comes from `package.json`, even when
 local generated settings still describe an earlier release. Production bundle
 version replacements and Sentry releases use that same package version.
 
+`build/rollup.shared.mjs` owns the common login, monitoring, and main bundle
+construction: registry-derived inputs, output names, browser resolution,
+warning handling, chunk versioning, and artifact recording. It creates fresh
+plugins for each standalone entry. `rollup.dev.config.mjs` and
+`rollup.config.mjs` keep their ordered mode-specific plugins and version values
+explicit, including CSS transforms, minification, source maps, startup budgets,
+Sentry uploads, and visualizer options. Publication still runs through
+`build/run-rollup.mjs` and `build/publication.mjs`.
+
 ## Output
 
 ```text

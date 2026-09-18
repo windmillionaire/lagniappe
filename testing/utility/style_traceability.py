@@ -35,6 +35,7 @@ DEFAULT_REPORT_PATH = Path("reports/style-traceability.md")
 PIPELINE_INPUT_PATHS = (
     Path("build/rollup.config.mjs"),
     Path("build/rollup.dev.config.mjs"),
+    Path("build/rollup.shared.mjs"),
     Path("build/utility.mjs"),
     Path("testing/utility/style_compile.mjs"),
     Path("package.json"),

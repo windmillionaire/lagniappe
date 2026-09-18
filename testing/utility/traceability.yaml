@@ -1,5 +1,6 @@
 source_roots:
   - build/publication.mjs
+  - build/rollup.shared.mjs
   - build/sentry.mjs
   - build/utility.mjs
   - mcp/src

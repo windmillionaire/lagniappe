@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7e4189f';
-import { l as loadWidget } from './core-foundation.js?v=b7e4189f';
-import { c as compatibleField, i as incompatibleSchema } from './formRepresentation.js?v=b7e4189f';
-import { Modal } from './modal.js?v=b7e4189f';
-import { e as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b7e4189f';
-import './connectivity.js?v=b7e4189f';
-import './storage.js?v=b7e4189f';
-import './upstreamUnavailable.js?v=b7e4189f';
+import { STYLES } from './styles.js?v=b7d16921';
+import { l as loadWidget } from './core-foundation.js?v=b7d16921';
+import { c as compatibleField, i as incompatibleSchema } from './formRepresentation.js?v=b7d16921';
+import { Modal } from './modal.js?v=b7d16921';
+import { e as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b7d16921';
+import './connectivity.js?v=b7d16921';
+import './storage.js?v=b7d16921';
+import './upstreamUnavailable.js?v=b7d16921';
 
 /**
  * Build a fully rendered, detached copy of a form widget for revision

@@ -80,19 +80,6 @@ const documentedBudgets = Object.fromEntries(
 );
 assert.deepEqual(documentedBudgets, STARTUP_BUDGETS);
 
-for (const configPath of [
-  "build/rollup.config.mjs",
-  "build/rollup.dev.config.mjs",
-]) {
-  const source = readFileSync(configPath, "utf8");
-  assert.match(source, /VIEW_ENTRIES/);
-  assert.match(source, /public: "\.\/src\/script\/public\.mjs"/);
-  assert.match(source, /chunks\/views\/\[name\]\.js/);
-  assert.match(source, /manualChunks: interactionFoundationChunk/);
-  assert.match(source, /onlyExplicitManualChunks: true/);
-  assert.equal((source.match(/manualChunks:/g) || []).length, 1);
-}
-
 const chunk = ({ name, code = "x", imports = [], modules = {} }) => ({
   type: "chunk",
   fileName: name === "main" ? "script.js" : `chunks/views/${name}.js`,
@@ -197,7 +184,6 @@ def test_interaction_preloads_have_stable_manual_chunks(run_node):
     run_node(
         r'''
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { interactionFoundationChunk } from "./build/utility.mjs";
 
 const root = "/checkout/src/script/";
@@ -241,19 +227,14 @@ for (const module of [
 assert.equal(interactionFoundationChunk(`${root}views/home.mjs`), undefined);
 assert.equal(interactionFoundationChunk("\0virtual:styles"), undefined);
 
-for (const config of ["build/rollup.config.mjs", "build/rollup.dev.config.mjs"]) {
-  const source = readFileSync(config, "utf8");
-  assert.match(source, /manualChunks: interactionFoundationChunk/);
-  assert.match(source, /onlyExplicitManualChunks: true/);
-}
 ''',
         module=True,
     )
 
 
 # @source build/publication.mjs::recordBuildArtifacts
-# @pair frontend-build:artifact-inventory
-def test_rollup_metadata_uses_package_version_with_stale_settings(run_node):
+# @matrix frontend-build : artifact-inventory chunking view-registry warnings build-modes
+def test_rollup_modes_preserve_bundle_and_publication_contracts(run_node):
     run_node(
         r'''
 import assert from "node:assert/strict";
@@ -263,7 +244,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 // Load style registries from the repository before isolating installer settings.
-await import("./build/utility.mjs");
+const { interactionFoundationChunk } = await import("./build/utility.mjs");
+const { VIEW_ENTRIES } = await import("./src/script/viewRegistry.mjs");
 const root = process.cwd();
 const fixture = mkdtempSync(join(tmpdir(), "lagniappe-build-version-"));
 const inventory = join(fixture, "inventory.json");
@@ -279,22 +261,88 @@ try {
     ["rollup.dev.config.mjs", "development"],
   ]) {
     const { default: bundles } = await import(pathToFileURL(join(root, "build", config)));
-    const recorder = bundles.at(-1).plugins.find(
-      plugin => plugin.name === "record-final-build-artifacts",
-    );
+    assert.equal(bundles.length, 3);
+    const [login, sentry, main] = bundles;
+    assert.equal(login.input, "./src/script/login.mjs");
+    assert.equal(sentry.input, "./src/script/sentry.mjs");
+    assert.equal(login.output.file, "./lagniappe/web/static/login.js");
+    assert.equal(sentry.output.file, "./lagniappe/web/static/sentry.js");
+    assert.equal(main.input.main, "./src/script/main.mjs");
+    assert.equal(main.input.public, "./src/script/public.mjs");
+    assert.deepEqual(Object.keys(main.input).sort(), ["main", "public", ...Object.keys(VIEW_ENTRIES)].sort());
+    for (const [name, source] of Object.entries(VIEW_ENTRIES)) {
+      assert.equal(main.input[name], `./src/script/${source.replace(/^\.\//, "")}`);
+      assert.equal(main.output.entryFileNames({ name }), "chunks/views/[name].js");
+    }
+    assert.equal(main.output.entryFileNames({ name: "main" }), "script.js");
+    assert.equal(main.output.entryFileNames({ name: "public" }), "chunks/views/[name].js");
+    assert.equal(main.output.chunkFileNames, "chunks/[name].js");
+    assert.equal(main.output.dir, "./lagniappe/web/static/");
+    assert.equal(main.output.manualChunks, interactionFoundationChunk);
+    assert.equal(main.output.onlyExplicitManualChunks, true);
+
+    const dependencyEval = { code: "EVAL", id: "/node_modules/vendor/index.js" };
+    const applicationEval = { code: "EVAL", id: "/src/script/app.mjs" };
+    const editorCycle = { code: "CIRCULAR_DEPENDENCY", ids: ["/node_modules/y-prosemirror/index.js"] };
+    const applicationCycle = { code: "CIRCULAR_DEPENDENCY", ids: ["/src/script/app.mjs"] };
+    const otherWarning = { code: "OTHER", id: "/node_modules/vendor/index.js" };
+    const pluginInstances = new Set();
+    for (const bundle of bundles) {
+      assert.equal(bundle.output.format, "esm");
+      assert.match(bundle.output.banner, /third-party-licenses\.txt/);
+      assert.equal(bundle.output.sourcemap, mode === "production" ? false : undefined);
+      assert.equal(bundle.output.minifyInternalExports, mode === "production" ? true : undefined);
+      assert.equal(bundle.plugins.some(plugin => plugin.name === "esbuild-minify"), mode === "production");
+      assert.ok(bundle.plugins.some(plugin => plugin.name === "json"));
+      assert.ok(bundle.plugins.some(plugin => plugin.name === "node-resolve"));
+      for (const plugin of bundle.plugins) {
+        assert.ok(!pluginInstances.has(plugin), `${plugin.name} shares state across bundles`);
+        pluginInstances.add(plugin);
+      }
+      const forwarded = [];
+      for (const warning of [dependencyEval, applicationEval, editorCycle, applicationCycle, otherWarning]) {
+        bundle.onwarn(warning, warning => forwarded.push(warning));
+      }
+      assert.deepEqual(forwarded, bundle === main
+        ? [applicationEval, applicationCycle, otherWarning]
+        : [applicationEval, editorCycle, applicationCycle, otherWarning]);
+    }
+    const pluginNames = main.plugins.map(plugin => plugin.name);
+    assert.equal(pluginNames.includes("startup-budget"), mode === "production");
+    assert.ok(pluginNames.indexOf("version-chunk-imports") < pluginNames.indexOf("replace"));
+    assert.equal(pluginNames.indexOf("postcss") < pluginNames.indexOf("replace"), mode === "production");
+    assert.equal(pluginNames.at(-1), "record-final-build-artifacts");
+    const recorder = main.plugins.at(-1);
     recorder.writeBundle();
     const metadata = JSON.parse(readFileSync(inventory, "utf8"));
     assert.equal(metadata.version, "1.2.3", config);
     assert.equal(metadata.mode, mode);
-    if (mode === "production") {
-      for (const bundle of bundles) {
-        const replacement = bundle.plugins.find(plugin => plugin.name === "replace");
-        const transformed = replacement.transform.call(
-          {}, 'export const version = "__VERSION__";', "version.js",
-        );
-        assert.equal(transformed.code, 'export const version = "1.2.3";');
+    assert.equal(metadata.build_id, "bversiontest");
+    assert.deepEqual(metadata.artifacts, [
+      "lagniappe/web/start/styles/fonts.py",
+      "lagniappe/web/start/styles/icons.py",
+      "lagniappe/web/start/styles/styles.py",
+      "lagniappe/web/static/sw.js",
+    ]);
+    const versions = [];
+    for (const bundle of bundles) {
+      const replacement = bundle.plugins.find(plugin => plugin.name === "replace");
+      const versionCode = mode === "production" ? '"__VERSION__"' : '__VERSION__';
+      const transformed = replacement.transform.call(
+        {}, `export const version = ${versionCode}; export const mode = process.env.NODE_ENV;`, "version.js",
+      );
+      const values = await import(`data:text/javascript,${encodeURIComponent(transformed.code)}`);
+      assert.equal(values.mode, mode);
+      versions.push(values.version);
+      if (mode === "production") assert.equal(values.version, "1.2.3");
+      else assert.equal(new Date(values.version).toISOString(), values.version);
+      if (bundle === main) {
+        const buildId = replacement.transform.call({}, 'export default __BUILD_ID__;', "build.js");
+        assert.equal(buildId.code, 'export default "bversiontest";');
       }
     }
+    assert.equal(new Set(versions).size, 1);
+
   }
 } finally {
   process.chdir(root);

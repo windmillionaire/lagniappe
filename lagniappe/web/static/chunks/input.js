@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7e4189f';
-import { B as BaseElement } from './baseElement.js?v=b7e4189f';
-import { f as formatting } from './formatting.js?v=b7e4189f';
-import { p as primitives } from './primitives.js?v=b7e4189f';
-import './icons.js?v=b7e4189f';
+import { STYLES } from './styles.js?v=b7d16921';
+import { B as BaseElement } from './baseElement.js?v=b7d16921';
+import { f as formatting } from './formatting.js?v=b7d16921';
+import { p as primitives } from './primitives.js?v=b7d16921';
+import './icons.js?v=b7d16921';
 
 /**
  * @testable infrastructure
