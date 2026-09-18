@@ -68,13 +68,12 @@ context.fetch = async (_url, config = {{}}) => {{
 }};
 
 vm.createContext(context);
-let source = fs.readFileSync("src/script/elements/upload.mjs", "utf8");
+let source = fs.readFileSync("src/script/shared/directUpload.mjs", "utf8");
 source = source.replace(/^import .*;\\n/gm, "");
-source = source.replace("export class UploadMenu", "class UploadMenu");
-source = source.replace("export const uploadElement = {{", "const uploadElement = {{");
-source += "\\nglobalThis.uploadElement = uploadElement;";
+source = source.replace("export const directUpload = {{", "const directUpload = {{");
+source += "\\nglobalThis.directUpload = directUpload;";
 vm.runInContext(source, context);
-const uploadElement = context.uploadElement;
+const directUpload = context.directUpload;
 const fetchCallsRef = context.fetchCalls;
 const progressRef = context.progress;
 
@@ -111,7 +110,8 @@ const context = {{
 }};
 
 context.BaseForm = class {{}};
-context.uploadElement = {{ directUpload: {{}} }};
+context.uploadElement = {{}};
+context.directUpload = {{}};
 
 vm.createContext(context);
 let source = fs.readFileSync("src/script/elements/base/baseUpload.mjs", "utf8");
@@ -120,7 +120,7 @@ source = source.replace("export class BaseUpload", "class BaseUpload");
 source += "\\nglobalThis.BaseUpload = BaseUpload;";
 vm.runInContext(source, context);
 const BaseUpload = context.BaseUpload;
-const uploadElement = context.uploadElement;
+const directUpload = context.directUpload;
 
 (async () => {{
 {textwrap.indent(assertion, "  ")}
@@ -139,7 +139,7 @@ def test_direct_upload_resumes_after_network_reset(run_node):
         run_node,
         """
 const file = new File(["abcdefghijkl"], "file.txt", { type: "text/plain" });
-const metadata = await uploadElement.directUpload.upload({
+const metadata = await directUpload.upload({
   file,
   sessionUrl: "https://storage.example.test/session",
   chunkSize: 4,
@@ -185,7 +185,7 @@ context.request = { post: async (route, body, options) => {
 } };
 let error;
 try {
-  await uploadElement.directUpload.createSession({
+  await directUpload.createSession({
     route: "/forms/draft/update", inputName: "draft-image-local", replaceErrorPage: false,
     file: new File(["image"], "image.png", { type: "image/png" }),
   });
@@ -209,7 +209,7 @@ instance.route = "/files/upload";
 instance.fileInput = { element: { files: [file] } };
 instance.showError = (message) => errors.push(message);
 
-uploadElement.directUpload.createSession = async () => {
+directUpload.createSession = async () => {
   throw new Error("session unavailable");
 };
 
@@ -282,7 +282,7 @@ instance.showError = (message) => errors.push(message);
 let sessionCalls = 0;
 let uploadCalls = 0;
 let failThird = true;
-uploadElement.directUpload.createSession = async ({ file }) => {
+directUpload.createSession = async ({ file }) => {
   sessionCalls += 1;
   return {
     chunk_size: 8,
@@ -290,7 +290,7 @@ uploadElement.directUpload.createSession = async ({ file }) => {
     token: `token:${file.name}`,
   };
 };
-uploadElement.directUpload.upload = async ({ file }) => {
+directUpload.upload = async ({ file }) => {
   uploadCalls += 1;
   if (failThird && file.name === "file-2.txt") {
     throw new Error("temporary upload failure");

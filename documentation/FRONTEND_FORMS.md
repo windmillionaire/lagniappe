@@ -122,6 +122,10 @@ to an ordinary HTTP submit.
 
 ## Uploads
 
+`shared/directUpload.mjs` owns direct-upload sessions, resumable chunk transfer,
+retry recovery, and progress callbacks. `BaseUpload` and the Form Builder import
+that client directly. `elements/upload.mjs` owns upload controls and menus.
+
 `BaseUpload` prefers resumable browser-to-Storage upload and submits signed
 metadata after each object completes. The widget checkpoints successful files
 so retry resumes from the first unfinished selection.

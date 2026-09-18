@@ -1,3 +1,4 @@
+import { directUpload } from "../../shared/directUpload";
 import { uploadElement } from "../upload";
 import { BaseForm } from "./baseForm";
 
@@ -402,12 +403,12 @@ export class BaseUpload {
 					completed.push(existing);
 					continue;
 				}
-				const session = await uploadElement.directUpload.createSession({
+				const session = await directUpload.createSession({
 					route: uploadRoute,
 					file,
 					inputName: this.inputName,
 				});
-				const metadata = await uploadElement.directUpload.upload({
+				const metadata = await directUpload.upload({
 					file,
 					sessionUrl: session.session_url,
 					chunkSize: session.chunk_size,

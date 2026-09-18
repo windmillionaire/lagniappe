@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b9107833';
-import { EntityMenu } from './entityMenu.js?v=b9107833';
-import { u as uploadElement } from './upload.js?v=b9107833';
-import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b9107833';
-import { c as connectivity } from './connectivity.js?v=b9107833';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b9107833';
-import { PollingCoordinator } from './polling.js?v=b9107833';
-import { STYLES } from './styles.js?v=b9107833';
-import { s as setIcon } from './icons.js?v=b9107833';
-import { p as primitives } from './primitives.js?v=b9107833';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=b9107833';
-import { F as FacetsBox } from './facets.js?v=b9107833';
+import { SearchBox } from './search.js?v=baf2edcb';
+import { EntityMenu } from './entityMenu.js?v=baf2edcb';
+import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=baf2edcb';
+import { c as connectivity } from './connectivity.js?v=baf2edcb';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=baf2edcb';
+import { d as directUpload } from './directUpload.js?v=baf2edcb';
+import { PollingCoordinator } from './polling.js?v=baf2edcb';
+import { STYLES } from './styles.js?v=baf2edcb';
+import { s as setIcon } from './icons.js?v=baf2edcb';
+import { p as primitives } from './primitives.js?v=baf2edcb';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=baf2edcb';
+import { F as FacetsBox } from './facets.js?v=baf2edcb';
 
 /**
  * @testable true
@@ -168,12 +168,12 @@ class FormChangeStatus {
 }
 
 const CONDITION_REGISTRY = {
-	modify: () => import('./modify.js?v=b9107833'),
-	html: () => import('./html.js?v=b9107833'),
-	status: () => import('./status.js?v=b9107833'),
-	visibility: () => import('./visibility.js?v=b9107833'),
-	columns: () => import('./columns.js?v=b9107833'),
-	options: () => import('./options.js?v=b9107833'),
+	modify: () => import('./modify.js?v=baf2edcb'),
+	html: () => import('./html.js?v=baf2edcb'),
+	status: () => import('./status.js?v=baf2edcb'),
+	visibility: () => import('./visibility.js?v=baf2edcb'),
+	columns: () => import('./columns.js?v=baf2edcb'),
+	options: () => import('./options.js?v=baf2edcb'),
 };
 
 /**
@@ -5741,13 +5741,13 @@ class FormBuilder {
 			if (image.file.size > 1024 * 1024) {
 				let uploaded = image.uploads.get(route);
 				if (!uploaded) {
-					const session = await uploadElement.directUpload.createSession({
+					const session = await directUpload.createSession({
 						route,
 						file: image.file,
 						inputName,
 						replaceErrorPage: false,
 					});
-					const metadata = await uploadElement.directUpload.upload({
+					const metadata = await directUpload.upload({
 						file: image.file,
 						sessionUrl: session.session_url,
 						chunkSize: session.chunk_size,
@@ -5915,7 +5915,7 @@ class FormBuilder {
 	 * @matrix html-field : generated-document-undo retained-editor
 	 */
 	async prepareGeneratedDocuments(htmlFields) {
-		const { default: HtmlEditor } = await import('./html.js?v=b9107833');
+		const { default: HtmlEditor } = await import('./html.js?v=baf2edcb');
 		for (const [id, html] of Object.entries(htmlFields || {})) {
 			const element = this.elements.get(id);
 			if (

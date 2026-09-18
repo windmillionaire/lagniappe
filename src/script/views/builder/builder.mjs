@@ -1,6 +1,5 @@
 import { SearchBox } from "../../elements/combobox/search";
 import { EntityMenu } from "../../elements/entityMenu";
-import { uploadElement } from "../../elements/upload";
 import {
 	captureError,
 	connectivity,
@@ -11,6 +10,7 @@ import {
 	request,
 	withTransition,
 } from "../../shared";
+import { directUpload } from "../../shared/directUpload";
 import { FormChangeStatus } from "./changeStatus";
 import { loadCondition } from "./conditions/loader";
 import { BuilderDraft } from "./draft";
@@ -365,13 +365,13 @@ class FormBuilder {
 			if (image.file.size > 1024 * 1024) {
 				let uploaded = image.uploads.get(route);
 				if (!uploaded) {
-					const session = await uploadElement.directUpload.createSession({
+					const session = await directUpload.createSession({
 						route,
 						file: image.file,
 						inputName,
 						replaceErrorPage: false,
 					});
-					const metadata = await uploadElement.directUpload.upload({
+					const metadata = await directUpload.upload({
 						file: image.file,
 						sessionUrl: session.session_url,
 						chunkSize: session.chunk_size,
