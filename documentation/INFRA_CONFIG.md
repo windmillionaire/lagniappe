@@ -290,3 +290,7 @@ from config import SETTINGS, Directory, Environment, File
 Local commands import `runner/` directly. Installer modules import their
 concrete orchestration owners. Do not re-export local runner or installer
 functions from `config`.
+
+`config.deployment` owns `DeploymentSettingsError`, a `ValueError` subclass,
+alongside deployment normalization. Validation does not import the application.
+`lagniappe.core.exceptions` re-exports the same class for runtime callers.

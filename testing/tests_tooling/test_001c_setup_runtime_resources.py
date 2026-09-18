@@ -2689,8 +2689,14 @@ def test_default_deployment_uses_three_memory_safe_workers():
 
 # @matrix config user-settings : app-yaml deployment-settings validation
 def test_deployment_settings_normalize_validation(monkeypatch):
-    class DeploymentSettingsError(Exception):
-        pass
+    real_import = builtins.__import__
+
+    def import_without_application(name, *args, **kwargs):
+        if name == "lagniappe" or name.startswith("lagniappe."):
+            pytest.fail("Deployment validation must not import application code")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_application)
 
     constants = types.SimpleNamespace(
         DEFAULT_DEPLOYMENT_SETTINGS={
@@ -2705,14 +2711,11 @@ def test_deployment_settings_normalize_validation(monkeypatch):
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
     )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=DeploymentSettingsError),
-    )
     _install_config_package(monkeypatch, constants)
 
-    from config.deployment import normalize_deployment_settings
+    from config.deployment import DeploymentSettingsError, normalize_deployment_settings
+
+    assert issubclass(DeploymentSettingsError, ValueError)
 
     assert normalize_deployment_settings(
         {
@@ -2731,7 +2734,9 @@ def test_deployment_settings_normalize_validation(monkeypatch):
         "DEPLOY_IDLE_TIMEOUT": "15m",
     }
 
-    with pytest.raises(DeploymentSettingsError):
+    with pytest.raises(
+        DeploymentSettingsError, match="^Scaling type must be automatic or basic\\.$"
+    ):
         normalize_deployment_settings({"DEPLOY_SCALING_TYPE": "manual"})
 
     with pytest.raises(DeploymentSettingsError):
@@ -2739,8 +2744,12 @@ def test_deployment_settings_normalize_validation(monkeypatch):
             {"DEPLOY_SCALING_TYPE": "automatic", "DEPLOY_INSTANCE_CLASS": "B2"}
         )
 
-    with pytest.raises(DeploymentSettingsError):
-        normalize_deployment_settings({"DEPLOY_WORKER_COUNT": "0"})
+    for value in ("0", "not-an-integer", None):
+        with pytest.raises(
+            DeploymentSettingsError,
+            match="^Worker count must be an integer greater than or equal to 1\\.$",
+        ):
+            normalize_deployment_settings({"DEPLOY_WORKER_COUNT": value})
 
     for instance_class in ("F2", "B2"):
         with pytest.raises(DeploymentSettingsError, match="at most 3 .*workers"):
@@ -2813,11 +2822,6 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
         SCALING_TYPES=("automatic", "basic"),
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=Exception),
     )
     _install_config_package(monkeypatch, constants)
 
@@ -2894,11 +2898,6 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
         SCALING_TYPES=("automatic", "basic"),
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=Exception),
     )
     _install_config_package(monkeypatch, constants)
 
@@ -3076,11 +3075,6 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
         SCALING_TYPES=("automatic", "basic"),
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=Exception),
     )
     _install_config_package(monkeypatch, constants, settings=settings)
 
