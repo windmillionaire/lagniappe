@@ -6,7 +6,8 @@ import {
 	shift,
 } from "@floating-ui/dom";
 import { STYLES } from "styles";
-import { captureError, generateElementId } from "../../shared";
+import { captureError } from "../../shared/errors";
+import { generateElementId } from "../../shared/utilities";
 import { primitives } from "../primitives";
 
 /**

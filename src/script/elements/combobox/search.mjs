@@ -1,5 +1,6 @@
 import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../../shared";
+import { ENDPOINTS } from "../../shared/endpoints";
+import { request } from "../../shared/request";
 import { RemoteQueryCombobox } from "./remote";
 import { Results } from "./results";
 

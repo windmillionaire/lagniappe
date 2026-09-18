@@ -1,17 +1,17 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=baf2edcb';
-import { r as request } from './foundation.js?v=baf2edcb';
-import './connectivity.js?v=baf2edcb';
-import { Modal } from './modal.js?v=baf2edcb';
-import { Dropdown } from './dropdown.js?v=baf2edcb';
-import { b as createMenuButton } from './toolbar.js?v=baf2edcb';
-import './upstreamUnavailable.js?v=baf2edcb';
-import './icons.js?v=baf2edcb';
-import './combobox.js?v=baf2edcb';
-import './primitives.js?v=baf2edcb';
-import './queryLifecycle.js?v=baf2edcb';
-import './buttons.js?v=baf2edcb';
-import './formatting.js?v=baf2edcb';
+import { STYLES } from './styles.js?v=b560d96b';
+import { r as request } from './foundation.js?v=b560d96b';
+import './connectivity.js?v=b560d96b';
+import { Modal } from './modal.js?v=b560d96b';
+import { Dropdown } from './dropdown.js?v=b560d96b';
+import { b as createMenuButton } from './toolbar.js?v=b560d96b';
+import './upstreamUnavailable.js?v=b560d96b';
+import './icons.js?v=b560d96b';
+import './combobox.js?v=b560d96b';
+import './primitives.js?v=b560d96b';
+import './queryLifecycle.js?v=b560d96b';
+import './buttons.js?v=b560d96b';
+import './formatting.js?v=b560d96b';
 
 /**
  * @testable true

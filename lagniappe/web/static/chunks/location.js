@@ -1,15 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=baf2edcb';
-import { s as setIcon } from './icons.js?v=baf2edcb';
-import { E as ENDPOINTS, r as request } from './foundation.js?v=baf2edcb';
-import './connectivity.js?v=baf2edcb';
-import { p as primitives } from './primitives.js?v=baf2edcb';
-import { updateUserLocation } from './user2.js?v=baf2edcb';
-import { R as RemoteQueryCombobox } from './remote.js?v=baf2edcb';
-import { B as BaseElement } from './baseElement.js?v=baf2edcb';
-import './upstreamUnavailable.js?v=baf2edcb';
-import './queryLifecycle.js?v=baf2edcb';
-import './combobox.js?v=baf2edcb';
+import { STYLES } from './styles.js?v=b560d96b';
+import { s as setIcon } from './icons.js?v=b560d96b';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=b560d96b';
+import { p as primitives } from './primitives.js?v=b560d96b';
+import { updateUserLocation } from './user2.js?v=b560d96b';
+import { R as RemoteQueryCombobox } from './remote.js?v=b560d96b';
+import { B as BaseElement } from './baseElement.js?v=b560d96b';
+import './upstreamUnavailable.js?v=b560d96b';
+import './connectivity.js?v=b560d96b';
+import './queryLifecycle.js?v=b560d96b';
+import './combobox.js?v=b560d96b';
 
 /**
  * @testable true

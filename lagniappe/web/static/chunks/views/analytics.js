@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=baf2edcb';
-import '../upstreamUnavailable.js?v=baf2edcb';
-import '../connectivity.js?v=baf2edcb';
+import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=b560d96b';
+import '../upstreamUnavailable.js?v=b560d96b';
+import '../connectivity.js?v=b560d96b';
 
 /**
  * @testable true

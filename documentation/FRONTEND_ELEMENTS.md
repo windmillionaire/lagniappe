@@ -147,6 +147,15 @@ An unconvertible value returns HTTP 422 with a field-specific error in the form;
 other history-fill controls remain usable. Filling changes only the draft and
 ignores responses after the field is replaced or the user enters a new value.
 
+## Shared imports
+
+Foundational controls import shared helpers from their concrete owners, such as
+`shared/request`, `shared/errors`, `shared/utilities`, and
+`shared/queryLifecycle`. Combobox internals follow this convention. Application
+composition may retain deliberate imports from the shared facade. Preserve
+existing lazy-loading boundaries and shared instances when narrowing imports;
+clearer dependencies alone do not establish a smaller bundle.
+
 ## Primitives
 
 `elements/primitives.mjs` owns DOM factories for inputs, labels, badges,

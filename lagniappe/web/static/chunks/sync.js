@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { l as loadHeadlessWidget } from './core-foundation.js?v=baf2edcb';
-import { i as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=baf2edcb';
-import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=baf2edcb';
-import './connectivity.js?v=baf2edcb';
-import './upstreamUnavailable.js?v=baf2edcb';
+import { l as loadHeadlessWidget } from './core-foundation.js?v=b560d96b';
+import { i as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=b560d96b';
+import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=b560d96b';
+import './connectivity.js?v=b560d96b';
+import './upstreamUnavailable.js?v=b560d96b';
 
 /**
  * Coordinate Yjs document updates through the shared polling protocol.

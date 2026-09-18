@@ -1,4 +1,6 @@
-import { captureError, debounce, QueryLifecycle } from "../../shared";
+import { captureError } from "../../shared/errors";
+import { QueryLifecycle } from "../../shared/queryLifecycle";
+import { debounce } from "../../shared/utilities";
 import { Combobox } from "./combobox";
 
 /**

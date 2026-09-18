@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FONT_MENU } from './toolbar.js?v=baf2edcb';
-import './styles.js?v=baf2edcb';
-import './combobox.js?v=baf2edcb';
-import './foundation.js?v=baf2edcb';
-import './upstreamUnavailable.js?v=baf2edcb';
-import './connectivity.js?v=baf2edcb';
-import './primitives.js?v=baf2edcb';
-import './icons.js?v=baf2edcb';
-import './queryLifecycle.js?v=baf2edcb';
-import './dropdown.js?v=baf2edcb';
-import './buttons.js?v=baf2edcb';
-import './formatting.js?v=baf2edcb';
+import { F as FONT_MENU } from './toolbar.js?v=b560d96b';
+import './styles.js?v=b560d96b';
+import './combobox.js?v=b560d96b';
+import './foundation.js?v=b560d96b';
+import './upstreamUnavailable.js?v=b560d96b';
+import './connectivity.js?v=b560d96b';
+import './primitives.js?v=b560d96b';
+import './icons.js?v=b560d96b';
+import './queryLifecycle.js?v=b560d96b';
+import './dropdown.js?v=b560d96b';
+import './buttons.js?v=b560d96b';
+import './formatting.js?v=b560d96b';
 
 /**
  * @testable true

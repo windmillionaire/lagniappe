@@ -289,7 +289,11 @@ comboboxSource = comboboxSource.replace(
 );
 comboboxSource = comboboxSource.replace('import { STYLES } from "styles";\n', "");
 comboboxSource = comboboxSource.replace(
-  'import { captureError, generateElementId } from "../../shared";\n',
+  'import { captureError } from "../../shared/errors";\n',
+  "",
+);
+comboboxSource = comboboxSource.replace(
+  'import { generateElementId } from "../../shared/utilities";\n',
   "",
 );
 comboboxSource = comboboxSource.replace(

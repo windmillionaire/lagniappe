@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=baf2edcb';
-import { BaseList } from './baseList.js?v=baf2edcb';
-import { r as request, w as withTransition } from './foundation.js?v=baf2edcb';
-import './connectivity.js?v=baf2edcb';
-import { s as setIcon } from './icons.js?v=baf2edcb';
-import './upstreamUnavailable.js?v=baf2edcb';
+import { STYLES } from './styles.js?v=b560d96b';
+import { BaseList } from './baseList.js?v=b560d96b';
+import { r as request, w as withTransition } from './foundation.js?v=b560d96b';
+import './connectivity.js?v=b560d96b';
+import { s as setIcon } from './icons.js?v=b560d96b';
+import './upstreamUnavailable.js?v=b560d96b';
 
 /**
  * @testable infrastructure

@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=baf2edcb';
-import { l as localStore } from './storage.js?v=baf2edcb';
-import { w as withTransition } from './foundation.js?v=baf2edcb';
-import './upstreamUnavailable.js?v=baf2edcb';
-import './connectivity.js?v=baf2edcb';
+import { BaseList } from './baseList.js?v=b560d96b';
+import { l as localStore } from './storage.js?v=b560d96b';
+import { w as withTransition } from './foundation.js?v=b560d96b';
+import './upstreamUnavailable.js?v=b560d96b';
+import './connectivity.js?v=b560d96b';
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 
@@ -325,7 +325,7 @@ class ToolReportList extends BaseList {
 		if (!element) return;
 		this._openingDelete = true;
 		try {
-			const { Modal } = await import('./modal.js?v=baf2edcb');
+			const { Modal } = await import('./modal.js?v=b560d96b');
 			if (this._destroyed) return;
 			this._deleteModal?.destroy();
 			const modal = new Modal(this.view, trigger);
@@ -375,7 +375,7 @@ class ToolReportList extends BaseList {
 		error.hidden = true;
 		this._renderFilters();
 		try {
-			const { request } = await import('./foundation.js?v=baf2edcb').then(function (n) { return n.n; });
+			const { request } = await import('./foundation.js?v=b560d96b').then(function (n) { return n.n; });
 			const response = await request.delete(route, { keys });
 			if (!response?.ok)
 				throw new Error("Reports could not be deleted. Please try again.");

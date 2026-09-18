@@ -1,6 +1,8 @@
 import { STYLES } from "styles";
-import { ENDPOINTS, request, updateUserLocation } from "../../shared";
+import { ENDPOINTS } from "../../shared/endpoints";
 import { setIcon } from "../../shared/icons";
+import { request } from "../../shared/request";
+import { updateUserLocation } from "../../shared/user";
 import { RemoteQueryCombobox } from "./remote";
 
 /**
