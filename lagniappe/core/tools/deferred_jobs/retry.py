@@ -42,7 +42,7 @@ def _retryable(error):
     seen = set()
     current = error
     while current is not None and id(current) not in seen:
-        from lagniappe.core.tools.ai.core import is_provider_transient_error
+        from lagniappe.core.tools.ai.provider_policy import is_provider_transient_error
 
         if isinstance(current, transient) or is_provider_transient_error(current):
             return True

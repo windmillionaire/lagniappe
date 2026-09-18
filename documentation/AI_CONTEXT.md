@@ -41,6 +41,12 @@ Foreground calls use the normal SDK retry profile. Other deferred jobs use at mo
 two SDK attempts so durable job backoff owns longer outages. See
 [BACKEND_JOBS.md](BACKEND_JOBS.md).
 
+`provider_policy.py` owns shared retry options, provider error details/messages,
+and quota/transient classification. `GenAI` and `ProviderSession` use that
+policy directly. The session manages request lifecycle and uses execution
+control's deadline and durable retry budget. Existing helper imports from
+`core.py` remain available as aliases.
+
 ## Function-tool loop
 
 Workflows explicitly select the declarations available to Gemini. When the

@@ -1,9 +1,10 @@
 """AI-powered image generation for pages."""
 
 from ... import exceptions
-from .core import ai_model, provider_error_message
+from .core import ai_model
 from .guidelines import IMAGE_PROMPT_RULES
 from .prompt import Prompt
+from .provider_policy import provider_error_message
 
 GENERIC_MESSAGE = "Image generation failed."
 

@@ -41,8 +41,9 @@ def test_blocked_request_is_cancelled_and_closed(monkeypatch):
     assert events == ["cancelled", "closed", "sync_closed"]
 
 
-# @matrix ai : cancellation deadline retry-ownership
-def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch):
+# @matrix ai : cancellation deadline retry-ownership service-tier
+@pytest.mark.parametrize("service_tier", [None, "priority", "flex"])
+def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch, service_tier):
     calls = []
     retries = []
     contents = ["existing conversation"]
@@ -65,6 +66,14 @@ def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch):
     control = SimpleNamespace(ensure_active=lambda: None, remaining_seconds=10, claim_provider_retry=claim_retry)
     session = provider_session.ProviderSession(control)
     config = types.GenerateContentConfig()
+    headers = None
+    if service_tier:
+        headers = {
+            "X-Vertex-AI-LLM-Request-Type": "shared",
+            "X-Vertex-AI-LLM-Shared-Request-Type": service_tier,
+        }
+        config.http_options = types.HttpOptions(headers=headers)
+    original_config = config.model_dump()
     try:
         assert session.request(model="fake", contents=contents, config=config) == "proposal"
         with pytest.raises(httpx.ReadTimeout):
@@ -75,4 +84,5 @@ def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch):
     assert all(call["contents"] is contents for call in calls)
     assert all(call["config"].http_options.retry_options.attempts == 1 for call in calls)
     assert all(call["config"].http_options.timeout == 10000 for call in calls)
-    assert config.http_options is None
+    assert all(call["config"].http_options.headers == headers for call in calls)
+    assert config.model_dump() == original_config
