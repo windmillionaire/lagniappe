@@ -2251,8 +2251,10 @@ def merge_remote_evidence(local, remote):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_result_directory_import_requires_the_exact_source
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_import_replaces_retired_parameter_results
 # @tests tests_tooling/test_009_hosted_e2e.py::test_traceability_common_import_does_not_require_playwright
 # @matrix hosted-e2e traceability : ci-import evidence merge provenance source-integrity
+# @matrix hosted-e2e : suite-scope failure-retention
 def import_result_directory(directory, *, expected_execution=None):
     """Validate and merge an already-downloaded hosted result directory."""
     from testing.utility.traceability_common import (
@@ -2289,7 +2291,18 @@ def import_result_directory(directory, *, expected_execution=None):
 
     remote = load_json(directory / "evidence.json")
     evidence_path = APP_DIR / LATEST_TEST_RUN
-    merged = merge_remote_evidence(load_json(evidence_path), remote)
+    local = load_json(evidence_path)
+    if (
+        manifest.get("suite") == "all"
+        and "targets" not in manifest
+        and manifest.get("exit_status") == 0
+        and isinstance(remote, dict)
+        and remote.get("exit_status") == 0
+    ):
+        # A complete successful inventory supersedes retired test IDs, including
+        # bare functions that now have parameters. Partial runs still merge.
+        local = None
+    merged = merge_remote_evidence(local, remote)
     write_json(evidence_path, merged)
     return manifest
 

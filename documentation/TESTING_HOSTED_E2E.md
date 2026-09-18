@@ -199,6 +199,12 @@ different result can be downloaded for diagnosis but cannot merge into tracked
 evidence. Failed results import their failures and bounded tracebacks as the
 latest selected evidence.
 
+A successful complete `all` run replaces the local test inventory, removing
+retired node IDs and old parameter variants. Failed, focused, and E2E-only runs
+merge into existing evidence so unselected tests and earlier failures remain
+visible. Both the execution manifest and its evidence must report success
+before a complete import replaces prior results.
+
 Use manifest start/end timestamps plus its exact App Engine service/version to
 query Cloud Logging after a failure. Logs can contain request paths, IPs, and
 user agents; narrow and sanitize them before sharing.
