@@ -134,9 +134,9 @@ def ordinary_notification_key(user, identifier):
     return create_named_key("notification", identifier, parent=user)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/notifications.py::create_ordinary_notification_record
-# @reason raw row construction is exercised through ordinary notification creation
+# @testable true
+# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
+# @matrix notifications : body html-stripping
 def prepare_ordinary_notification(key, user, *, body, target=None):
     now = datetime.now(timezone.utc)
     row = DatastoreEntity(key=key, exclude_from_indexes=("body",))

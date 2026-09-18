@@ -371,32 +371,6 @@ def test_home_note_visibility_across_users(get_user):
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @matrix activity : body create html-stripping notes-exclusion parent
-# @matrix notifications : body create html-stripping parent
-# @template notifications.html::item
-def test_notification_channel_uses_menu_not_home_notes(get_user):
-    user = get_user(Users.OWNER)
-    note_body = _unique("Process notification control note")
-    raw_body = f"<em>{_unique('Process notification complete')}</em>"
-    visible_body = raw_body.replace("<em>", "").replace("</em>", "")
-
-    _save_note(user, note_body)
-    _save_notification(user, raw_body)
-
-    home = user.go(SitePages.HOME)
-    home.activity_list
-    expect(_activity_item(home, note_body)).to_be_visible()
-    expect(_activity_item(home, visible_body)).not_to_be_attached()
-
-    notifications = user.locate("[data-role='notifications']")
-    expect(notifications).to_be_visible(timeout=15000)
-    notifications.click()
-    panel = user.page.locator("[role='listbox'][data-visible='true']")
-    option = panel.locator("[role='option']").filter(has_text=visible_body)
-    expect(option).to_be_visible()
-    expect(option).not_to_contain_text("<em>")
-
-
 # @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
 # @template notifications.html::item
 def test_notification_menu_renders_target_and_preserves_pending_state(get_user):

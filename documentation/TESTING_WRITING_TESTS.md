@@ -165,6 +165,11 @@ timeouts to cover an unexplained race. A longer timeout is appropriate only
 when the product operation itself has a known longer budget, such as a real
 provider call.
 
+The shared pytest configuration prints thread stacks after a test runs for
+three minutes. This is diagnostic only; it does not stop the test or change its
+outcome. Keep browser waits bounded, and prefer visible-result assertions over
+awaiting an internal render promise without a deadline.
+
 Capture one-time values only after the relevant state has settled. Prefer
 `expect(locator).to_have_text(...)` or `to_have_attribute(...)` to immediate
 `inner_text()`, `is_visible()`, or attribute snapshots.

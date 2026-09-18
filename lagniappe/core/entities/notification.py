@@ -50,12 +50,8 @@ class Notification(Entity):
         return database_notifications.notification_keys(parent)
 
     # @testable true
-    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
-    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
-    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
-    # @matrix activity : body create parent
-    # @matrix notifications : body create parent pending target
-    # @pair activity:notes-only
+    # @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
+    # @matrix notifications : body create
     @classmethod
     def create(cls, data):
         parent = data.get("parent")

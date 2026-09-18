@@ -886,6 +886,7 @@ def test_text_only_organize_plans_updates(get_user):
 
 
 # @matrix deferred-jobs : polling progress terminal-ownership
+# @matrix notifications : body create
 # @template home/tools.html::report_item
 # @template notifications.html::item
 @pytest.mark.parametrize("surface", ["home", "report"])

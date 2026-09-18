@@ -60,7 +60,6 @@ def get(kind):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
 # @matrix activity : cached-response load notes-exclusion notes-only
 # @matrix notes : cached-response load notes-only
 @internal.route("/activity")

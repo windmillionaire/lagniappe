@@ -362,7 +362,8 @@ def test_generate_text_live_page_context_with_tasks_and_files(get_user, request,
 
     assert generated_response.ok, response_body
 
-    editor.wait_for_render()
+    expect(editor.text_entry).to_contain_text(source_text)
+    expect(editor.text_entry).not_to_have_text(source_text)
     final_text = editor.get_text()
     report.record("document_after", final_text)
 
