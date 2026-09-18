@@ -166,8 +166,9 @@ for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 ## Operator output
 
 Follow [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) for the presentation contract.
-`runner/console.py` owns dependency-free layout; `runner/presentation.py` owns
-semantic styles and Rich progress. Bootstrap remains usable before Rich is
+`runner/console.py` owns layout; `runner/presentation.py` owns semantic styles
+and Rich progress. Both use `runner/terminal.py` for literal styling and lazy
+Rich console construction. Bootstrap remains usable before Rich is
 installed. The shared renderer preserves literal values and existing input
 semantics, respects `NO_COLOR`, and uses static progress where animation is
 unavailable. Windows validation targets PowerShell running `.\setup.cmd`.

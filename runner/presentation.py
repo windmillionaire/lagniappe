@@ -9,9 +9,9 @@ from runner.console import (
     ProgressLabel,
     format_value,
     terminal_width,
-    unstyle,
     wrap_text,
 )
+from runner.terminal import _console, styled, unstyle
 
 
 ACTIVE_PROGRESS = []
@@ -30,57 +30,6 @@ def supports_unicode(stream, text):
 
 
 # @testable false
-# @covered-by runner/presentation.py::styled
-# @reason optional renderer keeps bootstrap and read-only commands dependency-free
-def _console(stream=None):
-    stream = sys.stdout if stream is None else stream
-    try:
-        from rich.console import Console
-    except ImportError:
-        return None
-    tty = bool(getattr(stream, "isatty", lambda: False)())
-    styled_output = (
-        tty
-        and "NO_COLOR" not in os.environ
-        and os.environ.get("TERM", "").lower() not in {"dumb", "unknown"}
-    )
-    console = Console(
-        file=stream,
-        force_terminal=tty,
-        force_jupyter=False,
-        color_system="auto" if styled_output else None,
-        markup=False,
-        highlight=False,
-        emoji=False,
-    )
-    # Builtin input consumes prompt strings. Keep those strings portable in
-    # PowerShell's older console host, which cannot reliably render ANSI.
-    if console.legacy_windows:
-        console = Console(
-            file=stream, force_terminal=False, color_system=None,
-            force_jupyter=False, markup=False, highlight=False, emoji=False,
-            legacy_windows=True,
-        )
-    return console
-
-
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
-# @matrix setup : package-install spinner
-def styled(message, style, *, stream=None):
-    """Return a literal styled span without introducing wrapping or markup."""
-    text = unstyle(message)
-    console = _console(stream)
-    if console is None or console.color_system is None:
-        return text
-    from rich.text import Text
-
-    with console.capture() as capture:
-        console.print(Text(text, style=style), end="", soft_wrap=True)
-    return capture.get()
-
-
-# @testable false
 # @covered-by runner/presentation.py::status
 # @reason format-only section heading follows the shared semantic style contract
 def heading(message):
@@ -88,14 +37,14 @@ def heading(message):
 
 
 # @testable false
-# @covered-by runner/presentation.py::styled
+# @covered-by runner/terminal.py::styled
 # @reason literal inline emphasis shares the renderer's terminal and plain fallbacks
 def emphasis(message, *, stream=None):
     return styled(message, "bold", stream=stream)
 
 
 # @testable false
-# @covered-by runner/presentation.py::styled
+# @covered-by runner/terminal.py::styled
 # @reason exact action targets share the renderer's literal span contract
 def literal(message, *, stream=None):
     return styled(message, "cyan", stream=stream)
