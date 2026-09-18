@@ -184,6 +184,10 @@ generic collection refresh targets.
 instance per component. Unknown names receive `DefaultWidget`, which provides
 only visibility and configuration for simple show/hide targets.
 
+`widgets/userSettings.mjs` owns `UserSettings`, including user groups, Page
+associations, notification preferences, and API-key controls. It extends
+`PagePermissions`; `widgets/pageInfo.mjs` owns Page information and creation.
+
 The loader provides `enable()`, `disable()`, and synchronous `reconcile()`.
 Widgets implement only the members they need:
 

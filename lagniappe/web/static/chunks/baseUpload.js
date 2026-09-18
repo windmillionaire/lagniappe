@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { u as uploadElement } from './upload.js?v=bedf900f';
-import { B as BaseForm } from './baseForm.js?v=bedf900f';
+import { u as uploadElement } from './upload.js?v=b9107833';
+import { B as BaseForm } from './baseForm.js?v=b9107833';
 
 const PASTE_ERROR =
 	"File detected in clipboard but not accessible. Try pressing Cmd+V (Mac) or Ctrl+V (Windows/Linux) to paste instead.";

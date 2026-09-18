@@ -74,7 +74,7 @@ const WIDGETS = {
 	TaskMove: () => import("./taskSettings"),
 	ToolReportList: () => import("./home/lists"),
 	TaskSettings: () => import("./taskSettings"),
-	UserSettings: () => import("./pageInfo"),
+	UserSettings: () => import("./userSettings"),
 };
 
 /** Sync-capable widgets that can run without a mounted view (offline replay). */

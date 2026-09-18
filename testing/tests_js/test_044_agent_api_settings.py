@@ -50,7 +50,7 @@ context.PagePermissions = class {
 context.globalThis = context;
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/widgets/pageInfo.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/userSettings.mjs", "utf8");
 source = source.replace(/^import .*;\n/gm, "");
 source = source.replaceAll("export class ", "class ");
 source += "\nglobalThis.UserSettings = UserSettings;";
@@ -183,7 +183,7 @@ context.PagePermissions = class {
 context.globalThis = context;
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/widgets/pageInfo.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/userSettings.mjs", "utf8");
 source = source.replace(/^import .*;\n/gm, "");
 source = source.replaceAll("export class ", "class ");
 source += "\nglobalThis.UserSettings = UserSettings;";

@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../foundation.js?v=bedf900f';
-export { E as default } from '../index-foundation.js?v=bedf900f';
-import '../core-foundation.js?v=bedf900f';
-import '../upstreamUnavailable.js?v=bedf900f';
-import '../connectivity.js?v=bedf900f';
+import '../foundation.js?v=b9107833';
+export { E as default } from '../index-foundation.js?v=b9107833';
+import '../core-foundation.js?v=b9107833';
+import '../upstreamUnavailable.js?v=b9107833';
+import '../connectivity.js?v=b9107833';
