@@ -396,12 +396,12 @@ def test_add_multiple_files_to_page_without_existing_file_select(get_user, reque
     def check_summaries(number):
         nonlocal retried
         if number > 1:
-            from lagniappe.core.tools import ai
+            from lagniappe.core.tools.ai.reporting.completion import files as report_files
             from lagniappe.core.tools.ai.core import ai_model
             ai_model.initialize()
             # Retry summary generation for the already uploaded identities.
             # Reposting the upload would duplicate files after a partial success.
-            ai.summarize_report_input_files(SimpleNamespace(input_files=files), search=True, raise_quota=False)
+            report_files.summarize_report_input_files(SimpleNamespace(input_files=files), search=True, raise_quota=False)
             Entities.save(*files)
             retried = True
         quota_errors = []

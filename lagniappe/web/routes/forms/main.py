@@ -8,7 +8,7 @@ from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import schema as ai_schema
 from lagniappe.core.tools.forms import drafts as form_drafts
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
@@ -358,11 +358,11 @@ def create_schema():
         if not isinstance(request_id, str) or not form_drafts.IMAGE_ID.fullmatch(request_id) or revision < 0:
             raise exceptions.ValidationError("Generation needs a valid draft request identity.")
         draft = {"schema": schema, "html_fields": html_fields}
-        prompt = ai.form_generation_prompt(form.form_type, description=description, draft=draft)
+        prompt = ai_schema.form_generation_prompt(form.form_type, description=description, draft=draft)
         if request.form.get("explain"):
             return responses.explain(prompt)
         sources = _draft_image_sources(form, html_fields)
-        result = ai.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
+        result = ai_schema.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
             value, draft, form_type=form.form_type, image_sources=sources,
         ))
         current = Entities.fetch_one(form.key, request=Fetch.direct())

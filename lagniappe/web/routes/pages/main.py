@@ -10,7 +10,7 @@ from lagniappe.core.definitions import (
     FileConsumerLimitError,
     enforce_file_consumer,
 )
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.auth.references import (
@@ -240,7 +240,7 @@ def _autofill_data(page, request, create=False):
             )
         except FileConsumerLimitError as error:
             abort(422, description=str(error))
-    return ai.autofill_prompt_data(
+    return ai_autofill.autofill_prompt_data(
         page,
         current_user,
         user_context=request.form.get("autofill-description"),
@@ -386,7 +386,7 @@ def update(key, **kwargs):
                 return responses.error(str(error))
         if role == "explain":
             try:
-                prompt = ai.form_autofill_prompt(**_autofill_data(page, request))
+                prompt = ai_autofill.form_autofill_prompt(**_autofill_data(page, request))
                 return responses.explain(prompt)
             finally:
                 direct_uploads.cleanup_direct_uploads(
@@ -522,7 +522,7 @@ def create(key, **kwargs):
         require_ai_access(AI.CREATE)
         if role == "explain":
             try:
-                prompt = ai.form_autofill_prompt(
+                prompt = ai_autofill.form_autofill_prompt(
                     **_autofill_data(page, request, create=True)
                 )
                 return responses.explain(prompt)

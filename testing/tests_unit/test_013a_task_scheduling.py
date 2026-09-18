@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from lagniappe.core.exceptions import AIException
 
-_AI_PATCH = "lagniappe.core.properties.task_scheduling.ai.generate_schedule"
+_AI_PATCH = "lagniappe.core.properties.task_scheduling.ai_dates.generate_schedule"
 _USER_TZ_PATCH = "lagniappe.core.tools.dates.user_timezone"
 
 
@@ -46,7 +46,7 @@ def test_task_scheduled(get_test_entities):
 
     Scheduled has:
     - modes: daily (no AI), weekly (no AI), monthly (AI), yearly (AI)
-    - create() calls ai.generate_schedule (dict or AIException)
+    - create() calls ai_dates.generate_schedule (dict or AIException)
     """
     for task in get_test_entities():
         form_data = task.test_spec.get("form_data", {})
@@ -112,7 +112,7 @@ def test_task_scheduled(get_test_entities):
 def test_task_periodic(get_test_entities):
     """Test Periodic schedule property (ProcessProperty).
 
-    update() requires start-date; create() uses ai.generate_schedule (dict or AIException).
+    update() requires start-date; create() uses ai_dates.generate_schedule (dict or AIException).
     """
     for task in get_test_entities():
         form_data = task.test_spec.get("form_data", {})

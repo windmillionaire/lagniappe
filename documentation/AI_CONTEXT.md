@@ -5,6 +5,29 @@ permission-filtered context, files, and optional function declarations. The
 provider may choose which available read tools to call; application validation
 owns the safety of the final result.
 
+## Import boundaries
+
+The `tools.ai` package exposes only the explicit `initialize()` startup entry
+point. That call loads `core.ai_model` and initializes the same shared provider
+client used by generation modules. Importing the package itself does not load
+generation, report, upload, or provider-client workflows.
+
+Import feature operations from their owning modules: `autofill`, `dates`,
+`images`, `text`, `category`, `project`, `schema`, and `summarize` own their
+respective prompts and generation. `planner` owns report generation;
+`reporting/completion/files.py` owns input summaries, `reporting/uploads.py`
+owns upload manifests, `reporting/proposals/selection.py` owns action selection,
+and `reporting/execution/{ledger,runner}.py` own execution state and execution.
+Use module-qualified calls when a shared operation needs a replaceable test
+boundary, and patch that owner in tests. These operations are no longer
+re-exported from `tools.ai`.
+
+Shared policy and contract modules can now be imported without entering those
+workflows. This does not make every AI submodule independent: generation still
+loads its declared tool registry and entity dependencies, and Python still
+initializes the parent `lagniappe` configuration package. Preserve deliberate
+lazy imports and the single `core.ai_model` instance.
+
 ## Prompt contract
 
 `Prompt` contains more than the string returned by `build()`:

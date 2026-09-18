@@ -25,7 +25,7 @@ def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch
         report_history.DeferredJobs, "cancel", lambda job: effects.append("cancel")
     )
     monkeypatch.setattr(
-        report_history.ai,
+        report_history.report_uploads,
         "cleanup_report_upload_manifest",
         lambda report: effects.append("uploads"),
     )

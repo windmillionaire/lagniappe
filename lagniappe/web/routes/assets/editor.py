@@ -4,7 +4,9 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import images as ai_images
+from lagniappe.core.tools.ai import references as ai_references
+from lagniappe.core.tools.ai import text as ai_text
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import sanitize_form_content_html
 from lagniappe.core.tools.forms.definitions import (
@@ -152,11 +154,11 @@ def add_document_image(key, **kwargs):
             page_details = {"document": content}
 
         try:
-            prompt = ai.page_image_generation_prompt(
+            prompt = ai_images.page_image_generation_prompt(
                 user_prompt=user_prompt,
                 page_details=page_details,
             )
-            file = ai.generate_ai_image(prompt)
+            file = ai_images.generate_ai_image(prompt)
         except exceptions.AIException as e:
             return responses.error(str(e), exception=e)
     else:
@@ -210,7 +212,7 @@ def generate_text(key, **kwargs):
     field = request.values.get("field")
 
     try:
-        context_data = ai.document_generation_context(
+        context_data = ai_text.document_generation_context(
             entity,
             user=current_user,
             field=field,
@@ -221,16 +223,16 @@ def generate_text(key, **kwargs):
     if request.form.get("selected_text"):
         context_data["selected_text"] = request.form.get("selected_text").strip()
 
-    prompt = ai.text_generation_prompt(user_prompt, context_data)
+    prompt = ai_text.text_generation_prompt(user_prompt, context_data)
     if request.form.get("role") == "explain":
         return responses.explain(prompt)
 
     try:
-        markdown = ai.generate_ai_text(prompt)
+        markdown = ai_text.generate_ai_text(prompt)
     except exceptions.AIException as e:
         return responses.error(str(e), exception=e)
 
-    return responses.document_html(ai.render_ai_markdown(markdown))
+    return responses.document_html(ai_references.render_ai_markdown(markdown))
 
 
 # @testable true

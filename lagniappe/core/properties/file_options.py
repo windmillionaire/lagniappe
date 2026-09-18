@@ -1,5 +1,5 @@
 from ..mixins import ColumnMixin
-from ..tools.ai import summarize_file
+from ..tools.ai.summarize import summarize_file
 from ..tools.files.extract import get_file_text
 from .base_process import ProcessProperty
 from .base_property import Property

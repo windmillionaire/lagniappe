@@ -280,7 +280,7 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_a
 
         prompts = []
         monkeypatch.setattr(
-            autofill_adapter.ai,
+            autofill_adapter.ai_autofill,
             "generate_autofilled_submission",
             lambda prompt, *, entity, user: prompts.append(prompt)
             or {"input-textab12": expected_text},

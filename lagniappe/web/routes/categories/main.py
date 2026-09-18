@@ -3,7 +3,8 @@ from flask_login import current_user
 
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai, filters
+from lagniappe.core.tools import filters
+from lagniappe.core.tools.ai import category as ai_category
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.definitions import (
     AI,
@@ -140,12 +141,12 @@ def create():
 
     if generate:
         require_ai_access(AI.CREATE)
-        prompt = ai.category_creation_prompt(request.form.get("user_description"))
+        prompt = ai_category.category_creation_prompt(request.form.get("user_description"))
         if explain:
             return responses.explain(prompt)
 
         try:
-            results = ai.generate_category(prompt)
+            results = ai_category.generate_category(prompt)
             generated_data = _generate_category(results)
         except (exceptions.AIException, Exception) as e:
             return responses.error(str(e), exception=e)

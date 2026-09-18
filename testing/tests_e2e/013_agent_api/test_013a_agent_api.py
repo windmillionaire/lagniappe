@@ -11,7 +11,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai as ai_tools
+from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
@@ -2164,7 +2164,7 @@ def test_api_report_browser_mutations_reject_fenced_state_without_side_effects(
     )
     monkeypatch.setattr(DeferredJobs, "cancel", forbidden_side_effect)
     monkeypatch.setattr(
-        ai_tools,
+        report_uploads,
         "cleanup_report_upload_manifest",
         forbidden_side_effect,
     )
@@ -2209,7 +2209,7 @@ def test_api_report_delete_rejects_active_execution_without_side_effects(monkeyp
     )
     monkeypatch.setattr(DeferredJobs, "cancel", forbidden_side_effect)
     monkeypatch.setattr(
-        ai_tools,
+        report_uploads,
         "cleanup_report_upload_manifest",
         forbidden_side_effect,
     )

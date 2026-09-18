@@ -226,7 +226,7 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
         set_phase=lambda phase, **details: phases.append((phase, details)),
     )
     monkeypatch.setattr(
-        autofill_adapters.ai,
+        autofill_adapters.ai_autofill,
         "autofill_summary_dependencies",
         lambda *_args: {
             "complete": [SimpleNamespace()],
@@ -235,7 +235,7 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        autofill_adapters.ai,
+        autofill_adapters.ai_autofill,
         "generate_autofilled_submission",
         lambda _prompt: (_ for _ in ()).throw(
             AssertionError("Gemini must not run before summaries complete")
@@ -254,7 +254,7 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
     )
 
     monkeypatch.setattr(
-        autofill_adapters.ai,
+        autofill_adapters.ai_autofill,
         "autofill_summary_dependencies",
         lambda *_args: {
             "complete": [],
@@ -311,7 +311,7 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
         lambda user: datetime(2026, 8, 21, tzinfo=timezone.utc),
     )
     monkeypatch.setattr(
-        autofill_adapters.ai,
+        autofill_adapters.ai_autofill,
         "generate_autofilled_submission",
         lambda _prompt: (_ for _ in ()).throw(
             AssertionError("a resumed checkpoint must not regenerate")

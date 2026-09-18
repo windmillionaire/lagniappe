@@ -148,12 +148,12 @@ def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatc
     report = SimpleNamespace(summary=None, instructions="Question", input_files=[])
     saved = []
     monkeypatch.setattr(
-        report_adapters.ai,
+        report_adapters.report_uploads,
         "finalize_report_upload_manifest",
         lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
-        report_adapters.ai,
+        report_adapters.report_files,
         "summarize_report_input_files",
         lambda *_args, **_kwargs: [SimpleNamespace()],
     )
@@ -289,7 +289,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         }
         return current.result
 
-    monkeypatch.setattr(report_adapters.ai, "run_report", run_report)
+    monkeypatch.setattr(report_adapters.report_runner, "run_report", run_report)
 
     result = adapter.apply(context)
 
@@ -669,14 +669,14 @@ def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):
         process=SimpleNamespace(set_proposal=set_proposal)
     )
     monkeypatch.setattr(
-        report_adapters.ai, "finalize_report_upload_manifest", lambda *a, **k: None
+        report_adapters.report_uploads, "finalize_report_upload_manifest", lambda *a, **k: None
     )
     monkeypatch.setattr(
-        report_adapters.ai,
+        report_adapters.report_files,
         "summarize_report_input_files",
         lambda *a, **k: summaries.append(k),
     )
-    monkeypatch.setattr(report_adapters.ai, "generate_report", generate)
+    monkeypatch.setattr(report_adapters.report_planner, "generate_report", generate)
     monkeypatch.setattr(
         report_adapters.Entities, "save", lambda *entities: saved.append(entities)
     )

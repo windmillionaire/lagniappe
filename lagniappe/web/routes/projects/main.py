@@ -1,7 +1,8 @@
 from flask import abort, request
 
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, filters
+from lagniappe.core.tools import filters
+from lagniappe.core.tools.ai import project as ai_project
 from lagniappe.core.definitions import (
     AI,
     Action,
@@ -108,12 +109,12 @@ def create():
 
     if generate:
         require_ai_access(AI.CREATE)
-        prompt = ai.project_creation_prompt(request.form.get("user_description"))
+        prompt = ai_project.project_creation_prompt(request.form.get("user_description"))
         if explain:
             return responses.explain(prompt)
 
         try:
-            generated_data = ai.generate_project(prompt)
+            generated_data = ai_project.generate_project(prompt)
         except (exceptions.AIException, Exception) as e:
             return responses.error(str(e), exception=e)
 

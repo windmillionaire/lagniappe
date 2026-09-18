@@ -15,7 +15,8 @@ from lagniappe.core.definitions import (
     FileConsumer,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, dates
+from lagniappe.core.tools import dates
+from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
@@ -187,7 +188,7 @@ class AutofillAdapter(DeferredJobAdapter):
         existing_checkpoint = getattr(context, "checkpoint", None) or {}
         prepared_submission = existing_checkpoint.get("submission")
         if "submission" not in existing_checkpoint:
-            dependencies = ai.autofill_summary_dependencies(
+            dependencies = ai_autofill.autofill_summary_dependencies(
                 context.input("target"),
                 context.actor,
             )
@@ -218,16 +219,16 @@ class AutofillAdapter(DeferredJobAdapter):
             else None
         )
         if "submission" not in existing_checkpoint:
-            prompt_data = ai.autofill_prompt_data(
+            prompt_data = ai_autofill.autofill_prompt_data(
                 context.input("target"),
                 context.actor,
                 user_context=context.parameters.get("user_context"),
                 file=upload,
                 mimetype=context.parameters.get("mimetype"),
             )
-            prompt = ai.form_autofill_prompt(**prompt_data)
+            prompt = ai_autofill.form_autofill_prompt(**prompt_data)
             context.set_phase(DeferredJobPhase.GENERATING)
-            prepared_submission = ai.generate_autofilled_submission(
+            prepared_submission = ai_autofill.generate_autofilled_submission(
                 prompt, entity=context.input("target"), user=context.actor
             )
 

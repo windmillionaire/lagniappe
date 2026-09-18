@@ -6,7 +6,7 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai.reporting.completion import files as report_files
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -152,7 +152,7 @@ def _summarize_page_uploads(files):
         return []
 
     report = SimpleNamespace(input_files=files)
-    return ai.summarize_report_input_files(
+    return report_files.summarize_report_input_files(
         report,
         search=request.form.get("search-summary") is not None,
         raise_quota=False,

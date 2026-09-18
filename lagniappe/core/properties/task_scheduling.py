@@ -1,4 +1,5 @@
-from ..tools import ai, dates
+from ..tools import dates
+from ..tools.ai import dates as ai_dates
 from ..tools.tasks import scheduling
 from ..exceptions import AIException, capture
 from .base_process import ProcessProperty
@@ -38,7 +39,7 @@ class ScheduleType(ProcessProperty):
             return
 
         self._user_prompt = value
-        self._prompt = ai.scheduling_prompt(mode=mode, user_prompt=value)
+        self._prompt = ai_dates.scheduling_prompt(mode=mode, user_prompt=value)
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
@@ -51,7 +52,7 @@ class ScheduleType(ProcessProperty):
             return
 
         try:
-            result = ai.generate_schedule(self.prompt)
+            result = ai_dates.generate_schedule(self.prompt)
         except AIException as e:
             capture(e)
             self.error = str(e)

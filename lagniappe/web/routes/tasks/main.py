@@ -15,7 +15,8 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
-from lagniappe.core.tools import ai, dates
+from lagniappe.core.tools import dates
+from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools.forms.definitions import history_groups, history_values_for
 from lagniappe.core.tools.database import get as database_get
@@ -613,7 +614,7 @@ def _autofill_data(task, request):
             )
         except FileConsumerLimitError as error:
             abort(422, description=str(error))
-    return ai.autofill_prompt_data(
+    return ai_autofill.autofill_prompt_data(
         task,
         current_user,
         user_context=request.form.get("autofill-description"),
@@ -720,7 +721,7 @@ def update(key, **kwargs):
         require_ai_access(AI.CREATE)
         if explain == "autofill":
             try:
-                prompt = ai.form_autofill_prompt(**_autofill_data(task, request))
+                prompt = ai_autofill.form_autofill_prompt(**_autofill_data(task, request))
                 return responses.explain(prompt)
             finally:
                 direct_uploads.cleanup_direct_uploads(

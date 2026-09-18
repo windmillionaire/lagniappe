@@ -14,8 +14,12 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
-from lagniappe.core.tools import ai
 from lagniappe.core.tools.ai import external_operations
+from lagniappe.core.tools.ai import planner as report_planner
+from lagniappe.core.tools.ai.reporting import uploads as report_uploads
+from lagniappe.core.tools.ai.reporting.completion import files as report_files
+from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
+from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.database import agent_api as agent_api_store
 
 from .base import DeferredJobAdapter
@@ -162,7 +166,7 @@ class ReportAdapter(DeferredJobAdapter):
                 report.error = "Generation cancelled. Retry to start again."
         if active_job.get("key") == context.job.urlsafe_key:
             report.deferred_job = None
-        ai.cleanup_report_upload_manifest(report)
+        report_uploads.cleanup_report_upload_manifest(report)
         if report.upload_manifest:
             report.upload_manifest = None
         outcome = external_operations.save_plan_if_idle(report, snapshot)
@@ -235,7 +239,7 @@ class AIReportAdapter(ReportAdapter):
         )
         if stage_index < 1:
             context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
-            ai.finalize_report_upload_manifest(
+            report_uploads.finalize_report_upload_manifest(
                 report, actor, ensure_active=context.ensure_active
             )
             context.checkpoint_stage(
@@ -247,7 +251,7 @@ class AIReportAdapter(ReportAdapter):
             )
         if stage_index < 2:
             context.set_phase(DeferredJobPhase.SUMMARIZING)
-            ai.summarize_report_input_files(
+            report_files.summarize_report_input_files(
                 report,
                 save=Entities.save,
                 search=actor.access(AI.CREATE),
@@ -264,10 +268,10 @@ class AIReportAdapter(ReportAdapter):
                 if context.parameters.get("mode") == "revise"
                 else None
             )
-            prompt = ai.report_prompt(report, actor, feedback=feedback)
+            prompt = report_planner.report_prompt(report, actor, feedback=feedback)
             if service_tier:
                 prompt.set_service_tier(service_tier)
-            prepared = ai.generate_report(prompt)
+            prepared = report_planner.generate_report(prompt)
             context.ensure_active()
             prepared["status"] = (
                 "ready" if prepared["proposal"].get("actions") else "complete"
@@ -418,7 +422,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         report = context.input("report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
-        result = ai.run_report(
+        result = report_runner.run_report(
             report,
             context.actor,
             ensure_active=context.ensure_active,
@@ -453,7 +457,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             else None
         )
         result = report.result if isinstance(report.result, dict) else None
-        if result and result.get("ledger_version") == ai.REPORT_LEDGER_VERSION:
+        if result and result.get("ledger_version") == report_ledger.REPORT_LEDGER_VERSION:
             result["status"] = "failed"
             if not result.get("failed_at"):
                 for index, action in enumerate(result.get("actions") or [], 1):

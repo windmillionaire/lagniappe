@@ -131,7 +131,7 @@ def live_ai_job_quota(request, monkeypatch):
     from lagniappe.core import exceptions
     from lagniappe.core.definitions import Fetch
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import ai
+    from lagniappe.core.tools.ai import autofill as ai_autofill, planner as report_planner
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
     from lagniappe.web import app
     from ..utility import hosted_deferred_jobs, live_ai
@@ -146,8 +146,8 @@ def live_ai_job_quota(request, monkeypatch):
                 f"Generation failed. Please try again.  {message}", context=context,
             ) from exceptions.AIQuotaError(message, context=context)
         raise exceptions.AIQuotaError(message, context=context)
-    monkeypatch.setattr(ai, "generate_report", quota)
-    monkeypatch.setattr(ai, "generate_autofilled_submission", quota)
+    monkeypatch.setattr(report_planner, "generate_report", quota)
+    monkeypatch.setattr(ai_autofill, "generate_autofilled_submission", quota)
     monkeypatch.setattr(live_ai, "LIVE_AI_QUOTA_BACKOFF_SECONDS", 0)
 
     def deliver(_page, job, **_kwargs):

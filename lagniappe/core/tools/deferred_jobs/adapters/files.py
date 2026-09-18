@@ -14,7 +14,7 @@ from lagniappe.core.definitions import (
     DeferredJobType,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import summarize as ai_summarize
 from lagniappe.core.tools.files import extract as files
 
 from .base import DeferredJobAdapter
@@ -166,7 +166,7 @@ class FileSummarizeAdapter(FileAdapter):
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.SUMMARIZING)
         file = context.input("file")
-        summarize = ai.generate_summary(file, raise_quota=True, raise_errors=True)
+        summarize = ai_summarize.generate_summary(file, raise_quota=True, raise_errors=True)
         if not summarize.complete:
             raise DeferredJobDependencyFailedError(
                 summarize.error or "File summary did not complete."

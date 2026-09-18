@@ -4,7 +4,7 @@ from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI, Action, Resource
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import images as ai_images
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -90,10 +90,10 @@ def generate_page_image(key, **kwargs):
     if request.form.get("info"):
         generate_data["page_details"] = page.to_ai(user=current_user)
 
-    prompt = ai.page_image_generation_prompt(**generate_data)
+    prompt = ai_images.page_image_generation_prompt(**generate_data)
 
     try:
-        image = ai.generate_ai_image(prompt)
+        image = ai_images.generate_ai_image(prompt)
 
         page.properties.image.delete()
         page.image = image
