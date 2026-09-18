@@ -21,7 +21,8 @@ from testing.resources.form import Builder
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources import Form
 from testing.utility.reconnect import expect_reconnect_refresh
-from testing.utility.live_ai import LIVE_AI_RESPONSE_TIMEOUT_MS
+from testing.utility.live_ai import submit_live_ai
+from testing.utility.network import expect_successful_response, multipart_form_fields, scoped_browser_route
 
 
 # @matrix forms : index tools
@@ -282,9 +283,10 @@ def test_add_inputs_to_form(get_user):
 # @matrix ai forms : generate-schema live-ai reload saved-state
 # @template forms/builder.html::generate
 @pytest.mark.ai
-def test_generate_form_schema_live_saved_state(get_user, request):
+@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+def test_generate_form_schema_live_saved_state(get_user, request, browser_failures, live_ai_quota):
     """
-    Make one real provider call through the form builder Generate path.
+    Exercise real builder generation with bounded quota recovery.
 
     Generation changes only the current draft. The builder remains unsaved and
     the durable Form is unchanged until the user explicitly saves. The ``ai``
@@ -317,13 +319,40 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     expect(generate).to_be_visible()
     generate.locator("textarea[name='description']").fill(prompt)
 
-    with user.page.expect_response(
-        "**/forms/create-schema",
-        timeout=LIVE_AI_RESPONSE_TIMEOUT_MS,
-    ) as response:
-        generate.locator("button[type='submit']").click()
+    def fallback():
+        from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 
-    generated_response = response.value
+        def reply(route):
+            data = dict(multipart_form_fields(route.request))
+            draft = {"schema": json.loads(data["schema"]), "html_fields": json.loads(data["html_fields"])}
+            fields = [
+                {"id": "qa-full-name", "type": "input", "input": "text", "title": "Full name"},
+                {"id": "qa-email", "type": "input", "input": "email", "title": "Email"},
+                {"id": "qa-phone", "type": "input", "input": "tel", "title": "Phone"},
+                {"id": "qa-role", "type": "input", "input": "text", "title": "Preferred role"},
+                {"id": "qa-availability", "type": "textarea", "title": "Availability"},
+                {"id": "qa-notes", "type": "textarea", "title": "Notes"},
+            ]
+            prepared = prepare_generated_changes(
+                {"operations": [{"op": "add_field", "field": field} for field in fields]},
+                draft, form_type="page",
+            )
+            report.record("independent_generation_validation", prepared)
+            route.fulfill(status=200, content_type="application/json", body=json.dumps({
+                **prepared, "request_id": data["request_id"], "draft_revision": int(data["draft_revision"]),
+            }))
+
+        with scoped_browser_route(user.page.context, "**/forms/create-schema", reply):
+            with expect_successful_response(user.page, method="POST", path="/forms/create-schema") as response:
+                generate.locator("button[type='submit']").click()
+            expect(generate.get_by_role("button", name="Generated", exact=True)).to_be_visible()
+        return response.value
+
+    with live_ai_quota(user, "/forms/create-schema"):
+        generated_response = submit_live_ai(
+            user, path="/forms/create-schema", submit=lambda: generate.locator("button[type='submit']").click(),
+            results=report, browser_failures=browser_failures, fallback=fallback,
+        )
     response_text = generated_response.text()
     report.record("response_status", generated_response.status)
     report.record("response_body", response_text)

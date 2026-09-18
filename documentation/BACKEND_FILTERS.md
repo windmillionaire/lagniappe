@@ -220,9 +220,15 @@ Converts a list of `FilterDefinition` objects into a JSONPath query string. Each
 
 The final query wraps all conditions: `$..[?((@.id) && (cond1) && (cond2))].id`
 
-Field names use bracket notation and JSON encoding. String equality/substring
-escapes regex metacharacters before JSON encoding. Unsupported comparators
-raise rather than silently generating an incomplete expression.
+Field names use bracket notation and JSON encoding. Plain string comparisons
+use case-insensitive regex predicates. For punctuation, quotes, backslashes,
+Unicode, or control characters, `FilterCache` first runs the remaining Redis
+predicates, then compares those cached candidate values literally in Python.
+This avoids RedisJSON versions silently missing escaped regex operands such as
+`Dr. Rivera`. Matching IDs still pass through normal entity permission checks.
+These queries transfer candidate projections instead of only IDs; other queries
+retain the existing Redis-only path. Unsupported comparators raise rather than
+silently generating an incomplete expression.
 
 ## Routes (`lagniappe/web/routes/filters/main.py`)
 

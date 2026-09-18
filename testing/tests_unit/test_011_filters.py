@@ -15,6 +15,8 @@ reading ``Filter.conditions``.
 """
 
 import hashlib
+import json
+import re
 from datetime import datetime, timezone
 
 import pytest
@@ -207,21 +209,28 @@ def test_filter_expression_list_contains_accepts_scalar_form_values():
 
 # @matrix filters : escaping field-name jsonpath punctuation regex-literal
 @pytest.mark.unit
-def test_filter_expression_encodes_field_names_and_literal_regex_values():
+@pytest.mark.parametrize("value", ["Dr. Maria Rivera", 'René [a+b] ("x") \\folder ^$.?*|{2}', "quote'\n\t\x00"])
+@pytest.mark.parametrize("comparator", [Comparator.EQUALS, Comparator.SUBSTRING])
+def test_filter_expression_encodes_field_names_and_literal_regex_values(value, comparator):
     definition = FilterDefinition(
         "source",
         'field["unsafe"]',
         FieldType.STRING,
-        Comparator.EQUALS,
-        "A-B.*'quoted'",
+        comparator,
+        value,
         False,
     )
 
     expression = FilterExpression([definition]).build()
 
     assert '@["field[\\"unsafe\\"]"]' in expression
-    assert "A-B\\\\.\\\\*'quoted'" in expression
     assert "@.field" not in expression
+    encoded = expression.split(" =~ ", 1)[1].removesuffix("))].id")
+    pattern = json.loads(encoded)
+    assert re.fullmatch(pattern, value)
+    assert re.fullmatch(pattern, value.upper())
+    assert not re.search(pattern, value.replace(value[-1], "different"))
+    assert bool(re.search(pattern, f"prefix {value} suffix")) == (comparator == Comparator.SUBSTRING)
 
 
 # @matrix filter : parent parent-hash

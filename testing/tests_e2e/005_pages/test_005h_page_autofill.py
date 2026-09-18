@@ -11,7 +11,7 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Users
 from testing.resources import Page
 from testing.utility.polling import expect_poll_result
-from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
+from testing.utility.live_ai import run_hosted_autofill
 
 
 pytestmark = pytest.mark.e2e
@@ -37,8 +37,9 @@ def _attach_evidence(page):
 # @matrix pages : autofill deferred form-schema refresh
 # @template pages/info.html::info_form
 @pytest.mark.ai
+@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_page_autofill_runs_deferred_with_attached_file_context(
-    get_user, monkeypatch, browser_failures
+    get_user, monkeypatch, browser_failures, results, live_ai_job_quota
 ):
     user = get_user(Users.OWNER)
     page = Page(
@@ -48,7 +49,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
             name=f"Autofill Evidence Page {uuid4().hex}",
         ),
     ).create()
-    _attach_evidence(page)
+    evidence_file = _attach_evidence(page)
     user.go(page)
 
     form = page.info_form
@@ -115,9 +116,14 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     assert locked_update == 409
     expect(form.locator("input[name='name']")).to_have_value(original_name)
 
-    if CONFIG.hosted_e2e_runner:
-        completed, attempts = dispatch_hosted_deferred_job(user.page, job)
-        assert completed.status == DeferredJobStatus.SUCCEEDED.value, attempts
+    if CONFIG.hosted_e2e_runner or live_ai_job_quota:
+        def verify_submission():
+            evidence = Entities.fetch_one(evidence_file.key, request=Fetch.direct())
+            assert EXPECTED_VALUE in evidence.summary
+            results.record("independent_workspace_verification", {"file": evidence.urlsafe_key, "summary": evidence.summary})
+            return {FIELD_ID: EXPECTED_VALUE}
+        completed = run_hosted_autofill(user, job, results=results, verify_submission=verify_submission)
+        assert completed.status == DeferredJobStatus.SUCCEEDED.value
         user.page.reload()
         form = user.page.locator("[data-widget='PageInfo']")
         expect(form).to_have_attribute("initialized", "")

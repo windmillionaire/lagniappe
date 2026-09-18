@@ -12,7 +12,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Tasks, Users
 from testing.resources import Page, Task
-from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
+from testing.utility.live_ai import run_hosted_autofill
 
 
 pytestmark = pytest.mark.e2e
@@ -69,10 +69,11 @@ def _create_autofill_fixture(user):
 # @matrix notifications tasks : autofill deferred
 # @template pages/tasks.html::task_form
 @pytest.mark.ai
-def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatch):
+@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatch, results, live_ai_job_quota):
     user = get_user(Users.OWNER)
     page, task = _create_autofill_fixture(user)
-    _attach_task_evidence(task)
+    evidence_file = _attach_task_evidence(task)
     user.go(page, query_params={"tab": "tasks"})
 
     form = task.task_form
@@ -106,9 +107,14 @@ def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatc
     expect(form).to_have_attribute("data-autofill-probe", "mounted")
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
 
-    if CONFIG.hosted_e2e_runner:
-        completed, attempts = dispatch_hosted_deferred_job(user.page, job)
-        assert completed.status == DeferredJobStatus.SUCCEEDED.value, attempts
+    if CONFIG.hosted_e2e_runner or live_ai_job_quota:
+        def verify_submission():
+            evidence = Entities.fetch_one(evidence_file.key, request=Fetch.direct())
+            assert EXPECTED_VALUE in evidence.summary
+            results.record("independent_workspace_verification", {"file": evidence.urlsafe_key, "summary": evidence.summary})
+            return {FIELD_ID: EXPECTED_VALUE}
+        completed = run_hosted_autofill(user, job, results=results, verify_submission=verify_submission)
+        assert completed.status == DeferredJobStatus.SUCCEEDED.value
         user.page.reload()
         form = task.task_form
     else:

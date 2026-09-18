@@ -31,12 +31,13 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.services import places as location
 from lagniappe.core.tools.services import task_queue
-from lagniappe.core.tools.ai.core import GenAI
+from lagniappe.core.tools.ai.core import GenAI, is_provider_quota_error
 from lagniappe.core.tools.database import assets
 from lagniappe.core.tools.database.core import DATA
 
 from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements
+from testing.utility.live_ai import ProviderQuotaBlocked, run_live_ai
 
 pytestmark = [pytest.mark.e2e, pytest.mark.setup_provider]
 
@@ -325,7 +326,7 @@ def test_runtime_task_create_delete_and_scheduler_oidc_delivery(monkeypatch):
     }
 
 
-def test_runtime_document_ai_vertex_ai_and_places_operations():
+def test_runtime_document_ai_vertex_ai_and_places_operations(results):
     """Exercise the three runtime consumer APIs with the runtime credential."""
     probe_id = _probe_id()
     sample_pdf = Path(__file__).resolve().parents[2] / "files" / "sample_document.pdf"
@@ -357,11 +358,27 @@ def test_runtime_document_ai_vertex_ai_and_places_operations():
         if blob.exists():
             blob.delete()
 
-    vertex_response = GenAI().client.models.generate_content(
-        model=CONFIG.AI_UTILITY_MODEL,
-        contents="Reply with the single word OK.",
-    )
-    assert vertex_response.text.strip()
+    def attempt(_number):
+        try:
+            response = GenAI().client.models.generate_content(
+                model=CONFIG.AI_UTILITY_MODEL,
+                contents="Reply with the single word OK.",
+            )
+        except Exception as error:
+            if is_provider_quota_error(error):
+                raise ProviderQuotaBlocked(str(error)) from error
+            raise
+        assert response.text and response.text.strip()
+        return response
+
+    def fallback():
+        results.record("vertex_availability", {
+            "authenticated_request_reached_provider": True,
+            "response_generation_verified": False,
+            "reason": "Both runtime-credential requests returned provider quota, not an IAM denial.",
+        })
+
+    run_live_ai(attempt, results=results, fallback=fallback)
 
     place = location.get_place_details("ChIJN1t_tDeuEmsRUsoyG83frY4")
     assert place["id"] == "ChIJN1t_tDeuEmsRUsoyG83frY4"

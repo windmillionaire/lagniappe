@@ -3,7 +3,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from lagniappe.core.definitions import Action, Fetch, FetchReason, Restriction
+from lagniappe.core.definitions import Action, Comparator, Fetch, FetchReason, FieldType, FilterDefinition, Restriction
 from lagniappe.core.tools.filters.cache import FilterCache
 from lagniappe.core.tools.filters.contract import CompiledFilter
 
@@ -59,7 +59,7 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     )
     hidden = SimpleNamespace(allowed=lambda action, user=None: False)
     entity_filter = CompiledFilter(
-        definitions=("definition",),
+        definitions=(FilterDefinition("source", "completed", FieldType.BOOLEAN, Comparator.IS_FALSE, None, False),),
         contract={"version": 1, "conditions": []},
         related=(),
     )
@@ -96,6 +96,34 @@ def test_filter_cache_rejects_uncompiled_query_definitions():
         FilterCache(parent, user=_user()).query(
             SimpleNamespace(definitions=["untrusted"])
         )
+
+
+# @matrix filters : escaping punctuation regex-literal run-results string-condition
+@pytest.mark.parametrize("comparator", [Comparator.EQUALS, Comparator.SUBSTRING])
+@pytest.mark.parametrize("with_scope", [False, True])
+def test_filter_cache_matches_escaped_string_literals_after_redis_predicates(monkeypatch, comparator, with_scope):
+    from lagniappe.core.tools.filters import cache as module
+
+    value = 'Dr. René [a+b] "quoted" \\folder\n'
+    literal = FilterDefinition("source", "name", FieldType.STRING, comparator, value, False)
+    scope = FilterDefinition("source", "completed", FieldType.BOOLEAN, Comparator.IS_FALSE, None, False)
+    conditions = (scope, literal) if with_scope else (literal,)
+    compiled = CompiledFilter(definitions=conditions, contract={}, related=())
+    calls = []
+    def query(_key, expression):
+        calls.append(expression)
+        return [
+            {"id": "match", "name": value.upper()},
+            {"id": "substring", "name": f"prefix {value} suffix"},
+            {"id": "different", "name": value.replace("Dr.", "DrX")},
+            {"id": "missing"}, {"id": "null", "name": None}, {"access": {}},
+        ]
+    monkeypatch.setattr(module.filter_cache, "query", query)
+    keys = FilterCache(_parent("project"), user=_user())._query_keys(compiled)
+    assert keys == (["match"] if comparator == Comparator.EQUALS else ["match", "substring"])
+    assert len(calls) == 1
+    assert "name" not in calls[0] and not calls[0].endswith(".id")
+    assert ('"completed"' in calls[0]) is with_scope
 
 
 # @matrix filters : cache category-pagination restrictions source-query

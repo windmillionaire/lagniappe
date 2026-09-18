@@ -249,6 +249,29 @@ exactly verifiable visible result. Real calls and their cost are justified when
 they prove provider/tool/context or deferred-delivery integration that mocks
 cannot.
 
+Live-model stories use `testing/utility/live_ai.py` for quota pressure: make the
+real call, back off for 30 seconds after a positively identified provider quota
+error, and allow one more live attempt. This is provider backoff, not a browser
+synchronization delay. Do not retry assertions, invalid model output, permission
+errors, ordinary HTTP 5xx responses, or failed workspace writes. Production
+retry budgets are unchanged. Deferred work also honors its saved retry time.
+
+If both attempts hit quota, a test may use an explicit independent verification:
+query the real workspace tools before publishing a known report answer, validate
+a known builder proposal before testing save/reload, or exercise normal manual
+creation and generated-markup insertion. Autofill keeps real attachment
+preparation, authorization, form locks, and checkpoint publication. File-summary
+retries reuse uploaded identities; if quota persists, verify the original stored
+bytes and retained failure instead of fabricating completed summaries. The
+runtime-IAM probe may accept an authenticated provider quota response as evidence
+of access, while recording that text generation was unavailable.
+
+Every attempt and fallback is recorded in the test's HTML report. A fallback
+records `live_succeeded: false` and must never be described as successful live
+generation. Keep the ordinary assertions for successful responses and run the
+remaining persistence/UI checks after alternate verification. Tests without a
+meaningful alternate verification must remain unavailable or fail explicitly.
+
 Treat “Model returned no text content” as a diagnostic, not automatically as a
 model failure. Inspect the provider attempt record, supplied context, tool
 arguments/results, response format/schema, and raw safe diagnostics before

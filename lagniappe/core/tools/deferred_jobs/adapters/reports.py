@@ -104,7 +104,10 @@ class ReportAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ai_report_resumes_prepared_proposal
+    # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+    # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
     # @matrix ai-report : proposal-publication status
+    # @matrix ai-report : async persistence
     def apply(self, context):
         context.ensure_active()
         self.validate_apply(context)

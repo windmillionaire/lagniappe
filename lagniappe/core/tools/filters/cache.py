@@ -3,7 +3,7 @@
 from flask import url_for
 from lagniappe import CONFIG
 
-from ...definitions import Action, Fetch, FetchReason, Restriction
+from ...definitions import Action, Comparator, Fetch, FetchReason, FieldType, Restriction
 from ...entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from ...tools.database.core import KINDS
@@ -16,6 +16,33 @@ from .contract import CompiledFilter
 
 
 FILTER_CACHE_SCOPE = "all-v2"
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache._query_keys
+# @reason escaped-regex selection is exercised by literal filter queries
+def _needs_literal_match(definition):
+    # RedisJSON versions can silently miss regex operands containing escaped
+    # characters. Evaluate those literal comparisons over cached candidates.
+    return (
+        definition.field_type == FieldType.STRING
+        and definition.comparator in {Comparator.EQUALS, Comparator.SUBSTRING}
+        and any(
+            character in '\\.^$*+?{}[]|()"\'' or not 32 <= ord(character) < 127
+            for character in definition.value
+        )
+    )
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache._query_keys
+# @reason candidate comparisons are owned by the compiled cache query boundary
+def _matches_literal(row, definition):
+    value = row.get(definition.field)
+    if not isinstance(value, str):
+        return False
+    actual, expected = value.casefold(), definition.value.casefold()
+    return actual == expected if definition.comparator == Comparator.EQUALS else expected in actual
 
 
 # @testable false
@@ -42,13 +69,26 @@ class FilterCache:
     # @testable true
     # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_query_filters_loaded_entities_by_view_permission
     # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_rejects_uncompiled_query_definitions
+    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_matches_escaped_string_literals_after_redis_predicates
+    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_string_punctuation_matches_literal_values
     # @matrix cache filters : allowed query query-boundary related-load validation
     # @matrix permissions : allowed query related-load
+    # @matrix filters : escaping punctuation regex-literal run-results string-condition
     def _query_keys(self, filter):
         if not isinstance(filter, CompiledFilter):
             raise TypeError("FilterCache queries require a CompiledFilter")
-        expression = FilterExpression(filter.definitions).build()
-        return filter_cache.query(self.cache_key, expression)
+        literals = [definition for definition in filter.definitions if _needs_literal_match(definition)]
+        if not literals:
+            expression = FilterExpression(filter.definitions).build()
+            return filter_cache.query(self.cache_key, expression)
+        remaining = [definition for definition in filter.definitions if definition not in literals]
+        expression = FilterExpression(remaining).build(ids_only=False) if remaining else "$.*"
+        rows = filter_cache.query(self.cache_key, expression)
+        return [
+            row["id"] for row in rows
+            if isinstance(row, dict) and row.get("id")
+            and all(_matches_literal(row, definition) for definition in literals)
+        ]
 
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion

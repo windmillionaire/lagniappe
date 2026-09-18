@@ -45,6 +45,7 @@ class FilterExpression:
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_filter_expression_list_contains_accepts_scalar_form_values
     # @tests tests_unit/test_011_filters.py::test_filter_expression_encodes_field_names_and_literal_regex_values
+    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_matches_escaped_string_literals_after_redis_predicates
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_multiple_conditions
@@ -62,7 +63,7 @@ class FilterExpression:
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_checkbox_condition
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
     # @matrix filters : attached-form boolean-condition compound description document entity-condition escaping field-name jsonpath number-condition public punctuation regex-literal run-results scalar-list select-condition string-condition
-    def build(self):
+    def build(self, *, ids_only=True):
         """Convert filter definitions into a single JSONPath query."""
         if not self.definitions:
             raise ValueError("Filter expression requires at least one condition")
@@ -70,7 +71,9 @@ class FilterExpression:
             [f"({self._build_single_condition(d)})" for d in self.definitions]
         )
 
-        query = f"$..[?((@.id) && {conditions})].id"
+        query = f"$..[?((@.id) && {conditions})]"
+        if ids_only:
+            query += ".id"
         return query
 
     # @testable false
