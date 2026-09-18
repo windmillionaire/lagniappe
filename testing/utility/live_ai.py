@@ -34,7 +34,7 @@ def is_quota_message(message):
     message = str(message or "").strip()
     message = message.removeprefix("AI unable to generate summary: ")
     return message.startswith("AI quota is temporarily exhausted.") or bool(
-        re.search(r"\b429\s+RESOURCE_EXHAUSTED\b", message)
+        re.match(r"429\s+RESOURCE_EXHAUSTED\b", message)
     )
 
 

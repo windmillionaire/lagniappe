@@ -27,6 +27,7 @@ def _results():
     ("AI quota is temporarily exhausted. The report can retry shortly.", True),
     ("429 RESOURCE_EXHAUSTED. Resource exhausted, please try again later.", True),
     ("Invalid answer: the phrase RESOURCE_EXHAUSTED was not expected", False),
+    ("Invalid answer: 429 RESOURCE_EXHAUSTED was not expected", False),
     ("The saved entity changed; retry", False),
     ("403 PERMISSION_DENIED", False),
     ("500 Internal Server Error", False),
