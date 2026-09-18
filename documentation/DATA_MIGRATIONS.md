@@ -9,6 +9,14 @@ Implementation lives in
 `lagniappe/core/tools/database/migration_steps/`. The owner-facing controls are
 under **Admin → Site Settings → Maintenance**.
 
+`migration_steps/base.py` owns the shared value types, execution context,
+raw-row scanning, and bounded audit-result helpers. Both the catalog/ledger
+runner and versioned steps import that support directly; steps must not import
+`migrations.py`. The package initializer exposes only shared value types, so
+importing the base does not load historical transforms. Import versioned
+implementations from their specific modules. Existing public framework names
+remain available through `migrations.py` for callers of that facade.
+
 ## Operator workflow
 
 After deploying a release that includes migrations:
@@ -151,7 +159,8 @@ plan.
 ### Use bounded runners
 
 The runner receives a `MigrationContext` containing the raw query factory,
-writer, Datastore client, and lease heartbeat. Prefer `scan_kind`, filter by
+writer, Datastore client, and lease heartbeat. Import shared helpers from
+`migration_steps/base.py`. Prefer `scan_kind`, filter by
 kind and `type`, include inactive and history rows when relevant, and keep
 writes within `MIGRATION_CHUNK_SIZE`. Batch relation reads instead of fetching
 one related entity per record.
