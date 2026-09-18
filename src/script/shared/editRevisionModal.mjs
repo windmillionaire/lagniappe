@@ -1,5 +1,5 @@
 import { STYLES } from "styles";
-import { loadRevisionPreview } from "../widgets/loader";
+import { loadRevisionPreview } from "./editRevisionPreview";
 import { compatibleField } from "./formRepresentation";
 import { Modal } from "./modal";
 import { areEqual } from "./utilities";

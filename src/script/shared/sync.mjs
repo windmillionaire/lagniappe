@@ -1,4 +1,4 @@
-import { loadHeadlessWidget } from "../widgets/loader";
+import { loadHeadlessWidget } from "../elements/editor/headless";
 import { ENDPOINTS } from "./endpoints";
 import {
 	deleteSyncRecord,

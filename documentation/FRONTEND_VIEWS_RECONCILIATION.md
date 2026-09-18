@@ -31,8 +31,9 @@ Each marker keeps its own baseline. The root entity subscription supplies the
 newest observed revision. An inactive form performs no replacement request; on
 activation it compares baselines and catches up once when stale.
 
-For a changed active form, `EditReconciler` renders the focused response in a
-detached preview and compares normalized submissions:
+For a changed active form, `EditReconciler` uses
+`shared/editRevisionPreview.mjs::loadRevisionPreview()` to render the focused
+response in a detached preview and compares normalized submissions:
 
 - an unchanged saved baseline and schema leave the live form and draft intact;
 - otherwise, equal state installs automatically unless projecting an unsaved or
@@ -42,6 +43,10 @@ detached preview and compares normalized submissions:
 - a dirty non-renderer form offers **Reset form**;
 - a queued non-renderer form offers queued versus saved whole-form state; and
 - missing, inaccessible, or unsafe replacement falls back to **Reload page**.
+
+Revision modals use the same adapter for saved/local previews. It clones
+response DOM and delegates construction to the generic widget loader, leaving
+the original response available for application to the live form.
 
 A visible active form is protected even when clean, and focused forms are
 protected before the first input event. Probes are serialized per marker and

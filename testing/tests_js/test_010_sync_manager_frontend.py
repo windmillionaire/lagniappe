@@ -106,7 +106,7 @@ const context = {
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/sync.mjs", "utf8");
 source = source.replace(
-  'import { loadHeadlessWidget } from "../widgets/loader";',
+  'import { loadHeadlessWidget } from "../elements/editor/headless";',
   "const loadHeadlessWidget = globalThis.loadHeadlessWidget;",
 );
 source = source.replace(

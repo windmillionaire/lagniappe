@@ -1,12 +1,65 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as loadRevisionPreview } from './core-foundation.js?v=b0bb4d7e';
-import { STYLES } from './styles.js?v=b0bb4d7e';
-import { c as compatibleField, i as incompatibleSchema } from './formRepresentation.js?v=b0bb4d7e';
-import { Modal } from './modal.js?v=b0bb4d7e';
-import { e as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b0bb4d7e';
-import './connectivity.js?v=b0bb4d7e';
-import './storage.js?v=b0bb4d7e';
-import './upstreamUnavailable.js?v=b0bb4d7e';
+import { STYLES } from './styles.js?v=b7e4189f';
+import { l as loadWidget } from './core-foundation.js?v=b7e4189f';
+import { c as compatibleField, i as incompatibleSchema } from './formRepresentation.js?v=b7e4189f';
+import { Modal } from './modal.js?v=b7e4189f';
+import { e as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=b7e4189f';
+import './connectivity.js?v=b7e4189f';
+import './storage.js?v=b7e4189f';
+import './upstreamUnavailable.js?v=b7e4189f';
+
+/**
+ * Build a fully rendered, detached copy of a form widget for revision
+ * comparison. The response document is cloned so the original remains
+ * available if the user chooses to apply it.
+ *
+ * @testable infrastructure
+ */
+async function loadRevisionPreview(
+	liveWidget,
+	response,
+	{ readonly = liveWidget.readonly } = {},
+) {
+	const responseTarget = response.html?.querySelector(
+		`[data-widget='${liveWidget.name}']`,
+	);
+	if (!responseTarget) return null;
+
+	const container = document.createElement("div");
+	container.appendChild(responseTarget.cloneNode(true));
+	const view = {
+		key: liveWidget.key,
+		kind: liveWidget.kind,
+		readonly,
+		online: true,
+		hidden: false,
+		showExtractReloadNotice() {},
+	};
+	const component = {
+		elt: container,
+		view,
+		key: liveWidget.key,
+		kind: liveWidget.kind,
+		widgets: {},
+		get readonly() {
+			return readonly;
+		},
+	};
+	const preview = await loadWidget(component, liveWidget.name, {
+		revisionPreview: true,
+		schema: response.schema ?? null,
+		submission: response.submission ?? null,
+	});
+	const previewResponse = {
+		...response,
+		html: response.html?.cloneNode(true),
+	};
+
+	if (preview.updated) await preview.updated(previewResponse);
+	if (preview.prereconcile) await preview.prereconcile();
+	if (preview.postreconcile) preview.postreconcile();
+	return preview;
+}
 
 /**
  * @testable true

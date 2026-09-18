@@ -50,13 +50,17 @@ Used for entity documents (project documents, page documents). Manages real-time
 - **Saving**: On blur, the editor dispatches `sync-save`. `saveData` includes
   the merged delta, full `ydoc`, and rendered `html`; document HTML persistence
   happens through the `/l/sync` route when `html` is present.
-- **Offline/headless replay**: `loadHeadlessWidget(...)` can instantiate a
-  headless collaborative document so an offline record can merge and replay
-  even when the widget is not mounted on the current route.
+- **Offline/headless replay**: `headless.mjs` owns `loadHeadlessWidget(...)` and
+  its registry. It lazily imports the collaborative controller to construct a
+  detached document, allowing an offline record to merge and replay even when
+  the widget is not mounted on the current route. `SyncManager` retains
+  responsibility for initialization, remote/offline state, replay, and cleanup.
 
 **State encoding:** Yjs state vectors and updates are serialized as base64
 strings for transport. Shared helpers `base64ToUint8Array` and
-`uint8ArrayToBase64` handle conversion.
+`uint8ArrayToBase64` handle conversion. The collaborative controller imports
+these and `waitForAttribute` directly from `shared/utilities.mjs`; sync service
+acquisition remains lazy through the view.
 
 ### IndependentDocument (`independent.mjs`)
 

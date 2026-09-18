@@ -1,5 +1,5 @@
-import { loadRevisionPreview } from "../widgets/loader";
 import { FormRevisionModal, WholeFormRevisionModal } from "./editRevisionModal";
+import { loadRevisionPreview } from "./editRevisionPreview";
 import { captureError } from "./errors";
 import { incompatibleSchema } from "./formRepresentation";
 import { request } from "./request";

@@ -4,7 +4,7 @@ import {
 	base64ToUint8Array,
 	uint8ArrayToBase64,
 	waitForAttribute,
-} from "../../shared";
+} from "../../shared/utilities";
 import { collaborativeEditor } from "./editor";
 import { MentionSuggestions } from "./extensions";
 import { Toolbar } from "./toolbar";
