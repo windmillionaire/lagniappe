@@ -1,15 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7d16921';
-import { s as setIcon } from './icons.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
+import { STYLES } from './styles.js?v=bc80da50';
+import { s as setIcon } from './icons.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
 
 const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 
 /**
  * @testable infrastructure
  * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
- * @covered-by src/script/elements/renderer.mjs::Renderer.render
- * @covered-by src/script/elements/form.mjs::FormElement._click
+ * @covered-by src/script/forms/renderer.mjs::FormRenderer.render
+ * @covered-by src/script/widgets/base/formWidget.mjs::FormWidget._click
  */
 class BaseElement {
 	constructor(renderer, schema, submission) {

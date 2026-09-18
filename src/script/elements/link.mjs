@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
-import { FacetsBox } from "../elements/combobox";
 import { areEqual } from "../shared/utilities";
 import { BaseElement } from "./base/baseElement";
+import { FacetsBox } from "./combobox";
 import { formatting } from "./formatting";
 import { primitives } from "./primitives";
 

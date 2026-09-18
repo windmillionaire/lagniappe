@@ -1,4 +1,4 @@
-import { BaseForm } from "../../base/baseForm";
+import { FormController } from "../../../forms/controller";
 import { buttons } from "../../buttons";
 import { primitives } from "../../primitives";
 
@@ -46,7 +46,7 @@ class AddYouTube {
 		});
 		this.html = [this.link, submit];
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

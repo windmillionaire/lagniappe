@@ -15,27 +15,27 @@ function node(dataset = {}) {
     appendChild(child) { child.parent = this; this.children.push(child); return child; },
     prepend(child) { child.parent = this; this.children.unshift(child); },
     remove() { this.parent?.children.splice(this.parent.children.indexOf(this), 1); },
-    replaceWith() {}, setAttribute() {}, addEventListener() {},
+    replaceWith() {}, setAttribute() {}, addEventListener() {}, hasAttribute() { return false; },
     querySelector() { return null; }, matches() { return false; },
   };
 }
 const context = {
   document: {createElement: () => node()},
-  BaseForm: class {async init() {} destroy() {}},
+  FormController: class {async init() {} destroy() {}},
   Modal: class {
     constructor() { this.destroyed = 0; modals.push(this); }
     destroy() { this.destroyed += 1; }
   },
 };
 vm.createContext(context);
-for (const path of ["src/script/shared/formMigrationNotice.mjs", "src/script/elements/form.mjs"]) {
+for (const path of ["src/script/shared/formMigrationNotice.mjs", "src/script/widgets/base/formWidget.mjs"]) {
   vm.runInContext(fs.readFileSync(path, "utf8")
     .replace(/^import .*;\n/gm, "").replace(/export /g, ""), context);
 }
-vm.runInContext("globalThis.FormElement = FormElement;", context);
+vm.runInContext("globalThis.FormWidget = FormWidget;", context);
 (async () => {
   const values = JSON.stringify([{label: "Quantity", before: "invalid", after: "", reason: "invalid"}]);
-  const widget = new context.FormElement({target: node({migrationNotice: values})});
+  const widget = new context.FormWidget({target: node({migrationNotice: values})});
   widget.revisionSnapshot = () => "baseline";
   await widget.init();
   const original = widget.target;
@@ -177,26 +177,26 @@ class FakeHTMLFormElement {
   cloneNode() { return new FakeHTMLFormElement(); }
 }
 const context = {
-  BaseForm: class {},
+  FormController: class {},
   console,
   FormData: FakeFormData,
   HTMLFormElement: FakeHTMLFormElement,
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class FormElement", "class FormElement");
-source += "\nglobalThis.FormElement = FormElement;";
+source = source.replace("export class FormWidget", "class FormWidget");
+source += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(source, context);
 
 (async () => {
-  const widget = new context.FormElement({
+  const widget = new context.FormWidget({
     target,
     view: { SyncManager: { sendUpdates() { throw new Error("form used live sync"); } } },
   });
   if (widget.syncId !== undefined || widget.syncData !== undefined) {
-    throw new Error("FormElement still exposes the live-sync widget contract");
+    throw new Error("FormWidget still exposes the live-sync widget contract");
   }
   if (!(await widget.prepareSubmit())) {
     throw new Error("Ordinary form submit was unexpectedly blocked");
@@ -214,7 +214,7 @@ vm.runInContext(source, context);
   if (!(await widget.prepareSubmit(options)) || delegatedOptions !== options) {
     throw new Error("Autofill submit preparation was not delegated to its subform");
   }
-  const formWidget = new context.FormElement({
+  const formWidget = new context.FormWidget({
     target: new context.HTMLFormElement(),
   });
   formWidget.form = {
@@ -261,6 +261,7 @@ const managerReady = new Promise((resolve) => { releaseManager = resolve; });
 function operationForm() {
   return {
     dataset: { operation: "operation-1" },
+    hasAttribute() { return false; }, setAttribute() {},
     addEventListener() {},
     cloneNode() { return operationForm(); },
     matches(selector) { return selector === "[data-operation]"; },
@@ -270,21 +271,21 @@ function operationForm() {
 }
 
 const context = {
-  BaseForm: class {
+  FormController: class {
     async init() {}
   },
   console,
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class FormElement", "class FormElement");
-source += "\nglobalThis.FormElement = FormElement;";
+source = source.replace("export class FormWidget", "class FormWidget");
+source += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(source, context);
 
 (async () => {
-  const widget = new context.FormElement({
+  const widget = new context.FormWidget({
     target: operationForm(),
     view: {
       ensureDeferredOperations() {
@@ -337,16 +338,16 @@ const responseDocument = {
 const target = {
   cloneNode() { return {}; },
 };
-const context = { BaseForm: class {}, console, structuredClone };
+const context = { FormController: class {}, console, structuredClone };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class FormElement", "class FormElement");
-source += "\nglobalThis.FormElement = FormElement;";
+source = source.replace("export class FormWidget", "class FormWidget");
+source += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(source, context);
 
-const widget = new context.FormElement({
+const widget = new context.FormWidget({
   target,
   name: "PageInfo",
   schema: [
@@ -562,7 +563,7 @@ vm.runInContext(source, context);
   );
 
   if (JSON.stringify(stored.renderer_submission) !== JSON.stringify(rendererSubmission)) {
-    throw new Error("Renderer-native submission was not stored on the offline mutation");
+    throw new Error("FormRenderer-native submission was not stored on the offline mutation");
   }
 
   await manager._send(stored);
@@ -1758,357 +1759,6 @@ component.view = {
     )
 
 
-# @pair user-groups:single-reconciliation
-def test_permissions_form_does_not_rebuild_for_visibility_only_reconciliation(
-    run_node,
-):
-    run_node(
-        r'''
-const fs = require("node:fs");
-const vm = require("node:vm");
-
-const context = {
-  BaseForm: class {},
-  FacetsBox: class {},
-  FormElement: class {},
-  STYLES: {},
-  console,
-  primitives: {},
-};
-vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
-source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class PermissionsForm", "class PermissionsForm");
-source += "\nglobalThis.PermissionsForm = PermissionsForm;";
-vm.runInContext(source, context);
-
-const events = [];
-const widget = Object.create(context.PermissionsForm.prototype);
-widget.sections = new Map();
-widget._rebuildSections = false;
-widget._sectionReconcile = null;
-widget._success = false;
-widget.target = { cloneNode() { return {}; } };
-widget.discardPreparedReset = () => events.push("discard");
-widget.prepareReset = async () => {
-  events.push("prepare");
-  widget._preparedReset = true;
-};
-widget.commitReset = () => {
-  events.push("commit");
-  widget._preparedReset = false;
-};
-
-(async () => {
-  await widget.prereconcile();
-  widget.postreconcile();
-  if (events.length !== 0) {
-    throw new Error(`Visibility-only reconciliation rebuilt the form: ${events}`);
-  }
-
-  widget._rebuildSections = true;
-  await widget.prereconcile();
-  widget.postreconcile();
-  await widget.prereconcile();
-  widget.postreconcile();
-  const expected = ["discard", "prepare", "commit"];
-  if (JSON.stringify(events) !== JSON.stringify(expected)) {
-    throw new Error(`Server sections were not rebuilt exactly once: ${JSON.stringify(events)}`);
-  }
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-'''
-    )
-
-
-# @matrix user-groups : authoritative-sections initialization
-def test_permissions_form_waits_for_authoritative_sections_before_initializing(
-    run_node,
-):
-    run_node(
-        r'''
-const fs = require("node:fs");
-const vm = require("node:vm");
-
-class FakeBaseForm {
-  async init() {}
-}
-const context = {
-  BaseForm: FakeBaseForm,
-  FacetsBox: class {},
-  FormElement: class {},
-  STYLES: {},
-  console,
-  primitives: {},
-};
-vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
-source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class PermissionsForm", "class PermissionsForm");
-source += "\nglobalThis.PermissionsForm = PermissionsForm;";
-vm.runInContext(source, context);
-
-const attributes = new Set();
-const target = {
-  inert: false,
-  addEventListener() {},
-  setAttribute(name) { attributes.add(name); },
-};
-const widget = Object.create(context.PermissionsForm.prototype);
-widget.sections = new Map();
-widget.target = target;
-widget.initialized = false;
-widget.setVisibility = () => {};
-widget.commitRevisionBaseline = () => {};
-Object.defineProperty(widget, "html", { get: () => [{}] });
-
-(async () => {
-  await widget.init();
-  if (widget.initialized || attributes.has("initialized")) {
-    throw new Error("Cold permission form initialized before its sections loaded");
-  }
-
-  const stagedAttributes = new Set();
-  const stagedTarget = {
-    addEventListener() {},
-    setAttribute(name) { stagedAttributes.add(name); },
-  };
-  widget._rebuildSections = true;
-  widget._sectionReconcile = null;
-  widget._preparedReset = null;
-  widget.sections = new Map([["models", { config: {} }]]);
-  widget.target = {
-    inert: true,
-    cloneNode() { return stagedTarget; },
-  };
-  widget.discardPreparedReset = () => {};
-  widget.prepareReset = async (options) => {
-    const staged = {
-      target: stagedTarget,
-      initialized: false,
-      _update() {},
-      _change() {},
-      setSections() {},
-      setVisibility() {},
-    };
-    options.beforeInit(staged);
-    options.afterInit(staged);
-    widget._preparedReset = true;
-  };
-
-  await widget.prereconcile();
-  if (!stagedAttributes.has("initialized")) {
-    throw new Error("Authoritative permission form was not published as initialized");
-  }
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-'''
-    )
-
-
-# @matrix user-groups : rebuild-serialization single-reconciliation
-def test_permissions_form_serializes_overlapping_section_rebuilds(run_node):
-    run_node(
-        r'''
-const fs = require("node:fs");
-const vm = require("node:vm");
-
-const context = {
-  BaseForm: class {},
-  FacetsBox: class {},
-  FormElement: class {},
-  STYLES: {},
-  console,
-  primitives: {},
-};
-vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
-source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class PermissionsForm", "class PermissionsForm");
-source += "\nglobalThis.PermissionsForm = PermissionsForm;";
-vm.runInContext(source, context);
-
-const events = [];
-let releaseFirstInit;
-const firstInit = new Promise((resolve) => { releaseFirstInit = resolve; });
-const widget = Object.create(context.PermissionsForm.prototype);
-widget.unsavedState = false;
-widget.sections = new Map();
-widget._rebuildSections = false;
-widget._sectionReconcile = null;
-widget._success = false;
-widget.target = { inert: false, cloneNode() { return {}; } };
-widget.form = null;
-widget.discardPreparedReset = () => events.push("discard");
-widget.prepareReset = async () => {
-  events.push("prepare");
-  widget._preparedReset = true;
-  if (events.filter((event) => event === "prepare").length === 1) await firstInit;
-};
-widget.commitReset = () => {
-  events.push("commit");
-  widget._preparedReset = false;
-};
-
-(async () => {
-  await widget.updated({ sections: {} });
-  const first = widget.prereconcile();
-  if (!widget.target.inert) {
-    throw new Error("Permission controls became interactive during rebuild");
-  }
-
-  await widget.updated({ sections: {} });
-  const second = widget.prereconcile();
-  releaseFirstInit();
-  await Promise.all([first, second]);
-  widget.postreconcile();
-
-  const expected = ["discard", "prepare", "discard", "prepare", "commit"];
-  if (JSON.stringify(events) !== JSON.stringify(expected)) {
-    throw new Error(`Overlapping permission rebuilds were not serialized: ${events}`);
-  }
-  if (widget.target.inert || widget._sectionReconcile !== null) {
-    throw new Error("Permission controls did not leave the rebuild state");
-  }
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-'''
-    )
-
-
-# @matrix user-groups : background-update unsaved-preservation
-def test_permissions_form_preserves_unsaved_values_during_background_update(
-    run_node,
-):
-    run_node(
-        r'''
-const fs = require("node:fs");
-const vm = require("node:vm");
-
-const context = {
-  BaseForm: class {},
-  FacetsBox: class {},
-  FormElement: class {},
-  STYLES: {},
-  console,
-  primitives: {},
-};
-vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
-source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class PermissionsForm", "class PermissionsForm");
-source += "\nglobalThis.PermissionsForm = PermissionsForm;";
-vm.runInContext(source, context);
-
-const events = [];
-const local = { config: { permission: { level: "VIEW" } } };
-const widget = Object.create(context.PermissionsForm.prototype);
-widget.unsavedState = true;
-widget.sections = new Map([["models", local]]);
-widget._rebuildSections = false;
-widget.setSections = () => events.push("setSections");
-
-(async () => {
-  await widget.updated({
-    sections: {
-      models: { permission: { level: "NONE" } },
-    },
-  });
-  if (widget.sections.get("models") !== local) {
-    throw new Error("Background response replaced unsaved permission values");
-  }
-  if (widget._rebuildSections || events.length) {
-    throw new Error(`Background response scheduled a rebuild: ${events}`);
-  }
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-'''
-    )
-
-
-# @pair user-groups:conditional-response
-def test_permissions_form_ignores_validated_cached_response_after_initialization(
-    run_node,
-):
-    run_node(
-        r'''
-const fs = require("node:fs");
-const vm = require("node:vm");
-
-const context = {
-  BaseForm: class {},
-  FacetsBox: class {},
-  FormElement: class {},
-  STYLES: {},
-  console,
-  primitives: {},
-};
-vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
-source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class PermissionsForm", "class PermissionsForm");
-source += "\nglobalThis.PermissionsForm = PermissionsForm;";
-vm.runInContext(source, context);
-
-const existing = { config: { permission: { level: "VIEW" } } };
-const widget = Object.create(context.PermissionsForm.prototype);
-widget.initialized = true;
-widget.unsavedState = false;
-widget.sections = new Map([["models", existing]]);
-widget._rebuildSections = false;
-widget.target = { inert: false };
-
-(async () => {
-  await widget.updated({
-    updated: false,
-    sections: {
-      models: { permission: { level: "NONE" } },
-    },
-  });
-
-  if (widget.sections.get("models") !== existing) {
-    throw new Error("Validated cached response replaced initialized permissions");
-  }
-  if (widget._rebuildSections || widget.target.inert) {
-    throw new Error("Validated cached response scheduled an initialized rebuild");
-  }
-
-  const cold = Object.create(context.PermissionsForm.prototype);
-  cold.initialized = false;
-  cold.unsavedState = false;
-  cold.sections = new Map();
-  cold._rebuildSections = false;
-  cold.target = { inert: false };
-  await cold.updated({
-    updated: false,
-    sections: {
-      models: { permission: { level: "VIEW" } },
-    },
-  });
-  if (!cold._rebuildSections || !cold.target.inert || !cold.sections.has("models")) {
-    throw new Error("Validated cache could not initialize a cold permission form");
-  }
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-'''
-    )
-
-
 # @matrix tasks : active-form-preservation dirty-form-preservation stale-widget
 def test_task_list_refresh_preserves_rows_with_local_form_state(run_node):
     run_node(
@@ -2615,15 +2265,15 @@ if (direct.elt._lp_element !== direct) {
   throw new Error("Direct form element did not publish its field instance");
 }
 
-const formContext = { BaseForm: class {}, console };
+const formContext = { FormController: class {}, console };
 vm.createContext(formContext);
-let formSource = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+let formSource = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 formSource = formSource.replace(/^import .*$/gm, "");
-formSource = formSource.replace("export class FormElement", "class FormElement");
-formSource += "\nglobalThis.FormElement = FormElement;";
+formSource = formSource.replace("export class FormWidget", "class FormWidget");
+formSource += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(formSource, formContext);
 
-const widget = new formContext.FormElement({
+const widget = new formContext.FormWidget({
   readonly: false,
   target: { cloneNode() { return {}; } },
 });

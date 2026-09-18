@@ -1,13 +1,13 @@
-import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
+import { FormWidget } from "./base/formWidget";
 
 /**
  * @testable infrastructure
  */
-class CategoryForm extends FormElement {
+class CategoryForm extends FormWidget {
 	get nameElement() {
 		return new InputElement(
 			{ kind: "category", readonly: this.readonly },

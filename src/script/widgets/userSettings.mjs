@@ -2,12 +2,12 @@ import { InputElement } from "../elements/input";
 import { RadioElement } from "../elements/radio";
 import { SectionToggle } from "../elements/sectionToggle";
 import { captureError, Modal, request } from "../shared";
-import { PagePermissions } from "./pagePermissions";
+import { FormWidget } from "./base/formWidget";
 
 /**
  * @testable infrastructure
  */
-export class UserSettings extends PagePermissions {
+export class UserSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {
@@ -18,28 +18,14 @@ export class UserSettings extends PagePermissions {
 		this._groupSelect = null;
 	}
 
-	async reset() {
-		this.destroy();
-		await this.init();
-	}
-
-	updated(response) {
-		const updatedTarget = response.html?.querySelector(
-			`[data-widget='${this.name}']`,
-		);
-		if (updatedTarget) {
-			this.initialTarget = updatedTarget;
-			this._updated = true;
-		}
-	}
-
-	async init() {
-		await super.init();
+	async _initForm(options) {
+		await super._initForm(options);
+		this._groupSelect = null;
+		this._pageSelect = null;
 		this._initGroups();
 		this._initPageSelect();
 		this._initRemovePage();
 		this._initApiKey();
-		this.commitRevisionBaseline();
 	}
 
 	/**
@@ -49,6 +35,7 @@ export class UserSettings extends PagePermissions {
 	 * @matrix agent-api : copy-control expiry revoke rotate shown-once status
 	 */
 	_initApiKey() {
+		if (this.revisionPreview) return;
 		const section = this.target.querySelector("[data-role='api-key-settings']");
 		const route = this.target.dataset.apiKeyRoute;
 		if (!section || !route) return;
@@ -75,6 +62,7 @@ export class UserSettings extends PagePermissions {
 		void request
 			.get(route, null, { signal, replaceErrorPage: false })
 			.then((response) => {
+				if (signal.aborted) return;
 				if (response.ok) this._renderApiKey(section, response.credential);
 				else this._apiKeyError(section, response.error);
 			});
@@ -424,7 +412,11 @@ export class UserSettings extends PagePermissions {
 			].filter(Boolean),
 		);
 
-		return [this.visibleTo, this.restrictAccess, card].filter(Boolean);
+		return [
+			this.target.querySelector("[data-role='visible-to']"),
+			this.target.querySelector("[data-role='restrict-access']"),
+			card,
+		].filter(Boolean);
 	}
 
 	/**
@@ -435,7 +427,11 @@ export class UserSettings extends PagePermissions {
 	 * @pair user-settings:restrictions
 	 */
 	get formData() {
-		const data = super.formData;
+		const fields = super.formData;
+		const data = new FormData();
+		for (const key of ["restrictions", "admin", "group-key"]) {
+			for (const value of fields.getAll(key)) data.append(key, value);
+		}
 		const card = this.userCardElement;
 		const name = card?.querySelector("[name='name']");
 		const email = card?.querySelector("[name='email']");
@@ -497,19 +493,8 @@ export class UserSettings extends PagePermissions {
 	 */
 	postreconcile() {
 		const updated = this._updated;
-		if (!updated) return;
-
-		this._updated = false;
-		this.commitReset();
-		this.target.dataset.visible = "true";
-		this._initGroups();
-		this._initPageSelect();
-		this._initRemovePage();
-		this._initApiKey();
+		super.postreconcile();
+		if (!updated || this._updated) return;
 		this.setEntityMetadata();
-		if (this._success) {
-			this.form?.success();
-			this._success = false;
-		}
 	}
 }

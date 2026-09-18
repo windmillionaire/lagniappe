@@ -7,8 +7,8 @@ const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 /**
  * @testable infrastructure
  * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
- * @covered-by src/script/elements/renderer.mjs::Renderer.render
- * @covered-by src/script/elements/form.mjs::FormElement._click
+ * @covered-by src/script/forms/renderer.mjs::FormRenderer.render
+ * @covered-by src/script/widgets/base/formWidget.mjs::FormWidget._click
  */
 export class BaseElement {
 	constructor(renderer, schema, submission) {

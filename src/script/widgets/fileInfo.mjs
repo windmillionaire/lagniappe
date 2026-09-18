@@ -1,10 +1,10 @@
 import { STYLES } from "styles";
-import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { primitives } from "../elements/primitives";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
 import { setIcon } from "../shared/icons";
+import { FormWidget } from "./base/formWidget";
 
 /**
  * @testable true
@@ -13,7 +13,7 @@ import { setIcon } from "../shared/icons";
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_moves_between_page_and_task
  * @matrix file : active-reset authoritative-remount extract linked-pages polling reload status summarize summary text-tab
  */
-export class FileInfo extends FormElement {
+export class FileInfo extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.aiCreate = this.target.dataset.aiCreate === "true";

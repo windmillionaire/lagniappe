@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
-import { BaseForm } from "../../../elements/base/baseForm";
 import { SelectBox } from "../../../elements/combobox";
 import { primitives } from "../../../elements/primitives";
+import { FormController } from "../../../forms/controller";
 import { setIcon } from "../../../shared/icons";
 import { withTransition } from "../../../shared/transitions";
 
@@ -37,7 +37,7 @@ export class Condition {
 			delete this.draftSetting;
 		}
 		this.complete = false;
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

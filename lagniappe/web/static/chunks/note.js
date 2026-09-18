@@ -1,15 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './foundation.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './loader.js?v=b7d16921';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 /**
  * @testable true
@@ -19,7 +19,7 @@ import './loader.js?v=b7d16921';
  * @matrix notes : body-create combined-input photo-picker preview remove
  * @pair notes:photo
  */
-class CreateNote extends FormElement {
+class CreateNote extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

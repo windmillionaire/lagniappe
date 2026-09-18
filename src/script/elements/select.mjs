@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
-import { SelectBox } from "../elements/combobox";
 import { areEqual } from "../shared/utilities";
 import { BaseElement } from "./base/baseElement";
+import { SelectBox } from "./combobox";
 import { primitives } from "./primitives";
 
 /**

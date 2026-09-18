@@ -1,6 +1,6 @@
 import { STYLES } from "styles";
+import { FormController } from "../../../forms/controller";
 import { Modal, request } from "../../../shared";
-import { BaseForm } from "../../base/baseForm";
 import { buttons } from "../../buttons";
 import { primitives } from "../../primitives";
 
@@ -125,7 +125,7 @@ class GenerateText {
 			explain,
 		].filter(Boolean);
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

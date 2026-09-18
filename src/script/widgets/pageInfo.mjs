@@ -1,15 +1,15 @@
-import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
 import { captureError, request } from "../shared";
 import { withTransition } from "../shared/transitions";
+import { FormWidget } from "./base/formWidget";
 
 /**
  * @testable infrastructure
  */
-export class PageForm extends FormElement {
+export class PageForm extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.formSelect = null;

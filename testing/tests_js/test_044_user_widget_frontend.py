@@ -17,7 +17,7 @@ const document = {
   get activeElement() { return activeElement; },
 };
 
-class FormElement {
+class FormWidget {
   constructor(attributes = {}) {
     Object.assign(this, attributes);
     this._created = false;
@@ -34,16 +34,14 @@ class FormElement {
 
 class FacetedSearchElement {}
 class InputElement {}
-class PermissionsForm {}
 class RadioElement {}
 
 const context = {
   console,
   document,
   FacetedSearchElement,
-  FormElement,
+  FormWidget,
   InputElement,
-  PermissionsForm,
   RadioElement,
 };
 vm.createContext(context);
@@ -164,93 +162,55 @@ function createWidget(visible) {
 def test_group_permissions_tracks_rename_draft_after_target_rebuild(run_node):
     run_node(
         r'''
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-
-class FakeEdit {
-  constructor() {
-    this.listeners = new Map();
-  }
-
-  addEventListener(type, listener) {
-    this.listeners.set(type, listener);
-  }
-
-  input(value) {
-    this.listeners.get("input")?.({
-      target: {
-        matches(selector) { return selector === "input[name='name']"; },
-        value,
-      },
-    });
+const node = name => ({dataset: {name}, input: {value: name}, querySelector() {return this.input;}});
+class FormWidget {
+  constructor(attributes) {Object.assign(this, attributes);}
+  get formData() {return new Map([["name", this.target.input.value]]);}
+  async prepareSubmit() {return true;}
+  markUnsavedState() {this.unsavedState = true;}
+  async reset() {}
+  async prepareRevision() {}
+  postreconcile() {
+    if (!this._updated) return;
+    this.target = this.initialTarget;
+    this._updated = false;
+    this.unsavedState = false;
   }
 }
-
-class InputElement {
-  constructor(_widget, _schema, submission) {
-    this.edit = new FakeEdit();
-    this.submission = submission;
-  }
-}
-
-class PermissionsForm {
-  constructor(attributes = {}) {
-    Object.assign(this, attributes);
-  }
-
-  get formData() {
-    return new Map();
-  }
-
-  get html() {
-    return [];
-  }
-
-  updated(response) {
-    this.lastResponse = response;
-  }
-}
-
-const context = {
-  console,
-  FacetedSearchElement: class {},
-  FormElement: class {},
-  InputElement,
-  PermissionsForm,
-  RadioElement: class {},
-};
+const context = {FormWidget};
 vm.createContext(context);
-
-let source = fs.readFileSync("src/script/widgets/user.mjs", "utf8");
-source = source.replace(/^import .*;\n/gm, "");
-source = source.replaceAll("export class ", "class ");
-source += "\nglobalThis.GroupPermissions = GroupPermissions;";
-vm.runInContext(source, context);
-
-const widget = new context.GroupPermissions({
-  target: { dataset: { name: "Original Group" } },
-});
-const firstName = widget.html[0];
-firstName.input("First Draft");
-if (
-  widget._draftName !== "First Draft" ||
-  widget.target.dataset.name !== "First Draft"
-) {
-  throw new Error("Initial group-name control did not track its draft");
-}
-
-widget.target = { dataset: { name: "First Draft" } };
-const rebuiltName = widget.html[0];
-rebuiltName.input("Rebuilt Draft");
-if (
-  widget._draftName !== "Rebuilt Draft" ||
-  widget.target.dataset.name !== "Rebuilt Draft"
-) {
-  throw new Error("Rebuilt group-name control lost its draft listener");
-}
-
-if (widget.formData.get("name") !== "Rebuilt Draft") {
-  throw new Error("Rebuilt group rename was not retained for submission");
-}
+vm.runInContext(fs.readFileSync("src/script/widgets/userPermissions.mjs", "utf8")
+  .replace(/^import .*;\n/gm, "").replaceAll("export class ", "class ")
+  + "\nglobalThis.GroupPermissions = GroupPermissions;", context);
+const label = {textContent: "Original"};
+const button = {dataset: {key: "group"}, querySelector: () => label};
+const widget = new context.GroupPermissions({target: node("Original"), key: "group",
+  component: {elt: {querySelectorAll: () => [button]}}});
+(async () => {
+  widget.target.input.value = "First rename";
+  await widget.prepareSubmit();
+  widget.initialTarget = node("First rename");
+  widget._updated = true;
+  widget.postreconcile();
+  assert.equal(label.textContent, "First rename");
+  widget.target.input.value = "Second rename";
+  assert.equal(widget.formData.get("name"), "Second rename");
+  await widget.prepareSubmit();
+  widget.target.input.value = "Newer draft";
+  widget.initialTarget = node("Second rename");
+  widget._updated = true;
+  widget.postreconcile();
+  assert.equal(widget.formData.get("name"), "Newer draft");
+  assert.equal(label.textContent, "Second rename");
+  assert.equal(widget.unsavedState, true);
+  widget.revisionPreview = true;
+  widget.initialTarget = node("Preview only");
+  widget._updated = true;
+  widget.postreconcile();
+  assert.equal(label.textContent, "Second rename");
+})().catch(error => {console.error(error); process.exitCode = 1;});
 '''
     )

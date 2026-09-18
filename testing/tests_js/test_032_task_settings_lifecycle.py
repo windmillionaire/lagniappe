@@ -8,7 +8,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const context = {
-  FormElement: class { constructor(attributes) { Object.assign(this, attributes); } },
+  FormWidget: class { constructor(attributes) { Object.assign(this, attributes); } },
 };
 vm.createContext(context);
 const source = fs.readFileSync("src/script/widgets/taskSettings.mjs", "utf8")
@@ -143,7 +143,7 @@ const target = {
   dataset: {history: "history"},
 };
 const context = {
-  FormElement: class { constructor(attributes) { Object.assign(this, attributes); } },
+  FormWidget: class { constructor(attributes) { Object.assign(this, attributes); } },
   sections: {},
   captureError: () => { throw new Error("unexpected request error"); },
   request: { get: () => new Promise(resolve => pending.push(resolve)) },
@@ -407,7 +407,7 @@ const events = [];
 let resolveUpload;
 const uploadReady = new Promise((resolve) => { resolveUpload = resolve; });
 
-class FormElement {
+class FormWidget {
   constructor(attributes) {
     Object.assign(this, attributes);
     this.destroyables = [];
@@ -477,7 +477,7 @@ const target = {
 };
 
 const context = {
-  FormElement,
+  FormWidget,
   InputElement: class {},
   SectionToggle,
   TextareaElement: class {},
@@ -563,7 +563,7 @@ def test_form_response_metadata_stays_with_renderer_widget(run_node):
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-class BaseForm {}
+class FormController {}
 
 function target({ renderer = false } = {}) {
   return {
@@ -575,13 +575,13 @@ function target({ renderer = false } = {}) {
   };
 }
 
-const context = { BaseForm, console };
+const context = { FormController, console };
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/import .*?;\n/g, "");
-source = source.replace("export class FormElement", "class FormElement");
-source += "\nglobalThis.FormElement = FormElement;";
+source = source.replace("export class FormWidget", "class FormWidget");
+source += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(source, context);
 
 const responseState = {
@@ -592,7 +592,7 @@ const responseState = {
 };
 
 const settingsReplacement = target();
-const settings = new context.FormElement({
+const settings = new context.FormWidget({
   name: "TaskSettings",
   target: target(),
 });
@@ -615,7 +615,7 @@ if (settings.initialTarget !== settingsReplacement || !settings._updated) {
   throw new Error("TaskSettings did not retain its normal HTML reconciliation");
 }
 
-const renderer = new context.FormElement({
+const renderer = new context.FormWidget({
   name: "TaskForm",
   target: target({ renderer: true }),
 });
@@ -638,7 +638,7 @@ if (settingsReplacement.dataset.formGeneration !== undefined ||
   throw new Error("TaskSettings adopted a sibling TaskForm migration state");
 }
 
-const revision = new context.FormElement({
+const revision = new context.FormWidget({
   name: "TaskForm",
   target: target({ renderer: true }),
 });

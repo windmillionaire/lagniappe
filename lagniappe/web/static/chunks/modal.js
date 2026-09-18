@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7d16921';
-import { c as captureError, E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
+import { STYLES } from './styles.js?v=bc80da50';
+import { c as captureError, E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
 
 /**
  * @testable true

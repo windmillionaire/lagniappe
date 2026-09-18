@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FONT_MENU } from './toolbar.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
-import './foundation.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './queryLifecycle.js?v=b7d16921';
-import './dropdown.js?v=b7d16921';
-import './buttons.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
+import { F as FONT_MENU } from './toolbar.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './queryLifecycle.js?v=bc80da50';
+import './dropdown.js?v=bc80da50';
+import './buttons.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
 
 /**
  * @testable true

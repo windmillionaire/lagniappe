@@ -1,19 +1,19 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=b7d16921';
-import { InputElement } from './input.js?v=b7d16921';
-import { RadioElement } from './radio.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './foundation.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './baseElement.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
+import { InputElement } from './input.js?v=bc80da50';
+import { RadioElement } from './radio.js?v=bc80da50';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './baseElement.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 /**
  * @testable true
@@ -21,7 +21,7 @@ import './formatting.js?v=b7d16921';
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
  * @matrix forms : create page-form task-form
  */
-class CreateForm extends FormElement {
+class CreateForm extends FormWidget {
 	init() {
 		this.messages = {
 			submit: "Create Form",

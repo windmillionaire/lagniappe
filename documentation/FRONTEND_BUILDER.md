@@ -243,7 +243,7 @@ style.
 The form-level settings panel handles AI schema generation and form access
 restrictions.
 
-**AI generation**: A `BaseForm` with a textarea prompt. Submits the current
+**AI generation**: A `FormController` with a textarea prompt. Submits the current
 schema and HTML draft, saved baseline, draft revision and request identity to
 `ENDPOINTS.createSchema`. The response contains validated additions and exact-ID
 title, placeholder, option-label and column-title updates, plus HTML sidecars.
@@ -269,7 +269,7 @@ Regenerate. A no-op response uses the same success checkmark, without a notice,
 dirty state, Undo/Redo entry or rebuilding the form and its editors.
 
 Group restrictions and the owner checkbox are local drafts. Save Restrictions
-submits the complete snapshot in one PUT, using the standard `BaseForm` spinner
+submits the complete snapshot in one PUT, using the standard `FormController` spinner
 and error state. Adding or removing a group does not autosave. Failed saves keep
 the draft available for retry; duplicate submissions share one pending request.
 
@@ -289,7 +289,7 @@ Controls for the form name (inline editable), save button, and preview toggle.
 
 **Form name**: Click to edit, blur or Enter to finish the local edit. Escape reverts. Changes mark the form as unsaved.
 
-**Preview toggle**: Creates a `Renderer` instance with the current schema and renders a live preview of the form. Expands the builder layout and hides the model panel while previewing.
+**Preview toggle**: Creates a `FormRenderer` instance with the current schema and renders a live preview of the form. Expands the builder layout and hides the model panel while previewing.
 
 Preview rendering uses a generation guard. A renderer that finishes after a
 new toggle or Builder teardown destroys its detached resources and cannot
@@ -339,7 +339,7 @@ Conditions are property editors that open in the ConditionPanel. Each condition 
 
 ### Base Classes (`conditions/base.mjs`)
 
-**`Condition`** -- base class for all condition editors. Creates a target container, header (with help/close buttons), progress section, and submit button. Uses a `BaseForm` for error display and submit state. Manages a `Map<name, element>` of progressive option inputs and a `destroyables` array for cleanup.
+**`Condition`** -- base class for all condition editors. Creates a target container, header (with help/close buttons), progress section, and submit button. Uses a `FormController` for error display and submit state. Manages a `Map<name, element>` of progressive option inputs and a `destroyables` array for cleanup.
 
 **`ConditionTarget`** -- extends `Condition` for conditions that reference another form element (visibility, status). Adds:
 
@@ -380,7 +380,7 @@ inventory: SearchBox, OfflineModal, Components/Model/Settings/Condition/Form
 Settings/Header panels, EntityMenu, active element conditions, draft editors,
 local image URLs, and the document click listener. Panel classes remove the exact
 delegated listeners they installed and destroy Sortable/combobox/form/modal
-children. Conditions destroy their current `BaseForm`, child controls, and
+children. Conditions destroy their current `FormController`, child controls, and
 feedback timers; rebuilt column editors replace their exact `updated` handler
 instead of accumulating listeners. Async saves and mutation responses may
 finish, but re-check destruction before changing connected UI or navigating.

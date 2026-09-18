@@ -1,13 +1,13 @@
 # Frontend Elements
 
 `src/script/elements/` turns a form schema and submission into dynamic read/edit
-fields. A `FormElement` widget owns a `BaseForm`; the form owns a `Renderer`;
+fields. A `FormWidget` widget owns a `FormController`; the form owns a `FormRenderer`;
 the renderer lazy-loads one `BaseElement` subclass per schema field.
 
 ```text
-FormElement widget
-  -> BaseForm
-       -> Renderer
+FormWidget widget
+  -> FormController
+       -> FormRenderer
             -> BaseElement subclasses
 ```
 
@@ -15,9 +15,9 @@ Form lifecycle, submit state, revision baselines, and uploads are documented in
 [FRONTEND_FORMS.md](FRONTEND_FORMS.md). Comboboxes have their own guide:
 [FRONTEND_COMBOBOX.md](FRONTEND_COMBOBOX.md).
 
-## Renderer
+## FormRenderer
 
-`elements/renderer.mjs` receives the schema, submission, target, and entity key.
+`forms/renderer.mjs` receives the schema, submission, target, and entity key.
 `render()` creates fields through `getFormElement()`, appends them, and wires:
 
 - read/edit toggling;
@@ -30,7 +30,7 @@ different trigger IDs must all match. One input event computes all resulting
 visibility and commits it in one `withTransition()` call. Status text updates
 immediately.
 
-The Renderer may replace host children only during `BaseForm.init()`. Server
+The FormRenderer may replace host children only during `FormController.init()`. Server
 fragment updates use the full form replacement path so nested editors, uploads,
 comboboxes, and listeners have one teardown boundary. `destroy()` removes every
 field and renderer listener.

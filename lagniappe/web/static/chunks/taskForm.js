@@ -1,22 +1,22 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseForm } from './baseForm.js?v=b7d16921';
-import { F as FormElement } from './form2.js?v=b7d16921';
-import { s as sections } from './sections.js?v=b7d16921';
-import { r as request, c as captureError } from './foundation.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseUpload.js?v=b7d16921';
-import './directUpload.js?v=b7d16921';
-import './buttons.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
-import './dropdown.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
+import { s as sections } from './sections.js?v=bc80da50';
+import { F as FormController } from './controller.js?v=bc80da50';
+import { r as request, c as captureError } from './foundation.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './baseUpload.js?v=bc80da50';
+import './directUpload.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './buttons.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
+import './dropdown.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 /**
  * @testable false
@@ -27,7 +27,7 @@ import './combobox.js?v=b7d16921';
 async function renderOriginalSubmission(response, key) {
 	const host = document.createElement("div");
 	host.dataset.kind = "task";
-	const form = new BaseForm({
+	const form = new FormController({
 		target: host,
 		key,
 		readonly: true,
@@ -63,7 +63,7 @@ async function renderOriginalSubmission(response, key) {
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
  * @matrix tasks : attached-form autofill complete empty-fields partial-submission permission-gates readonly submission
  */
-class TaskForm extends FormElement {
+class TaskForm extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

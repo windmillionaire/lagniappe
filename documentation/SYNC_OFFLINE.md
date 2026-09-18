@@ -32,7 +32,7 @@ Only a create/update form with `lp-offline` and a widget
 
 - method, route, submitter role, and destination;
 - entity fingerprint/modified precondition;
-- structured Renderer values and ordinary fields;
+- structured FormRenderer values and ordinary fields;
 - selected Files; and
 - enough optimistic UI state to restore the queued record.
 

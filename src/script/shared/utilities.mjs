@@ -24,14 +24,14 @@ export const generateElementId = (type) => {
 /**
  * @testable false
  * @covered-by src/script/views/base/component.mjs::ViewComponent
- * @covered-by src/script/elements/base/baseForm.mjs::BaseForm
+ * @covered-by src/script/forms/controller.mjs::FormController
  * @reason transient UI feedback helper exercised through form/component flows
  */
 const briefMessageTimers = new WeakMap();
 
 /**
  * @testable false
- * @covered-by src/script/elements/base/baseForm.mjs::BaseForm
+ * @covered-by src/script/forms/controller.mjs::FormController
  * @covered-by src/script/views/base/component.mjs::ViewComponent
  * @reason transient status feedback is exercised through form and component flows
  */

@@ -232,8 +232,9 @@ export default class ViewComponent {
 
 	// this is called when a widget needs to be loaded/reloaded in response to an event
 	/**
-	 * @testable false
-	 * @reason foundational view lifecycle plumbing
+	 * @testable true
+	 * @tests tests_js/test_048_form_controls.py::test_validated_html_initializes_cold_widget_without_rebuilding_loaded_widget
+	 * @matrix user-groups : conditional-response initialization
 	 */
 	async load(widget = this.active, route = null) {
 		if (!widget || widget?.loaded) return null;
@@ -242,6 +243,7 @@ export default class ViewComponent {
 		const response = await this.view.load(this, route);
 		widget.modified = true;
 		if (!response) return null;
+		if (response.updated === false && widget.initialized) return null;
 		const responseTarget = response.html?.querySelector?.(
 			`[data-widget='${widget.name}']`,
 		);

@@ -1,0 +1,33 @@
+{% macro group_row(group=None) %}
+  <li class="{{ styles.form.restriction }}">
+    <input type="hidden" name="group-key" value="{{ group.urlsafe_key if group else '' }}">
+    <span data-role="group-name" class="text-base font-semibold text-user-default truncate">{{ group.name if group else '' }}</span>
+    <button class="{{ styles.toggle.plain }}" data-role="remove-restriction"
+            data-key="{{ group.urlsafe_key if group else '' }}" data-kind="delete"
+            aria-label="Remove group restriction" type="button">
+      {{ render_icon('x') }}
+    </button>
+  </li>
+{% endmacro %}
+
+{% macro fields(entity, label='Group Restrictions') %}
+  <input type="hidden" name="restrictions" value="true">
+  <label class="{{ styles.checkbox.label }}">
+    <div class="{{ styles.checkbox.container }}">
+      <input type="checkbox" name="admin" value="true" data-role="specific-access" data-kind="user"
+             {% if entity.properties.restricted_to.stored == ['admin'] %}checked{% endif %}
+             class="{{ styles.checkbox.default }}">
+      {{ render_icon('check', styles.checkbox.icon) }}
+    </div>
+    <span>Administrators only</span>
+  </label>
+  <label class="flex flex-col gap-1">
+    <span class="{{ styles.label.sectionHeading }}">{{ label }}</span>
+    <input data-index="group" data-role="restrict-group-input" data-kind="user"
+           data-placeholder="Add group restriction..." name="restriction-group" class="{{ styles.input }}">
+  </label>
+  <ul class="flex flex-col gap-2 empty:hidden" data-role="restricted-group-list">
+    {% for group in entity.groups %}{{ group_row(group) }}{% endfor %}
+  </ul>
+  <template data-role="restriction-template">{{ group_row() }}</template>
+{% endmacro %}

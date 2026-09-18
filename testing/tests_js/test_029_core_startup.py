@@ -808,15 +808,15 @@ const context = { console };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
 
-let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
-source = source.replace('import { withTransition } from "../shared/transitions";\n', "");
+let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
+source = source.replace('import { withTransition } from "../../shared/transitions";\n', "");
 source = source.replace(
-  'import { BaseForm } from "./base/baseForm";',
-  "const BaseForm = class {};",
+  'import { FormController } from "../../forms/controller";',
+  "const FormController = class {};",
 );
 source = source.replace(/^import.*\n/gm, "");
-source = source.replace("export class FormElement", "class FormElement");
-source += "\nglobalThis.FormElement = FormElement;";
+source = source.replace("export class FormWidget", "class FormWidget");
+source += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(source, context);
 
 (async () => {
@@ -825,11 +825,12 @@ vm.runInContext(source, context);
   const initialReplayReady = new Promise(() => {});
   const target = {
     cloneNode() { return {}; },
+    hasAttribute() { return false; },
     setAttribute(name) {
       if (name === "initialized") initialized = true;
     },
   };
-  const form = new context.FormElement({
+  const form = new context.FormWidget({
     target,
     view: { initialReplayReady },
     readonly: false,

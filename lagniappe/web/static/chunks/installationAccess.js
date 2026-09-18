@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as SiteSetting } from './base.js?v=b7d16921';
+import { S as SiteSetting } from './base.js?v=bc80da50';
 
 /**
  * @testable false

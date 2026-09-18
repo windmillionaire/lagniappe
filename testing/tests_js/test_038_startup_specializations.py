@@ -347,7 +347,7 @@ const context = {
 context.globalThis = context;
 context.loadBaseForm = async () => {
   formLoads += 1;
-  return { BaseForm: context.FakeBaseForm };
+  return { FormController: context.FakeBaseForm };
 };
 vm.createContext(context);
 
@@ -364,7 +364,7 @@ const REPORT_FORM_SELECTOR =
 `,
 );
 source = source.replace(
-  'import("../elements/base/baseForm")',
+  'import("../forms/controller")',
   "globalThis.loadBaseForm()",
 );
 source = source.replace("export default class Report", "class Report");
@@ -391,7 +391,7 @@ const formsRoot = {
 (async () => {
   const empty = new context.Report({ querySelector() { return null; } });
   await empty.init();
-  if (formLoads !== 0) throw new Error("Formless report loaded BaseForm");
+  if (formLoads !== 0) throw new Error("Formless report loaded FormController");
 
   const report = new context.Report(formsRoot);
   const initializing = report.init();

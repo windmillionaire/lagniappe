@@ -1,25 +1,25 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=b7d16921';
-import { InputElement } from './input.js?v=b7d16921';
-import { s as sections } from './sections.js?v=b7d16921';
-import { TextareaElement } from './textarea.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './foundation.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './baseElement.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
-import './baseUpload.js?v=b7d16921';
-import './directUpload.js?v=b7d16921';
-import './buttons.js?v=b7d16921';
-import './dropdown.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
+import { InputElement } from './input.js?v=bc80da50';
+import { s as sections } from './sections.js?v=bc80da50';
+import { TextareaElement } from './textarea.js?v=bc80da50';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './baseElement.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './baseUpload.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './directUpload.js?v=bc80da50';
+import './buttons.js?v=bc80da50';
+import './dropdown.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 /**
  * @testable false
@@ -27,7 +27,7 @@ import './combobox.js?v=b7d16921';
  * @covered-by src/script/widgets/projectInfo.mjs::ProjectInfo
  * @reason shared field construction is exercised through concrete project widgets
  */
-class ProjectForm extends FormElement {
+class ProjectForm extends FormWidget {
 	get nameElement() {
 		return new InputElement(
 			{

@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7d16921';
-import { c as createIcon, i as iconDefinition, s as setIcon } from './icons.js?v=b7d16921';
+import { STYLES } from './styles.js?v=bc80da50';
+import { c as createIcon, i as iconDefinition, s as setIcon } from './icons.js?v=bc80da50';
 
 const ROUTES = {
 	task: "pages",

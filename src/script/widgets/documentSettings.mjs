@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
 import { SelectBox } from "../elements/combobox";
-import { FormElement } from "../elements/form";
 import { primitives } from "../elements/primitives";
+import { FormWidget } from "./base/formWidget";
 
 const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
 
@@ -18,7 +18,7 @@ const VISIBILITY = {
  * @matrix public-pages : metadata preview
  * @pair public-directory:category
  */
-export class DocumentSettings extends FormElement {
+export class DocumentSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

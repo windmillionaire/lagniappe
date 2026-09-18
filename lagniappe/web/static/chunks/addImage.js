@@ -1,19 +1,19 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition, r as request } from './foundation.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import { Modal } from './modal.js?v=b7d16921';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b7d16921';
-import { b as buttons } from './buttons.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './directUpload.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './dropdown.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
+import { w as withTransition, r as request } from './foundation.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import { Modal } from './modal.js?v=bc80da50';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=bc80da50';
+import { b as buttons } from './buttons.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './directUpload.js?v=bc80da50';
+import './dropdown.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
 
 const IMAGE_DROPZONE_TEXT =
 	"Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";

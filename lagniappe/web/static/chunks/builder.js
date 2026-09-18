@@ -1,16 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b7d16921';
-import { EntityMenu } from './entityMenu.js?v=b7d16921';
-import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, e as areEqual, g as generateElementId } from './foundation.js?v=b7d16921';
-import { c as connectivity } from './connectivity.js?v=b7d16921';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b7d16921';
-import { d as directUpload } from './directUpload.js?v=b7d16921';
-import { PollingCoordinator } from './polling.js?v=b7d16921';
-import { STYLES } from './styles.js?v=b7d16921';
-import { s as setIcon } from './icons.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=b7d16921';
-import { F as FacetsBox } from './facets.js?v=b7d16921';
+import { SearchBox } from './search.js?v=bc80da50';
+import { EntityMenu } from './entityMenu.js?v=bc80da50';
+import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, e as areEqual, g as generateElementId } from './foundation.js?v=bc80da50';
+import { c as connectivity } from './connectivity.js?v=bc80da50';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bc80da50';
+import { d as directUpload } from './directUpload.js?v=bc80da50';
+import { PollingCoordinator } from './polling.js?v=bc80da50';
+import { STYLES } from './styles.js?v=bc80da50';
+import { s as setIcon } from './icons.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
+import { F as FormController, a as FormRenderer } from './controller.js?v=bc80da50';
 
 /**
  * @testable true
@@ -168,12 +167,12 @@ class FormChangeStatus {
 }
 
 const CONDITION_REGISTRY = {
-	modify: () => import('./modify.js?v=b7d16921'),
-	html: () => import('./html.js?v=b7d16921'),
-	status: () => import('./status.js?v=b7d16921'),
-	visibility: () => import('./visibility.js?v=b7d16921'),
-	columns: () => import('./columns.js?v=b7d16921'),
-	options: () => import('./options.js?v=b7d16921'),
+	modify: () => import('./modify.js?v=bc80da50'),
+	html: () => import('./html.js?v=bc80da50'),
+	status: () => import('./status.js?v=bc80da50'),
+	visibility: () => import('./visibility.js?v=bc80da50'),
+	columns: () => import('./columns.js?v=bc80da50'),
+	options: () => import('./options.js?v=bc80da50'),
 };
 
 /**
@@ -4175,11 +4174,10 @@ class FormSettings {
 		this.builder = builder;
 		this.column = document.getElementById("form-settings-panel");
 		this.restrictions = document.querySelector("[data-role='restrict-access']");
-		this.selectGroup = null;
 
 		const generateTarget = this.column?.querySelector("#generate");
 		if (generateTarget) {
-			this.generateForm = new BaseForm({
+			this.generateForm = new FormController({
 				target: generateTarget,
 				submitGroup: generateTarget.querySelector("[data-role='submit-group']"),
 				messages: {
@@ -4199,7 +4197,7 @@ class FormSettings {
 		this._saveRestrictions = this._saveRestrictions.bind(this);
 		this._restrictionPromise = null;
 		this.restrictionForm = this.restrictions
-			? new BaseForm({
+			? new FormController({
 					target: this.restrictions,
 					messages: {
 						submit: "Save Restrictions",
@@ -4210,7 +4208,6 @@ class FormSettings {
 			: null;
 		this._input = this._input.bind(this);
 		this._click = this._click.bind(this);
-		this._restrictionUpdated = this._restrictionUpdated.bind(this);
 		this.modal = null;
 	}
 
@@ -4219,10 +4216,11 @@ class FormSettings {
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
 	 * @matrix forms : access-restrictions group-restricted
 	 */
-	init() {
+	async init() {
 		if (this._destroyed) return;
 		if (this.generateForm) {
-			this.generateForm.init();
+			await this.generateForm.init();
+			if (this._destroyed) return;
 			this.generateForm.target.addEventListener("submit", this._generateSchema);
 		}
 
@@ -4230,58 +4228,13 @@ class FormSettings {
 		this.column?.addEventListener("click", this._click);
 
 		if (this.restrictions) {
-			this.restrictionForm.init();
+			await this.restrictionForm.init();
+			if (this._destroyed) return;
 			this.restrictions.addEventListener("submit", this._saveRestrictions);
-			const input = this.column.querySelector(
-				"[data-role='restrict-group-input']",
-			);
-			this.selectGroup = new FacetsBox(input);
-			this.selectGroup.init();
-			this.restrictions.addEventListener("updated", this._restrictionUpdated);
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
-	 * @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
-	 */
-	_restrictionUpdated(event) {
-		if (this._destroyed) return;
-		if (Object.keys(event.detail.options).length) {
-			this.restrictions.querySelector("[name='admin']").checked = false;
-		}
-		const list = this.restrictions.querySelector("ul");
-		const template = this.restrictions.querySelector("template");
-		for (const [key, option] of Object.entries(event.detail.options)) {
-			if (
-				[...list.querySelectorAll("input[name='group-key']")].some(
-					(input) => input.value === key,
-				)
-			)
-				continue;
-			const item = template.content.firstElementChild.cloneNode(true);
-			item.querySelector("input").value = key;
-			item.querySelector("span").textContent = option.name;
-			item.querySelector("button").dataset.key = key;
-			list.append(item);
-		}
-		this.selectGroup.clear({ notify: false });
-		this.restrictionForm.markUnsavedState();
-	}
-
-	/**
-	 * @testable true
-	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
-	 * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
-	 * @matrix forms : access-restrictions explicit-submit owner-restricted
-	 */
 	_input(event) {
-		if (event.target.name === "admin" && event.target.checked) {
-			this.restrictions.querySelector("ul").replaceChildren();
-			this.selectGroup.clear({ notify: false });
-			this.restrictionForm.markUnsavedState();
-		}
 		if (event.target.name === "description" && this.generateForm?.target) {
 			const explain = this.generateForm.target.querySelector(
 				"[data-role='explain']",
@@ -4303,9 +4256,6 @@ class FormSettings {
 			this.generateForm.resetSubmitButton();
 			const ta = this.generateForm.target.querySelector("textarea");
 			if (ta) ta.value = "";
-		} else if (button?.dataset.role === "remove-restriction") {
-			button.closest("li")?.remove();
-			this.restrictionForm.markUnsavedState();
 		}
 	}
 
@@ -4513,11 +4463,9 @@ class FormSettings {
 		);
 		this.column?.removeEventListener("input", this._input);
 		this.column?.removeEventListener("click", this._click);
-		this.restrictions?.removeEventListener("updated", this._restrictionUpdated);
 		this.restrictions?.removeEventListener("submit", this._saveRestrictions);
 		this.restrictionForm?.destroy();
 		this.generateForm?.destroy();
-		this.selectGroup?.destroy();
 		this.modal?.destroy();
 		this.modal = null;
 	}
@@ -4677,7 +4625,7 @@ class Header {
 
 		let renderer = null;
 		if (!active) {
-			renderer = new Renderer({
+			renderer = new FormRenderer({
 				target: this.previewPanel,
 				schema: this.builder.schema,
 				kind: "form",
@@ -5467,7 +5415,8 @@ class FormBuilder {
 
 		this.model.init();
 		this.settings.init();
-		this.formSettings.init();
+		await this.formSettings.init();
+		if (this._destroyed) return this;
 		if (this.bootstrap?.pending_change)
 			this.setPendingChange(this.bootstrap.pending_change);
 
@@ -5915,7 +5864,7 @@ class FormBuilder {
 	 * @matrix html-field : generated-document-undo retained-editor
 	 */
 	async prepareGeneratedDocuments(htmlFields) {
-		const { default: HtmlEditor } = await import('./html.js?v=b7d16921');
+		const { default: HtmlEditor } = await import('./html.js?v=bc80da50');
 		for (const [id, html] of Object.entries(htmlFields || {})) {
 			const element = this.elements.get(id);
 			if (

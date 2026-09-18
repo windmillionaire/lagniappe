@@ -10,7 +10,7 @@ const vm = require("node:vm");
 
 const events = [];
 let hasTextTab = false;
-class FormElement {
+class FormWidget {
   updated() { events.push("base-updated"); }
   async postreconcile() { events.push("base-postreconcile"); }
   setEntityMetadata() { events.push("metadata"); }
@@ -20,7 +20,7 @@ const context = {
   document: {
     getElementById(id) { return id === "text" && hasTextTab ? {} : null; },
   },
-  FormElement,
+  FormWidget,
   InputElement: class {},
   primitives: {},
   SectionToggle: {},

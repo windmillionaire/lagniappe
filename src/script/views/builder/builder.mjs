@@ -91,7 +91,8 @@ class FormBuilder {
 
 		this.model.init();
 		this.settings.init();
-		this.formSettings.init();
+		await this.formSettings.init();
+		if (this._destroyed) return this;
 		if (this.bootstrap?.pending_change)
 			this.setPendingChange(this.bootstrap.pending_change);
 

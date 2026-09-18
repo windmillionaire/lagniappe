@@ -191,8 +191,10 @@ lazy document construction used by offline replay. The generic loader does not
 import either adapter.
 
 `widgets/userSettings.mjs` owns `UserSettings`, including user groups, Page
-associations, notification preferences, and API-key controls. It extends
-`PagePermissions`; `widgets/pageInfo.mjs` owns Page information and creation.
+associations, notification preferences, and API-key controls. It and
+`PagePermissions` independently extend `FormWidget`; their shared restriction
+control is declared in HTML and owned by `FormController`.
+`widgets/pageInfo.mjs` owns Page information and creation.
 
 The loader provides `enable()`, `disable()`, and synchronous `reconcile()`.
 Widgets implement only the members they need:
@@ -203,7 +205,7 @@ Widgets implement only the members they need:
 | `updated(response)` / `created(response)` | Prepare server response state. |
 | `prereconcile()` | Finish imports, detached rendering, or data work. |
 | `postreconcile()` | Commit connected-DOM work synchronously. |
-| `data` | Contribute `FormData` to the component. |
+| `formData` | Contribute `FormData` to the component. |
 | `showError(message)` | Present a validation error. |
 | `destroy()` | Remove listeners and owned resources. |
 
@@ -211,7 +213,7 @@ Loader settings come from the widget target, component, and view: key, kind,
 readonly, visibility, persistence, endpoint registry, and parsed JSON values
 such as schema, submission, conditions, columns, selected, preload, and options.
 
-Most behavioral widgets extend `FormElement`, `BaseList`, `BaseTable`, or
+Most behavioral widgets extend `FormWidget`, `BaseList`, `BaseTable`, or
 `BaseUpload`. See [FRONTEND_FORMS.md](FRONTEND_FORMS.md) and
 [FRONTEND_ELEMENTS.md](FRONTEND_ELEMENTS.md).
 

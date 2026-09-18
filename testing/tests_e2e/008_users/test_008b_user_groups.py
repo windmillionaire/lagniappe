@@ -1,4 +1,5 @@
 import re
+from copy import copy
 from uuid import uuid4
 
 import pytest
@@ -9,6 +10,7 @@ from testing.definitions import Groups, Permissions, SitePages, Users
 from testing.definitions.group_definitions import GroupDefinition
 from testing.elements import Buttons, Modal, PermissionsForm, SpinnerButtons, Tools
 from testing.resources import Group
+from testing.utility.polling import expect_poll_result
 
 pytestmark = pytest.mark.e2e
 
@@ -160,6 +162,50 @@ def test_rename_group(get_user):
     user.reload(user_index)
     expect(selector.locator("[data-role='group-name']")).to_have_text(renamed)
     expect(name_input).to_have_value(renamed)
+
+
+# @matrix user-groups : background-update unsaved-preservation reset permission-update
+# @source src/script/widgets/base/formWidget.mjs::FormWidget
+# @source src/script/widgets/userPermissions.mjs::GroupPermissions
+# @source lagniappe/web/responses.py::group_permissions
+# @template users/tools.html::group_permissions
+# @template users/permissions.html::sections
+def test_permissions_html_preserves_dirty_form_until_explicit_reset(get_user):
+    owner = get_user(Users.OWNER)
+    collaborator = copy(owner)
+    collaborator.page = owner.page.context.new_page()
+    user_index = owner.go(SitePages.USER_INDEX)
+    group = _new_group(owner, "Permission Revision Group")
+    _create_group(owner, user_index, group)
+    local = PermissionsForm(owner, group)
+    local_name = local.form.locator("input[name='name']")
+    local_name.fill("Unsaved group name")
+
+    remote_index = collaborator.go(SitePages.USER_INDEX)
+    remote_index.user_groups.locator(f"button[data-key='{group.key}']").click()
+    remote = PermissionsForm(collaborator, group)
+    saved_name = f"Saved group name {uuid4().hex}"
+    remote.form.locator("input[name='name']").fill(saved_name)
+    remote.set(General.MODELS, Levels.VIEW)
+    with expect_poll_result(owner.page, subscription_id=f"edit:{group.key}", timeout=25000):
+        response = remote.submit()
+
+    assert response.headers["content-type"].startswith("text/html")
+    assert 'data-form-control="permission-sections"' in response.text()
+    assert 'data-section="models"' in response.text()
+    marker = local.form.locator("[lp-edited-marker]")
+    expect(marker).to_be_visible()
+    expect(local_name).to_have_value("Unsaved group name")
+    local.verify(General.MODELS, Levels.NONE)
+    marker.locator("[data-role='edited-reset']").click()
+    expect(local_name).to_have_value(saved_name)
+    local.verify(General.MODELS, Levels.VIEW)
+    expect(marker).to_be_hidden()
+
+    # The replacement is editable and retains ordinary form submission behavior.
+    local.set(General.MODELS, Levels.NONE)
+    local.submit()
+    local.verify(General.MODELS, Levels.NONE)
 
 
 # @matrix permissions public-groups : active permission-update public

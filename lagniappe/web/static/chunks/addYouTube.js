@@ -1,14 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseForm } from './baseForm.js?v=b7d16921';
-import { b as buttons } from './buttons.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
-import './foundation.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
+import { F as FormController } from './controller.js?v=bc80da50';
+import { b as buttons } from './buttons.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
 
 /**
  * @testable true
@@ -54,7 +54,7 @@ class AddYouTube {
 		});
 		this.html = [this.link, submit];
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

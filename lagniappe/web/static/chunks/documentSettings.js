@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7d16921';
-import './foundation.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
-import { S as SelectBox } from './select2.js?v=b7d16921';
-import { F as FormElement } from './form2.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
-import './results.js?v=b7d16921';
-import './storage.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
-import './submitter.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './loader.js?v=b7d16921';
+import { STYLES } from './styles.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
+import { S as SelectBox } from './select2.js?v=bc80da50';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './results.js?v=bc80da50';
+import './storage.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
+import './submitter.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
 
@@ -32,7 +32,7 @@ const VISIBILITY = {
  * @matrix public-pages : metadata preview
  * @pair public-directory:category
  */
-class DocumentSettings extends FormElement {
+class DocumentSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

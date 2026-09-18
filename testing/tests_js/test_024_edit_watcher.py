@@ -32,18 +32,18 @@ const context = {
   showBriefly() {},
   withTransition(callback) { return callback(); },
   primitives: { error() { return {}; } },
-  Renderer: class {},
+  FormRenderer: class {},
   ICONS: { builder: { unsaved: "unsaved" } },
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/base/baseForm.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/controller.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class BaseForm", "class BaseForm");
-source += "\nglobalThis.BaseForm = BaseForm;";
+source = source.replace("export class FormController", "class FormController");
+source += "\nglobalThis.FormController = FormController;";
 vm.runInContext(source, context);
 
-const form = new context.BaseForm(widget);
+const form = new context.FormController(widget);
 form.setSubmitButton = (state) => { form.lastState = state; };
 form.hideError = () => {};
 form._initUnsavedState();
@@ -90,7 +90,7 @@ const target = {
 };
 const context = {
   areEqual(left, right) { return JSON.stringify(left) === JSON.stringify(right); },
-  BaseForm: class {},
+  FormController: class {},
   console,
   File: class {},
   FormData: FakeFormData,
@@ -99,13 +99,13 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
-source = source.replace("export class FormElement", "class FormElement");
-source += "\nglobalThis.FormElement = FormElement;";
+source = source.replace("export class FormWidget", "class FormWidget");
+source += "\nglobalThis.FormWidget = FormWidget;";
 vm.runInContext(source, context);
 
-const widget = new context.FormElement({ target });
+const widget = new context.FormWidget({ target });
 Object.defineProperty(widget, "formData", {
 	configurable: true,
   get() {

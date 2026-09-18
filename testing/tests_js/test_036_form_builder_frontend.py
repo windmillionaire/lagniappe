@@ -71,7 +71,7 @@ const context = {
   console,
   document,
   FormData: class { constructor(form) { this.form = form; } },
-  Renderer: class {},
+  FormRenderer: class {},
   request: {
     put(...args) {
       return new Promise((resolve, reject) => requests.push({ resolve, reject, args }));
@@ -280,7 +280,7 @@ const vm = require("node:vm");
 let finishRequest;
 let requestCount = 0;
 const context = {
-  BaseForm: class {},
+  FormController: class {},
   crypto: require("node:crypto").webcrypto,
   captureError() {},
   console,

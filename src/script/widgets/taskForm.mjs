@@ -1,7 +1,7 @@
-import { BaseForm } from "../elements/base/baseForm";
-import { FormElement } from "../elements/form";
 import { sections } from "../elements/sections";
+import { FormController } from "../forms/controller";
 import { captureError, request } from "../shared";
+import { FormWidget } from "./base/formWidget";
 
 /**
  * @testable false
@@ -12,7 +12,7 @@ import { captureError, request } from "../shared";
 async function renderOriginalSubmission(response, key) {
 	const host = document.createElement("div");
 	host.dataset.kind = "task";
-	const form = new BaseForm({
+	const form = new FormController({
 		target: host,
 		key,
 		readonly: true,
@@ -48,7 +48,7 @@ async function renderOriginalSubmission(response, key) {
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
  * @matrix tasks : attached-form autofill complete empty-fields partial-submission permission-gates readonly submission
  */
-export class TaskForm extends FormElement {
+export class TaskForm extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

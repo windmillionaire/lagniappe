@@ -1,8 +1,8 @@
-import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
 import { withTransition } from "../shared/transitions";
+import { FormWidget } from "./base/formWidget";
 
 const TASK_BUTTONS = {
 	selectUser: "facet",
@@ -16,7 +16,7 @@ const TASK_BUTTONS = {
 /**
  * @testable infrastructure
  */
-export class BaseTaskSettings extends FormElement {
+export class BaseTaskSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.buttons = {};
@@ -221,7 +221,7 @@ export class TaskMove extends BaseTaskSettings {
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
  * @matrix task-combine : checkbox-submit delta lazy-form
  */
-export class TaskCombine extends FormElement {
+export class TaskCombine extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

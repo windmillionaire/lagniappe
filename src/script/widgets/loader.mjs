@@ -7,7 +7,7 @@
  * - reconcile(): Sync this.visible and prepared state to the DOM (in transition)
  * - updated(response): Handle server response
  * - created(response): Post-create handling (reset forms)
- * - data: FormData getter for submissions
+ * - formData: FormData getter for submissions
  * - destroy(): Cleanup listeners
  */
 
@@ -36,7 +36,7 @@ const WIDGETS = {
 	FileUpload: () => import("./uploadFile"),
 	Filters: () => import("./filters"),
 	FilterResults: () => import("./tables"),
-	GroupPermissions: () => import("./user"),
+	GroupPermissions: () => import("./userPermissions"),
 	HomeActivityList: () => import("./home/activity"),
 	HomePageList: () => import("./home/lists"),
 	HomeTaskList: () => import("./home/tasks"),
@@ -54,7 +54,7 @@ const WIDGETS = {
 	PagePhoto: () => import("./pagePhoto"),
 	PageTaskList: () => import("./pageTaskList"),
 	ProjectInfo: () => import("./projectInfo"),
-	PublicPermissions: () => import("./user"),
+	PublicPermissions: () => import("./userPermissions"),
 	SavedFilters: () => import("./filters"),
 	SiteAiModels: () => import("./siteSettings/aiModels"),
 	SiteAdministrators: () => import("./siteSettings/administrators"),

@@ -34,9 +34,7 @@ def public_permissions():
     if request.method == "PUT":
         public_group.save_permissions(request.form)
 
-        return responses.group_permissions(public_group, public=True, update=True)
-
-    return responses.group_permissions(public_group, public=True, update=True)
+    return responses.group_permissions(public_group, public=True)
 
 
 # @testable true
@@ -60,9 +58,7 @@ def group_permissions(key, **kwargs):
 
         group.save_permissions(request.form)
 
-        return responses.group_permissions(group, update=True)
-
-    return responses.group_permissions(group, update=True)
+    return responses.group_permissions(group)
 
 
 # @testable true

@@ -1,5 +1,5 @@
+import { FormController } from "../../../forms/controller";
 import { request } from "../../../shared";
-import { BaseForm } from "../../base/baseForm";
 import { buttons } from "../../buttons";
 import { primitives } from "../../primitives";
 
@@ -45,7 +45,7 @@ class PinVersion {
 		this.input.maxLength = 100;
 		this.html = [this.input, buttons.submit({ kind: "editor" })];
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

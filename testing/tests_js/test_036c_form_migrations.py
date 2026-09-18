@@ -372,7 +372,7 @@ const vm = require("node:vm");
 const mode = MODE;
 const change = CHANGE;
 const context = {
-  BaseForm: class {}, structuredClone, console,
+  FormController: class {}, structuredClone, console,
   areEqual: (left, right) => JSON.stringify(left) === JSON.stringify(right),
   captureError(error) { throw error; },
   withTransition: commit => commit(),
@@ -383,7 +383,7 @@ const context = {
 vm.createContext(context);
 for (const [path, name] of [
   ["src/script/shared/formRepresentation.mjs", null],
-  ["src/script/elements/form.mjs", "FormElement"],
+  ["src/script/widgets/base/formWidget.mjs", "FormWidget"],
   ["src/script/shared/editReconciler.mjs", "EditReconciler"],
 ]) {
   const source = fs.readFileSync(path, "utf8")
@@ -403,7 +403,7 @@ let applied = 0;
 const cancelled = [];
 const button = {textContent: ""};
 const message = {textContent: ""};
-const widget = new context.FormElement({
+const widget = new context.FormWidget({
   name: "TaskForm", schema: before, submission: {quantity: "009", note: "Keep"},
   target: {cloneNode() { return {}; }},
 });

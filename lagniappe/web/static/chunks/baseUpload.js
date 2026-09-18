@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { d as directUpload } from './directUpload.js?v=b7d16921';
-import { STYLES } from './styles.js?v=b7d16921';
-import { c as createIcon } from './icons.js?v=b7d16921';
-import { b as buttons } from './buttons.js?v=b7d16921';
-import { Dropdown } from './dropdown.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
-import { B as BaseForm } from './baseForm.js?v=b7d16921';
+import { F as FormController } from './controller.js?v=bc80da50';
+import { d as directUpload } from './directUpload.js?v=bc80da50';
+import { STYLES } from './styles.js?v=bc80da50';
+import { c as createIcon } from './icons.js?v=bc80da50';
+import { b as buttons } from './buttons.js?v=bc80da50';
+import { Dropdown } from './dropdown.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
 
 const DEFAULT_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";
@@ -696,7 +696,7 @@ class BaseUpload {
 	}
 
 	async init() {
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		await this.form.init();
 
 		if (this.readonly) {

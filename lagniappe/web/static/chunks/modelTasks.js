@@ -1,36 +1,36 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=b7d16921';
-import { F as FormElement } from './form2.js?v=b7d16921';
-import { InputElement } from './input.js?v=b7d16921';
-import { S as SectionToggle } from './sectionToggle.js?v=b7d16921';
-import { r as request, w as withTransition } from './foundation.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './baseElement.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
-import './facets.js?v=b7d16921';
-import './remote.js?v=b7d16921';
-import './queryLifecycle.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
-import './results.js?v=b7d16921';
-import './storage.js?v=b7d16921';
-import './submitter.js?v=b7d16921';
-import './buttons.js?v=b7d16921';
-import './baseUpload.js?v=b7d16921';
-import './directUpload.js?v=b7d16921';
-import './dropdown.js?v=b7d16921';
+import { BaseList } from './baseList.js?v=bc80da50';
+import { InputElement } from './input.js?v=bc80da50';
+import { S as SectionToggle } from './sectionToggle.js?v=bc80da50';
+import { r as request, w as withTransition } from './foundation.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './baseElement.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
+import './facets.js?v=bc80da50';
+import './remote.js?v=bc80da50';
+import './queryLifecycle.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './results.js?v=bc80da50';
+import './storage.js?v=bc80da50';
+import './submitter.js?v=bc80da50';
+import './buttons.js?v=bc80da50';
+import './baseUpload.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './directUpload.js?v=bc80da50';
+import './dropdown.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 /**
  * @testable infrastructure
  */
-class ModelTask extends FormElement {
+class ModelTask extends FormWidget {
 	get formSelectElement() {
 		const target = this.target.querySelector('[data-action="select-form"]');
 		if (!target) return null;

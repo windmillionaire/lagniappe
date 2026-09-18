@@ -109,7 +109,7 @@ const context = {{
   }},
 }};
 
-context.BaseForm = class {{}};
+context.FormController = class {{}};
 context.uploadElement = {{}};
 context.directUpload = {{}};
 

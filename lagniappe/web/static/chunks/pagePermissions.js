@@ -1,23 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import './foundation.js?v=b7d16921';
-import { F as FacetsBox } from './facets.js?v=b7d16921';
-import { F as FormElement } from './form2.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import './remote.js?v=b7d16921';
-import './queryLifecycle.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './primitives.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './results.js?v=b7d16921';
-import './storage.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
-import './submitter.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './formRepresentation.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './loader.js?v=b7d16921';
+import { F as FormWidget } from './formWidget.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './primitives.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './foundation.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './formRepresentation.js?v=bc80da50';
 
 /**
  * @testable true
@@ -25,7 +17,7 @@ import './loader.js?v=b7d16921';
  * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restrictions_save_drafts_and_show_each_source
  * @matrix pages : permission-gates permissions-panel access-restrictions explicit-submit group-restricted owner-restricted source-summary
  */
-class PagePermissions extends FormElement {
+class PagePermissions extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {
@@ -33,100 +25,6 @@ class PagePermissions extends FormElement {
 			submitting: "Saving Restrictions",
 			submitted: "Restrictions Saved",
 		};
-	}
-
-	async _initForm(options) {
-		await super._initForm(options);
-		const restrictAccess = this.restrictAccess;
-		if (!restrictAccess || this.readonly) return;
-
-		const input = restrictAccess.querySelector(
-			"[data-role='restrict-group-input']",
-		);
-		const select = new FacetsBox(input);
-		await select.init();
-		const addGroup = (event) => this._addGroup(event, select);
-		const changeAdmin = (event) => {
-			if (event.target.name !== "admin" || !event.target.checked) return;
-			restrictAccess
-				.querySelector("[data-role='restricted-group-list']")
-				.replaceChildren();
-			select.clear({ notify: false });
-			this.markUnsavedState();
-		};
-		restrictAccess.addEventListener("updated", addGroup);
-		restrictAccess.addEventListener("change", changeAdmin);
-		this.destroyables.push(select, {
-			destroy: () => {
-				restrictAccess.removeEventListener("updated", addGroup);
-				restrictAccess.removeEventListener("change", changeAdmin);
-			},
-		});
-	}
-
-	_click(event) {
-		super._click(event);
-		if (this.readonly) return;
-		const button = event.target.closest("[data-role='remove-restriction']");
-		if (!button) return;
-		button.closest("li").remove();
-		this.markUnsavedState();
-	}
-
-	_addGroup(event, select) {
-		if (Object.keys(event.detail.options).length) {
-			this.restrictAccess.querySelector("[name='admin']").checked = false;
-		}
-		const list = this.restrictAccess.querySelector(
-			"[data-role='restricted-group-list']",
-		);
-		const template = this.restrictAccess.querySelector(
-			"[data-role='restriction-template']",
-		);
-		const selected = new Set(
-			Array.from(
-				list.querySelectorAll("input[name='group-key']"),
-				(input) => input.value,
-			),
-		);
-		for (const [key, option] of Object.entries(event.detail.options)) {
-			if (selected.has(key)) continue;
-			const item = template.content.firstElementChild.cloneNode(true);
-			item.querySelector("input[name='group-key']").value = key;
-			item.querySelector("[data-role='group-name']").textContent = option.name;
-			item.querySelector("button").dataset.key = key;
-			list.append(item);
-		}
-		select.clear({ notify: false });
-		this.markUnsavedState();
-	}
-
-	get formData() {
-		const data = new FormData();
-		const restrictions = this.restrictAccess;
-		if (!restrictions) return data;
-		data.set("restrictions", "true");
-		const adminOnly = restrictions.querySelector("[name='admin']").checked;
-		data.set("admin", adminOnly ? "true" : "false");
-		if (adminOnly) return data;
-		for (const input of restrictions.querySelectorAll(
-			"input[name='group-key']",
-		)) {
-			data.append("group-key", input.value);
-		}
-		return data;
-	}
-
-	get visibleTo() {
-		return this.target.querySelector("[data-role='visible-to']");
-	}
-
-	get restrictAccess() {
-		return this.target.querySelector("[data-role='restrict-access']");
-	}
-
-	get html() {
-		return [this.visibleTo, this.restrictAccess];
 	}
 }
 

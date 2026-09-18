@@ -1,6 +1,6 @@
+import { FormController } from "../../forms/controller";
 import { directUpload } from "../../shared/directUpload";
 import { uploadElement } from "../upload";
-import { BaseForm } from "./baseForm";
 
 const PASTE_ERROR =
 	"File detected in clipboard but not accessible. Try pressing Cmd+V (Mac) or Ctrl+V (Windows/Linux) to paste instead.";
@@ -148,7 +148,7 @@ export class BaseUpload {
 	}
 
 	async init() {
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		await this.form.init();
 
 		if (this.readonly) {

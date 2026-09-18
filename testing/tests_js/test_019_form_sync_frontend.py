@@ -352,21 +352,10 @@ const context = {
 };
 
 vm.createContext(context);
-let source = fs.readFileSync("src/script/elements/renderer.mjs", "utf8");
-source = source.replace(
-  'import { getFormElement } from "../elements/loader";',
-  "const getFormElement = globalThis.getFormElement;",
-);
-source = source.replace(
-  /import \{[\s\S]*?\} from "\.\.\/shared";/,
-  "const { areEqual, captureError, generateElementId } = globalThis;",
-);
-source = source.replace(
-  'import { withTransition } from "../shared/transitions";',
-  "const withTransition = globalThis.withTransition;",
-);
-source = source.replace("export class Renderer", "class Renderer");
-source += "\nglobalThis.Renderer = Renderer;";
+let source = fs.readFileSync("src/script/forms/renderer.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class FormRenderer", "class FormRenderer");
+source += "\nglobalThis.FormRenderer = FormRenderer;";
 vm.runInContext(source, context);
 
 const triggerNode = {};
@@ -390,7 +379,7 @@ const form = {
   target: { dataset: {} },
   readonly: false,
 };
-const renderer = new context.Renderer(form);
+const renderer = new context.FormRenderer(form);
 renderer.elements.set(trigger.id, trigger);
 renderer.elements.set(target.id, target);
 

@@ -235,3 +235,25 @@ When changing route authorization or freshness:
 6. Update focused unit tests and E2E coverage for observable browser behavior.
 7. Run the changed-source traceability and template-contract checks when their
    respective contracts move.
+
+## Permission editing forms
+
+Group and public permission GET/PUT routes return complete HTML forms through
+`responses.group_permissions()`, with the usual entity-revision acknowledgement
+headers. The existing core permission configuration supplies template context;
+permission levels, defaults, explicit denials, and stored maps keep their domain
+ownership. There is no separate section JSON response.
+
+The Users index renders `lp-load` shells with entity/revision markers. Keeping the
+marker declares edit-watching capability before editable controls load.
+Focused responses render the
+native controls and mark the form `loaded`; group creation returns a complete
+form alongside its navigation selector. `users/permissions.html` owns section
+ordering, level choices, saved rows and templates for newly selected entities.
+
+Page/User Settings and Builder restrictions share the native fields in
+`forms/access_restrictions.html`. The presence marker `restrictions=true` enables
+restriction updates in User Settings only when that block was rendered.
+`admin=true` means administrators only; an omitted checkbox means false.
+Repeated `group-key` fields name selected groups. Server-side authorization and
+submitted-reference validation remain authoritative.

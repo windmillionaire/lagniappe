@@ -1,29 +1,28 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { C as CONFIG, f as fieldKind } from './builder.js?v=b7d16921';
-import { g as generateElementId } from './foundation.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
-import { S as SelectBox } from './select2.js?v=b7d16921';
-import './connectivity.js?v=b7d16921';
-import { C as Condition } from './base2.js?v=b7d16921';
-import './search.js?v=b7d16921';
-import './styles.js?v=b7d16921';
-import './remote.js?v=b7d16921';
-import './queryLifecycle.js?v=b7d16921';
-import './combobox.js?v=b7d16921';
-import './results.js?v=b7d16921';
-import './icons.js?v=b7d16921';
-import './storage.js?v=b7d16921';
-import './formatting.js?v=b7d16921';
-import './upstreamUnavailable.js?v=b7d16921';
-import './entityMenu.js?v=b7d16921';
-import './dropdown.js?v=b7d16921';
-import './modal.js?v=b7d16921';
-import './directUpload.js?v=b7d16921';
-import './polling.js?v=b7d16921';
-import './baseForm.js?v=b7d16921';
-import './loader.js?v=b7d16921';
-import './facets.js?v=b7d16921';
-import './submitter.js?v=b7d16921';
+import { C as CONFIG, f as fieldKind } from './builder.js?v=bc80da50';
+import { g as generateElementId } from './foundation.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
+import { S as SelectBox } from './select2.js?v=bc80da50';
+import './connectivity.js?v=bc80da50';
+import { C as Condition } from './base2.js?v=bc80da50';
+import './search.js?v=bc80da50';
+import './styles.js?v=bc80da50';
+import './remote.js?v=bc80da50';
+import './queryLifecycle.js?v=bc80da50';
+import './combobox.js?v=bc80da50';
+import './results.js?v=bc80da50';
+import './icons.js?v=bc80da50';
+import './storage.js?v=bc80da50';
+import './formatting.js?v=bc80da50';
+import './upstreamUnavailable.js?v=bc80da50';
+import './entityMenu.js?v=bc80da50';
+import './dropdown.js?v=bc80da50';
+import './modal.js?v=bc80da50';
+import './directUpload.js?v=bc80da50';
+import './polling.js?v=bc80da50';
+import './controller.js?v=bc80da50';
+import './loader.js?v=bc80da50';
+import './submitter.js?v=bc80da50';
 
 /**
  * @testable true

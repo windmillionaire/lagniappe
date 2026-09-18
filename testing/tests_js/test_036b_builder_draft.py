@@ -433,7 +433,7 @@ let focused = false;
 const active = { name: "option-name", selectionStart: 4, selectionEnd: 8 };
 const restoredInput = { name: "option-name", focus() { focused = true; }, setSelectionRange(start, end) { assert.equal(start, 4); assert.equal(end, 8); } };
 const context = { structuredClone, document: { activeElement: active }, withTransition: (callback) => callback(),
-  BaseForm: class { constructor(owner) { this.owner = owner; } init() {} } };
+  FormController: class { constructor(owner) { this.owner = owner; } init() {} } };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/views/builder/builder.mjs", "utf8")
   .replace(/^import[\s\S]*?from ["'][^"']+["'];\n/gm, "").replace("export default FormBuilder;", "globalThis.FormBuilder = FormBuilder;"), context);
@@ -550,7 +550,7 @@ assert.equal(element.create().innerHTML, "");
 # @matrix forms : schema-generation draft-history
 # @pair forms:success
 # @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
-# @source src/script/elements/base/baseForm.mjs::BaseForm.success
+# @source src/script/forms/controller.mjs::FormController.success
 def test_stale_generation_retry_label_survives_base_form_error_transition(run_node):
     run_node(
         r'''
@@ -590,7 +590,7 @@ const context = { console, crypto: require("node:crypto").webcrypto, ENDPOINTS: 
   request: { post(route, data) { return new Promise((resolve) => { request = { data, resolve }; }); } },
 };
 vm.createContext(context);
-for (const [path, name] of [["src/script/elements/base/baseForm.mjs", "BaseForm"], ["src/script/views/builder/panels/formSettings.mjs", "FormSettings"]]) {
+for (const [path, name] of [["src/script/forms/controller.mjs", "FormController"], ["src/script/views/builder/panels/formSettings.mjs", "FormSettings"]]) {
   vm.runInContext(fs.readFileSync(path, "utf8").replace(/^import.*\n/gm, "")
     .replace(`export class ${name}`, `globalThis.${name} = class ${name}`), context);
 }
@@ -600,7 +600,7 @@ for (const [path, name] of [["src/script/elements/base/baseForm.mjs", "BaseForm"
     target, submitButton: submitter, error,
     messages: { submit: "Generate", submitting: "Thinking...", submitted: "Generated" },
   };
-  const form = new context.BaseForm(widget);
+  const form = new context.FormController(widget);
   let restores = 0;
   const builder = {
     updateSchema() {},

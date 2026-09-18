@@ -1,14 +1,22 @@
-import { installMigrationNotice } from "../shared/formMigrationNotice";
-import { compatibleField } from "../shared/formRepresentation";
-import { withTransition } from "../shared/transitions";
-import { BaseForm } from "./base/baseForm";
+import { FormController } from "../../forms/controller";
+import { installMigrationNotice } from "../../shared/formMigrationNotice";
+import { compatibleField } from "../../shared/formRepresentation";
+import { withTransition } from "../../shared/transitions";
 
 /**
  * @testable true
  * @tests tests_js/test_024_edit_watcher.py::test_form_revision_snapshot_is_canonical_and_memory_only
  * @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state
+ * @tests tests_js/test_048_form_controls.py::test_form_shell_waits_for_html_and_visibility_does_not_rebuild
+ * @tests tests_js/test_048_form_controls.py::test_form_replacements_serialize_and_adopt_only_latest_controls
+ * @tests tests_js/test_048_form_controls.py::test_form_discard_and_failure_leave_live_controls_intact
+ * @tests tests_js/test_048_form_controls.py::test_explicit_revision_reset_can_replace_dirty_form
+ * @matrix forms user-groups : initialization conditional-response single-reconciliation rebuild-serialization
+ * @matrix forms : teardown reset unsaved-preservation
+ * @matrix user-groups : background-update unsaved-preservation reset
+ * @tests tests_js/test_048_form_controls.py::test_queued_commit_waits_for_newer_replacement
  */
-export class FormElement {
+export class FormWidget {
 	constructor(attributes) {
 		Object.assign(this, attributes);
 		this.destroyables = [];
@@ -25,6 +33,12 @@ export class FormElement {
 		this._updated = false;
 		this._success = false;
 		this._preparedReset = null;
+		this._preparingReset = null;
+		this._preparingState = null;
+		this._resetEpoch = 0;
+		this._replacementVersion = 0;
+		this._replacementPromise = null;
+		this._replacementInert = null;
 		this._migrationNotice = null;
 
 		this._deferredOperation = this.target?.dataset?.operation || null;
@@ -279,6 +293,11 @@ export class FormElement {
 	 * @pair forms:queue-independent-initial-render
 	 */
 	async init() {
+		if (
+			this.target?.hasAttribute("lp-load") &&
+			!this.target.hasAttribute("loaded")
+		)
+			return;
 		await this._initForm();
 		this.commitRevisionBaseline();
 		this.initialized = true;
@@ -396,7 +415,7 @@ export class FormElement {
 			this.initialTarget = this.target.cloneNode(true);
 		}
 		this.target._lp_widget = this;
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		await this.form.init();
 		if (
 			this.target.dataset.migrationNotice &&
@@ -418,6 +437,9 @@ export class FormElement {
 			const manager = await this.view?.ensureDeferredOperations?.();
 			manager?.scan(this.target);
 		}
+		this.initialized = true;
+		this.loaded = this.target.hasAttribute("loaded");
+		this.target.setAttribute("initialized", "");
 	}
 
 	/**
@@ -467,13 +489,26 @@ export class FormElement {
 	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
 	 * @matrix form-migration : informational-notice
 	 */
-	async prepareReset({
-		nextTarget = this.initialTarget || this.target.cloneNode(true),
+	async prepareReset(options = {}) {
+		if (this._preparingReset) return this._preparingReset;
+		if (this._preparedReset) return;
+		const pending = this._prepareReset(options);
+		this._preparingReset = pending;
+		try {
+			await pending;
+		} finally {
+			if (this._preparingReset === pending) this._preparingReset = null;
+		}
+	}
+
+	async _prepareReset({
+		nextTarget = (this.initialTarget || this.target).cloneNode(true),
 		staged = {},
 		beforeInit = null,
 		afterInit = null,
 	} = {}) {
 		if (this._preparedReset) return;
+		const epoch = this._resetEpoch;
 
 		const visible = this.target?.dataset.visible;
 		if (visible !== undefined) nextTarget.dataset.visible = visible;
@@ -482,41 +517,57 @@ export class FormElement {
 			target: nextTarget,
 			initialTarget: null,
 			form: null,
+			initialized: false,
+			loaded: this.loaded,
 			destroyables: [],
 			_migrationNotice: null,
 			...staged,
 		};
+		let adopted = false;
 		const stagedWidget = new Proxy(this, {
 			get(target, property, receiver) {
-				if (Object.hasOwn(stagedState, property)) {
+				if (!adopted && Object.hasOwn(stagedState, property)) {
 					return stagedState[property];
 				}
 				return Reflect.get(target, property, receiver);
 			},
 			set(target, property, value) {
-				if (Object.hasOwn(stagedState, property)) {
+				if (!adopted) {
 					stagedState[property] = value;
 					return true;
 				}
 				return Reflect.set(target, property, value);
 			},
 		});
-
-		await beforeInit?.(stagedWidget);
-		await stagedWidget._initForm({ replace: false });
-		await afterInit?.(stagedWidget);
-		this._preparedReset = {
-			adopt: Object.keys(stagedState),
-			state: stagedState,
-			revisionBaseline: stagedWidget.revisionSnapshot(),
-		};
+		this._preparingState = stagedState;
+		try {
+			await beforeInit?.(stagedWidget);
+			if (epoch !== this._resetEpoch) return;
+			await stagedWidget._initForm({ replace: false });
+			if (epoch !== this._resetEpoch) return;
+			await afterInit?.(stagedWidget);
+			if (epoch !== this._resetEpoch) return;
+			this._preparedReset = {
+				adopt: Object.keys(stagedState),
+				state: stagedState,
+				revisionBaseline: stagedWidget.revisionSnapshot(),
+				activate: () => {
+					adopted = true;
+				},
+			};
+		} finally {
+			if (this._preparedReset?.state !== stagedState)
+				this._destroyFormState(stagedState);
+			if (this._preparingState === stagedState) this._preparingState = null;
+		}
 	}
 
 	commitReset() {
 		if (!this._preparedReset) return false;
-		const { adopt, state, revisionBaseline } = this._preparedReset;
+		const { adopt, state, revisionBaseline, activate } = this._preparedReset;
 		this._preparedReset = null;
 		const previousTarget = this.target;
+		const previousInert = this._replacementInert;
 		const visible = previousTarget?.dataset.visible;
 		if (visible !== undefined) state.target.dataset.visible = visible;
 
@@ -525,20 +576,28 @@ export class FormElement {
 		if (previousTarget !== state.target)
 			previousTarget.replaceWith(state.target);
 		for (const property of adopt) this[property] = state[property];
+		if (previousInert != null) this.target.inert = previousInert;
+		activate?.();
 		this.target._lp_widget = this;
 		this._revisionBaseline = revisionBaseline;
 		return true;
 	}
 
 	discardPreparedReset() {
-		if (!this._preparedReset) return;
-		const { state } = this._preparedReset;
+		this._resetEpoch = (this._resetEpoch || 0) + 1;
+		if (this._preparingState) this._destroyFormState(this._preparingState);
+		if (this._preparedReset) this._destroyFormState(this._preparedReset.state);
+		this._preparedReset = null;
+	}
+
+	_destroyFormState(state) {
 		state._migrationNotice?.destroy();
+		state._migrationNotice = null;
 		state.form?.destroy?.();
 		state.destroyables?.forEach((destroyable) => {
 			destroyable.destroy?.();
 		});
-		this._preparedReset = null;
+		state.destroyables = [];
 	}
 
 	async reset() {
@@ -598,6 +657,7 @@ export class FormElement {
 			this.initialTarget = updatedTarget;
 			this._deferredOperation = updatedTarget.dataset.operation || null;
 			this._updated = true;
+			this._replacementVersion = (this._replacementVersion || 0) + 1;
 		}
 		if (ownsRendererState && Object.hasOwn(response, "schema")) {
 			this.schema = response.schema;
@@ -622,18 +682,56 @@ export class FormElement {
 	}
 
 	async prereconcile() {
-		if (this._updated) await this.prepareReset();
+		if (this._replacementPromise) return this._replacementPromise;
+		if (!this._updated) return;
+		if (this._preparedReset?.version === this._replacementVersion) return;
+		this._replacementInert ??= Boolean(this.target.inert);
+		this.target.inert = true;
+		const pending = (async () => {
+			let preparedVersion;
+			do {
+				preparedVersion = this._replacementVersion;
+				this.discardPreparedReset();
+				await this.prepareReset();
+				if (this._preparedReset) this._preparedReset.version = preparedVersion;
+			} while (preparedVersion !== this._replacementVersion);
+		})();
+		this._replacementPromise = pending;
+		try {
+			await pending;
+		} catch (error) {
+			this._restoreInteractivity();
+			throw error;
+		} finally {
+			if (this._replacementPromise === pending) this._replacementPromise = null;
+		}
+	}
+
+	_restoreInteractivity() {
+		if (this._replacementInert == null) return;
+		this.target.inert = this._replacementInert;
+		this._replacementInert = null;
 	}
 
 	postreconcile() {
 		const updated = this._updated;
 		if (!this._created && !updated) return;
+		if (
+			updated &&
+			(this._replacementPromise ||
+				(this._preparedReset?.version !== undefined &&
+					this._preparedReset.version !== this._replacementVersion))
+		) {
+			this.modified = true;
+			return;
+		}
 
 		this._created = false;
 		this._updated = false;
 
 		if (updated) {
 			this.commitReset();
+			this._restoreInteractivity();
 			if (this.visible) this.target.dataset.visible = "true";
 		}
 
@@ -644,6 +742,8 @@ export class FormElement {
 	}
 
 	destroy() {
+		this.discardPreparedReset();
+		this._restoreInteractivity();
 		this._migrationNotice?.destroy();
 		this._migrationNotice = null;
 		this.form?.destroy();

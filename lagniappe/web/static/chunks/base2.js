@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b7d16921';
-import { B as BaseForm } from './baseForm.js?v=b7d16921';
-import { s as setIcon } from './icons.js?v=b7d16921';
-import { w as withTransition } from './foundation.js?v=b7d16921';
-import { p as primitives } from './primitives.js?v=b7d16921';
-import { S as SelectBox } from './select2.js?v=b7d16921';
+import { STYLES } from './styles.js?v=bc80da50';
+import { s as setIcon } from './icons.js?v=bc80da50';
+import { w as withTransition } from './foundation.js?v=bc80da50';
+import { p as primitives } from './primitives.js?v=bc80da50';
+import { S as SelectBox } from './select2.js?v=bc80da50';
+import { F as FormController } from './controller.js?v=bc80da50';
 
 /**
  * @testable infrastructure
@@ -38,7 +38,7 @@ class Condition {
 			delete this.draftSetting;
 		}
 		this.complete = false;
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

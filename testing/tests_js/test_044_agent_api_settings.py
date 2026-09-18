@@ -14,7 +14,7 @@ const context = {
   AbortController,
   clearTimeout() {},
   console,
-  FormElement: class {},
+  FormWidget: class {},
   InputElement: class {},
   RadioElement: class {},
   sections: {},
@@ -44,8 +44,15 @@ const context = {
   withTransition() {},
   window: {},
 };
-context.PagePermissions = class {
+context.FormWidget = class {
   constructor() { this.destroyables = []; }
+  async _initForm() {}
+  postreconcile() {
+    if (!this._updated) return;
+    this._updated = false;
+    this.commitReset();
+    this.target.dataset.visible = "true";
+  }
 };
 context.globalThis = context;
 vm.createContext(context);
@@ -116,6 +123,13 @@ widget._confirmApiKeyAction = async (_section, _trigger, options) => {
   }
   if (stored) throw new Error("API key touched browser storage");
 
+  const preview = Object.create(context.UserSettings.prototype);
+  preview.revisionPreview = true;
+  preview.target = {
+    querySelector() { throw new Error("Revision preview initialized API key controls"); },
+  };
+  preview._initApiKey();
+
   const initialized = [];
   widget._updated = true;
   widget.target = { dataset: {} };
@@ -125,9 +139,10 @@ widget._confirmApiKeyAction = async (_section, _trigger, options) => {
   widget._initRemovePage = () => initialized.push("remove-page");
   widget._initApiKey = () => initialized.push("api-key");
   widget.setEntityMetadata = () => initialized.push("metadata");
+  await widget._initForm({replace: false});
   widget.postreconcile();
   if (initialized.join(",") !==
-      "commit,groups,page-select,remove-page,api-key,metadata" ||
+      "groups,page-select,remove-page,api-key,commit,metadata" ||
       widget._updated !== false || widget.target.dataset.visible !== "true") {
     throw new Error("Polling replacement did not reinitialize API key status");
   }
@@ -166,7 +181,7 @@ class Modal {
 let capturedError = null;
 const context = {
   AbortController,
-  FormElement: class {},
+  FormWidget: class {},
   InputElement: class {},
   Modal,
   RadioElement: class {},
@@ -177,8 +192,15 @@ const context = {
   request: {},
   withTransition() {},
 };
-context.PagePermissions = class {
+context.FormWidget = class {
   constructor() { this.destroyables = []; }
+  async _initForm() {}
+  postreconcile() {
+    if (!this._updated) return;
+    this._updated = false;
+    this.commitReset();
+    this.target.dataset.visible = "true";
+  }
 };
 context.globalThis = context;
 vm.createContext(context);

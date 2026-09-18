@@ -1,4 +1,4 @@
-import { Renderer } from "../../../elements/renderer";
+import { FormRenderer } from "../../../forms/renderer";
 import { areEqual, captureError, request } from "../../../shared";
 import { withTransition } from "../../../shared/transitions";
 
@@ -156,7 +156,7 @@ export class Header {
 
 		let renderer = null;
 		if (!active) {
-			renderer = new Renderer({
+			renderer = new FormRenderer({
 				target: this.previewPanel,
 				schema: this.builder.schema,
 				kind: "form",

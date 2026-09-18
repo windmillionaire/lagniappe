@@ -144,7 +144,7 @@ Recent selections are stored per index key as `recent-{index}` in localStorage, 
 
 Three rendering modes based on the `index`:
 
-| Index | Renderer | Used By |
+| Index | FormRenderer | Used By |
 |---|---|---|
 | `"search"` | `search()` | SearchBox -- shows icon, name, parent, form field matches, text snippets |
 | Any other string | `facet()` | FacetsBox -- shows icon, name, parent breadcrumb |

@@ -1,15 +1,284 @@
-import { showBriefly } from "../../shared";
-import { createIcon } from "../../shared/icons";
-import { withTransition } from "../../shared/transitions";
-import { primitives } from "../primitives";
-import { Renderer } from "../renderer";
+/*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=bc80da50';
+import { c as createIcon } from './icons.js?v=bc80da50';
+import { g as generateElementId, w as withTransition, c as captureError, s as showBriefly } from './foundation.js?v=bc80da50';
+import { g as getFormElement } from './loader.js?v=bc80da50';
+
+const CONTROLS = {
+	"permission-sections": () => import('./permissionSections.js?v=bc80da50'),
+	"access-restrictions": () => import('./accessRestrictions.js?v=bc80da50'),
+};
+
+/**
+ * Enhance only controls declared by this form, including its own root.
+ * Register ownership before awaiting initialization so teardown also covers
+ * partially initialized controls and detached replacements.
+ * @testable true
+ * @tests tests_js/test_048_form_controls.py::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
+ * @matrix forms : initialization teardown readonly
+ */
+async function initFormControls(form) {
+	const target = form.target;
+	const selector = "[data-form-control]";
+	const roots = [
+		...(target.matches?.(selector) ? [target] : []),
+		...(target.querySelectorAll?.(selector) ?? []),
+	];
+	for (const root of roots) {
+		const load = CONTROLS[root.dataset.formControl];
+		if (!load)
+			throw new Error(`Unknown form control: ${root.dataset.formControl}`);
+		const { default: Control } = await load();
+		if (form._destroyed) return;
+		const control = new Control(root, {
+			readonly: form.readonly,
+			onChange: form.markUnsavedState,
+		});
+		form.destroyables.push(control);
+		await control.init();
+		if (form._destroyed) {
+			control.destroy();
+			return;
+		}
+	}
+}
 
 /**
  * @testable infrastructure
  */
-export class BaseForm {
+class FormRenderer {
+	constructor(form) {
+		this.id = generateElementId("renderer");
+		this.form = form;
+		this.kind = form.kind || form.target.dataset.kind || "form";
+		this.elements = new Map();
+		this.visibilityTriggers = new Map();
+		this.visibilityConditions = new Map();
+		this.statusTriggers = new Set();
+		this.status = null;
+
+		this._onChange = this._onChange.bind(this);
+	}
+
+	get target() {
+		return this.form.target;
+	}
+
+	get readonly() {
+		return this.form.readonly;
+	}
+
+	get showEmptyFields() {
+		return this.form.showEmptyFields;
+	}
+
+	get historyFillEnabled() {
+		return this.form.historyFillEnabled;
+	}
+
+	async render() {
+		await this._createElements();
+
+		const html = Array.from(this.elements.values())
+			.map((element) => element.elt)
+			.filter(Boolean);
+		this.form.target.replaceChildren(...html);
+
+		this._initStatusTriggers();
+
+		this._initVisibilityTriggers();
+		if (!this.readonly) {
+			this.target.addEventListener("change", this._onChange);
+		}
+
+		this._updateDerivedState();
+		this.target.setAttribute("rendered", "");
+	}
+
+	destroy() {
+		this.elements.forEach((element) => {
+			if (element.destroy) element.destroy();
+		});
+		this.target.removeAttribute("rendered");
+		this.target.removeEventListener("change", this._onChange);
+		this.visibilityTriggers.clear();
+		this.visibilityConditions.clear();
+		this.statusTriggers.clear();
+	}
+
+	_packageSubmission() {
+		const result = Object.fromEntries(
+			Array.from(this.elements.values()).map((element) => [
+				element.schema.id,
+				element.value,
+			]),
+		);
+
+		return result;
+	}
+
+	_onChange(event) {
+		const trigger = event.target.closest(".form-element");
+		if (!trigger) return;
+
+		const element = this.elements.get(trigger.id);
+		if (!element) return;
+
+		if (this.statusTriggers.has(element)) {
+			this.status.update();
+		}
+		if (this.visibilityTriggers.has(element)) {
+			this._updateVisibility(element);
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
+	 * @matrix tasks : element-matrix history-fill latest-submission
+	 */
+	addHistoryFillButtons(submission) {
+		if (!this.historyFillEnabled || !submission) return;
+
+		for (const [fieldId, value] of Object.entries(submission)) {
+			const element = this.elements.get(`${fieldId}-${this.id}`);
+			element?.addHistoryFill?.(value);
+		}
+	}
+
+	async _initStatusTriggers() {
+		this.statusTriggers.clear();
+		this.status = Array.from(this.elements.values()).find(
+			(element) => element.schema.type === "status",
+		);
+		if (!this.status) return;
+
+		const messages = Array.isArray(this.status.schema.status)
+			? this.status.schema.status
+			: [];
+		for (const message of messages) {
+			if (!message?.id) continue;
+
+			const trigger = this.elements.get(`${message.id}-${this.id}`);
+			if (!trigger) continue;
+
+			this.statusTriggers.add(trigger);
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_019_form_sync_frontend.py::test_renderer_visibility_requires_canonical_condition_lists
+	 * @matrix form-schema forms : canonical-list legacy-object-rejected visibility
+	 */
+	async _initVisibilityTriggers() {
+		this.visibilityTriggers = new Map();
+		this.visibilityConditions.clear();
+
+		const targets = Array.from(this.elements.values()).filter(
+			(element) => element.schema.visibility && element.elt,
+		);
+
+		for (const target of targets) {
+			const conditions = target.schema.visibility.filter(
+				(trigger) => trigger?.id,
+			);
+			if (conditions.length === 0) continue;
+			this.visibilityConditions.set(target, conditions);
+
+			for (const trigger of conditions) {
+				const element = this.elements.get(`${trigger.id}-${this.id}`);
+				if (!element?.elt) continue;
+
+				const values = this.visibilityTriggers.get(element) || new Set();
+				values.add(target);
+				this.visibilityTriggers.set(element, values);
+			}
+		}
+	}
+
+	_updateDerivedState() {
+		this.status?.update();
+		this.visibilityConditions.forEach((_conditions, target) => {
+			this._updateVisibilityTarget(target);
+		});
+	}
+
+	_updateVisibility(trigger) {
+		const targets = this.visibilityTriggers.get(trigger);
+		if (!targets) return;
+
+		const changes = Array.from(targets, (target) => ({
+			target,
+			visible: this._visibilityConditionsMatch(target),
+		})).filter(
+			({ target, visible }) =>
+				target.elt.dataset.visible !== (visible ? "true" : "false"),
+		);
+		if (!changes.length) return;
+
+		void withTransition(
+			() => {
+				changes.forEach(({ target, visible }) => {
+					target.elt.dataset.visible = visible ? "true" : "false";
+				});
+			},
+			{ label: "form:conditional-visibility" },
+		);
+	}
+
+	_updateVisibilityTarget(target) {
+		const visible = this._visibilityConditionsMatch(target);
+		target.elt.dataset.visible = visible ? "true" : "false";
+	}
+
+	_visibilityConditionsMatch(target) {
+		const conditions = (this.visibilityConditions.get(target) || []).filter(
+			(condition) => condition?.id,
+		);
+		if (conditions.length === 0) return true;
+
+		const groups = new Map();
+
+		for (const condition of conditions) {
+			const group = groups.get(condition.id) || [];
+			group.push(condition);
+			groups.set(condition.id, group);
+		}
+
+		return Array.from(groups.entries()).every(([triggerId, group]) => {
+			const element = this.elements.get(`${triggerId}-${this.id}`);
+			if (!element) return false;
+			return group.some((condition) => element.active(condition.value));
+		});
+	}
+
+	async _createElements() {
+		for (const eltSchema of this.form.schema) {
+			const eltSubmission = this.form.submission?.[eltSchema.id];
+			try {
+				const element = await getFormElement(this, eltSchema, eltSubmission);
+				this.elements.set(element.id, element);
+			} catch (error) {
+				captureError(error, this.target, {
+					schema: eltSchema,
+					submission: eltSubmission,
+				});
+			}
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_048_form_controls.py::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
+ * @matrix forms : initialization teardown readonly
+ */
+class FormController {
 	constructor(widget) {
 		this._widget = widget;
+		this._destroyed = false;
 
 		this._submitGroup = widget.submitGroup ?? null;
 		this._submitButton = widget.submitButton ?? null;
@@ -135,13 +404,22 @@ export class BaseForm {
 	}
 
 	async init() {
+		try {
+			await this._initialize();
+		} catch (error) {
+			this.destroy();
+			throw error;
+		}
+	}
+
+	async _initialize() {
 		const prepend = this._widget.prepend;
 		const append = this._widget.append;
 		const html = this.html ?? [];
 		const schema = this.schema ?? [];
 
 		if (schema.length > 0) {
-			this.renderer = new Renderer(this);
+			this.renderer = new FormRenderer(this);
 			await this.renderer.render();
 		} else if (html.length > 0) {
 			this.target.replaceChildren(...html.filter(Boolean));
@@ -174,6 +452,8 @@ export class BaseForm {
 			}
 		}
 
+		await initFormControls(this);
+		if (this._destroyed) return;
 		this._initSubmitButton();
 		this._initOfflineState();
 		this._initUnsavedState();
@@ -464,6 +744,8 @@ export class BaseForm {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
 		const submitButton = this.submitButton;
 		if (submitButton?.__initialized) {
 			submitButton.removeEventListener("click", this.submitting);
@@ -492,3 +774,10 @@ export class BaseForm {
 		this.destroyables = [];
 	}
 }
+
+var controller = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	FormController: FormController
+});
+
+export { FormController as F, FormRenderer as a, controller as c };

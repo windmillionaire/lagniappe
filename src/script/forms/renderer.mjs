@@ -1,11 +1,12 @@
 import { getFormElement } from "../elements/loader";
-import { captureError, generateElementId } from "../shared";
+import { captureError } from "../shared/errors";
 import { withTransition } from "../shared/transitions";
+import { generateElementId } from "../shared/utilities";
 
 /**
  * @testable infrastructure
  */
-export class Renderer {
+export class FormRenderer {
 	constructor(form) {
 		this.id = generateElementId("renderer");
 		this.form = form;
