@@ -33,10 +33,13 @@ Redis uses isolated keys per document:
 Document state expires after five minutes. Presence fields expire after one
 minute and are refreshed by the active two-second poll. An existing document
 poll reads the state and refreshes its TTL with one Redis `GETEX`; it does not
-enter an optimistic transaction or rewrite the full document. When working
-state is absent, the poll enters the normal isolated transaction to create one
-new generation from the durable document asset. Document updates and asset
-refreshes continue to use optimistic transactions.
+download a durable snapshot, enter an optimistic transaction, or rewrite the
+full document. Authorization and document identity are checked on every poll.
+When working state is absent, the poll loads the durable YDoc (or legacy HTML
+fallback) once, then enters the normal isolated transaction to initialize a new
+generation. A generation created concurrently while loading or initializing
+takes precedence over that fallback. Document updates and asset refreshes
+continue to use optimistic transactions and fresh durable reads where required.
 
 ## Deltas and checkpoints
 

@@ -1,2 +1,65 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="e78ed0fc-6b95-4d74-a89d-8f5b91e6884f",e._sentryDebugIdIdentifier="sentry-dbid-e78ed0fc-6b95-4d74-a89d-8f5b91e6884f");}catch(e){}}();import{E as e}from"./baseTable.js?v=b937cacd";import"./foundation.js?v=b937cacd";import"./upstreamUnavailable.js?v=b937cacd";import"./connectivity.js?v=b937cacd";import"./styles.js?v=b937cacd";import"./icons.js?v=b937cacd";import"./primitives.js?v=b937cacd";import"./table.js?v=b937cacd";import"./baseElement.js?v=b937cacd";import"./checkbox.js?v=b937cacd";import"./input.js?v=b937cacd";import"./formatting.js?v=b937cacd";import"./link.js?v=b937cacd";import"./facets.js?v=b937cacd";import"./remote.js?v=b937cacd";import"./queryLifecycle.js?v=b937cacd";import"./combobox.js?v=b937cacd";import"./results.js?v=b937cacd";import"./storage.js?v=b937cacd";import"./submitter.js?v=b937cacd";import"./loader.js?v=b937cacd";class i extends e{constructor(t){super(t),this._updated=null}get table(){return this.target.querySelector("[data-role='table']")}async updated(t){this._updated=t.html.querySelector("[data-role='completion-history']")}postreconcile(){if(this._updated){this.visible=!0,this.target.dataset.visible="true",this.table.replaceChildren(this._updated),this._updated.dataset.visible="true";for(const t of this._updated.querySelectorAll("table"))t.dataset.visible="true",this.initVisibility(t,`columns-${this.component.name}-history`);this._updated=null}}}export{i as TaskHistory};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as EmbeddedTable } from './baseTable.js?v=b1aeef6f';
+import './foundation.js?v=b1aeef6f';
+import './upstreamUnavailable.js?v=b1aeef6f';
+import './connectivity.js?v=b1aeef6f';
+import './styles.js?v=b1aeef6f';
+import './icons.js?v=b1aeef6f';
+import './primitives.js?v=b1aeef6f';
+import './table.js?v=b1aeef6f';
+import './baseElement.js?v=b1aeef6f';
+import './checkbox.js?v=b1aeef6f';
+import './input.js?v=b1aeef6f';
+import './formatting.js?v=b1aeef6f';
+import './link.js?v=b1aeef6f';
+import './facets.js?v=b1aeef6f';
+import './remote.js?v=b1aeef6f';
+import './queryLifecycle.js?v=b1aeef6f';
+import './combobox.js?v=b1aeef6f';
+import './results.js?v=b1aeef6f';
+import './storage.js?v=b1aeef6f';
+import './submitter.js?v=b1aeef6f';
+import './loader.js?v=b1aeef6f';
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
+ * @matrix tasks : completion-cycle history reload
+ * @matrix task-completion : history readonly generation
+ * @pair embedded-table:table-cell-expand
+ */
+class TaskHistory extends EmbeddedTable {
+	constructor(attributes) {
+		super(attributes);
+		this._updated = null;
+	}
+
+	get table() {
+		return this.target.querySelector("[data-role='table']");
+	}
+
+	async updated(response) {
+		this._updated = response.html.querySelector(
+			"[data-role='completion-history']",
+		);
+	}
+
+	postreconcile() {
+		if (!this._updated) return;
+
+		this.visible = true;
+		this.target.dataset.visible = "true";
+		this.table.replaceChildren(this._updated);
+		this._updated.dataset.visible = "true";
+		for (const table of this._updated.querySelectorAll("table")) {
+			table.dataset.visible = "true";
+			this.initVisibility(table, `columns-${this.component.name}-history`);
+		}
+		this._updated = null;
+	}
+}
+
+export { TaskHistory };

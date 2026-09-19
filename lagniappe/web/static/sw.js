@@ -1,154 +1,155 @@
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "b937cacd";
+const SW_VERSION = "b1aeef6f";
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = [
-	"/chunks/accessRestrictions.js?v=b937cacd",
-	"/chunks/activity.js?v=b937cacd",
-	"/chunks/addImage.js?v=b937cacd",
-	"/chunks/addLink.js?v=b937cacd",
-	"/chunks/addYouTube.js?v=b937cacd",
-	"/chunks/administrators.js?v=b937cacd",
-	"/chunks/aiModels.js?v=b937cacd",
-	"/chunks/analytics.js?v=b937cacd",
-	"/chunks/base.js?v=b937cacd",
-	"/chunks/base2.js?v=b937cacd",
-	"/chunks/baseElement.js?v=b937cacd",
-	"/chunks/baseList.js?v=b937cacd",
-	"/chunks/baseTable.js?v=b937cacd",
-	"/chunks/baseUpload.js?v=b937cacd",
-	"/chunks/bookmark.js?v=b937cacd",
-	"/chunks/builder.js?v=b937cacd",
-	"/chunks/buttons.js?v=b937cacd",
-	"/chunks/category.js?v=b937cacd",
-	"/chunks/checkbox.js?v=b937cacd",
-	"/chunks/collaborative.js?v=b937cacd",
-	"/chunks/columns.js?v=b937cacd",
-	"/chunks/combobox.js?v=b937cacd",
-	"/chunks/connectivity.js?v=b937cacd",
-	"/chunks/controller.js?v=b937cacd",
-	"/chunks/core-foundation.js?v=b937cacd",
-	"/chunks/deferredOperations.js?v=b937cacd",
-	"/chunks/deployment.js?v=b937cacd",
-	"/chunks/directUpload.js?v=b937cacd",
-	"/chunks/documentHistory.js?v=b937cacd",
-	"/chunks/documentSettings.js?v=b937cacd",
-	"/chunks/dropdown.js?v=b937cacd",
-	"/chunks/editor.js?v=b937cacd",
-	"/chunks/entity-foundation.js?v=b937cacd",
-	"/chunks/entityMenu.js?v=b937cacd",
-	"/chunks/facets.js?v=b937cacd",
-	"/chunks/fileInfo.js?v=b937cacd",
-	"/chunks/filePdfPreview.js?v=b937cacd",
-	"/chunks/filterResults.js?v=b937cacd",
-	"/chunks/filters.js?v=b937cacd",
-	"/chunks/form.js?v=b937cacd",
-	"/chunks/formWidget.js?v=b937cacd",
-	"/chunks/formatting.js?v=b937cacd",
-	"/chunks/foundation.js?v=b937cacd",
-	"/chunks/generateText.js?v=b937cacd",
-	"/chunks/html.js?v=b937cacd",
-	"/chunks/html2.js?v=b937cacd",
-	"/chunks/icons.js?v=b937cacd",
-	"/chunks/image.js?v=b937cacd",
-	"/chunks/index-foundation.js?v=b937cacd",
-	"/chunks/indexTable.js?v=b937cacd",
-	"/chunks/ingress.js?v=b937cacd",
-	"/chunks/ingressUpload.js?v=b937cacd",
-	"/chunks/input.js?v=b937cacd",
-	"/chunks/installationAccess.js?v=b937cacd",
-	"/chunks/link.js?v=b937cacd",
-	"/chunks/lists.js?v=b937cacd",
-	"/chunks/loader.js?v=b937cacd",
-	"/chunks/location.js?v=b937cacd",
-	"/chunks/logout.js?v=b937cacd",
-	"/chunks/maintenance.js?v=b937cacd",
-	"/chunks/menuItems.js?v=b937cacd",
-	"/chunks/messageComposer.js?v=b937cacd",
-	"/chunks/mobileControls.js?v=b937cacd",
-	"/chunks/modal.js?v=b937cacd",
-	"/chunks/modelTasks.js?v=b937cacd",
-	"/chunks/modify.js?v=b937cacd",
-	"/chunks/note.js?v=b937cacd",
-	"/chunks/notifications.js?v=b937cacd",
-	"/chunks/offline.js?v=b937cacd",
-	"/chunks/offlineQueue.js?v=b937cacd",
-	"/chunks/offlineReplay.js?v=b937cacd",
-	"/chunks/offlineWork.js?v=b937cacd",
-	"/chunks/options.js?v=b937cacd",
-	"/chunks/pageInfo.js?v=b937cacd",
-	"/chunks/pagePermissions.js?v=b937cacd",
-	"/chunks/pagePhoto.js?v=b937cacd",
-	"/chunks/pageTaskList.js?v=b937cacd",
-	"/chunks/permissionSections.js?v=b937cacd",
-	"/chunks/pinVersion.js?v=b937cacd",
-	"/chunks/polling.js?v=b937cacd",
-	"/chunks/primitives.js?v=b937cacd",
-	"/chunks/projectInfo.js?v=b937cacd",
-	"/chunks/providers.js?v=b937cacd",
-	"/chunks/queryLifecycle.js?v=b937cacd",
-	"/chunks/radio.js?v=b937cacd",
-	"/chunks/remote.js?v=b937cacd",
-	"/chunks/representation.js?v=b937cacd",
-	"/chunks/results.js?v=b937cacd",
-	"/chunks/search.js?v=b937cacd",
-	"/chunks/sectionToggle.js?v=b937cacd",
-	"/chunks/sections.js?v=b937cacd",
-	"/chunks/select.js?v=b937cacd",
-	"/chunks/select2.js?v=b937cacd",
-	"/chunks/setColor.js?v=b937cacd",
-	"/chunks/setFontFamily.js?v=b937cacd",
-	"/chunks/setImage.js?v=b937cacd",
-	"/chunks/signature.js?v=b937cacd",
-	"/chunks/siteSettings.js?v=b937cacd",
-	"/chunks/sorting.js?v=b937cacd",
-	"/chunks/status.js?v=b937cacd",
-	"/chunks/status2.js?v=b937cacd",
-	"/chunks/storage.js?v=b937cacd",
-	"/chunks/styles.js?v=b937cacd",
-	"/chunks/submission.js?v=b937cacd",
-	"/chunks/submitter.js?v=b937cacd",
-	"/chunks/sync.js?v=b937cacd",
-	"/chunks/table.js?v=b937cacd",
-	"/chunks/taskForm.js?v=b937cacd",
-	"/chunks/taskHistory.js?v=b937cacd",
-	"/chunks/taskSettings.js?v=b937cacd",
-	"/chunks/tasks.js?v=b937cacd",
-	"/chunks/textarea.js?v=b937cacd",
-	"/chunks/todo.js?v=b937cacd",
-	"/chunks/toolbar.js?v=b937cacd",
-	"/chunks/toolbarButtons.js?v=b937cacd",
-	"/chunks/tools.js?v=b937cacd",
-	"/chunks/uploadFile.js?v=b937cacd",
-	"/chunks/upstreamUnavailable.js?v=b937cacd",
-	"/chunks/user.js?v=b937cacd",
-	"/chunks/user2.js?v=b937cacd",
-	"/chunks/userPermissions.js?v=b937cacd",
-	"/chunks/userSettings.js?v=b937cacd",
-	"/chunks/views/admin.js?v=b937cacd",
-	"/chunks/views/analytics.js?v=b937cacd",
-	"/chunks/views/builder.js?v=b937cacd",
-	"/chunks/views/file.js?v=b937cacd",
-	"/chunks/views/help.js?v=b937cacd",
-	"/chunks/views/home.js?v=b937cacd",
-	"/chunks/views/index.js?v=b937cacd",
-	"/chunks/views/manual.js?v=b937cacd",
-	"/chunks/views/messages.js?v=b937cacd",
-	"/chunks/views/page.js?v=b937cacd",
-	"/chunks/views/project.js?v=b937cacd",
-	"/chunks/views/public.js?v=b937cacd",
-	"/chunks/views/report.js?v=b937cacd",
-	"/chunks/views/results.js?v=b937cacd",
-	"/chunks/views/user.js?v=b937cacd",
-	"/chunks/visibility.js?v=b937cacd",
-	"/chunks/visibility2.js?v=b937cacd",
-	"/chunks/watcher.js?v=b937cacd"
+	"/chunks/accessRestrictions.js?v=b1aeef6f",
+	"/chunks/activity.js?v=b1aeef6f",
+	"/chunks/addImage.js?v=b1aeef6f",
+	"/chunks/addLink.js?v=b1aeef6f",
+	"/chunks/addYouTube.js?v=b1aeef6f",
+	"/chunks/administrators.js?v=b1aeef6f",
+	"/chunks/aiModels.js?v=b1aeef6f",
+	"/chunks/analytics.js?v=b1aeef6f",
+	"/chunks/base.js?v=b1aeef6f",
+	"/chunks/base2.js?v=b1aeef6f",
+	"/chunks/baseElement.js?v=b1aeef6f",
+	"/chunks/baseList.js?v=b1aeef6f",
+	"/chunks/baseTable.js?v=b1aeef6f",
+	"/chunks/baseUpload.js?v=b1aeef6f",
+	"/chunks/bookmark.js?v=b1aeef6f",
+	"/chunks/builder.js?v=b1aeef6f",
+	"/chunks/buttons.js?v=b1aeef6f",
+	"/chunks/category.js?v=b1aeef6f",
+	"/chunks/checkbox.js?v=b1aeef6f",
+	"/chunks/collaborative.js?v=b1aeef6f",
+	"/chunks/columns.js?v=b1aeef6f",
+	"/chunks/combobox.js?v=b1aeef6f",
+	"/chunks/connectivity.js?v=b1aeef6f",
+	"/chunks/controller.js?v=b1aeef6f",
+	"/chunks/core-foundation.js?v=b1aeef6f",
+	"/chunks/deferredOperations.js?v=b1aeef6f",
+	"/chunks/deployment.js?v=b1aeef6f",
+	"/chunks/directUpload.js?v=b1aeef6f",
+	"/chunks/documentHistory.js?v=b1aeef6f",
+	"/chunks/documentSettings.js?v=b1aeef6f",
+	"/chunks/dropdown.js?v=b1aeef6f",
+	"/chunks/editor.js?v=b1aeef6f",
+	"/chunks/entity-foundation.js?v=b1aeef6f",
+	"/chunks/entityMenu.js?v=b1aeef6f",
+	"/chunks/facets.js?v=b1aeef6f",
+	"/chunks/fileInfo.js?v=b1aeef6f",
+	"/chunks/filePdfPreview.js?v=b1aeef6f",
+	"/chunks/filterResults.js?v=b1aeef6f",
+	"/chunks/filters.js?v=b1aeef6f",
+	"/chunks/form.js?v=b1aeef6f",
+	"/chunks/formWidget.js?v=b1aeef6f",
+	"/chunks/formatting.js?v=b1aeef6f",
+	"/chunks/foundation.js?v=b1aeef6f",
+	"/chunks/generateText.js?v=b1aeef6f",
+	"/chunks/html.js?v=b1aeef6f",
+	"/chunks/html2.js?v=b1aeef6f",
+	"/chunks/icons.js?v=b1aeef6f",
+	"/chunks/image.js?v=b1aeef6f",
+	"/chunks/index-foundation.js?v=b1aeef6f",
+	"/chunks/indexTable.js?v=b1aeef6f",
+	"/chunks/ingress.js?v=b1aeef6f",
+	"/chunks/ingressUpload.js?v=b1aeef6f",
+	"/chunks/input.js?v=b1aeef6f",
+	"/chunks/installationAccess.js?v=b1aeef6f",
+	"/chunks/link.js?v=b1aeef6f",
+	"/chunks/lists.js?v=b1aeef6f",
+	"/chunks/loader.js?v=b1aeef6f",
+	"/chunks/location.js?v=b1aeef6f",
+	"/chunks/logout.js?v=b1aeef6f",
+	"/chunks/maintenance.js?v=b1aeef6f",
+	"/chunks/menuItems.js?v=b1aeef6f",
+	"/chunks/messageComposer.js?v=b1aeef6f",
+	"/chunks/mobileControls.js?v=b1aeef6f",
+	"/chunks/modal.js?v=b1aeef6f",
+	"/chunks/modelTasks.js?v=b1aeef6f",
+	"/chunks/modify.js?v=b1aeef6f",
+	"/chunks/note.js?v=b1aeef6f",
+	"/chunks/notifications.js?v=b1aeef6f",
+	"/chunks/offline.js?v=b1aeef6f",
+	"/chunks/offlineQueue.js?v=b1aeef6f",
+	"/chunks/offlineReplay.js?v=b1aeef6f",
+	"/chunks/offlineWork.js?v=b1aeef6f",
+	"/chunks/options.js?v=b1aeef6f",
+	"/chunks/pageInfo.js?v=b1aeef6f",
+	"/chunks/pagePermissions.js?v=b1aeef6f",
+	"/chunks/pagePhoto.js?v=b1aeef6f",
+	"/chunks/pageTaskList.js?v=b1aeef6f",
+	"/chunks/permissionSections.js?v=b1aeef6f",
+	"/chunks/pinVersion.js?v=b1aeef6f",
+	"/chunks/polling.js?v=b1aeef6f",
+	"/chunks/primitives.js?v=b1aeef6f",
+	"/chunks/projectInfo.js?v=b1aeef6f",
+	"/chunks/providers.js?v=b1aeef6f",
+	"/chunks/queryLifecycle.js?v=b1aeef6f",
+	"/chunks/radio.js?v=b1aeef6f",
+	"/chunks/remote.js?v=b1aeef6f",
+	"/chunks/representation.js?v=b1aeef6f",
+	"/chunks/results.js?v=b1aeef6f",
+	"/chunks/search.js?v=b1aeef6f",
+	"/chunks/sectionToggle.js?v=b1aeef6f",
+	"/chunks/sections.js?v=b1aeef6f",
+	"/chunks/select.js?v=b1aeef6f",
+	"/chunks/select2.js?v=b1aeef6f",
+	"/chunks/setColor.js?v=b1aeef6f",
+	"/chunks/setFontFamily.js?v=b1aeef6f",
+	"/chunks/setImage.js?v=b1aeef6f",
+	"/chunks/signature.js?v=b1aeef6f",
+	"/chunks/siteSettings.js?v=b1aeef6f",
+	"/chunks/sorting.js?v=b1aeef6f",
+	"/chunks/status.js?v=b1aeef6f",
+	"/chunks/status2.js?v=b1aeef6f",
+	"/chunks/storage.js?v=b1aeef6f",
+	"/chunks/styles.js?v=b1aeef6f",
+	"/chunks/submission.js?v=b1aeef6f",
+	"/chunks/submitter.js?v=b1aeef6f",
+	"/chunks/sync.js?v=b1aeef6f",
+	"/chunks/table.js?v=b1aeef6f",
+	"/chunks/taskForm.js?v=b1aeef6f",
+	"/chunks/taskHistory.js?v=b1aeef6f",
+	"/chunks/taskSettings.js?v=b1aeef6f",
+	"/chunks/tasks.js?v=b1aeef6f",
+	"/chunks/textarea.js?v=b1aeef6f",
+	"/chunks/todo.js?v=b1aeef6f",
+	"/chunks/toolbar.js?v=b1aeef6f",
+	"/chunks/toolbarButtons.js?v=b1aeef6f",
+	"/chunks/tools.js?v=b1aeef6f",
+	"/chunks/uploadFile.js?v=b1aeef6f",
+	"/chunks/upstreamUnavailable.js?v=b1aeef6f",
+	"/chunks/user.js?v=b1aeef6f",
+	"/chunks/user2.js?v=b1aeef6f",
+	"/chunks/userPermissions.js?v=b1aeef6f",
+	"/chunks/userSettings.js?v=b1aeef6f",
+	"/chunks/views/admin.js?v=b1aeef6f",
+	"/chunks/views/analytics.js?v=b1aeef6f",
+	"/chunks/views/builder.js?v=b1aeef6f",
+	"/chunks/views/file.js?v=b1aeef6f",
+	"/chunks/views/help.js?v=b1aeef6f",
+	"/chunks/views/home.js?v=b1aeef6f",
+	"/chunks/views/index.js?v=b1aeef6f",
+	"/chunks/views/manual.js?v=b1aeef6f",
+	"/chunks/views/messages.js?v=b1aeef6f",
+	"/chunks/views/page.js?v=b1aeef6f",
+	"/chunks/views/project.js?v=b1aeef6f",
+	"/chunks/views/public.js?v=b1aeef6f",
+	"/chunks/views/report.js?v=b1aeef6f",
+	"/chunks/views/results.js?v=b1aeef6f",
+	"/chunks/views/user.js?v=b1aeef6f",
+	"/chunks/visibility.js?v=b1aeef6f",
+	"/chunks/visibility2.js?v=b1aeef6f",
+	"/chunks/watcher.js?v=b1aeef6f"
 ];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
 const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
 const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
 const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
 const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
+const STATIC_RETRY_DELAYS_MS = [250, 750];
 const BROWSER_PROTOCOL = {
 	"id": "lagniappe-browser",
 	"version": 4,
@@ -211,7 +212,9 @@ async function updateCaches() {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.mjs::test_precache_static_assets_warms_configured_urls_and_ignores_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_precache_retries_transient_failures_and_preserves_cache_policy
  * @matrix cache : precache service-worker static-assets
+ * @matrix cache : retry no-store
  */
 async function precacheStaticAssets() {
 	const cache = await caches.open(CACHE);
@@ -220,12 +223,55 @@ async function precacheStaticAssets() {
 			const request = new Request(new URL(url, self.location.origin).href, {
 				cache: "reload",
 			});
-			const response = await fetch(request);
+			const response = await fetchStaticAsset(request);
 			if (response.ok && !responsePreventsStorage(response)) {
 				await cache.put(request, response.clone());
 			}
 		}),
 	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::handleStatic
+ * @covered-by src/script/sw.template.mjs::precacheStaticAssets
+ * @reason bounded static GET retries are exercised through serving and cache warming
+ */
+async function fetchStaticAsset(request) {
+	let currentRequest = request;
+	for (let attempt = 0; ; attempt += 1) {
+		let response;
+		try {
+			response = await fetch(currentRequest);
+		} catch (error) {
+			if (
+				request.method !== "GET" ||
+				request.signal.aborted ||
+				error?.name === "AbortError" ||
+				attempt === STATIC_RETRY_DELAYS_MS.length
+			) {
+				throw error;
+			}
+		}
+		if (
+			response &&
+			(request.method !== "GET" ||
+				request.signal.aborted ||
+				!UPSTREAM_STATUSES.has(response.status) ||
+				response.headers.has("X-Lagniappe-Error") ||
+				attempt === STATIC_RETRY_DELAYS_MS.length)
+		) {
+			return response;
+		}
+		// Discard failed bodies before another attempt, and avoid replaying an
+		// HTTP-cache error or a conditional request without a usable cached body.
+		await response?.body?.cancel().catch(() => {});
+		await new Promise((resolve) =>
+			setTimeout(resolve, STATIC_RETRY_DELAYS_MS[attempt]),
+		);
+		if (request.signal.aborted) throw request.signal.reason;
+		currentRequest = networkRequest(request, { cache: "reload" });
+	}
 }
 
 /**
@@ -796,7 +842,13 @@ self.addEventListener("fetch", (event) => {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retries_transient_failures_and_caches_recovery
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retry_budget_preserves_failure
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_does_not_retry_permanent_errors_or_mutations
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_abort_stops_retries
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_cache_hit_avoids_network
  * @matrix cache : no-store service-worker static-assets
+ * @matrix cache : retry abort cache-hit
  */
 async function handleStatic(event) {
 	const cache = await caches.open(CACHE);
@@ -808,7 +860,7 @@ async function handleStatic(event) {
 	}
 
 	try {
-		const response = await fetch(event.request);
+		const response = await fetchStaticAsset(event.request);
 		if (isUpstreamUnavailableResponse(response)) {
 			return handleUpstreamUnavailable(event, event.request, response);
 		}
