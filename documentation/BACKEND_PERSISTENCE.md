@@ -120,6 +120,16 @@ branches compose as false inside OR expressions, while a denied top-level/AND
 filter dominates the query. Every `Query` terminal method returns its typed
 empty result without constructing a Datastore query when the filter denies all.
 
+`Query.count()` uses a Datastore `COUNT` aggregation over the existing keys-only
+query and returns a Python integer, including zero. It retains filters, ancestor,
+and ordering, and continues to count the full result set regardless of the
+builder's limit/cursor. Only the aggregate is transferred to the application.
+Home's task count keeps its single owned-or-assigned OR filter for active,
+incomplete Tasks; a Task matching both branches counts once. No count cache or
+maintained counter is involved. See Google's
+[aggregation-query behavior](https://docs.cloud.google.com/datastore/docs/aggregation-queries#behavior_and_limitations)
+when introducing new query shapes, especially projections of array properties.
+
 Keep queries bounded and ordered. When a browser list uses a cursor, preserve
 provider order through `Entities.fetch()` instead of applying a second sort
 after hydration.

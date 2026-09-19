@@ -1,8 +1,11 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
-from google.cloud.datastore import Key
+from google.auth.credentials import AnonymousCredentials
+from google.cloud.datastore import Client, Key
+from google.cloud.datastore_v1.types import RunAggregationQueryResponse
 
 from lagniappe import CONFIG
 from lagniappe.core.tools.database import get, utility
@@ -120,6 +123,88 @@ def test_denied_query_terminals_do_not_create_datastore_query(monkeypatch):
     assert list(denied_query().fetch_iter()) == []
     assert denied_query().count() == 0
     assert denied_query().exists() is False
+
+
+@pytest.fixture
+def aggregation_datastore(monkeypatch):
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    client._datastore_api_internal = SimpleNamespace(
+        run_query=Mock(side_effect=AssertionError("Counting must not download entity keys.")),
+        run_aggregation_query=Mock(),
+    )
+    monkeypatch.setattr(database_filter, "DATA", SimpleNamespace(datastore=client))
+    return client
+
+
+# @matrix database : count aggregation
+@pytest.mark.unit
+@pytest.mark.parametrize("count", [0, 4, 1_000_000])
+def test_query_count_uses_aggregation_without_fetching_entities(aggregation_datastore, count):
+    client = aggregation_datastore
+    api = client._datastore_api
+    api.run_aggregation_query.return_value = RunAggregationQueryResponse(
+        batch={
+            "aggregation_results": [{"aggregate_properties": {"total": {"integer_value": count}}}],
+            "more_results": "NO_MORE_RESULTS",
+        },
+    )
+    parent = client.key("pages", "parent")
+    query = (
+        Query("instances", ancestor=parent)
+        .filter(Filter().eq("type", "task").eq("active", True))
+        .order("-modified").project("name").limit(1).cursor("ignored-for-count")
+    )
+
+    result = query.count()
+
+    assert result == count
+    assert type(result) is int  # The SDK decodes a zero count as 0.0.
+    api.run_query.assert_not_called()
+    api.run_aggregation_query.assert_called_once()
+    request = api.run_aggregation_query.call_args.kwargs["request"]
+    aggregation = request["aggregation_query"]
+    assert len(aggregation.aggregations) == 1
+    assert aggregation.aggregations[0].alias == "total"
+    assert aggregation.aggregations[0]._pb.WhichOneof("operator") == "count"
+    nested = aggregation.nested_query
+    assert nested.kind[0].name == "instances"
+    assert [item.property.name for item in nested.projection] == ["__key__"]
+    assert nested.order[0].property.name == "modified"
+    assert nested.order[0].direction.name == "DESCENDING"
+    assert not nested._pb.HasField("limit")
+    assert nested.start_cursor == b""
+    def property_filters(filter):
+        if filter._pb.HasField("property_filter"):
+            yield filter.property_filter
+        else:
+            assert filter.composite_filter.op.name == "AND"
+            for child in filter.composite_filter.filters:
+                yield from property_filters(child)
+
+    filters = {item.property.name: item for item in property_filters(nested.filter)}
+    assert set(filters) == {
+        "__key__", "type", "active",
+    }
+    assert filters["type"].op.name == "EQUAL"
+    assert filters["type"].value.string_value == "task"
+    assert filters["active"].op.name == "EQUAL"
+    assert filters["active"].value.boolean_value is True
+    ancestor = filters["__key__"]
+    assert ancestor.op.name == "HAS_ANCESTOR"
+    assert ancestor.value.key_value.path[-1].name == "parent"
+
+
+# @source lagniappe/core/tools/database/filter.py::Query.count
+# @matrix database : count aggregation
+@pytest.mark.unit
+def test_query_count_propagates_aggregation_failure(aggregation_datastore):
+    api = aggregation_datastore._datastore_api
+    api.run_aggregation_query.side_effect = RuntimeError("Aggregation unavailable")
+
+    with pytest.raises(RuntimeError, match="Aggregation unavailable"):
+        Query("instances").count()
+
+    api.run_query.assert_not_called()
 
 
 # @matrix database permissions : deny-all group-query
