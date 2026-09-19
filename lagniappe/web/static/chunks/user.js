@@ -1,26 +1,26 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bf6747aa';
-import { B as BaseElement } from './baseElement.js?v=bf6747aa';
-import './foundation.js?v=bf6747aa';
-import { p as primitives } from './primitives.js?v=bf6747aa';
-import { F as FacetsBox } from './facets.js?v=bf6747aa';
-import { f as formatting } from './formatting.js?v=bf6747aa';
-import { InputElement } from './input.js?v=bf6747aa';
-import { RadioElement } from './radio.js?v=bf6747aa';
-import { F as FormWidget } from './formWidget.js?v=bf6747aa';
-import './icons.js?v=bf6747aa';
-import './upstreamUnavailable.js?v=bf6747aa';
-import './connectivity.js?v=bf6747aa';
-import './remote.js?v=bf6747aa';
-import './queryLifecycle.js?v=bf6747aa';
-import './combobox.js?v=bf6747aa';
-import './results.js?v=bf6747aa';
-import './storage.js?v=bf6747aa';
-import './submitter.js?v=bf6747aa';
-import './controller.js?v=bf6747aa';
-import './loader.js?v=bf6747aa';
-import './modal.js?v=bf6747aa';
-import './formRepresentation.js?v=bf6747aa';
+import { STYLES } from './styles.js?v=bc63f152';
+import { B as BaseElement } from './baseElement.js?v=bc63f152';
+import './foundation.js?v=bc63f152';
+import { p as primitives } from './primitives.js?v=bc63f152';
+import { F as FacetsBox } from './facets.js?v=bc63f152';
+import { f as formatting } from './formatting.js?v=bc63f152';
+import { InputElement } from './input.js?v=bc63f152';
+import { RadioElement } from './radio.js?v=bc63f152';
+import { F as FormWidget } from './formWidget.js?v=bc63f152';
+import './icons.js?v=bc63f152';
+import './upstreamUnavailable.js?v=bc63f152';
+import './connectivity.js?v=bc63f152';
+import './remote.js?v=bc63f152';
+import './queryLifecycle.js?v=bc63f152';
+import './combobox.js?v=bc63f152';
+import './results.js?v=bc63f152';
+import './storage.js?v=bc63f152';
+import './submitter.js?v=bc63f152';
+import './controller.js?v=bc63f152';
+import './loader.js?v=bc63f152';
+import './modal.js?v=bc63f152';
+import './representation.js?v=bc63f152';
 
 /**
  * @testable infrastructure

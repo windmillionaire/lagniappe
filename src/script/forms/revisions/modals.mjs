@@ -1,8 +1,8 @@
 import { STYLES } from "styles";
-import { loadRevisionPreview } from "./editRevisionPreview";
-import { compatibleField } from "./formRepresentation";
-import { Modal } from "./modal";
-import { areEqual } from "./utilities";
+import { Modal } from "../../shared/modal";
+import { areEqual } from "../../shared/utilities";
+import { compatibleField } from "../representation";
+import { loadRevisionPreview } from "./preview";
 
 /**
  * @testable true
@@ -22,7 +22,7 @@ export class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private schema-summary copy is part of the reconciliation modal
 	 */
 	_schemaSummary() {
@@ -46,7 +46,7 @@ export class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private readonly value extraction is part of the reconciliation modal
 	 */
 	_value(element) {
@@ -80,7 +80,7 @@ export class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private changed-field projection is part of the reconciliation modal
 	 */
 	async _differences(localResponse) {
@@ -154,7 +154,7 @@ export class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private per-field choice composition is part of the reconciliation modal
 	 */
 	_choice(field, source, value) {
@@ -279,7 +279,7 @@ export class FormRevisionModal extends Modal {
 
 /**
  * @testable false
- * @covered-by src/script/shared/editReconciler.mjs::EditReconciler
+ * @covered-by src/script/forms/revisions/reconciler.mjs::EditReconciler
  * @reason private whole-form conflict UI is selected by capability-aware reconciliation state
  */
 export class WholeFormRevisionModal extends Modal {

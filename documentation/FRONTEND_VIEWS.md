@@ -193,7 +193,7 @@ instance per component. Unknown names receive `DefaultWidget`, which provides
 only visibility and configuration for simple show/hide targets.
 
 Specialized construction belongs to its consuming feature:
-`shared/editRevisionPreview.mjs` builds detached form comparison widgets through
+`forms/revisions/preview.mjs` builds detached form comparison widgets through
 `loadWidget()`, and `elements/editor/headless.mjs` owns the headless registry and
 lazy document construction used by offline replay. The generic loader does not
 import either adapter.

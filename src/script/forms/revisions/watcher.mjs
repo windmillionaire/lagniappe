@@ -1,5 +1,5 @@
-import { EditReconciler } from "./editReconciler";
-import { captureError } from "./errors";
+import { captureError } from "../../shared/errors";
+import { EditReconciler } from "./reconciler";
 
 /**
  * View-scoped detector for committed edits to forms represented by

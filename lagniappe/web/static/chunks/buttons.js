@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bf6747aa';
-import { c as createIcon, s as setIcon } from './icons.js?v=bf6747aa';
-import { f as formatting } from './formatting.js?v=bf6747aa';
+import { STYLES } from './styles.js?v=bc63f152';
+import { c as createIcon, s as setIcon } from './icons.js?v=bc63f152';
+import { f as formatting } from './formatting.js?v=bc63f152';
 
 /**
  * @testable infrastructure

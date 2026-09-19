@@ -147,6 +147,32 @@ The snapshot is not persisted or sent to the server. Entity fingerprints and
 uses a detached focused response to compare the live draft with saved state.
 See [FRONTEND_VIEWS_RECONCILIATION.md](FRONTEND_VIEWS_RECONCILIATION.md).
 
+## Revision coordination
+
+`forms/revisions/` owns watched-form revision coordination:
+
+| Module | Responsibility |
+| --- | --- |
+| `watcher.mjs` | `EditWatcher`: entity/marker discovery, polling subscriptions, acknowledgements, and deferred-operation coordination. |
+| `reconciler.mjs` | `EditReconciler`: focused authoritative probes, draft/queued comparisons, and revision resolution. |
+| `modals.mjs` | `FormRevisionModal` and `WholeFormRevisionModal`: field or whole-form saved/local choices. |
+| `preview.mjs` | `loadRevisionPreview()`: detached form construction through the generic widget loader, using cloned response DOM. |
+
+Views obtain the service through `ensureEditWatcher()` and retain it as
+`view.EditWatcher`. The loader awaits the shared polling coordinator and loads
+the watcher dynamically. Revision coordination stays outside Core's static
+startup closure; there is no forms barrel or shared-facade re-export.
+
+`forms/representation.mjs` provides dependency-free `compatibleField()` and
+`incompatibleSchema()` comparisons to both FormWidget and revision UI. The
+widget continues to own snapshots, local-state capture/projection, and staged
+replacement; those operations do not import revision coordination.
+
+`forms/migrationNotice.mjs` independently installs the informational notice for
+values converted by a schema migration. Its banner/modal belong to FormWidget's
+prepared state, not the revision watcher or reconciler. Polling, offline replay,
+deferred operations, and collaborative documents keep their existing owners.
+
 ## Offline forms
 
 An `lp-offline` form renders authoritative server HTML immediately and does not

@@ -28,7 +28,7 @@ const context = {
   },
 };
 vm.createContext(context);
-for (const path of ["src/script/shared/formMigrationNotice.mjs", "src/script/widgets/base/formWidget.mjs"]) {
+for (const path of ["src/script/forms/migrationNotice.mjs", "src/script/widgets/base/formWidget.mjs"]) {
   vm.runInContext(fs.readFileSync(path, "utf8")
     .replace(/^import .*;\n/gm, "").replace(/export /g, ""), context);
 }
@@ -133,7 +133,7 @@ const indexedDB = {
 };
 const context = { console, indexedDB, queueMicrotask };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offline.mjs", "utf8");
 source = source.replace(/export function /g, "function ");
 source += "\nglobalThis.getOfflineMutations = getOfflineMutations;";
@@ -183,7 +183,7 @@ const context = {
   HTMLFormElement: FakeHTMLFormElement,
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormWidget", "class FormWidget");
@@ -277,7 +277,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormWidget", "class FormWidget");
@@ -340,7 +340,7 @@ const target = {
 };
 const context = { FormController: class {}, console, structuredClone };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormWidget", "class FormWidget");
@@ -436,7 +436,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -539,7 +539,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -640,7 +640,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -728,7 +728,7 @@ const context = {
   setOfflineMutation: async () => {},
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -854,7 +854,7 @@ const context = {
   window: { dispatchEvent() {} },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
 source = source.replace("export class OfflineQueue", "class OfflineQueue");
@@ -994,8 +994,8 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let reconcilerSource = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
   "export class EditReconciler",
@@ -1003,7 +1003,7 @@ reconcilerSource = reconcilerSource.replace(
 );
 reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
 vm.runInContext(reconcilerSource, context);
-let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/revisions/watcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
@@ -1240,8 +1240,8 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let reconcilerSource = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
   "export class EditReconciler",
@@ -1249,7 +1249,7 @@ reconcilerSource = reconcilerSource.replace(
 );
 reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
 vm.runInContext(reconcilerSource, context);
-let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/revisions/watcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
@@ -1330,8 +1330,8 @@ const view = {
 };
 const context = { console, Modal: class {} };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let reconcilerSource = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
   "export class EditReconciler",
@@ -1339,7 +1339,7 @@ reconcilerSource = reconcilerSource.replace(
 );
 reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
 vm.runInContext(reconcilerSource, context);
-let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/revisions/watcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
@@ -1466,8 +1466,8 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let reconcilerSource = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
   "export class EditReconciler",
@@ -1475,7 +1475,7 @@ reconcilerSource = reconcilerSource.replace(
 );
 reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
 vm.runInContext(reconcilerSource, context);
-let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/revisions/watcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
@@ -1573,7 +1573,7 @@ const context = {
   },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let replaySource = fs.readFileSync(
   "src/script/views/base/offlineReplay.mjs",
@@ -1710,7 +1710,7 @@ const context = {
   loadWidget: async () => null,
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/views/base/component.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export default class ViewComponent", "class ViewComponent");
@@ -1768,7 +1768,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -1893,7 +1893,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -1971,7 +1971,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2043,7 +2043,7 @@ const context = {
   FormData,
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2094,7 +2094,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");
@@ -2180,7 +2180,7 @@ const vm = require("node:vm");
 
 const context = { BaseList: class {}, console };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class PageTaskList", "class PageTaskList");

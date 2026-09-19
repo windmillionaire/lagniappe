@@ -1,6 +1,6 @@
 import { FormController } from "../../forms/controller";
-import { installMigrationNotice } from "../../shared/formMigrationNotice";
-import { compatibleField } from "../../shared/formRepresentation";
+import { installMigrationNotice } from "../../forms/migrationNotice";
+import { compatibleField } from "../../forms/representation";
 import { withTransition } from "../../shared/transitions";
 
 /**

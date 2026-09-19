@@ -29,7 +29,7 @@ export const CORE_VIEW_ENTRIES = Object.freeze([
 export const CORE_FORBIDDEN_MODULES = Object.freeze([
 	"/shared/offlineQueue.mjs",
 	"/shared/sync.mjs",
-	"/shared/editWatcher.mjs",
+	"/forms/revisions/",
 	"/shared/deferredOperations.mjs",
 	"/shared/modal.mjs",
 	"/elements/notifications.mjs",

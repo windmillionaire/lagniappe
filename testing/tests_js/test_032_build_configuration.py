@@ -118,6 +118,31 @@ assert.throws(
   () => validateStartupBudgets(forbidden),
   /statically includes/,
 );
+
+// Revision services may be reachable dynamically, but none may become part
+// of a Core view's static closure, even through an intermediate chunk.
+for (const module of ["watcher", "reconciler", "modals", "preview"]) {
+  const revisions = structuredClone(bundle);
+  const revisionFile = "chunks/form-revisions.js";
+  const bridgeFile = "chunks/revision-bridge.js";
+  revisions[revisionFile] = {
+    type: "chunk", fileName: revisionFile, name: "form-revisions",
+    code: "x", isEntry: false, imports: [],
+    modules: { [`/src/script/forms/revisions/${module}.mjs`]: {} },
+  };
+  revisions[bridgeFile] = {
+    type: "chunk", fileName: bridgeFile, name: "revision-bridge",
+    code: "x", isEntry: false, imports: [revisionFile], modules: {},
+  };
+  revisions["chunks/views/page.js"].dynamicImports = [bridgeFile];
+  assert.doesNotThrow(() => validateStartupBudgets(revisions));
+  revisions["chunks/views/page.js"].imports = [bridgeFile];
+  assert.throws(
+    () => validateStartupBudgets(revisions),
+    /Core view page statically includes .*forms\/revisions\//,
+    `${module} must remain outside the Core startup closure`,
+  );
+}
 ''',
         module=True,
     )

@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { C as Core, N as NavElement } from './core-foundation.js?v=bf6747aa';
-import { d as debounce, w as withTransition } from './foundation.js?v=bf6747aa';
+import { C as Core, N as NavElement } from './core-foundation.js?v=bc63f152';
+import { d as debounce, w as withTransition } from './foundation.js?v=bc63f152';
 
 /**
  * @testable infrastructure

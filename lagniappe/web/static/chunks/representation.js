@@ -1,5 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
 /**
+ * Compare field representations without importing form controllers or UI.
+ *
  * @testable true
  * @tests tests_js/test_036c_form_migrations.py::test_incompatible_local_values_require_review
  * @matrix form-migration : stale-input representation-aware

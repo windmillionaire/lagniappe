@@ -1,5 +1,5 @@
 import { STYLES } from "styles";
-import { Modal } from "./modal";
+import { Modal } from "../shared/modal";
 
 /**
  * @testable true

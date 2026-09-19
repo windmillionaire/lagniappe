@@ -36,7 +36,7 @@ const context = {
   ICONS: { builder: { unsaved: "unsaved" } },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/forms/controller.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormController", "class FormController");
@@ -98,7 +98,7 @@ const context = {
   primitives: {},
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class FormWidget", "class FormWidget");
@@ -314,8 +314,8 @@ const context = {
   },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let reconcilerSource = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
   "export class EditReconciler",
@@ -323,7 +323,7 @@ reconcilerSource = reconcilerSource.replace(
 );
 reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
 vm.runInContext(reconcilerSource, context);
-let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/revisions/watcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
@@ -511,8 +511,8 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let reconcilerSource = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8");
 reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
 reconcilerSource = reconcilerSource.replace(
   "export class EditReconciler",
@@ -520,7 +520,7 @@ reconcilerSource = reconcilerSource.replace(
 );
 reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
 vm.runInContext(reconcilerSource, context);
-let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+let source = fs.readFileSync("src/script/forms/revisions/watcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
@@ -584,7 +584,7 @@ vm.runInContext(source, context);
 
 
 # @pair edited-entity-notice:unchanged-form
-# @source src/script/shared/editReconciler.mjs::EditReconciler
+# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
 def test_metadata_only_revision_preserves_clean_and_dirty_forms(run_node):
     run_node(
         r'''
@@ -601,8 +601,8 @@ const context = {
   withTransition: async (callback) => callback(),
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync("src/script/shared/formRepresentation.mjs", "utf8").replaceAll("export ", ""), context);
-let source = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8")
+vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
+let source = fs.readFileSync("src/script/forms/revisions/reconciler.mjs", "utf8")
   .replace(/^import .*$/gm, "")
   .replace("export class EditReconciler", "class EditReconciler");
 vm.runInContext(source + "\nglobalThis.EditReconciler = EditReconciler;", context);

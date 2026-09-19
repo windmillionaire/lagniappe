@@ -1,10 +1,10 @@
-import { FormRevisionModal, WholeFormRevisionModal } from "./editRevisionModal";
-import { loadRevisionPreview } from "./editRevisionPreview";
-import { captureError } from "./errors";
-import { incompatibleSchema } from "./formRepresentation";
-import { request } from "./request";
-import { withTransition } from "./transitions";
-import { areEqual } from "./utilities";
+import { captureError } from "../../shared/errors";
+import { request } from "../../shared/request";
+import { withTransition } from "../../shared/transitions";
+import { areEqual } from "../../shared/utilities";
+import { incompatibleSchema } from "../representation";
+import { FormRevisionModal, WholeFormRevisionModal } from "./modals";
+import { loadRevisionPreview } from "./preview";
 
 /**
  * Per-marker authoritative revision probing, comparison, and resolution for

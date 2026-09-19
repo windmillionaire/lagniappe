@@ -98,6 +98,9 @@ The main startup path has four measured closures:
 fails when a closure exceeds its budget. It also prevents heavy interactive
 systems such as sync, edit reconciliation, modals, notifications, and combobox
 from entering every Core view's static closure.
+The edit-reconciliation guard covers the whole `forms/revisions/` directory,
+including the watcher, reconciler, review modals, and preview adapter. These
+modules remain available through the lazy `ensureEditWatcher()` service.
 
 ## Production behavior
 

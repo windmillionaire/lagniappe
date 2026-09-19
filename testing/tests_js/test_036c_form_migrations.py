@@ -350,7 +350,7 @@ assert.deepEqual(schema[1].visibility, [{id:"choice",type:"select",value:"yes"}]
 def test_incompatible_local_values_require_review(run_node):
     run_node(r"""
 const assert = await import("node:assert/strict").then(module => module.default);
-const { compatibleField, incompatibleSchema } = await import(process.cwd() + "/src/script/shared/formRepresentation.mjs");
+const { compatibleField, incompatibleSchema } = await import(process.cwd() + "/src/script/forms/representation.mjs");
 const text = {id:"quantity",type:"input",input:"text"};
 assert.equal(compatibleField(text, {...text,title:"New label"}), true);
 assert.equal(compatibleField(text, {...text,input:"number"}), false);
@@ -382,9 +382,9 @@ const context = {
 };
 vm.createContext(context);
 for (const [path, name] of [
-  ["src/script/shared/formRepresentation.mjs", null],
+  ["src/script/forms/representation.mjs", null],
   ["src/script/widgets/base/formWidget.mjs", "FormWidget"],
-  ["src/script/shared/editReconciler.mjs", "EditReconciler"],
+  ["src/script/forms/revisions/reconciler.mjs", "EditReconciler"],
 ]) {
   const source = fs.readFileSync(path, "utf8")
     .replace(/^import .*$/gm, "").replaceAll("export ", "");

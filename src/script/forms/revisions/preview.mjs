@@ -1,4 +1,4 @@
-import { loadWidget } from "../widgets/loader";
+import { loadWidget } from "../../widgets/loader";
 
 /**
  * Build a fully rendered, detached copy of a form widget for revision

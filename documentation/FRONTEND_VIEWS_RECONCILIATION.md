@@ -21,6 +21,12 @@ routes continue to own HTML and full data.
 
 ## Watched forms
 
+The watcher, reconciler, review modals, and detached preview adapter live in
+`forms/revisions/`. Core loads the watcher through `ensureEditWatcher()`;
+the other modules remain internal to that service. Pure schema compatibility
+comparisons live below them in `forms/representation.mjs`. Migration notices
+are separate FormWidget-owned UI in `forms/migrationNotice.mjs`.
+
 A server-rendered entity anchor carries `data-key`, `data-fingerprint`, and,
 for Page/Task forms, `data-modified`. An `lp-edited-marker` inside a form points
 to a side-effect-free focused replacement route. `EditWatcher` starts from
@@ -32,7 +38,7 @@ newest observed revision. An inactive form performs no replacement request; on
 activation it compares baselines and catches up once when stale.
 
 For a changed active form, `EditReconciler` uses
-`shared/editRevisionPreview.mjs::loadRevisionPreview()` to render the focused
+`forms/revisions/preview.mjs::loadRevisionPreview()` to render the focused
 response in a detached preview and compares normalized submissions:
 
 - an unchanged saved baseline and schema leave the live form and draft intact;

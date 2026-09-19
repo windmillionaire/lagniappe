@@ -394,7 +394,7 @@ def test_cancel_generation_restores_previous_image_visibility(get_user):
 
 # @matrix pages : image-add image-replace image-remove unsaved-preservation
 # @pair edited-entity-notice:unchanged-form
-# @source src/script/shared/editReconciler.mjs::EditReconciler
+# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
 @pytest.mark.parametrize("dirty", [False, True])

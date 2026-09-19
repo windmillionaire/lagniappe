@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { s as setIcon } from './icons.js?v=bf6747aa';
-import { S as SiteSetting } from './base.js?v=bf6747aa';
+import { s as setIcon } from './icons.js?v=bc63f152';
+import { S as SiteSetting } from './base.js?v=bc63f152';
 
 /**
  * @testable true

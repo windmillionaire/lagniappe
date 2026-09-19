@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bf6747aa';
-import { l as loadWidget } from './core-foundation.js?v=bf6747aa';
-import { c as compatibleField, i as incompatibleSchema } from './formRepresentation.js?v=bf6747aa';
-import { Modal } from './modal.js?v=bf6747aa';
-import { e as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=bf6747aa';
-import './connectivity.js?v=bf6747aa';
-import './storage.js?v=bf6747aa';
-import './upstreamUnavailable.js?v=bf6747aa';
+import { e as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=bc63f152';
+import { c as compatibleField, i as incompatibleSchema } from './representation.js?v=bc63f152';
+import { STYLES } from './styles.js?v=bc63f152';
+import { Modal } from './modal.js?v=bc63f152';
+import { l as loadWidget } from './core-foundation.js?v=bc63f152';
+import './upstreamUnavailable.js?v=bc63f152';
+import './connectivity.js?v=bc63f152';
+import './storage.js?v=bc63f152';
 
 /**
  * Build a fully rendered, detached copy of a form widget for revision
@@ -79,7 +79,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private schema-summary copy is part of the reconciliation modal
 	 */
 	_schemaSummary() {
@@ -103,7 +103,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private readonly value extraction is part of the reconciliation modal
 	 */
 	_value(element) {
@@ -137,7 +137,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private changed-field projection is part of the reconciliation modal
 	 */
 	async _differences(localResponse) {
@@ -211,7 +211,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
+	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private per-field choice composition is part of the reconciliation modal
 	 */
 	_choice(field, source, value) {
@@ -336,7 +336,7 @@ class FormRevisionModal extends Modal {
 
 /**
  * @testable false
- * @covered-by src/script/shared/editReconciler.mjs::EditReconciler
+ * @covered-by src/script/forms/revisions/reconciler.mjs::EditReconciler
  * @reason private whole-form conflict UI is selected by capability-aware reconciliation state
  */
 class WholeFormRevisionModal extends Modal {

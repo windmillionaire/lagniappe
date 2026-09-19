@@ -1,7 +1,6 @@
 export { analytics } from "./analytics";
 export { ConnectivityState, connectivity } from "./connectivity";
 export { DeferredOperationManager } from "./deferredOperations";
-export { EditWatcher } from "./editWatcher";
 export { ENDPOINTS } from "./endpoints";
 export {
 	captureError,
