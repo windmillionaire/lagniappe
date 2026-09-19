@@ -37,6 +37,7 @@ test_roots:
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_005_test_session.py
   - testing/tests_tooling/test_005a_frontend_build.py
+  - testing/tests_tooling/test_007_entity_fingerprint_contract.py
   - testing/tests_tooling/test_007_run_py_test_command.py
   - testing/tests_tooling/test_008_data_lifecycle.py
   - testing/tests_tooling/test_009_hosted_e2e.py
