@@ -9,41 +9,100 @@
 						"name": "Category Form",
 						"hash": "catform1",
 						"schema": "basic_inputs"
-					}
+					},
+					"expected_entity_fields": [
+						[
+							"form",
+							"catform1"
+						]
+					]
 				}
 			],
-			["CATEGORY", { "name": "Category Without Form" }],
+			[
+				"CATEGORY",
+				{
+					"name": "Category Without Form",
+					"expected_entity_fields": []
+				}
+			],
 			[
 				"PAGE",
 				{
 					"name": "Page With Everything",
 					"description": "A detailed description",
 					"public": true,
-					"assets": { "image": { "type": "image", "path": "test.jpg" } }
+					"assets": {
+						"image": {
+							"type": "image",
+							"path": "test.jpg"
+						}
+					},
+					"expected_filter": {
+						"name": "Page With Everything",
+						"description": "A detailed description",
+						"is_public": true,
+						"has_image": true,
+						"has_document": false
+					}
 				}
 			],
 			[
 				"PAGE",
 				{
 					"name": "The Simple Page",
-					"description": "Basic page"
+					"description": "Basic page",
+					"expected_filter": {
+						"name": "The Simple Page",
+						"description": "Basic page",
+						"is_public": false,
+						"has_image": false,
+						"has_document": false
+					}
 				}
 			],
 			[
 				"PAGE",
 				{
 					"name": "Public Page",
-					"public": true
+					"public": true,
+					"expected_filter": {
+						"name": "Public Page",
+						"is_public": true,
+						"has_image": false,
+						"has_document": false
+					}
 				}
 			],
 			[
 				"PAGE",
 				{
 					"name": "Page With Image",
-					"assets": { "image": { "type": "image", "path": "photo.png" } }
+					"assets": {
+						"image": {
+							"type": "image",
+							"path": "photo.png"
+						}
+					},
+					"expected_filter": {
+						"name": "Page With Image",
+						"is_public": false,
+						"has_image": true,
+						"has_document": false
+					}
 				}
 			],
-			["PAGE", { "name": "Minimal Page" }],
+			[
+				"PAGE",
+				{
+					"name": "Minimal Page",
+					"expected_filter": {
+						"name": "Minimal Page",
+						"is_public": false,
+						"has_image": false,
+						"has_document": false
+					}
+				}
+			],
 			[
 				"PAGE",
 				{
@@ -52,6 +111,13 @@
 						"name": "Different Form",
 						"hash": "diffform1",
 						"schema": "selection_types"
+					},
+					"expected_filter": {
+						"name": "Page With Different Form",
+						"form": "diffform1",
+						"is_public": false,
+						"has_image": false,
+						"has_document": false
 					}
 				}
 			]
@@ -70,7 +136,12 @@
 					}
 				}
 			],
-			["CATEGORY", { "name": "Category Without Form" }]
+			[
+				"CATEGORY",
+				{
+					"name": "Category Without Form"
+				}
+			]
 		]
 	},
 	"test_category_filters_related_forms": {

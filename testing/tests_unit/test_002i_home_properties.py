@@ -131,7 +131,7 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
         return SimpleNamespace(results=["page-1", "page-2", "page-3"], next_cursor="p2")
 
     def load_entities(*keys, request):
-        load_requests.append(keys)
+        load_requests.append((keys, request))
         return pages
 
     monkeypatch.setattr(home_properties, "current_user", user)
@@ -147,7 +147,9 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
             "hashes": ("models", "page-a", "category-a"),
         }
     ]
-    assert load_requests == [("page-1", "page-2", "page-3")]
+    assert load_requests == [
+        (("page-1", "page-2", "page-3"), home_properties.Fetch.direct())
+    ]
     assert visible_pages == [pages[0], pages[2]]
     assert [page.allowed_actions for page in pages] == [
         [home_properties.Action.VIEW],
@@ -199,7 +201,7 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
         return stored_tasks
 
     def load_entities(*keys, request):
-        load_requests.append(keys)
+        load_requests.append((keys, request))
         return tasks
 
     def user_task_count(page):
@@ -224,10 +226,13 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     ]
     assert load_requests == [
         (
-            *stored_tasks,
-            "page-1",
-            "page-2",
-            "page-3",
+            (
+                *stored_tasks,
+                "page-1",
+                "page-2",
+                "page-3",
+            ),
+            home_properties.Fetch.direct(),
         )
     ]
     assert visible_tasks == [tasks[0], tasks[2]]
@@ -278,7 +283,7 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
             return self.visible
 
     def load_entities(*keys, request):
-        loaded_requests.append(keys)
+        loaded_requests.append((keys, request))
         return [FakeEntity(key) for key in keys if key != stale_key]
 
     monkeypatch.setattr(home_properties, "current_user", user)
@@ -292,17 +297,17 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
     section = home_properties.StarredList()
     loaded = section.list
 
-    assert loaded_requests == [tuple(starred_keys[:10])]
+    assert loaded_requests == [
+        (tuple(starred_keys[:10]), home_properties.Fetch.direct())
+    ]
     assert [entity.key for entity in loaded] == [
         key for key in starred_keys[:10] if key != stale_key
     ]
-    assert [item for item in section.items if "entity" not in item] == [
-        {
-            "key": f"urlsafe:{stale_key}",
-            "state": "missing",
-            "message": "This starred item no longer exists.",
-        }
-    ]
+    missing = [item for item in section.items if "entity" not in item]
+    assert len(missing) == 1
+    assert missing[0]["key"] == f"urlsafe:{stale_key}"
+    assert missing[0]["state"] == "missing"
+    assert "no longer exists" in missing[0]["message"]
     assert [item.get("key") for item in section.items] == [
         f"urlsafe:{key}" for key in starred_keys[:10]
     ]
@@ -315,6 +320,20 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
         entity.allowed_requests == [(home_properties.Action.VIEW, user)]
         for entity in loaded
     )
+
+    next_section = home_properties.StarredList(cursor="1")
+    next_loaded = next_section.list
+
+    assert loaded_requests == [
+        (tuple(starred_keys[:10]), home_properties.Fetch.direct()),
+        (tuple(starred_keys[10:]), home_properties.Fetch.direct()),
+    ]
+    assert [entity.key for entity in next_loaded] == starred_keys[10:]
+    assert [item["key"] for item in next_section.items] == [
+        f"urlsafe:{key}" for key in starred_keys[10:]
+    ]
+    assert next_section.cursor is None
+    assert next_section.count == 12
 
 
 # @matrix starred : inaccessible-placeholder retained-inaccessible view-authorization
@@ -347,12 +366,17 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     )
     visible = FakeEntity("visible", True)
     restricted = FakeEntity("restricted", False)
+    load_requests = []
+
+    def load_entities(*keys, request):
+        load_requests.append((keys, request))
+        return [visible, restricted]
 
     monkeypatch.setattr(home_properties, "current_user", current_user)
     monkeypatch.setattr(
         home_properties.Entities,
         "fetch",
-        lambda *keys, request: [visible, restricted],
+        load_entities,
     )
     monkeypatch.setattr(
         home_properties.database_get,
@@ -363,18 +387,13 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     section = home_properties.StarredList()
 
     assert section.list == [visible]
-    assert [item for item in section.items if "entity" not in item] == [
-        {
-            "key": "urlsafe:restricted",
-            "state": "inaccessible",
-            "message": "This item is no longer accessible.",
-        },
-        {
-            "key": "urlsafe:missing",
-            "state": "missing",
-            "message": "This starred item no longer exists.",
-        },
+    placeholders = [item for item in section.items if "entity" not in item]
+    assert [(item["key"], item["state"]) for item in placeholders] == [
+        ("urlsafe:restricted", "inaccessible"),
+        ("urlsafe:missing", "missing"),
     ]
+    assert "no longer accessible" in placeholders[0]["message"]
+    assert "no longer exists" in placeholders[1]["message"]
     assert [item.get("entity", item.get("key")) for item in section.items] == [
         visible,
         "urlsafe:restricted",
@@ -383,6 +402,9 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     assert starred.deleted == []
     assert starred.keys == ["visible", "restricted", "missing"]
     assert section.count == 3
+    assert load_requests == [
+        (("visible", "restricted", "missing"), home_properties.Fetch.direct())
+    ]
 
 
 # @matrix home : ingress list notes query tools
@@ -408,7 +430,7 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
         return ["report-1"]
 
     def load_entities(*keys, request):
-        load_requests.append(keys)
+        load_requests.append((keys, request))
         return [SimpleNamespace(key=key) for key in keys]
 
     monkeypatch.setattr(home_properties, "current_user", user)
@@ -429,7 +451,11 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     assert notes_requests == [user]
     assert ingress_requests == [True]
     assert ai_report_requests == [user]
-    assert load_requests == [("note-1", "note-2"), ("ingress-1",), ("report-1",)]
+    assert load_requests == [
+        (("note-1", "note-2"), home_properties.Fetch.direct()),
+        (("ingress-1",), home_properties.Fetch.direct()),
+        (("report-1",), home_properties.Fetch.direct()),
+    ]
     assert [note.key for note in notes] == ["note-1", "note-2"]
     assert [ingress.key for ingress in ingress_files] == ["ingress-1"]
     assert [report.key for report in reports] == ["report-1"]

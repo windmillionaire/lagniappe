@@ -21,8 +21,7 @@ from ..tools.auth.references import (
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_skips_keys_not_in_schema
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_multipart_keys_merge_under_field_id
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_drops_falsy_entries_in_lists
-# @tests tests_unit/test_004d_submitter.py::test_normalize_list_drops_numeric_zero_keeps_string_zero
-# @matrix submission : list-filtering multipart normalize unknown-keys zero
+# @matrix submission : list-filtering multipart normalize unknown-keys
 def normalize_submission_values(values, fields):
     updated = {}
 
@@ -135,7 +134,8 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit submit-boundary
+    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
+    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit preservation submit-boundary validation
     # @matrix form-migration : stale-generation direct-write
     def form_submission(self, values, *, actor=None):
         require_mutable_submission(self)

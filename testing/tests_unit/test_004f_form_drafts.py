@@ -153,6 +153,8 @@ def test_compatible_schema_preserves_representation_and_identity():
     target = deepcopy(source)
     target[0]["options"][0]["label"] = "New"
     target[1]["columns"][0]["title"] = "Renamed"
+    original_source = deepcopy(source)
+    original_target = deepcopy(target)
     accepted = drafts.validate_compatible_schema(source, target, "task")
     assert accepted[0]["options"][0] == {"value": "stable", "label": "New"}
     assert accepted[1]["columns"][0]["id"] == "cell"
@@ -166,7 +168,8 @@ def test_compatible_schema_preserves_representation_and_identity():
         mutate(invalid)
         with pytest.raises(exceptions.ValidationError, match="migration"):
             drafts.validate_compatible_schema(source, invalid, "task")
-    assert source[0]["options"][0]["label"] == "Old"
+    assert source == original_source
+    assert target == original_target
 
 
 # @matrix forms html-field : draft baseline no-write
@@ -414,14 +417,16 @@ def test_generation_resolution_batches_current_forms(memory_forms, monkeypatch):
     form = memory_forms.form()
     actual_fetch = Entities.fetch
     calls = []
+
     def fetch(*keys, request):
-        calls.append(keys)
+        calls.append((keys, request))
         return actual_fetch(*keys, request=request)
+
     monkeypatch.setattr(Entities, "fetch", fetch)
     result = definitions.resolve_form_generations([(form.key, 0), (form.key, 0)])
     assert list(result) == [(form.key, 0)]
     assert result[(form.key, 0)].schema == form.schema
-    assert calls == [(form.key,)]
+    assert calls == [((form.key,), Fetch.root())]
 
 
 # @matrix forms html-field : copy draft immutable-assets save-receipt

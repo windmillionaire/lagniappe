@@ -184,6 +184,12 @@
 						"type": "input",
 						"input": "text",
 						"title": "T"
+					},
+					"expected_field": {
+						"id": "t",
+						"label": "T",
+						"kind": "form",
+						"icon": "text"
 					}
 				}
 			]

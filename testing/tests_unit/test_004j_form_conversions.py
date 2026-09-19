@@ -16,14 +16,14 @@ from lagniappe.core.tools.forms.conversions import (
 
 
 def field(kind, **settings):
-    schema = next(
-        (
-            item["schema"]
-            for item in conversion_catalog()["types"]
-            if item["value"] == kind
-        ),
-        {"type": kind},
-    )
+    if kind in {"text", "number", "email", "tel", "date", "time"}:
+        schema = {"type": "input", "input": kind}
+    elif kind in {"in", "out"}:
+        schema = {"type": "link", "location": kind}
+    elif kind == "multiple":
+        schema = {"type": "select", "multiple": True}
+    else:
+        schema = {"type": kind}
     return {"id": "answer", "title": "Answer", **schema, **settings}
 
 
@@ -89,9 +89,17 @@ def test_schema_diff_preserves_ids_and_rejects_unsupported_changes():
         == []
     )
     assert classify_changes([field("html")], []) == []
-    converted = classify_changes([field("text")], [field("number")])
-    assert converted[0]["id"] == "answer"
-    assert converted[0]["source"]["input"] == "text"
+    source_text = field("text")
+    target_number = field("number")
+    converted = classify_changes([source_text], [target_number])
+    assert converted == [{
+        "id": "answer",
+        "source": source_text,
+        "target": target_number,
+        "rule": "scalar",
+        "version": 2,
+        "map": {},
+    }]
     for before, after in [
         (field("signature"), field("text")),
         (field("checkbox"), field("time")),
@@ -108,45 +116,51 @@ def test_schema_diff_preserves_ids_and_rejects_unsupported_changes():
 
 # @matrix form-migration : conversion invalid-value presence provider-free
 @pytest.mark.parametrize(
-    "source,target,value,expected",
+    "source,target,value,expected,expected_reason",
     [
-        ("text", "textarea", "  hello\r\nworld ", "  hello\r\nworld "),
-        ("textarea", "text", "hello\r\nworld", "hello world"),
-        ("text", "number", " 0 ", 0.0),
-        ("text", "number", "1.25", 1.25),
-        ("text", "number", "unknown", MISSING),
-        ("text", "number", "NaN", MISSING),
-        ("text", "number", "Infinity", MISSING),
-        ("text", "number", None, MISSING),
-        ("checkbox", "text", False, "False"),
-        ("number", "text", 0, "0"),
-        ("text", "email", "a@example.com", "a@example.com"),
-        ("text", "email", "a@example.com trailing", MISSING),
-        ("text", "tel", "+1 202-555-0123", "+12025550123"),
-        ("text", "tel", "no phone", MISSING),
-        ("text", "date", "2026-09-11", "2026-09-11T00:00:00+00:00"),
-        ("text", "date", "2026-02-30", MISSING),
-        ("text", "time", "23:45", "23:45"),
-        ("text", "time", "25:45", MISSING),
+        ("text", "textarea", "  hello\r\nworld ", "  hello\r\nworld ", "converted"),
+        ("textarea", "text", "hello\r\nworld", "hello world", "converted"),
+        ("text", "number", " 0 ", 0.0, "converted"),
+        ("text", "number", "1.25", 1.25, "converted"),
+        ("text", "number", "unknown", MISSING, "invalid"),
+        ("text", "number", "NaN", MISSING, "invalid"),
+        ("text", "number", "Infinity", MISSING, "invalid"),
+        ("text", "number", None, MISSING, "unset"),
+        ("checkbox", "text", False, "False", "converted"),
+        ("number", "text", 0, "0", "converted"),
+        ("text", "email", "a@example.com", "a@example.com", "converted"),
+        ("text", "email", "a@example.com trailing", MISSING, "invalid"),
+        ("text", "tel", "+1 202-555-0123", "+12025550123", "converted"),
+        ("text", "tel", "no phone", MISSING, "invalid"),
+        (
+            "text", "date", "2026-09-11", "2026-09-11T00:00:00+00:00",
+            "converted",
+        ),
+        ("text", "date", "2026-02-30", MISSING, "invalid"),
+        ("text", "time", "23:45", "23:45", "converted"),
+        ("text", "time", "25:45", MISSING, "invalid"),
         (
             "bookmark",
             "text",
             {"url": "https://example.com", "title": "Example"},
             "https://example.com",
+            "converted",
         ),
         (
             "location",
             "text",
             {"name": "Office", "address": "123 Main"},
             "Office, 123 Main",
+            "converted",
         ),
     ],
 )
-def test_scalar_conversions_and_invalid_values(source, target, value, expected):
+def test_scalar_conversions_and_invalid_values(
+    source, target, value, expected, expected_reason,
+):
     result, reason = convert_value(value, field(source), field(target))
     assert result is MISSING if expected is MISSING else result == expected
-    if expected is MISSING:
-        assert reason in {"unset", "invalid"}
+    assert reason == expected_reason
 
 
 # @matrix form-migration : conversion invalid-value presence nested-columns provider-free
@@ -214,7 +228,12 @@ def test_submission_notice_preserves_first_values_and_unrelated_answers():
     first = classify_changes([field("text")], [field("number")])
     values, notice = convert_submission({"answer": "012", "unrelated": False}, first)
     assert values == {"answer": 12.0, "unrelated": False}
-    assert notice["answer"]["value"] == "012"
+    assert notice == {"answer": {
+        "schema": field("text"),
+        "value": "012",
+        "generation": 0,
+        "reason": "converted",
+    }}
     values, notice = convert_submission(
         values,
         classify_changes([field("number")], []),
@@ -222,9 +241,12 @@ def test_submission_notice_preserves_first_values_and_unrelated_answers():
         generation=1,
     )
     assert values == {"unrelated": False}
-    assert notice["answer"]["value"] == "012"
-    assert notice["answer"]["generation"] == 0
-    assert notice["answer"]["reason"] == "removed"
+    assert notice == {"answer": {
+        "schema": field("text"),
+        "value": "012",
+        "generation": 0,
+        "reason": "removed",
+    }}
     assert convert_submission({}, first) == ({}, {})
     assert (
         convert_submission({"answer": "bad"}, first)[1]["answer"]["reason"] == "invalid"

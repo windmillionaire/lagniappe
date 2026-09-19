@@ -5,18 +5,32 @@
 				"PROJECT",
 				{
 					"name": "Simple Desc",
-					"description": "A simple description"
+					"description": "A simple description",
+					"expected_description": "A simple description"
 				}
 			],
 			[
 				"PROJECT",
 				{
 					"name": "HTML Desc",
-					"description": "<p>Paragraph with <strong>bold</strong> text</p>"
+					"description": "<p>Paragraph with <strong>bold</strong> text</p>",
+					"expected_description": "Paragraph with  bold  text"
 				}
 			],
-			["PROJECT", { "name": "No Desc" }],
-			["PROJECT", { "name": "No Features" }]
+			[
+				"PROJECT",
+				{
+					"name": "No Desc",
+					"expected_description": null
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "No Features",
+					"expected_description": null
+				}
+			]
 		]
 	},
 	"test_project_document": {
@@ -25,16 +39,31 @@
 				"PROJECT",
 				{
 					"name": "Has Document",
-					"assets": { "document": { "type": "html", "path": "test.html" } },
+					"assets": {
+						"document": {
+							"type": "html",
+							"path": "test.html"
+						}
+					},
 					"document": "This is the document text content for search and AI."
 				}
 			],
-			["PROJECT", { "name": "No Document" }],
+			[
+				"PROJECT",
+				{
+					"name": "No Document"
+				}
+			],
 			[
 				"PROJECT",
 				{
 					"name": "Document With No Features",
-					"assets": { "document": { "type": "html", "path": "test.html" } },
+					"assets": {
+						"document": {
+							"type": "html",
+							"path": "test.html"
+						}
+					},
 					"document": "Document text content with no features."
 				}
 			]
@@ -42,8 +71,19 @@
 	},
 	"test_project_is_public": {
 		"entities": [
-			["PROJECT", { "name": "Public Project", "public": true }],
-			["PROJECT", { "name": "Private Project" }]
+			[
+				"PROJECT",
+				{
+					"name": "Public Project",
+					"public": true
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "Private Project"
+				}
+			]
 		]
 	},
 	"test_project_filters": {
@@ -62,16 +102,42 @@
 								"schema": "basic_inputs"
 							}
 						},
-						{ "name": "Model Without Form", "hash": "model2" }
+						{
+							"name": "Model Without Form",
+							"hash": "model2"
+						}
+					],
+					"expected_entity_fields": [
+						[
+							"model",
+							"model1"
+						],
+						[
+							"form",
+							"modelform1"
+						],
+						[
+							"model",
+							"model2"
+						]
 					]
 				}
 			],
-			["PROJECT", { "name": "Project Without Models" }],
+			[
+				"PROJECT",
+				{
+					"name": "Project Without Models",
+					"expected_entity_fields": []
+				}
+			],
 			[
 				"TASK",
 				{
 					"name": "Task With Model And Form",
-					"model": { "name": "Model With Form", "hash": "model1" },
+					"model": {
+						"name": "Model With Form",
+						"hash": "model1"
+					},
 					"form": {
 						"name": "Model Form",
 						"hash": "modelform1",
@@ -80,28 +146,72 @@
 					"assigned_to": {
 						"name": "Test User",
 						"hash": "user1",
-						"page": { "name": "Test User Page", "hash": "upg001" }
+						"page": {
+							"name": "Test User Page",
+							"hash": "upg001"
+						}
 					},
-					"due_date": "2026-02-15",
-					"completed": false
+					"due_date": "2026-02-15T00:00:00+00:00",
+					"completed": false,
+					"expected_filter": {
+						"name": "Task With Model And Form",
+						"assigned_to": "upg001",
+						"due_date": 1771113600.0,
+						"completed": false,
+						"model": "model1",
+						"form": "modelform1"
+					}
 				}
 			],
 			[
 				"TASK",
 				{
 					"name": "Task With Model Only",
-					"model": { "name": "Model Without Form", "hash": "model2" },
-					"completed": true
+					"model": {
+						"name": "Model Without Form",
+						"hash": "model2"
+					},
+					"completed": true,
+					"expected_filter": {
+						"name": "Task With Model Only",
+						"completed": true,
+						"model": "model2"
+					}
 				}
 			],
 			[
 				"TASK",
 				{
 					"name": "Task With Categories",
-					"categories": [{ "name": "Cat1", "hash": "cat1" }]
+					"page": {
+						"name": "Categorized Page",
+						"hash": "pagecat1",
+						"categories": [
+							{
+								"name": "Cat1",
+								"hash": "cat1"
+							}
+						]
+					},
+					"expected_filter": {
+						"name": "Task With Categories",
+						"categories": [
+							"cat1"
+						],
+						"completed": false
+					}
 				}
 			],
-			["TASK", { "name": "Simple Task" }]
+			[
+				"TASK",
+				{
+					"name": "Simple Task",
+					"expected_filter": {
+						"name": "Simple Task",
+						"completed": false
+					}
+				}
+			]
 		]
 	}
 }

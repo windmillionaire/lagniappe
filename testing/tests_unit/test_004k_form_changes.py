@@ -163,6 +163,7 @@ def test_pending_definition_resolves_each_generation(migration):
     resolved = definitions.effective_definition(target, form)
     assert resolved.schema[0]["input"] == "number"
     assert resolved.generation == 1
+    assert changes.PENDING not in resolved.db
     assert form.generation == 0
     assert changes.PENDING in form.db
 
@@ -194,7 +195,10 @@ def test_pending_and_removed_fields_are_withheld_from_tables_and_filters(migrati
     assert "answer" not in filtered.fields
     catalog = field_catalog(category, migration.actor)
     assert (migration.form.hash, "answer") not in catalog
-    assert any(entry.allowed_values for entry in catalog.values())  # Form restriction stays available.
+    assert sum(
+        migration.form.hash in (entry.allowed_values or {})
+        for entry in catalog.values()
+    ) == 1
     with pytest.raises(FilterContractError, match="unavailable"):
         resolve_filter_field(category, migration.form.hash, "answer", migration.actor)
 
@@ -271,14 +275,23 @@ def test_prepare_target_preserves_completion_and_original_answers(migration, env
     converted = changes.prepare_target(task, migration.change)
     assert converted.completed
     assert converted.generation == 1
+    assert converted.db["schema_version"] == "new"
+    assert converted.db[changes.RECEIPT] == "change1"
     assert json.loads(converted.db["submission"]) == {"answer": 7, "unrelated": False}
     original = json.loads(converted.db["completed_submission"])
-    assert (
-        original == envelope
-        if envelope
-        else original["submission"] == {"answer": "7", "unrelated": False}
-    )
-    assert json.loads(converted.db[changes.NOTICE])["answer"]["value"] == "7"
+    assert original == (envelope or {
+        "submission": {"answer": "7", "unrelated": False},
+        "form_key": database_get.urlsafe_key(migration.form.key),
+        "generation": 0,
+    })
+    assert json.loads(converted.db[changes.NOTICE]) == {"answer": {
+        "schema": {
+            "id": "answer", "type": "input", "input": "text", "title": "Answer",
+        },
+        "value": "7",
+        "generation": 0,
+        "reason": "converted",
+    }}
     assert task.db == before
 
 
@@ -468,13 +481,23 @@ def test_notice_shows_only_changed_fields_and_cells(migration):
     )
     form = record("form", "table-form", form_type="page", schema=json.dumps([schema]))
     page.form = form
+    before = deepcopy(page.db)
     result = changes.notice_projection(page)
-    assert len(result) == 2
-    assert result[0]["label"] == "Items · Row 1 · Quantity"
-    assert result[0]["reason"] == "converted"
-    assert result[1]["label"] == "Items · Row 3 · Quantity"
-    assert result[1]["reason"] == "invalid"
-    assert changes.NOTICE in page.db
+    assert result == [
+        {
+            "label": "Items · Row 1 · Quantity",
+            "before": "2",
+            "after": "2",
+            "reason": "converted",
+        },
+        {
+            "label": "Items · Row 3 · Quantity",
+            "before": "bad",
+            "after": "Not provided",
+            "reason": "invalid",
+        },
+    ]
+    assert page.db == before
 
 
 # @matrix form-migration : retry cancellation ownership

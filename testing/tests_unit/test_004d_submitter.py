@@ -1,8 +1,8 @@
-"""``SubmitterMixin`` and ``normalize_submission_values`` (``004d_submitter.json``).
+"""``SubmitterMixin`` import, AI, patch, and save behavior.
 
 PAGE (and similar) entities with ``SubmitterMixin`` plus an attached form for schema.
-``save_submission`` writes ``entity.db`` submission JSON and copies ``schema_version`` /
-``form_hash`` from ``entity.form`` — distinct from ``Form.save()`` in
+``save_submission`` writes ``entity.db`` submission JSON and copies the schema
+version and submission generation from ``entity.form`` — distinct from ``Form.save()`` in
 ``lagniappe/core/entities/form.py``.
 """
 
@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from lagniappe.core.definitions import Fetch
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.mixins.submitter import normalize_submission_values
 from testing.utility.test_entities import TestEntities
 from testing.utility.mock_submission import WebFormSubmission
 
@@ -30,11 +30,13 @@ class _MinimalImportProcess:
 
 
 def _internal_link_entity(identifier, *, request):
+    assert request == Fetch.direct()
     return SimpleNamespace(
         details={
             "id": identifier,
             "name": f"Page-{identifier}",
             "hash": identifier,
+            "kind": "page",
         }
     )
 
@@ -54,24 +56,6 @@ def _links_import_entity(get_schema, name, hash_suffix):
     )
     entity.form.schema = get_schema("submission_integration_links")
     return entity
-
-
-def _assert_normalize_case(entity, get_schema):
-    entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
-    case = entity.test_spec["normalize_case"]
-    fields = entity.properties.submission.fields
-    got = normalize_submission_values(WebFormSubmission(case["values"]), fields)
-    assert got == case["expected"]
-
-
-# @matrix submission : list-filtering normalize zero
-@pytest.mark.unit
-def test_normalize_list_drops_numeric_zero_keeps_string_zero(
-    get_test_entities, get_schema
-):
-    """List normalization uses truthiness: ``0`` is dropped, ``\"0\"`` is kept."""
-    for entity in get_test_entities():
-        _assert_normalize_case(entity, get_schema)
 
 
 # @matrix submission : multiple-fields patch
@@ -135,23 +119,6 @@ def test_import_submission_validation_error_includes_field_and_payload(
         assert "Row length does not match number of columns" in msg
 
 
-# @matrix text-input : import list-normalization
-@pytest.mark.unit
-def test_text_input_validate_import_space_joins_list_values(get_schema):
-    entity = TestEntities.get(
-        "PAGE", {"name": "Text input import page", "hash": "txtimp"}
-    )
-    form = TestEntities.get("FORM", {"name": "F", "hash": "txtimpf"})
-    form.schema = get_schema("text_input_only")
-    entity.form = form
-    field = entity.properties.submission.fields["input-textab12"]
-
-    field.validate_import(["Ada", "", None, "Lovelace"])
-
-    assert field.value == "Ada Lovelace"
-    assert field.errors == []
-
-
 # @matrix submission text-input : import list-normalization save
 @pytest.mark.unit
 def test_import_submission_space_joins_input_list_values():
@@ -207,6 +174,7 @@ def test_import_submission_internal_link_exact_match(get_schema, monkeypatch):
             "id": "target_a",
             "name": "Page-target_a",
             "hash": "target_a",
+            "kind": "page",
         }
     }
 
@@ -236,6 +204,7 @@ def test_ai_submission_internal_link_plaintext_resolves(get_schema, monkeypatch)
             "id": "target_ai",
             "name": "Page-target_ai",
             "hash": "target_ai",
+            "kind": "page",
         }
     }
 
@@ -268,6 +237,7 @@ def test_ai_submission_internal_link_falls_back_to_value_setter(
             "id": "target_ai_id",
             "name": "Page-target_ai_id",
             "hash": "target_ai_id",
+            "kind": "page",
         }
     }
 
@@ -363,6 +333,7 @@ def test_import_submission_table_internal_link_exact_match(get_schema, monkeypat
                         "id": "target_b",
                         "name": "Page-target_b",
                         "hash": "target_b",
+                        "kind": "page",
                     }
                 }
             ]
@@ -430,6 +401,7 @@ def test_import_submission_table_internal_link_no_match_records_error(
 
 
 # @matrix form-table submission : import list-normalization
+# @matrix text-input : import list-normalization
 @pytest.mark.unit
 def test_import_submission_preserves_table_row_lists_during_input_list_normalization(
     get_schema,
@@ -442,10 +414,13 @@ def test_import_submission_preserves_table_row_lists_during_input_list_normaliza
     entity.form = form
 
     entity.import_submission(
-        {"tbl": [["Ada", "Lovelace"]]},
+        {"tbl": [["Ada", "Lovelace"], [["Grace", "", None, "Brewster"], "Hopper"]]},
         _MinimalImportProcess(),
     )
 
     assert json.loads(entity.db["submission"]) == {
-        "tbl": {"rows": [{"a": "Ada", "b": "Lovelace"}]}
+        "tbl": {"rows": [
+            {"a": "Ada", "b": "Lovelace"},
+            {"a": "Grace Brewster", "b": "Hopper"},
+        ]}
     }

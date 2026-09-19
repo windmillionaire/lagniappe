@@ -711,7 +711,7 @@ def form_instance_users(form_key):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_activity_query_filters_requested_types
-# @matrix activity : ancestor query type-order
+# @matrix activity : ancestor query multi-type type-order
 def activity(parent, types=("note", "notification")):
     """Fetch activity items belonging to ``parent``."""
     parent_key = datastore_key(parent)

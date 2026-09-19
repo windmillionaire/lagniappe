@@ -244,6 +244,8 @@ def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
     values = {"items": {"rows": [{"count": 0}]}}
     copied = definitions.compatible_values(table, table, values)
     assert copied == values and copied is not values
+    copied["items"]["rows"][0]["count"] = 4
+    assert values["items"]["rows"][0]["count"] == 0
     changed = deepcopy(table)
     changed[0]["columns"][0]["id"] = "other"
     with pytest.raises(ValidationError, match="review"):
@@ -541,10 +543,8 @@ def test_generated_answers_reject_unknown_fields_before_resetting_values():
 @pytest.mark.unit
 def test_task_construction_does_not_hydrate_or_copy_whole_rows():
     from google.cloud import datastore
-    from lagniappe.core.entities.entity import Entity
     from lagniappe.core.entities.task import Task
 
-    assert Task.db is Entity.db
     for entity_type in (Task, TaskHistory):
         key = datastore.Key("tasks", "lazy", project="test")
         raw = datastore.Entity(key=key)

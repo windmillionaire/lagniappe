@@ -66,7 +66,7 @@ class Note(AssetMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_002j_notes.py::test_note_create_persists_body_photo_visibility_and_scope
-    # @matrix notes : body create parent photo scope visibility
+    # @matrix notes : author body create defaults parent photo scope visibility
     @classmethod
     def create(cls, data):
         parent = data.get("parent") or data.get("user")

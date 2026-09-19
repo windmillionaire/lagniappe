@@ -21,32 +21,70 @@ def test_form_index_table(get_test_entities):
 
     forms = get_test_entities()
 
-    # set properties that need to be set via setter
     for form in forms:
-        form.name = form.test_spec.get("name")
-        form.form_type = form.test_spec.get("form_type")
+        form.name = form.test_spec["name"]
+        form.form_type = form.test_spec["form_type"]
+        # The JSON helper materializes these fixture relations lazily.
+        _ = form.categories
+        _ = form.projects
 
     form_index = FormIndex()
     form_index._forms = forms
 
     table = form_index.table
 
-    # 5 columns with metadata from ``Columns.columns`` (includes link/parent flags)
-    assert len(table.columns) == 5
-    column_keys = {
-        "field",
-        "title",
-        "icon",
-        "ordering",
-        "selected",
-        "link",
-        "parent",
-        "schema",
-    }
-    for col in table.columns:
-        assert set(col.keys()) == column_keys
-
-    # all selected by default
+    assert table.columns == [
+        {
+            "field": "name",
+            "title": "Name",
+            "icon": "text",
+            "ordering": "lexical",
+            "selected": True,
+            "link": True,
+            "parent": True,
+            "schema": {"type": "input", "input": "text"},
+        },
+        {
+            "field": "form_type",
+            "title": "Form Type",
+            "icon": "form",
+            "ordering": "categorical",
+            "selected": True,
+            "link": True,
+            "parent": True,
+            "schema": None,
+        },
+        {
+            "field": "categories",
+            "title": "Categories",
+            "icon": "category",
+            "ordering": "categorical",
+            "selected": True,
+            "link": True,
+            "parent": True,
+            "schema": None,
+        },
+        {
+            "field": "projects",
+            "title": "Projects",
+            "icon": "project",
+            "ordering": "categorical",
+            "selected": True,
+            "link": True,
+            "parent": True,
+            "schema": None,
+        },
+        {
+            "field": "modified",
+            "title": "Modified",
+            "icon": "date",
+            "ordering": "numeric",
+            "selected": True,
+            "link": True,
+            "parent": True,
+            "schema": None,
+        },
+    ]
     assert table.selected == [
         "name",
         "form_type",
@@ -55,25 +93,9 @@ def test_form_index_table(get_test_entities):
         "modified",
     ]
 
-    # verify entity.column() returns correct column_value for each form
     for form in forms:
-        # name - returns entity details dict
-        name_col = form.column("name")
-        assert name_col.column_value == form.details
-
-        # form_type - returns the type string
-        type_col = form.column("form_type")
-        assert type_col.column_value == form.test_spec.get("form_type")
-
-        # categories - returns list of category details
-        cat_col = form.column("categories")
-        expected_cats = [c.reference_details for c in form.categories]
-        assert cat_col.column_value == expected_cats
-
-        # projects — list of project details
-        proj_col = form.column("projects")
-        expected_projects = [p.reference_details for p in form.projects]
-        assert proj_col.column_value == expected_projects
-
-        # modified - column exists (value tested in test_entity_modified)
-        assert form.column("modified") is not None
+        expected = form.test_spec["expected_columns"]
+        assert form.column("name").column_value == expected["name"]
+        assert form.column("form_type").column_value == expected["form_type"]
+        assert form.column("categories").column_value == expected["categories"]
+        assert form.column("projects").column_value == expected["projects"]

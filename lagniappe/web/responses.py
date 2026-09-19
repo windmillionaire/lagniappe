@@ -58,6 +58,7 @@ def offline():
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
+# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
 # @pair request-errors:plain-validation
 def error(error, exception=None):
     if exception:

@@ -55,51 +55,22 @@ def test_model_task_reference_retains_project_without_loading_relations():
 # @matrix project : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_project_description(get_test_entities):
-    """Test Description property with CacheMixin, ColumnMixin, AIMixin, FilterMixin.
-
-    Description has special behavior:
-    - Setter strips HTML tags via utility.strip_tags
-    - filter_value is lowercase
-    - sort_value is boolean (True if has description)
-    - cache_key is "desc"
-    - ai_key is "Description" for PROJECT (uses label)
-    """
-    for project in get_test_entities():
-        raw_value = project.test_spec.get("description")
-
-        if raw_value:
-            project.description = raw_value
-
-            # Value should have HTML stripped (if any)
-            # For plain text, value equals input
-            # For HTML, tags are removed
-            assert project.description == project.properties.description.value
-            assert "<" not in (project.description or "")  # No HTML tags
-
-            # FilterMixin - filter_value is lowercase
-            assert (
-                project.to_filter_index()["description"]
-                == project.description
-            )
-
-            # sort_value is True when description exists
-            assert project.properties.description.sort_value is True
-
-            # CacheMixin - cache_key is "desc"
-            assert project.to_cache["desc"] == project.description
-
-            # AIMixin - default ai_key is the property id
-            assert project.to_ai()["description"] == project.description
-
-            # ColumnMixin - column_value returns entity.description
-            assert project.column("description").column_value == project.description
-
-        else:
-            # No description case
-            assert project.description is None
-            assert project.properties.description.filter_value is None
-            assert project.properties.description.sort_value is False
-            assert project.properties.description.cache_value is None
+    """Description strips markup while preserving text, case, and whitespace."""
+    projects = get_test_entities()
+    assert projects
+    for project in projects:
+        expected = project.test_spec["expected_description"]
+        if "description" in project.test_spec:
+            project.description = project.test_spec["description"]
+        assert project.description == expected
+        assert project.properties.description.filter_value == expected
+        assert project.properties.description.sort_value is bool(expected)
+        assert project.properties.description.cache_value == expected
+        assert project.column("description").column_value == expected
+        if expected is not None:
+            assert project.to_filter_index()["description"] == expected
+            assert project.to_cache["desc"] == expected
+            assert project.to_ai()["description"] == expected
 
 
 # @matrix project : ai-value cache document filter-value
@@ -109,12 +80,14 @@ def test_project_document(get_test_entities):
 
     Document has special behavior:
     - filter_value is boolean (True if entity.assets has "document")
-    - cache_value and ai_value use entity.text_for_cache("document")
+    - cache_value and ai_value use the document asset text
     - cache_key is "doc"
     - filter_key is "has_document"
     """
-    for project in get_test_entities():
-        document_text = project.text_for_cache("document")
+    projects = get_test_entities()
+    assert projects
+    for project in projects:
+        document_text = project.test_spec.get("document")
 
         # FilterMixin - filter_value is boolean
         if document_text:
@@ -154,7 +127,9 @@ def test_project_is_public(get_test_entities):
     - filter_key is "is_public"
     - Value reads from entity.db["public"]
     """
-    for project in get_test_entities():
+    entities = get_test_entities()
+    assert entities
+    for project in entities:
         is_public = project.test_spec.get("public", False)
 
         # Set public in db if specified in test_spec
@@ -183,6 +158,7 @@ def test_project_filters(get_test_entities, get_schema):
     entities = get_test_entities()
     projects = [e for e in entities if e.entity_kind == "project"]
     tasks = [e for e in entities if e.entity_kind == "task"]
+    assert projects and tasks
 
     # set schema on model task forms
     for project in projects:
@@ -202,6 +178,8 @@ def test_project_filters(get_test_entities, get_schema):
             task.properties.model._value = model_tasks.get(
                 task.test_spec["model"]["hash"]
             )
+        if "due_date" in task.test_spec:
+            task.due_date = datetime.fromisoformat(task.test_spec["due_date"])
         if "completed" in task.test_spec:
             task.db["completed"] = task.test_spec["completed"]
         if task.form and "form" in task.test_spec:
@@ -214,13 +192,12 @@ def test_project_filters(get_test_entities, get_schema):
 
         # verify project.filters.conditions structure
         conditions = project.filters.conditions
-        # Base: 7 (Name, Categories, AssignedTo, DueDate, Completed,
-        # HasSignature, HasStatus)
-        # Plus: 1 AttachedModelTask per model + 1 AttachedForm per model with form
-        model_count = len(project.model_tasks)
-        form_count = len([m for m in project.model_tasks if m.form])
-        expected_count = 7 + model_count + form_count
-        assert len(conditions) == expected_count
+        assert [(c["field"], c.get("hash")) for c in conditions] == [
+            ("name", None), ("categories", None), ("assigned_to", None),
+            ("due_date", None), ("completed", None), ("has_signature", None),
+            ("has_status", None),
+            *[tuple(item) for item in project.test_spec["expected_entity_fields"]],
+        ]
 
         base_keys = {"field", "label", "kind", "icon"}
         entity_keys = base_keys | {"hash", "key"}
@@ -261,25 +238,12 @@ def test_project_filters(get_test_entities, get_schema):
         for task in tasks:
             task_index = task.to_filter_index()
 
-            for f in project.properties.filters.conditions:
-                field_key = f["field"]
-                if "hash" in f:
-                    # entity-valued condition (model or form)
-                    if field_key == "model" and task.model:
-                        assert task_index["model"] == task.properties.model.filter_value
-                    elif field_key == "form" and task.form:
-                        assert task_index["form"] == task.properties.form.filter_value
-                elif field_key == "categories":
-                    assert task_index.get(field_key, []) == [
-                        c.hash for c in task.categories
-                    ]
-                elif field_key in project.filters.fields:
-                    property_id = project.filters.fields[field_key].id
-                    if task.properties.get(property_id) and field_key in task_index:
-                        assert (
-                            task_index[field_key]
-                            == task.properties[property_id].filter_value
-                        )
+            projected_fields = {
+                "name", "categories", "assigned_to", "due_date", "completed",
+                "has_signature", "has_status", "model", "form",
+            }
+            assert {key: value for key, value in task_index.items()
+                    if key in projected_fields} == task.test_spec["expected_filter"]
 
 
 # @matrix filters permissions project : conditions entity-fields view-access

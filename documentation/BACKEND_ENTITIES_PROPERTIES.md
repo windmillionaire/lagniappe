@@ -87,6 +87,14 @@ Stored fields receive their backend value; absent fields remain unset. The
 submission's stored projection omits unset and blank values, so an empty
 submission removes `db["submission"]`.
 
+Browser submissions reject malformed nonempty Email, Time, Date, and Number
+values with a field-labeled `ValidationError`. Numbers must be finite; Email
+uses the existing address pattern against the entire value. Missing or blank
+optional values remain valid, and numeric zero remains an answer. Page and Task
+update routes return HTTP 422 without saving the submission on validation
+failure. This browser boundary does not change AI/import normalization policy
+or retroactively validate stored answers.
+
 Date fields accept calendar dates in the acting user's timezone and store UTC
 datetimes. DateMixin uses the property's explicit user when there is no browser
 session; table column fields inherit their table's user. AI values, form values

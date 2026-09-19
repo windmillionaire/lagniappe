@@ -48,35 +48,14 @@
 							"ai_value": {
 								"Items": {"rows": [{ "row_note": "Row one" }]}
 							},
-							"filter_value": { "row_note": ["Row one"] }
+								"filter_value": { "row_note": ["Row one"] }
+							}
+						},
+						"expected_search": {
+							"keys": ["Headline", "[Items] Note"],
+							"values": ["Top story", "Row one"]
 						}
 					}
-				}
-			]
-		]
-	},
-	"test_submission_email_form_accepts_non_matching_string": {
-		"entities": [
-			[
-				"PAGE",
-				{
-					"name": "Email form no regex",
-					"hash": "em1",
-					"form": {
-						"name": "F",
-						"hash": "fem1",
-						"schema": "email_input_only"
-					},
-					"form_submission": { "input-emlab12": "not-an-email" },
-					"expected": {
-						"input-emlab12": {
-							"value": "not-an-email",
-							"form_value": "not-an-email",
-							"filter_value": "not-an-email",
-							"ai_value": "not-an-email"
-						}
-					}
-				}
 			]
 		]
 	},
@@ -100,22 +79,6 @@
 							"filter_value": 0.0,
 							"ai_value": 0.0
 						}
-					}
-				}
-			]
-		]
-	},
-	"test_submission_time_form_invalid_format_raises": {
-		"entities": [
-			[
-				"PAGE",
-				{
-					"name": "Bad time page",
-					"hash": "bt1",
-					"form": {
-						"name": "F",
-						"hash": "fbt1",
-						"schema": "time_input_only"
 					}
 				}
 			]

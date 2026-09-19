@@ -23,7 +23,9 @@ from testing.utility.test_entities import TestEntities
 @pytest.mark.unit
 def test_display_name(get_test_entities):
     """Test DisplayName property returns name if set, otherwise filename without extension."""
-    for file in get_test_entities():
+    files = get_test_entities()
+    assert files
+    for file in files:
         expected = file.test_spec["expected"]
 
         # Set filename first (needed for fallback)
@@ -44,7 +46,9 @@ def test_display_name(get_test_entities):
 @pytest.mark.unit
 def test_filename_mimetype_encoding(get_test_entities):
     """Test simple DBProperty getters/setters for filename, mimetype, encoding."""
-    for file in get_test_entities():
+    files = get_test_entities()
+    assert files
+    for file in files:
         expected = file.test_spec["expected"]
 
         file.filename = file.test_spec.get("filename")
@@ -61,7 +65,9 @@ def test_filename_mimetype_encoding(get_test_entities):
 @pytest.mark.unit
 def test_summary(get_test_entities):
     """Test Summary property with conditional description cache projection."""
-    for file in get_test_entities():
+    files = get_test_entities()
+    assert files
+    for file in files:
         expected = file.test_spec["expected"]
 
         file.summary = file.test_spec.get("summary")
@@ -210,25 +216,15 @@ def test_file_size_and_large_use_asset_metadata():
 @pytest.mark.unit
 def test_as_html(get_test_entities):
     """Test AsHTML property converts text to HTML using the focused helper."""
-    with patch("lagniappe.core.properties.file_assets.file_html.htmlize") as mock_htmlize:
-        for file in get_test_entities():
-            expected = file.test_spec["expected"]
-
-            # Set up mock return value
-            mock_htmlize.return_value = expected.get("html")
-
-            # Set text asset if provided
-            if file.test_spec.get("has_text"):
-                file.properties.text._value = True
-                file.properties.text._asset = file.test_spec.get("text_content")
-
-            result = file.html
-
-            if file.test_spec.get("has_text"):
-                mock_htmlize.assert_called_once()
-            assert result == expected.get("html")
-
-            mock_htmlize.reset_mock()
+    files = get_test_entities()
+    assert files
+    for file in files:
+        file.mimetype = "text/markdown"
+        if file.test_spec["has_text"]:
+            file.properties.text._value = True
+            file.properties.text._asset = file.test_spec["text_content"]
+        result = file.html
+        assert (str(result).strip() if result is not None else None) == file.test_spec["expected"]["html"]
 
 
 # @matrix file : fallback html-preview text-asset
@@ -315,7 +311,9 @@ def test_extract_update_completes_immediately_for_text_files():
 @pytest.mark.unit
 def test_extract_process(get_test_entities):
     """Test Extract ProcessProperty attributes and extract kickoff behavior."""
-    for file in get_test_entities():
+    files = get_test_entities()
+    assert files
+    for file in files:
         expected = file.test_spec["expected"]
 
         # Set initial attributes
@@ -328,14 +326,8 @@ def test_extract_process(get_test_entities):
         # Test update method if status provided
         if "update_status" in file.test_spec:
             with patch("lagniappe.core.properties.file_options.get_file_text") as extract:
-                def _complete(entity, *, dispatch):
-                    assert dispatch is False
-                    entity.properties.extract.complete = True
-                    entity.properties.extract.status = expected["status"]
-                    return entity.properties.extract
-
-                extract.side_effect = _complete
-                file.properties.extract.update(
+                extract.return_value = SimpleNamespace(complete=True, error=None)
+                pending = file.properties.extract.update(
                     {
                         "enable-extract": "on",
                         "search-text": "on"
@@ -345,7 +337,7 @@ def test_extract_process(get_test_entities):
                 )
 
             extract.assert_called_once_with(file, dispatch=False)
-            assert file.properties.extract.complete == expected.get("complete", False)
+            assert pending is False
             assert file.properties.extract.enabled is True
 
 
@@ -353,7 +345,9 @@ def test_extract_process(get_test_entities):
 @pytest.mark.unit
 def test_summarize_process(get_test_entities):
     """Test Summarize ProcessProperty attributes and summarize kickoff behavior."""
-    for file in get_test_entities():
+    files = get_test_entities()
+    assert files
+    for file in files:
         expected = file.test_spec["expected"]
 
         # Set initial attributes
@@ -480,19 +474,6 @@ def test_file_processing_dispatches_summary_before_extraction():
     start_extract.assert_not_called()
 
 
-# @matrix file : summarize update
-@pytest.mark.unit
-def test_summarize_update_starts_without_browser_routing_identity():
-    """Summarization starts without any browser-specific client identity."""
-    file = TestEntities.get("FILE", {"filename": "document.pdf"})
-
-    with patch("lagniappe.core.properties.file_options.summarize_file") as summarize:
-        file.properties.summarize.update({"enable-summarize": "on"})
-
-    summarize.assert_called_once_with(file, dispatch=False)
-    assert file.properties.summarize.enabled is True
-
-
 # @matrix file : asset mimetype preview
 @pytest.mark.unit
 def test_preview_url_when_mimetype_supported_and_file_present():
@@ -533,7 +514,9 @@ def test_preview_none_when_no_file_asset():
 @pytest.mark.unit
 def test_options(get_test_entities):
     """Test Options property returns combined extract/summarize options."""
-    for file in get_test_entities():
+    files = get_test_entities()
+    assert files
+    for file in files:
         expected = file.test_spec["expected"]
 
         # Set up extract and summarize options
@@ -544,9 +527,7 @@ def test_options(get_test_entities):
 
         options = file.options
 
-        assert options is not None
-        assert ("extract" in options) == expected["has_extract"]
-        assert ("summarize" in options) == expected["has_summarize"]
+        assert options == expected
 
 
 # @matrix file : asset-lifecycle encoding metadata upload

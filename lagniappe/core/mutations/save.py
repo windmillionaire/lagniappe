@@ -209,7 +209,9 @@ class ReportMutation(StandardMutation):
                 builder.touch(owner, reason="report-list-owner")
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_002j_notes.py::test_note_save_touches_parent_and_author
+# @matrix mutations notes : save owner-invalidation
 class NoteMutation(StandardMutation):
     # @testable infrastructure
     def plan_save(self, entity, builder, *, reason, depends_on=()):

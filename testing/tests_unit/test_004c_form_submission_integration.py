@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
+from lagniappe.core.definitions import Fetch
 from testing.utility.mock_submission import WebFormSubmission
 from testing.utility.test_entities import TestEntities
 
@@ -27,7 +28,7 @@ def test_submission_fields_stale_when_db_submission_changes(
         entity.form.schema = get_schema(spec["form"]["schema"])
         entity.db["submission"] = json.dumps(spec["initial_submission_json"])
         submission = entity.properties.submission
-        assert submission.fields["note"].db_value == "first"
+        assert submission.fields["note"].db_value == spec["expected_initial_note"]
         entity.db["submission"] = json.dumps(spec["mutated_submission_json"])
         assert submission.fields["note"].db_value == spec["expected_stale_note"]
 
@@ -40,8 +41,11 @@ def test_submission_links_internal_top_level_and_table_row(
     for entity in get_test_entities():
         spec = entity.test_spec
         entity.form.schema = get_schema(spec["form"]["schema"])
+        fetch_requests = []
+        key_requests = []
 
         def _fake_entities_get(identifier, *, request):
+            fetch_requests.append((identifier, request))
             return SimpleNamespace(
                 details={
                     "id": identifier,
@@ -51,7 +55,11 @@ def test_submission_links_internal_top_level_and_table_row(
                 }
             )
 
-        rows = {"rows": [{"row_rel": "target_b"}]}
+        def _fake_datastore_key(identifier):
+            key_requests.append(identifier)
+            return f"key:{identifier}"
+
+        submitted = spec["submission_json"]
         with (
             patch(
                 "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -59,19 +67,22 @@ def test_submission_links_internal_top_level_and_table_row(
             ),
             patch(
                 "lagniappe.core.mixins.submitter.database_get.datastore_key",
-                side_effect=lambda identifier: f"key:{identifier}",
+                side_effect=_fake_datastore_key,
             ),
         ):
             entity.form_submission(
                 WebFormSubmission(
                     {
-                        "top_link": "target_a",
-                        "with_rows": json.dumps(rows),
+                        "top_link": submitted["top_link"],
+                        "with_rows": json.dumps(submitted["with_rows"]),
                     }
                 )
             )
 
-            assert entity.derived_page_keys == ["key:target_a"]
+            assert entity.derived_page_keys == spec["expected_derived_page_keys"]
+
+        assert fetch_requests == [(submitted["top_link"], Fetch.direct())]
+        assert key_requests == [submitted["top_link"]]
 
         submission = entity.properties.submission
         # Top-level internal links resolve to entity details dicts; table row
@@ -99,11 +110,18 @@ def test_submission_internal_link_missing_target_clears_value(get_schema):
         },
     )
     entity.form.schema = get_schema("submission_integration_links")
+    fetch_requests = []
+
+    def missing_target(identifier, *, request):
+        fetch_requests.append((identifier, request))
+        return None
 
     with patch(
-        "lagniappe.core.properties.form_links.Entities.fetch_one", return_value=None
+        "lagniappe.core.properties.form_links.Entities.fetch_one",
+        side_effect=missing_target,
     ):
         entity.form_submission(WebFormSubmission({"top_link": "missing_target"}))
 
+    assert fetch_requests == [("missing_target", Fetch.direct())]
     assert entity.properties.submission.fields["top_link"].value is None
     assert "submission" not in entity.db

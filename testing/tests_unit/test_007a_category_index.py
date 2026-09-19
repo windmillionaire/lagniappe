@@ -4,8 +4,6 @@
 (e.g. testing/tests_e2e/test_007_category_index.py), not here.
 """
 
-from types import SimpleNamespace
-
 import pytest
 
 
@@ -20,6 +18,7 @@ def test_category_index(get_test_entities):
     entities = get_test_entities()
     categories = [e for e in entities if e.entity_kind == "category"]
     pages = [e for e in entities if e.entity_kind == "page"]
+    assert categories and pages
 
     # Set properties that need to be set via setter
     for category in categories:
@@ -28,11 +27,6 @@ def test_category_index(get_test_entities):
     for page in pages:
         page.name = page.test_spec.get("name")
         page.description = page.test_spec.get("description")
-        raw = page.test_spec.get("assets", {}).get("image")
-        if isinstance(raw, dict):
-            page.test_spec.setdefault("assets", {})["image"] = SimpleNamespace(
-                url=f"https://test.example/{raw.get('path', 'image')}"
-            )
 
     for category in categories:
         # Attach pages to category as their model
@@ -44,39 +38,46 @@ def test_category_index(get_test_entities):
 
         table = page_index.table
 
-        # 5 base columns; each column dict includes at least table metadata keys
-        assert len(table.columns) == 5
-        required = {"field", "title", "icon", "ordering", "selected"}
-        for col in table.columns:
-            assert required.issubset(col.keys()), f"Missing keys in {col.keys()}"
-
-        # Verify column field order
-        expected_fields = ["image", "name", "form", "description", "modified"]
-        assert [c["field"] for c in table.columns] == expected_fields
+        assert [
+            (c["field"], c["title"], c["icon"], c["ordering"], c["selected"])
+            for c in table.columns
+        ] == [
+            ("image", "Image", "image", "exists", False),
+            ("name", "Name", "text", "lexical", True),
+            ("form", "Form", "form", "categorical", False),
+            ("description", "Description", "textarea", None, False),
+            ("modified", "Modified", "date", "numeric", True),
+        ]
+        assert table.selected == ["name", "modified"]
+        assert table.fields["name"].link is True
+        assert table.fields["name"].parent is False
 
         # Verify entity.column() returns correct column_value for each page
         for page in pages:
             # image - returns asset URL if exists, None otherwise
             image_col = page.column("image")
             if page.assets.get("image"):
-                assert image_col.column_value is not None
+                assert image_col.column_value == "https://test.example/test.jpg"
             else:
                 assert image_col.column_value is None
 
             # name - returns entity details dict
             name_col = page.column("name")
-            assert name_col.column_value == page.details
+            assert {key: name_col.column_value[key] for key in ("name", "hash", "kind")} == {
+                "name": page.test_spec["name"], "hash": page.test_spec["hash"], "kind": "page",
+            }
 
             # form — assert own fixture form; pages without one may inherit category form
             form_col = page.column("form")
             if page.test_spec.get("form"):
-                assert form_col.column_value == page.form.reference_details
+                assert {key: form_col.column_value[key] for key in ("name", "hash", "kind")} == {
+                    "name": "Page Form", "hash": "pgform1", "kind": "form",
+                }
             elif page.model and page.model.form:
-                assert form_col.column_value == page.model.form.reference_details
+                assert {key: form_col.column_value[key] for key in ("name", "hash", "kind")} == {
+                    "name": "Category Form", "hash": "catform", "kind": "form",
+                }
 
             # description - returns description string
             desc_col = page.column("description")
-            assert desc_col.column_value == page.description
-
-            # modified - column exists (value tested elsewhere due to timezone context)
-            assert page.column("modified") is not None
+            assert desc_col.column_value == page.test_spec.get("description")
