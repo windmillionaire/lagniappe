@@ -8,6 +8,7 @@ const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
 const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
 const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
 const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
+const STATIC_RETRY_DELAYS_MS = [250, 750];
 const BROWSER_PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;
 const TOKEN_REQUEST = {
 	credentials: "include",
@@ -43,7 +44,9 @@ async function updateCaches() {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.mjs::test_precache_static_assets_warms_configured_urls_and_ignores_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_precache_retries_transient_failures_and_preserves_cache_policy
  * @matrix cache : precache service-worker static-assets
+ * @matrix cache : retry no-store
  */
 async function precacheStaticAssets() {
 	const cache = await caches.open(CACHE);
@@ -52,12 +55,55 @@ async function precacheStaticAssets() {
 			const request = new Request(new URL(url, self.location.origin).href, {
 				cache: "reload",
 			});
-			const response = await fetch(request);
+			const response = await fetchStaticAsset(request);
 			if (response.ok && !responsePreventsStorage(response)) {
 				await cache.put(request, response.clone());
 			}
 		}),
 	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::handleStatic
+ * @covered-by src/script/sw.template.mjs::precacheStaticAssets
+ * @reason bounded static GET retries are exercised through serving and cache warming
+ */
+async function fetchStaticAsset(request) {
+	let currentRequest = request;
+	for (let attempt = 0; ; attempt += 1) {
+		let response;
+		try {
+			response = await fetch(currentRequest);
+		} catch (error) {
+			if (
+				request.method !== "GET" ||
+				request.signal.aborted ||
+				error?.name === "AbortError" ||
+				attempt === STATIC_RETRY_DELAYS_MS.length
+			) {
+				throw error;
+			}
+		}
+		if (
+			response &&
+			(request.method !== "GET" ||
+				request.signal.aborted ||
+				!UPSTREAM_STATUSES.has(response.status) ||
+				response.headers.has("X-Lagniappe-Error") ||
+				attempt === STATIC_RETRY_DELAYS_MS.length)
+		) {
+			return response;
+		}
+		// Discard failed bodies before another attempt, and avoid replaying an
+		// HTTP-cache error or a conditional request without a usable cached body.
+		await response?.body?.cancel().catch(() => {});
+		await new Promise((resolve) =>
+			setTimeout(resolve, STATIC_RETRY_DELAYS_MS[attempt]),
+		);
+		if (request.signal.aborted) throw request.signal.reason;
+		currentRequest = networkRequest(request, { cache: "reload" });
+	}
 }
 
 /**
@@ -628,7 +674,13 @@ self.addEventListener("fetch", (event) => {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retries_transient_failures_and_caches_recovery
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retry_budget_preserves_failure
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_does_not_retry_permanent_errors_or_mutations
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_abort_stops_retries
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_cache_hit_avoids_network
  * @matrix cache : no-store service-worker static-assets
+ * @matrix cache : retry abort cache-hit
  */
 async function handleStatic(event) {
 	const cache = await caches.open(CACHE);
@@ -640,7 +692,7 @@ async function handleStatic(event) {
 	}
 
 	try {
-		const response = await fetch(event.request);
+		const response = await fetchStaticAsset(event.request);
 		if (isUpstreamUnavailableResponse(response)) {
 			return handleUpstreamUnavailable(event, event.request, response);
 		}

@@ -647,33 +647,76 @@ def test_hosted_manifest_records_exact_suite_window(monkeypatch):
 
 
 # @matrix hosted-e2e : argument-injection focused-execution target-validation
-def test_hosted_focused_targets_require_existing_e2e_nodeids():
+def test_hosted_focused_targets_require_individual_nodeids(tmp_path, monkeypatch):
     target = "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
-
-    assert hosted_e2e_job.validate_focused_targets([target]) == (target,)
-    focused_command = hosted_e2e_job._pytest_command("focused", [target])
-    assert target in focused_command
-    assert focused_command[focused_command.index("-m") + 1] == (
-        "not unfinished"
+    targets = (
+        target,
+        "testing/tests_unit/test_033c_mcp_server.py::test_hosted_configuration_and_public_discovery_are_exact",
+        "testing/tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached",
+        "testing/tests_tooling/test_009_hosted_e2e.py::test_provider_describe_distinguishes_absence_from_operational_errors",
+        "testing/tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants[task]",
     )
+    assert hosted_e2e_job.validate_focused_targets(targets) == targets
+    focused_command = hosted_e2e_job._pytest_command(targets)
+    assert focused_command[focused_command.index("--strict") + 1 : -3] == list(targets)
+    assert focused_command[focused_command.index("-m") + 1] == "not unfinished"
     with pytest.raises(RuntimeError):
         hosted_e2e_job.validate_focused_targets([target, target])
+    with pytest.raises(RuntimeError, match="at least one"):
+        hosted_e2e_job.validate_focused_targets([])
+    with pytest.raises(RuntimeError, match="at most 50"):
+        hosted_e2e_job.validate_focused_targets([f"{target}[{i}]" for i in range(51)])
 
     invalid_targets = (
         "--collect-only",
+        "unit",
         "testing/tests_unit/test_001_entities.py",
         "testing/tests_e2e/../tests_unit/test_001_entities.py",
         "testing/tests_e2e/001_site/missing.py::test_missing",
         f"{target},--collect-only",
+        f"{target}\n--collect-only",
+        f"{target}[{'x' * 512}]",
+        target.split("::")[0],
+        "testing/tests_e2e/001_site/",
+        "testing/tests_e2e/001_site/test_001a_environment.py::TestEnvironment",
         "testing/tests_e2e/001_site/test_001a_environment.py::",
+        "testing/tests_e2e/001_site/test_001a_environment.py::test_*",
+        f"./{target}",
+        f"/{target}",
+        target.replace("testing/", "testing//"),
+        targets[2] + "[unsupported-js-selection]",
+    )
+    # Invalid input must fail before activating credentials or touching a provider.
+    activations = []
+    monkeypatch.setattr(
+        hosted_e2e, "_activate", lambda **kwargs: activations.append(kwargs)
     )
     for invalid in invalid_targets:
         with pytest.raises(RuntimeError):
             hosted_e2e_job.validate_focused_targets([invalid])
+        with pytest.raises(HostedE2EError):
+            hosted_e2e.execute(targets=[invalid])
+    assert activations == []
+
+    suite = tmp_path / "testing/tests_unit"
+    suite.mkdir(parents=True)
+    (suite / "test_example.py").write_text("class TestExample: pass\n", encoding="utf-8")
+    outside = tmp_path / "test_outside.py"
+    outside.write_text("", encoding="utf-8")
+    (suite / "test_escape.py").symlink_to(outside)
+    monkeypatch.setattr(hosted_e2e_job, "REPOSITORY_ROOT", tmp_path)
+    class_target = "testing/tests_unit/test_example.py::TestExample::test_method[value]"
+    # File scope and selector syntax are checked here; pytest collects the actual case.
+    assert hosted_e2e_job.validate_focused_targets([class_target]) == (class_target,)
+    with pytest.raises(RuntimeError, match="inside their suite"):
+        hosted_e2e_job.validate_focused_targets(
+            ["testing/tests_unit/test_escape.py::test_escape"]
+        )
 
 
+# @matrix hosted-e2e : suite-scope target-validation
 def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
-    command = hosted_e2e_job._pytest_command("all")
+    command = hosted_e2e_job._pytest_command()
 
     assert command[command.index("--strict") + 1 : -1] == [
         "unit",
@@ -684,14 +727,69 @@ def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
         "not unfinished",
     ]
     with pytest.raises(RuntimeError):
-        hosted_e2e_job._pytest_command("all", ["testing/tests_unit/"])
+        hosted_e2e_job._pytest_command(["testing/tests_unit/"])
+
+
+# @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
+@pytest.mark.parametrize("focused", [False, True], ids=["complete", "nodeid"])
+def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
+    tmp_path, monkeypatch, focused,
+):
+    target = "testing/tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached"
+    environment = {
+        "CLOUD_RUN_EXECUTION": "lagniappe-e2e-example",
+        "CLOUD_RUN_JOB": "lagniappe-e2e",
+        "GOOGLE_CLOUD_PROJECT": "project-1",
+        "LAGNIAPPE_HOSTED_E2E_JOB": "lagniappe-e2e",
+        "LAGNIAPPE_HOSTED_E2E_ENVIRONMENT": "standard",
+        "LAGNIAPPE_HOSTED_E2E_SERVICE": "e2e",
+        "LAGNIAPPE_HOSTED_E2E_VERSION": "e2e-abcdef1234567890",
+        "LAGNIAPPE_HOSTED_E2E_SOURCE": "a" * 40,
+        "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": "b" * 64,
+        "LAGNIAPPE_HOSTED_E2E_BUILD_ID": "b1234567",
+        "LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET": "test-artifacts",
+    }
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(hosted_e2e_job, "HOSTED_REPORT_ROOT", tmp_path)
+    commands, stamped, uploaded = [], [], []
+    monkeypatch.setattr(
+        hosted_e2e_job.subprocess,
+        "run",
+        lambda command, **kwargs: commands.append((command, kwargs))
+        or subprocess.CompletedProcess(command, returncode=1),
+    )
+    monkeypatch.setattr(hosted_e2e_job, "_stamp_evidence", stamped.append)
+    monkeypatch.setattr(hosted_e2e_job, "_upload_artifacts", uploaded.append)
+
+    assert hosted_e2e_job.main([f"--target={target}"] if focused else []) == 1
+
+    command, options = commands[0]
+    selection = [target] if focused else ["unit", "js", "tooling", "e2e"]
+    assert command[command.index("--strict") + 1 : -1] == [
+        *selection, "-m", "not unfinished"
+    ]
+    assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
+    assert stamped == uploaded
+    assert uploaded[0]["suite"] == ("focused" if focused else "all")
+    assert uploaded[0].get("targets", []) == ([target] if focused else [])
+    assert uploaded[0]["exit_status"] == 1
+
+    for suite in ("all", "full", "focused"):
+        with pytest.raises(SystemExit) as error:
+            hosted_e2e_job.main(["--suite", suite])
+        assert error.value.code == 2
+    with pytest.raises(RuntimeError, match="individual"):
+        hosted_e2e_job.main(["--target", target.split("::")[0]])
+    assert len(commands) == 1
+    assert len(uploaded) == 1
 
 
 # @matrix hosted-e2e : cloud-run focused-execution local-dispatch override
 def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
     target = "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
     second_target = (
-        "testing/tests_e2e/001_site/test_001a_environment.py::test_cache_setup"
+        "testing/tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached"
     )
     calls = []
     writes = []
@@ -725,7 +823,6 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
     )
 
     result = hosted_e2e.execute(
-        suite="focused",
         targets=[target, second_target],
         import_results=False,
     )
@@ -736,7 +833,7 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
         "suite": "focused",
     }
     assert (
-        f"--args=--suite=focused,--target={target},--target={second_target}"
+        f"--args=--target={target},--target={second_target}"
         in calls[0][0]
     )
     assert "--async" in calls[0][0]
@@ -749,6 +846,7 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
     monkeypatch,
 ):
     writes = []
+    calls = []
     monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
     monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
     monkeypatch.setattr(
@@ -764,7 +862,8 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
     monkeypatch.setattr(
         hosted_e2e,
         "_gcloud",
-        lambda *_arguments, **_options: subprocess.CompletedProcess(
+        lambda *arguments, **_options: calls.append(arguments)
+        or subprocess.CompletedProcess(
             ["gcloud"],
             returncode=1,
             stdout="",
@@ -790,7 +889,7 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
         ),
     )
 
-    result = hosted_e2e.execute(suite="all", import_results=False)
+    result = hosted_e2e.execute(import_results=False)
 
     assert result == {
         "execution": "lagniappe-e2e-failed1",
@@ -799,6 +898,7 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
     }
     assert writes[0][1]["last_execution"] == "lagniappe-e2e-failed1"
     assert writes[0][1]["last_suite"] == "all"
+    assert "--args=" in calls[0]
 
 
 # @matrix hosted-e2e : execution-status failure-reporting progress
@@ -971,13 +1071,18 @@ def test_hosted_execute_command_defaults_to_all_and_imports(
     assert hosted_e2e.run_hosted_e2e_command(["execute"]) == 0
     assert hosted_e2e.run_hosted_e2e_command(["execute", "--no-import-results"]) == 0
     assert calls == [
-        {"suite": "all", "targets": (), "import_results": True},
-        {"suite": "all", "targets": (), "import_results": False},
+        {"targets": (), "import_results": True},
+        {"targets": (), "import_results": False},
     ]
     output = capsys.readouterr().out
     assert output.count("Hosted E2E PASSED") == 2
     assert "Results were left in Cloud Storage" in output
     assert not output.lstrip().startswith("{")
+    for suite in ("all", "full", "focused"):
+        with pytest.raises(SystemExit) as error:
+            hosted_e2e.run_hosted_e2e_command(["execute", "--suite", suite])
+        assert error.value.code == 2
+    assert len(calls) == 2
 
 
 # @pair hosted-e2e:cli-routing
@@ -1439,7 +1544,11 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     }
     dispatch = workflow["on"]["workflow_dispatch"]["inputs"]
     assert dispatch["mode"]["options"] == ["manual", "continuation"]
-    assert dispatch["suite"]["options"] == ["all", "full"]
+    assert "suite" not in dispatch
+    assert "suite" not in workflow["jobs"]["request"]["outputs"]
+    assert "--suite" not in workflow_text
+    assert "--args=" in workflow_text
+    assert "E2E_SUITE" not in workflow_text
     assert {"pull_request", "candidate_sha", "evidence_sha"} <= set(dispatch)
     request = workflow["jobs"]["request"]
     execute = workflow["jobs"]["execute"]
@@ -2124,6 +2233,7 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
         for arguments, _options in calls
         if arguments[:3] == ("run", "jobs", "create")
     )
+    assert "--args=" in job_update
     secret_argument = next(
         argument for argument in job_update if argument.startswith("--set-secrets=")
     )
@@ -2195,7 +2305,7 @@ def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
                 "execute",
                 *environment,
                 "--target",
-                "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py",
+                "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_managed_mcp_adapter_exercises_the_real_api_boundary",
                 "--no-import-results",
             ]
         )
@@ -2212,8 +2322,7 @@ def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
         (
             "execute",
             {
-                "suite": "focused",
-                "targets": ["testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"],
+                "targets": ["testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_managed_mcp_adapter_exercises_the_real_api_boundary"],
                 "import_results": False,
             },
         ),

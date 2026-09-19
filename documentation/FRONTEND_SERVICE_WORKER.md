@@ -25,15 +25,25 @@ provider-owned telemetry keep their browser-defined request modes and redirect
 handling. Every same-origin fetch is classified into one of three categories:
 
 **Static** (`isStatic`) -- fonts, images, chunks, the offline page, and files
-ending in `.css`, `.js`, `.map`, `.json`, `.txt`, or `.ico`:
+ending in `.css`, `.js`, `.mjs`, `.map`, `.json`, `.txt`, or `.ico`:
 
 - Strategy: **cache-first**
 - On hit: return cached response immediately
-- On miss: fetch from network, cache if successful, return response
-- On network error: return 503
+- On miss: fetch from network, cache if successful and storage is permitted,
+  return response
+- Static GETs retry network failures and unmarked 500/502/503/504 responses
+  twice, after 250 ms and 750 ms (three attempts total). Retries bypass the HTTP
+  cache and remove conditional validators while retaining the versioned URL,
+  credentials, and other request settings.
+- Aborted requests, non-GET requests, other HTTP errors (including 404), and
+  responses marked `X-Lagniappe-Error` are not retried. Failed responses are never
+  cached. Exhausted network failures return 503; exhausted HTTP failures follow
+  the existing upstream-error handling.
 - On service-worker activation: current dynamic JS chunk URLs, including their
   build-ID query strings, are warmed into `static-cache` from the build-injected
-  precache list
+  precache list using the same retry policy. Warming remains best-effort: one
+  exhausted asset does not prevent other assets from being cached. Successful
+  `no-store` responses are not cached, including after recovery.
 
 **Cacheable** -- all non-static GET requests:
 
@@ -176,6 +186,11 @@ current connectivity state to the replacement controller, and runs
 
 Registration starts before view loading and does not block it. Public pages
 skip the authenticated health-check and synchronization lifecycle.
+
+Static retries apply only to worker-controlled requests and its own precache
+fetches. Initial module preloads can start before a newly registered worker
+controls the page, so this policy does not guarantee recovery of first-visit
+bootstrap downloads. It does not reload the page or replay application writes.
 
 `main.mjs` sends the worker a versioned `connectivity-state` message with four
 independent fields: browser link state, application-server reachability,

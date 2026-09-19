@@ -1,4 +1,5 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: each case selects from one standard worker sandbox boundary
+import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createServiceWorkerContext } from "../utility/js/service_worker.mjs";
 
@@ -1118,6 +1119,246 @@ test("test_no_store_static_response_is_not_cached", async () => {
 	}
 });
 
+/** @matrix cache : retry service-worker static-assets */
+test("test_static_asset_retries_transient_failures_and_caches_recovery", async () => {
+	const { context, fetchCalls, listeners, staticCache, clientMessages } =
+		createServiceWorkerContext();
+	const timers = [];
+	context.setTimeout = (callback, delay) => timers.push({ callback, delay });
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (fetchCalls.length === 1) {
+			return new Response("<h1>temporarily unavailable</h1>", {
+				status: 503,
+				headers: { "Content-Type": "text/html" },
+			});
+		}
+		if (fetchCalls.length === 2) throw new TypeError("connection reset");
+		return new Response("export const ready = true;", {
+			headers: { "Content-Type": "text/javascript" },
+		});
+	};
+	const request = new Request(
+		"https://example.test/chunks/foundation.js?v=btest",
+		{
+			credentials: "include",
+			headers: { "If-None-Match": '"old"', "X-Asset-Request": "retained" },
+		},
+	);
+	const pending = [];
+	let responsePromise;
+	listeners.get("fetch")({
+		request,
+		respondWith: (promise) => {
+			responsePromise = promise;
+		},
+		waitUntil: (promise) => pending.push(promise),
+	});
+	for (const [index, delay] of [250, 750].entries()) {
+		await new Promise(setImmediate);
+		assert.equal(fetchCalls.length, index + 1, "must wait before retrying");
+		assert.equal(
+			staticCache.entries.size,
+			0,
+			"failed responses must not be cached",
+		);
+		assert.equal(timers[index].delay, delay);
+		timers[index].callback();
+	}
+	const response = await responsePromise;
+	await Promise.all(pending);
+	assert.equal(response.status, 200);
+	assert.equal(await response.text(), "export const ready = true;");
+	assert.equal(
+		await staticCache.entries.get(request.url).text(),
+		"export const ready = true;",
+	);
+	assert.equal(staticCache.puts, 1);
+	assert.equal(fetchCalls.length, 3);
+	assert.equal(timers.length, 2);
+	assert.deepEqual(
+		clientMessages,
+		[],
+		"recovered fetches must not signal an outage",
+	);
+	for (const retried of fetchCalls.slice(1)) {
+		assert.equal(retried.url, request.url);
+		assert.equal(retried.credentials, "include");
+		assert.equal(retried.headers.get("X-Asset-Request"), "retained");
+		assert.equal(retried.cache, "reload");
+		assert.equal(retried.headers.has("If-None-Match"), false);
+	}
+});
+
+/** @matrix cache : retry service-worker static-assets */
+test("test_static_asset_retry_budget_preserves_failure", async () => {
+	for (const status of [500, 502, 503, 504, "network", "upstream-html"]) {
+		const { context, staticCache, fetchCalls, clientMessages } =
+			createServiceWorkerContext();
+		const delays = [];
+		context.setTimeout = (callback, delay) => {
+			delays.push(delay);
+			queueMicrotask(callback);
+		};
+		context.fetch = async (request) => {
+			fetchCalls.push(request);
+			if (status === "network") throw new TypeError("connection reset");
+			if (status === "upstream-html") {
+				return new Response("<h1>raw host error</h1>", {
+					status: 502,
+					headers: { "Content-Type": "text/html" },
+				});
+			}
+			return new Response("still unavailable", { status });
+		};
+		const pending = [];
+		const response = await context.handleStatic({
+			request: new Request("https://example.test/chunks/app.js"),
+			waitUntil: (promise) => pending.push(promise),
+		});
+		await Promise.all(pending);
+		assert.equal(response.status, typeof status === "number" ? status : 503);
+		if (typeof status === "number")
+			assert.equal(await response.text(), "still unavailable");
+		if (status === "upstream-html") {
+			assert.equal(response.headers.get("X-Lagniappe-Upstream-Status"), "502");
+			assert.equal((await response.text()).includes("raw host error"), false);
+			assert.equal(
+				clientMessages.length,
+				1,
+				"report only the exhausted outage",
+			);
+		}
+		assert.equal(fetchCalls.length, 3, `bounded attempts for ${status}`);
+		assert.deepEqual(delays, [250, 750]);
+		assert.equal(staticCache.entries.size, 0);
+	}
+});
+
+/** @matrix cache : retry service-worker static-assets */
+test("test_static_asset_does_not_retry_permanent_errors_or_mutations", async () => {
+	for (const [method, status, headers] of [
+		["GET", 400],
+		["GET", 403],
+		["GET", 404],
+		["GET", 429],
+		["GET", 503, { "X-Lagniappe-Error": "true" }],
+		["POST", 503],
+		["PUT", 503],
+		["DELETE", 503],
+		["HEAD", 503],
+	]) {
+		const { context, fetchCalls, staticCache } = createServiceWorkerContext();
+		context.setTimeout = () => assert.fail("request must not be retried");
+		context.fetch = async (request) => {
+			fetchCalls.push(request);
+			return new Response("not retryable", { status, headers });
+		};
+		const response = await context.handleStatic({
+			request: new Request("https://example.test/chunks/app.js", { method }),
+			waitUntil: () => assert.fail("error must not be cached"),
+		});
+		assert.equal(response.status, status);
+		assert.equal(await response.text(), "not retryable");
+		assert.equal(fetchCalls.length, 1);
+		assert.equal(staticCache.entries.size, 0);
+	}
+});
+
+/** @matrix cache : abort retry service-worker static-assets */
+test("test_static_asset_abort_stops_retries", async () => {
+	for (const abortDuringBackoff of [false, true]) {
+		const { context, fetchCalls, staticCache } = createServiceWorkerContext();
+		const controller = new AbortController();
+		let retry;
+		context.setTimeout = (callback) => {
+			retry = callback;
+		};
+		context.fetch = async (request) => {
+			fetchCalls.push(request);
+			if (!abortDuringBackoff)
+				throw new DOMException("cancelled", "AbortError");
+			return new Response("retry later", { status: 503 });
+		};
+		const pending = context.handleStatic({
+			request: new Request("https://example.test/chunks/app.js", {
+				signal: controller.signal,
+			}),
+			waitUntil: () => assert.fail("aborted fetch must not be cached"),
+		});
+		await new Promise(setImmediate);
+		if (abortDuringBackoff) {
+			assert.equal(typeof retry, "function");
+			controller.abort();
+			retry();
+		} else {
+			assert.equal(retry, undefined);
+		}
+		assert.equal((await pending).status, 503);
+		assert.equal(fetchCalls.length, 1, "aborts must not trigger another fetch");
+		assert.equal(staticCache.entries.size, 0);
+	}
+});
+
+/** @matrix cache : cache-hit service-worker static-assets */
+test("test_static_asset_cache_hit_avoids_network", async () => {
+	const { context, fetchCalls, staticCache } = createServiceWorkerContext();
+	const request = new Request("https://example.test/chunks/app.js?v=btest");
+	staticCache.entries.set(request.url, new Response("cached asset"));
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return new Response("unexpected network asset");
+	};
+	const response = await context.handleStatic({ request });
+	assert.equal(await response.text(), "cached asset");
+	assert.deepEqual(fetchCalls, []);
+	assert.equal(staticCache.puts, 0);
+});
+
+/** @matrix cache : precache service-worker static-assets retry no-store */
+test("test_precache_retries_transient_failures_and_preserves_cache_policy", async () => {
+	const { context, staticCache, vm } = createServiceWorkerContext();
+	const attempts = new Map();
+	context.setTimeout = (callback) => queueMicrotask(callback);
+	context.fetch = async (request) => {
+		const name = new URL(request.url).pathname;
+		const attempt = (attempts.get(name) ?? 0) + 1;
+		attempts.set(name, attempt);
+		if (name.endsWith("missing.js"))
+			return new Response("missing", { status: 404 });
+		if (attempt === 1 || name.endsWith("unavailable.js")) {
+			return new Response("retry later", { status: 503 });
+		}
+		return new Response(`asset: ${name}`, {
+			headers: {
+				"Cache-Control": name.endsWith("private.js") ? "no-store" : "no-cache",
+			},
+		});
+	};
+	vm.runInContext(
+		`PRECACHE_URLS.push(
+		"/chunks/recovered.js?v=btest", "/chunks/private.js?v=btest",
+		"/chunks/missing.js?v=btest", "/chunks/unavailable.js?v=btest"
+	)`,
+		context,
+	);
+	await context.precacheStaticAssets();
+	assert.deepEqual(Object.fromEntries(attempts), {
+		"/chunks/recovered.js": 2,
+		"/chunks/private.js": 2,
+		"/chunks/missing.js": 1,
+		"/chunks/unavailable.js": 3,
+	});
+	assert.deepEqual(
+		[...staticCache.entries.keys()],
+		["https://example.test/chunks/recovered.js?v=btest"],
+	);
+	assert.equal(
+		await staticCache.entries.values().next().value.text(),
+		"asset: /chunks/recovered.js",
+	);
+});
+
 /** @matrix cache : precache service-worker static-assets */
 test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", async () => {
 	const {
@@ -1131,6 +1372,7 @@ test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", a
 		staticCache,
 		vm,
 	} = createServiceWorkerContext();
+	context.setTimeout = (callback) => queueMicrotask(callback);
 	context.fetch = async (request) => {
 		fetchCalls.push(request);
 		const pathname = new URL(request.url).pathname;
@@ -1173,9 +1415,18 @@ test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", a
 	if (staticCache.entries.has(missingUrl)) {
 		throw new Error("failed chunk was precached");
 	}
-	if (fetchCalls.length !== 3) {
-		throw new Error(`Expected three warmup fetches, got ${fetchCalls.length}`);
-	}
+	assert.equal(
+		fetchCalls.filter((request) => request.url === chunkUrl).length,
+		1,
+	);
+	assert.equal(
+		fetchCalls.filter((request) => request.url === noStoreUrl).length,
+		1,
+	);
+	assert.equal(
+		fetchCalls.filter((request) => request.url === missingUrl).length,
+		3,
+	);
 	if (!fetchCalls.every((request) => request.cache === "reload")) {
 		throw new Error("precache fetches did not bypass the HTTP cache");
 	}

@@ -21,14 +21,6 @@ on:
         options:
           - manual
           - continuation
-      suite:
-        description: Hosted test scope for a manual run
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - full
       pull_request:
         description: Release PR number supplied by the candidate run
         required: false
@@ -60,7 +52,6 @@ jobs:
       branch: ${{ steps.context.outputs.branch }}
       candidate_sha: ${{ steps.context.outputs.candidate_sha }}
       pull_request: ${{ steps.context.outputs.pull_request }}
-      suite: ${{ steps.context.outputs.suite }}
 
     steps:
       - name: Resolve the exact execution context
@@ -79,14 +70,12 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REPOSITORY: ${{ github.repository }}
           REQUESTED_MODE: ${{ inputs.mode }}
-          REQUESTED_SUITE: ${{ inputs.suite }}
         run: |
           execute=false
           base_sha=""
           branch=""
           candidate_sha=""
           pull_request=""
-          suite="all"
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" || "$BASE_REF" != "main" ]]; then
@@ -140,7 +129,6 @@ jobs:
             fi
             branch="$REF_NAME"
             candidate_sha="$EVENT_SHA"
-            suite="$REQUESTED_SUITE"
             execute=true
           elif [[ "$REQUESTED_MODE" != "continuation" ]]; then
             echo "Unsupported hosted release request."
@@ -166,7 +154,6 @@ jobs:
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           echo "pull_request=$pull_request" >> "$GITHUB_OUTPUT"
-          echo "suite=$suite" >> "$GITHUB_OUTPUT"
 
   execute:
     needs: request
@@ -231,11 +218,10 @@ jobs:
         env:
           E2E_JOB: lagniappe-e2e
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
-          E2E_SUITE: ${{ needs.request.outputs.suite }}
         run: |
           execution_json="$(gcloud run jobs execute "$E2E_JOB" \
             --region "$E2E_REGION" \
-            "--args=--suite=$E2E_SUITE" \
+            --args= \
             --async \
             --format=json)"
           execution="$(jq -er '.metadata.name // .name' <<<"$execution_json" 2>/dev/null || true)"
@@ -362,7 +348,6 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --ref "$BRANCH" \
             -f mode=continuation \
-            -f suite=all \
             -f pull_request="$PULL_REQUEST" \
             -f candidate_sha="$CANDIDATE_SHA" \
             -f evidence_sha="$EVIDENCE_SHA"
