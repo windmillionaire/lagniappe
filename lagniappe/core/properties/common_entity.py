@@ -34,7 +34,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
     Get:
         value (str): Entity name.
         column_value (dict): Full entity details dict for table display.
-        sort_value (str): Lowercase name with "The " stripped.
+        sort_value (str): Lowercase name with a leading "The " stripped.
 
     Overrides:
         cache_value: Returns the entity name for search indexing.
@@ -77,7 +77,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
     # @pair name:sort
     @property
     def sort_value(self):
-        return self.value.replace("The ", "").lower() if self.value else None
+        return self.value.removeprefix("The ").lower() if self.value else None
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name

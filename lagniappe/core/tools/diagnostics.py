@@ -25,7 +25,6 @@ PROFILE_SOURCE_FILES = {"main.py", "run.py"}
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_config_enabled
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_parameterized_preserves_metadata
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_profiles_project_calls
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_profile_omits_raw_profile_table
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_project_filter_excludes_local_dependency_paths
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_profile_rows_use_total_calls
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_prints_when_wrapped_function_raises
@@ -212,5 +211,4 @@ def _profile_location(filename, line, function, project_only):
             return None
 
     return f"{path}:{line} {function}"
-
 

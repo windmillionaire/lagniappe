@@ -101,6 +101,12 @@ task = Entities.fetch_one(
 | `touch(*entities)` | Update only `modified` through the masked root path. |
 | `delete(*entities)` | Plan survivor repairs, cascades, durable deletes, and post-commit cleanup. |
 
+`fetch()` preserves first-requested root order for mixed keys and entities,
+deduplicates by key, and omits missing roots. An explicitly supplied entity is
+reused rather than fetched again when the same key also appears in the request.
+These guarantees apply at every fetch depth; root-only fetches do not attach
+relationships between roots.
+
 `_load()` is an internal attachment primitive. Request code must use `fetch()`
 or `fetch_one()` so relation depth cannot depend on whether a caller happened
 to pass a key or an already-typed entity.

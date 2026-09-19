@@ -1003,8 +1003,96 @@ def test_importer_story_processes_page_rows_into_entities_and_results(monkeypatc
     assert imported[0]["entity"] == {"id": "page-1", "name": "Ada"}
     assert imported[0]["warnings"] == ["trimmed"]
     assert imported[0]["errors"] == ["Invalid title"]
-    assert imported[1]["warnings"] == ["Bad title"]
+    assert imported[1]["errors"] == ["Bad title"]
     assert "entity" not in imported[1]
+
+
+# @matrix ingress : row-results row-task task-import validation-errors
+# @matrix form-todo : import validation
+# @matrix submission : error-message import save validation
+@pytest.mark.unit
+def test_importer_rejects_entire_malformed_todo_row(monkeypatch):
+    page = TestEntities.get("PAGE", {"hash": "todo_import_page", "name": "Target"})
+    form = TestEntities.get("FORM", {"hash": "todo_import_form", "name": "Checklist"})
+    form.form_type = "task"
+    form.schema = [
+        {"id": "input-note", "title": "Note", "type": "input", "input": "text"},
+        {"id": "todo-work", "title": "Work", "type": "todo"},
+    ]
+    field_map = {"input-note": ["note"], "todo-work": ["work"]}
+    entity = SimpleNamespace(
+        form=form,
+        model=None,
+        project=None,
+        properties=SimpleNamespace(
+            process_csv=SimpleNamespace(columns={
+                "page": {"label": "Page"},
+                "note": {"label": "Note"},
+                "work": {"label": "Work"},
+            }),
+            assign_columns=SimpleNamespace(field_map=field_map, column_map={}),
+            verify_import=SimpleNamespace(
+                field_map=field_map,
+                column_map={},
+                index_from="page",
+                index_to_field={"label": "Name"},
+                fuzzy_page=False,
+                fuzzy_match=lambda _field_id: False,
+            ),
+            choose_type=SimpleNamespace(entity_type="task"),
+            choose_parent=SimpleNamespace(task_name="Imported checklist"),
+        ),
+    )
+    created = []
+
+    def create_task(data):
+        task = TestEntities.get(
+            "TASK",
+            {"hash": f"todo_import_task_{len(created)}", "name": data["name"]},
+            page=data["page"],
+        )
+        task.form = data["form"]
+        created.append(task)
+        return task
+
+    monkeypatch.setattr(
+        ingress_service.IngressMutationPlanner,
+        "Entities",
+        SimpleNamespace(PAGE=lambda _key: page, TASK=SimpleNamespace(create=create_task)),
+    )
+    monkeypatch.setattr(
+        ingress_service.files,
+        "find_page",
+        lambda *_args, **_kwargs: {"id": page.key, "warnings": [], "errors": []},
+    )
+    invalid = ingress_service.IngressMutationPlanner(entity, row_index=0).plan({
+        "page": "Target",
+        "note": "This valid field must not create a partial task",
+        "work": {"items": "not-a-list"},
+    })
+
+    assert invalid.entities == ()
+    assert "entity" not in invalid.result
+    assert "history" not in invalid.result
+    assert any(
+        "todo-work" in error and "items" in error and "list" in error
+        for error in invalid.result["errors"]
+    )
+    assert "submission" not in created[0].db
+
+    valid = ingress_service.IngressMutationPlanner(entity, row_index=1).plan({
+        "page": "Target",
+        "note": "Keep this row",
+        "work": "  First step  ",
+    })
+
+    assert valid.entities == (created[1],)
+    assert valid.result["entity"] == created[1].details
+    assert not valid.result.get("errors")
+    assert json.loads(created[1].db["submission"]) == {
+        "input-note": "Keep this row",
+        "todo-work": {"items": [{"text": "First step", "checked": False}]},
+    }
 
 
 # @matrix ingress : entity-name import-pages list-normalization

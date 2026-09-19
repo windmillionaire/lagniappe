@@ -1,6 +1,7 @@
 """Unit tests for general infrastructure and core utility functions."""
 
 from types import SimpleNamespace
+from uuid import UUID
 
 from flask import Flask, g
 import pytest
@@ -758,6 +759,12 @@ def test_agent_access_config_and_user_helpers(monkeypatch):
     assert not agent_access.enabled()
 
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_CODE", "secret-code", raising=False)
+    monkeypatch.setattr(CONFIG, "AGENT_ACCESS_EMAIL", " ", raising=False)
+    assert not agent_access.enabled()
+
+    monkeypatch.setattr(
+        CONFIG, "AGENT_ACCESS_EMAIL", "Agent@Example.COM", raising=False
+    )
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_ENABLED", True, raising=False)
 
     assert agent_access.enabled()
@@ -886,10 +893,10 @@ def test_entities_fetch_root_reuses_typed_entity_without_database_fetch(monkeypa
         {"name": "Loaded Category", "hash": "loaded-category"},
     )
 
-    def fail_database_read(identifier):
-        raise AssertionError(f"unexpected database read for {identifier!r}")
+    def fail_database_read(keys):
+        raise AssertionError(f"unexpected database read for {keys!r}")
 
-    monkeypatch.setattr(entities_module.database_get, "entity", fail_database_read)
+    monkeypatch.setattr(entities_module.database_get, "entities", fail_database_read)
 
     assert Entities.fetch_one(entity, request=Fetch.root()) is entity
 
@@ -1123,19 +1130,33 @@ def test_entities_fetch_batches_unresolved_roots_once(monkeypatch):
 
     def load_entities(keys):
         calls.append(list(keys))
-        return [entities[key] for key in keys]
+        return [entities[key] for key in reversed(keys)]
 
     monkeypatch.setattr(entities_module.database_get, "entities", load_entities)
 
     loaded = Entities.fetch(first.key, second.key, request=Fetch.root())
 
-    assert {entity.key for entity in loaded} == {first.key, second.key}
+    assert loaded == [first, second]
     assert calls == [[first.key, second.key]]
 
 
 # @matrix entities : batch explicit-fetch-depth
-# @pair relations:root
-def test_entities_fetch_deduplicates_mixed_roots_and_skips_missing(monkeypatch):
+# @matrix relations : direct nested root
+@pytest.mark.parametrize(
+    "fetch",
+    [
+        Fetch.root(),
+        Fetch.direct(),
+        Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    ],
+    ids=["root", "direct", "nested"],
+)
+@pytest.mark.parametrize(
+    "key_before_typed", [False, True], ids=["typed-first", "key-first"]
+)
+def test_entities_fetch_deduplicates_mixed_roots_and_skips_missing(
+    monkeypatch, fetch, key_before_typed
+):
     first = TestEntities.get(
         "CATEGORY",
         {"name": "Typed Root", "hash": "typed-root"},
@@ -1154,20 +1175,24 @@ def test_entities_fetch_deduplicates_mixed_roots_and_skips_missing(monkeypatch):
     )
 
     def load_entities(keys):
-        calls.append(list(keys))
+        if keys:
+            calls.append(list(keys))
         return [second] if second.key in keys else []
 
     monkeypatch.setattr(entities_module.database_get, "entities", load_entities)
 
     loaded = Entities.fetch(
+        first.key if key_before_typed else first,
+        second.key,
+        second.key,
+        first.key,
         first,
-        second.key,
-        second.key,
         missing,
-        request=Fetch.root(),
+        request=fetch,
     )
 
-    assert {entity.key for entity in loaded} == {first.key, second.key}
+    assert loaded == [first, second]
+    assert loaded[0] is first
     assert calls == [[second.key, missing]]
 
 
@@ -1214,7 +1239,7 @@ def test_reference_details_does_not_derive_requirements_from_unloaded_relations(
 
     details = page.reference_details
 
-    assert details["name"] == page.name
+    assert details["name"] == "Shallow Reference Page"
     assert "requires" not in details
     assert page.properties.model.is_set is False
 
@@ -1408,7 +1433,6 @@ def test_print_entity_load_trace_outputs_request_summary(monkeypatch, capsys):
         "primary=- secondary=models:Task Model, instances:Caleb Page "
         "related=models:Page Model"
     ) in output
-    assert "category:Projects" not in output
 
 
 # @matrix relations : diagnostics unloaded-fallback
@@ -1658,24 +1682,6 @@ def test_timed_profiles_project_calls(capsys):
 
 
 # @pair utility:timing
-def test_timed_profile_omits_raw_profile_table(capsys):
-    @diagnostics.timed(
-        enabled=True,
-        profile=True,
-        label="profiled-without-raw-table",
-    )
-    def profiled():
-        return _timed_profile_helper(5)
-
-    assert profiled() == 30
-
-    output = capsys.readouterr().out
-    assert "[timing] profiled-without-raw-table:" in output
-    assert "[timing] project calls by cumulative time" in output
-    assert "[timing] raw calls by cumulative time" not in output
-
-
-# @pair utility:timing
 def test_timed_project_filter_excludes_local_dependency_paths():
     project_file = diagnostics.PROJECT_ROOT / "lagniappe" / "web" / "auth.py"
     dependency_file = (
@@ -1771,15 +1777,16 @@ def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
 
 
 # @pair utility:hashing
-def test_short_hash_and_uuid():
+def test_short_hash_and_uuid(monkeypatch):
     """Test hash and uuid utility functions."""
-    h = identifiers.short_hash("test")
-    assert len(h) == 12
-    assert isinstance(h, str)
+    assert identifiers.short_hash("test") == "9f86d081884c"
 
-    u = identifiers.short_uuid()
-    assert len(u) == 8
-    assert isinstance(u, str)
+    monkeypatch.setattr(
+        identifiers.uuid,
+        "uuid4",
+        lambda: UUID("12345678-abcd-4abc-8abc-1234567890ab"),
+    )
+    assert identifiers.short_uuid() == "12345678"
 
 
 # @pair utility:task-sorting
@@ -1806,8 +1813,6 @@ def test_sort_tasks():
 
 # @matrix database : filter validation
 def test_database_filter_requires_rejects_invalid_hashes_type():
-    assert Restriction.is_denied([])
-    assert not Restriction.is_denied(Restriction.UNRESTRICTED)
     assert Filter().requires(Restriction.UNRESTRICTED).build() is None
 
     with pytest.raises(

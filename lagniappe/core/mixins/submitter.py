@@ -300,6 +300,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
+    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
     # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
     def import_submission(self, imported_submission, import_process):
         require_mutable_submission(self)

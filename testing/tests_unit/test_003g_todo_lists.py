@@ -92,9 +92,13 @@ def test_todo_list_validation_and_import():
         field.validate_submission("not-json")
     assert field.value == preserved
 
-    field.validate_import({"items": "not-a-list"})
-    assert field.value is None
-    assert field.errors == ["Todo list submission must contain an items list."]
+    with pytest.raises(ValidationError, match="items.*list"):
+        field.validate_import({"items": "not-a-list"})
+    assert field.value == preserved
+
+    with pytest.raises(ValidationError, match="checked.*boolean"):
+        field.validate_import({"items": [{"text": "Bad", "checked": "yes"}]})
+    assert field.value == preserved
 
 
 # @pairs form-schema:form-type form-todo:task-only

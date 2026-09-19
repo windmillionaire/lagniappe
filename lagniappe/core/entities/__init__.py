@@ -142,20 +142,33 @@ class EntityRegistry:
     # @matrix relations : direct nested root
     # @pairs entities:fetch entities:no-extra-read entities:typed-entity relations:stale-key
     def fetch(self, *identifiers, request):
-        """Load roots and expand only to the requested total relationship depth."""
+        """Load unique roots in caller order, then expand to the requested depth.
+
+        Explicit entities take precedence over keys for the same root. Missing
+        roots are omitted, and duplicate identifiers retain their first position.
+        """
         if not isinstance(request, Fetch):
             raise TypeError("Entities.fetch requires a Fetch request")
 
-        entities = self._load(
-            *[identifier for identifier in identifiers if not hasattr(identifier, "key")],
+        roots = {}
+        for identifier in identifiers:
+            if hasattr(identifier, "key"):
+                entity = self._typed_entity(identifier)
+                if entity is not None:
+                    roots[entity.key] = entity
+            else:
+                key = database_get.datastore_key(identifier)
+                if key:
+                    roots.setdefault(key, None)
+
+        loaded = self._load(
+            *[key for key, entity in roots.items() if entity is None],
             related=False,
             _fetch=request,
             _fetch_stage="roots",
-        ) + [
-            self._typed_entity(identifier)
-            for identifier in identifiers
-            if hasattr(identifier, "key")
-        ]
+        )
+        roots.update((entity.key, entity) for entity in loaded)
+        entities = [entity for entity in roots.values() if entity is not None]
         if request.depth is FetchDepth.ROOT:
             return entities
         return self._load(

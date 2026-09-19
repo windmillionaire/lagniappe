@@ -461,7 +461,10 @@ class IngressMutationPlanner:
             f"row:{self.row_index}:{role}",
         )
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
+    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
+    # @matrix ingress : row-results row-task task-import validation-errors
     def plan(self, row):
         values = {
             self.columns[column_id]["label"]: value
@@ -496,7 +499,12 @@ class IngressMutationPlanner:
                 self._extend_messages(result, "warnings", field.warnings)
                 self._extend_messages(result, "errors", field.errors)
         except ValidationError as error:
-            result.setdefault("warnings", []).append(str(error))
+            # Tasks may already be staged when submission validation fails.
+            # Do not hand any part of a rejected row to the mutation executor.
+            self.created_entities.clear()
+            result.pop("entity", None)
+            result.pop("history", None)
+            result.setdefault("errors", []).append(str(error))
         except Exception as error:
             exceptions.capture(error, result)
             result.setdefault("errors", []).append(
