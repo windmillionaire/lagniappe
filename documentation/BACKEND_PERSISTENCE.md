@@ -108,6 +108,15 @@ completed entry left by an earlier cleanup failure.
 Shared bounded Datastore contention retry lives in `transactions.py`. A retry
 must repeat the complete read/check/write transaction body.
 
+Guarded mutations and atomic job starts batch distinct guard keys inside that
+transaction, in groups of at most 1,000 (the Datastore
+[Lookup limit](https://docs.cloud.google.com/datastore/docs/concepts/limits)).
+Results are matched by key; every supplied expectation still applies, including
+multiple expectations for the same row. Subset, exact-row, and absence guards
+retain their separate meanings. The SDK retries deferred reads; an unresolved
+key after those retries aborts the operation rather than satisfying an absence
+guard. Contention retries read and check all guards again.
+
 ## Query contract
 
 `database/filter.py` wraps Datastore queries with `eq`, `any_of`, `all_of`, and

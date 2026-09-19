@@ -378,9 +378,12 @@ def test_checkpoint_persists_before_publishing_and_guards_assets(monkeypatch):
 def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
     writes = []
     transaction = SimpleNamespace(put=lambda row: writes.append(row))
+    key = datastore.Key("instances", "page", project="test-project")
+    row = datastore.Entity(key)
+    row["assets"] = "winner"
     store = SimpleNamespace(
         transaction=lambda: nullcontext(transaction),
-        get=lambda key, **kwargs: {"assets": "winner"},
+        get_multi=lambda keys, **kwargs: [row],
     )
     monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=store))
     monkeypatch.setattr(
@@ -389,11 +392,11 @@ def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
     entity = SimpleNamespace(db={"assets": "loser"})
     with pytest.raises(exceptions.MutationConflict, match="Saved state changed"):
         utility._save_guarded_mutations(
-            [(entity, ("assets",))], [], [("page", {"assets": "old"})]
+            [(entity, ("assets",))], [], [(key, {"assets": "old"})]
         )
     assert writes == []
     utility._save_guarded_mutations(
-        [(entity, ("assets",))], [], [("page", {"assets": "winner"})]
+        [(entity, ("assets",))], [], [(key, {"assets": "winner"})]
     )
     assert writes == [{"assets": "loser"}]
 

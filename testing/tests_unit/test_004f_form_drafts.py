@@ -317,18 +317,20 @@ def test_replaced_live_html_is_deleted_only_after_commit_and_preserves_archive(
 def test_exact_publication_guard_rejects_new_properties_but_document_guard_is_subset(monkeypatch):
     written = []
     transaction = SimpleNamespace(put=written.append)
-    row = {"assets": "unchanged", "restricted_to": ["new-restriction"]}
-    store = SimpleNamespace(transaction=lambda: nullcontext(transaction), get=lambda *args, **kwargs: row)
+    key = datastore.Key("models", "form", project="test-project")
+    row = datastore.Entity(key)
+    row.update(assets="unchanged", restricted_to=["new-restriction"])
+    store = SimpleNamespace(transaction=lambda: nullcontext(transaction), get_multi=lambda *args, **kwargs: [row])
     monkeypatch.setattr(database_utility, "DATA", SimpleNamespace(datastore=store))
     monkeypatch.setattr(database_utility, "_put_mutation", lambda writer, row, mask: written.append(row))
     entity = SimpleNamespace(db={"assets": "draft"})
     with pytest.raises(exceptions.MutationConflict):
         database_utility._save_guarded_mutations([(entity, None)], [], [
-            ("form", database_utility.ExactEntityState({"assets": "unchanged"})),
+            (key, database_utility.ExactEntityState({"assets": "unchanged"})),
         ])
     assert written == []
     database_utility._save_guarded_mutations([(entity, ("assets",))], [], [
-        ("page", {"assets": "unchanged"}),
+        (key, {"assets": "unchanged"}),
     ])
     assert written == [{"assets": "draft"}]
 

@@ -513,13 +513,13 @@ def test_form_archive_and_deletion_share_the_guarded_transaction(monkeypatch, so
         opened.append(transaction)
         return nullcontext(transaction)
 
-    def get_row(key, **kwargs):
-        assert key == form_key and kwargs["transaction"] is transaction
-        reads.append(key)
-        return deepcopy(persisted)
+    def get_rows(keys, **kwargs):
+        assert keys == [form_key] and kwargs["transaction"] is transaction
+        reads.extend(keys)
+        return [deepcopy(persisted)]
 
     monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=SimpleNamespace(
-        transaction=open_transaction, get=get_row,
+        transaction=open_transaction, get_multi=get_rows,
     )))
     monkeypatch.setattr(utility, "update_site_fingerprints", lambda *rows: (
         fingerprinted.extend(rows) or [fingerprint]
