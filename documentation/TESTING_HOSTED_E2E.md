@@ -129,7 +129,9 @@ the same persistence prerequisites as local startup, and runs one pytest
 session. Direct fixtures execute from Cloud Run; browser requests target the
 exact App Engine version. The runner image includes Git and POSIX process
 inspection tools because repository and test-session contracts run in that
-same container. Local execution follows status and imports results by default.
+same container. It also installs `libatomic1`, required by the Node runtime
+copied into the Python-based image. Local execution follows status and imports
+results by default.
 
 ## MCP coverage
 
