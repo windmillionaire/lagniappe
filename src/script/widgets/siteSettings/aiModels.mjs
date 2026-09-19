@@ -1,8 +1,8 @@
-import { buttons } from "../../elements/buttons";
-import { SelectBox } from "../../elements/combobox";
-import { request } from "../../shared";
-import { withTransition } from "../../shared/transitions";
-import { SiteSetting } from "./base";
+import { buttons } from "../../elements/buttons.mjs";
+import { SelectBox } from "../../elements/combobox/index.mjs";
+import { request } from "../../shared/index.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { SiteSetting } from "./base.mjs";
 
 /**
  * @testable true

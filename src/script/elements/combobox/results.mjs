@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { setIcon } from "../../shared/icons";
-import { localStore } from "../../shared/storage";
-import { formatting } from "../formatting";
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { localStore } from "../../shared/storage.mjs";
+import { formatting } from "../formatting.mjs";
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
 const SEARCH_ENTITIES = Object.freeze({

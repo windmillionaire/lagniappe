@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { captureError } from "../../shared/errors";
-import { request } from "../../shared/request";
-import { independentEditor } from "./editor";
-import { Toolbar } from "./toolbar";
+import { STYLES } from "../../generated/styles.mjs";
+import { captureError } from "../../shared/errors.mjs";
+import { request } from "../../shared/request.mjs";
+import { independentEditor } from "./editor.mjs";
+import { Toolbar } from "./toolbar.mjs";
 
 const EMPTY_HTML = new Set(["", "<p></p>", "<p><br></p>"]);
 const KEEPALIVE_BODY_LIMIT = 64 * 1024;

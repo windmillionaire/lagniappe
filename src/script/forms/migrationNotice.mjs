@@ -1,5 +1,5 @@
-import { STYLES } from "styles";
-import { Modal } from "../shared/modal";
+import { STYLES } from "../generated/styles.mjs";
+import { Modal } from "../shared/modal.mjs";
 
 /**
  * @testable true

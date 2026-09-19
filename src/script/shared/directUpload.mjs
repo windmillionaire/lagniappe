@@ -1,4 +1,4 @@
-import { request } from "./request";
+import { request } from "./request.mjs";
 
 const DEFAULT_DIRECT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
 const DEFAULT_DIRECT_UPLOAD_RETRIES = 3;

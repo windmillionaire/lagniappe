@@ -1396,7 +1396,8 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
         "COPY requirements.txt requirements-dev.txt requirements-installer.txt ./"
         in dockerfile
     )
-    assert "FROM node:24-bookworm-slim@sha256:" in dockerfile
+    node_version = (hosted_e2e.APP_DIR / ".nvmrc").read_text().strip()
+    assert f"FROM node:{node_version}-bookworm-slim@sha256:" in dockerfile
     assert "AS node-runtime" in dockerfile
     assert "apt-get install --yes --no-install-recommends git procps" in dockerfile
     assert "ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm" in (

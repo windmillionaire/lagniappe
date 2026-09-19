@@ -1,12 +1,12 @@
 import { getMarkRange } from "@tiptap/core";
-import { STYLES } from "styles";
-import { FormController } from "../../../forms/controller";
-import { ENDPOINTS } from "../../../shared/endpoints";
-import { request } from "../../../shared/request";
-import { buttons } from "../../buttons";
-import { RemoteQueryCombobox } from "../../combobox/remote";
-import { Results } from "../../combobox/results";
-import { primitives } from "../../primitives";
+import { FormController } from "../../../forms/controller.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { ENDPOINTS } from "../../../shared/endpoints.mjs";
+import { request } from "../../../shared/request.mjs";
+import { buttons } from "../../buttons.mjs";
+import { RemoteQueryCombobox } from "../../combobox/remote.mjs";
+import { Results } from "../../combobox/results.mjs";
+import { primitives } from "../../primitives.mjs";
 import { normalizeLinkAttributes } from "../extensions/linkAttributes.mjs";
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;

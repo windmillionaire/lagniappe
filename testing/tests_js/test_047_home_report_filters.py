@@ -15,7 +15,7 @@ let base = fs.readFileSync("src/script/elements/base/baseList.mjs", "utf8").repl
 let source = fs.readFileSync("src/script/widgets/home/lists.mjs", "utf8")
   .replace(/^import .*;\n/gm, "")
   .replace(/export class/g, "class")
-  .replace('await import("../../shared/request")', '({ request: globalThis.request })');
+  .replace('await import("../../shared/request.mjs")', '({ request: globalThis.request })');
 vm.runInContext(base + source + "\nglobalThis.ToolReportList = ToolReportList; globalThis.category = reportCategory;", context);
 
 function fixture() {

@@ -1,4 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
+// This file is auto-generated. Do not edit manually.
 const ICONS = {
   "add": {
     "glyph": "add",

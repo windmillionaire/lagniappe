@@ -1,7 +1,7 @@
-import { FormController } from "../../forms/controller";
-import { installMigrationNotice } from "../../forms/migrationNotice";
-import { compatibleField } from "../../forms/representation";
-import { withTransition } from "../../shared/transitions";
+import { FormController } from "../../forms/controller.mjs";
+import { installMigrationNotice } from "../../forms/migrationNotice.mjs";
+import { compatibleField } from "../../forms/representation.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * @testable true

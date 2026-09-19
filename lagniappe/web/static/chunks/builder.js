@@ -1,15 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b158c05a';
-import { EntityMenu } from './entityMenu.js?v=b158c05a';
-import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, e as areEqual, g as generateElementId } from './foundation.js?v=b158c05a';
-import { c as connectivity } from './connectivity.js?v=b158c05a';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b158c05a';
-import { d as directUpload } from './directUpload.js?v=b158c05a';
-import { PollingCoordinator } from './polling.js?v=b158c05a';
-import { STYLES } from './styles.js?v=b158c05a';
-import { s as setIcon } from './icons.js?v=b158c05a';
-import { p as primitives } from './primitives.js?v=b158c05a';
-import { F as FormController, a as FormRenderer } from './controller.js?v=b158c05a';
+import { SearchBox } from './search.js?v=bdc1ce7d';
+import { EntityMenu } from './entityMenu.js?v=bdc1ce7d';
+import { d as directUpload } from './directUpload.js?v=bdc1ce7d';
+import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, e as areEqual, g as generateElementId } from './foundation.js?v=bdc1ce7d';
+import { c as connectivity } from './connectivity.js?v=bdc1ce7d';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bdc1ce7d';
+import { PollingCoordinator } from './polling.js?v=bdc1ce7d';
+import { STYLES } from './styles.js?v=bdc1ce7d';
+import { s as setIcon } from './icons.js?v=bdc1ce7d';
+import { p as primitives } from './primitives.js?v=bdc1ce7d';
+import { F as FormController, a as FormRenderer } from './controller.js?v=bdc1ce7d';
 
 /**
  * @testable true
@@ -167,12 +167,12 @@ class FormChangeStatus {
 }
 
 const CONDITION_REGISTRY = {
-	modify: () => import('./modify.js?v=b158c05a'),
-	html: () => import('./html.js?v=b158c05a'),
-	status: () => import('./status.js?v=b158c05a'),
-	visibility: () => import('./visibility2.js?v=b158c05a'),
-	columns: () => import('./columns.js?v=b158c05a'),
-	options: () => import('./options.js?v=b158c05a'),
+	modify: () => import('./modify.js?v=bdc1ce7d'),
+	html: () => import('./html.js?v=bdc1ce7d'),
+	status: () => import('./status.js?v=bdc1ce7d'),
+	visibility: () => import('./visibility2.js?v=bdc1ce7d'),
+	columns: () => import('./columns.js?v=bdc1ce7d'),
+	options: () => import('./options.js?v=bdc1ce7d'),
 };
 
 /**
@@ -5864,7 +5864,7 @@ class FormBuilder {
 	 * @matrix html-field : generated-document-undo retained-editor
 	 */
 	async prepareGeneratedDocuments(htmlFields) {
-		const { default: HtmlEditor } = await import('./html.js?v=b158c05a');
+		const { default: HtmlEditor } = await import('./html.js?v=bdc1ce7d');
 		for (const [id, html] of Object.entries(htmlFields || {})) {
 			const element = this.elements.get(id);
 			if (

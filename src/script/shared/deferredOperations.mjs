@@ -1,6 +1,6 @@
-import { captureError } from "./errors";
-import { createIcon } from "./icons";
-import { withTransition } from "./transitions";
+import { captureError } from "./errors.mjs";
+import { createIcon } from "./icons.mjs";
+import { withTransition } from "./transitions.mjs";
 
 /**
  * @testable false

@@ -1,7 +1,7 @@
 /** Sync-capable widgets that can run without a mounted view (offline replay). */
 const HEADLESS_WIDGETS = {
 	document: {
-		load: () => import("./collaborative"),
+		load: () => import("./collaborative.mjs"),
 		name: "CollaborativeDocument",
 	},
 };

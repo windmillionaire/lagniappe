@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { ENDPOINTS } from "./endpoints";
-import { captureError } from "./errors";
-import { request } from "./request";
-import { withTransition } from "./transitions";
+import { STYLES } from "../generated/styles.mjs";
+import { ENDPOINTS } from "./endpoints.mjs";
+import { captureError } from "./errors.mjs";
+import { request } from "./request.mjs";
+import { withTransition } from "./transitions.mjs";
 
 /**
  * @testable true

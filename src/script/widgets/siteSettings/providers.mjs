@@ -1,5 +1,5 @@
-import { setIcon } from "../../shared/icons";
-import { SiteSetting } from "./base";
+import { setIcon } from "../../shared/icons.mjs";
+import { SiteSetting } from "./base.mjs";
 
 /**
  * @testable true

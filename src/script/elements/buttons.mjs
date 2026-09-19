@@ -1,6 +1,6 @@
-import { STYLES } from "styles";
-import { createIcon, setIcon } from "../shared/icons";
-import { formatting } from "./formatting";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon, setIcon } from "../shared/icons.mjs";
+import { formatting } from "./formatting.mjs";
 
 /**
  * @testable infrastructure

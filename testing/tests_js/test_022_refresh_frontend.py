@@ -65,7 +65,7 @@ vm.runInContext(pageSource + "\nglobalThis.Page = Page;", context);
 let services = fs.readFileSync("src/script/views/base/services.mjs", "utf8")
   .replace(/^import .*;\n/gm, "")
   .replaceAll("export ", "")
-  .replace('import("../../shared/polling")', "globalThis.pollingModule");
+  .replace('import("../../shared/polling.mjs")', "globalThis.pollingModule");
 vm.runInContext(services + "\nglobalThis.ensurePollingCoordinator = ensurePollingCoordinator;", context);
 
 let completed = false;
@@ -158,7 +158,7 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/widgets/tables/indexTable.mjs", "utf8");
 source = source.replace(
-  'import { BaseTable } from "../../elements/base/baseTable";',
+  'import { BaseTable } from "../../elements/base/baseTable.mjs";',
   "class BaseTable {}",
 );
 source = source.replace(/^import .*;\n/gm, "");

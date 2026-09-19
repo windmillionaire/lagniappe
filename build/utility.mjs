@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
 	existsSync,
+	mkdirSync,
 	readdirSync,
 	readFileSync,
 	renameSync,
@@ -59,6 +60,9 @@ const INDEX_FOUNDATION_MODULES = new Set([
  * @reason private durability helper exercised through generated build outputs
  */
 const atomicWriteFileSync = (pathValue, content) => {
+	if (existsSync(pathValue) && readFileSync(pathValue, "utf8") === content)
+		return;
+	mkdirSync(path.dirname(pathValue), { recursive: true });
 	const temporary = `${pathValue}.tmp-${process.pid}`;
 	try {
 		writeFileSync(temporary, content);
@@ -98,7 +102,7 @@ const interactionFoundationChunk = (id) => {
 
 /**
  * @testable false
- * @covered-by build/utility.mjs::virtualStyleModuleSource
+ * @covered-by build/utility.mjs::javascriptStyleModuleSource
  * @reason private serializer exercised through emitted module sources
  */
 const stringify = (yaml) => {
@@ -369,8 +373,8 @@ const stylesYaml = normalizeStyleRegistry(rawStylesYaml);
  * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @pair style-build:runtime-parity
  */
-const virtualStyleModuleSource = (styles) => {
-	return `const STYLES = ${stringify(styles)};\nexport { STYLES };`;
+const javascriptStyleModuleSource = (styles) => {
+	return `// This file is auto-generated. Do not edit manually.\nconst STYLES = ${stringify(styles)};\nexport { STYLES };`;
 };
 
 /**
@@ -378,8 +382,8 @@ const virtualStyleModuleSource = (styles) => {
  * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @pair style-build:runtime-parity
  */
-const virtualIconModuleSource = (icons) => {
-	return `const ICONS = ${stringify(icons)};\nexport { ICONS };`;
+const javascriptIconModuleSource = (icons) => {
+	return `// This file is auto-generated. Do not edit manually.\nconst ICONS = ${stringify(icons)};\nexport { ICONS };`;
 };
 
 /**
@@ -428,40 +432,40 @@ const pythonStyleModuleSource = (name, registry) => {
  * @pair style-build:pipeline-contract
  * @pair frontend-build:font-delivery
  */
-const buildStyles = () => {
-	const virtualModules = new Map([
+const buildStyles = () => ({
+	name: "build-styles",
+	buildStart: generateStyleModules,
+});
+
+/**
+ * @testable true
+ * @tests tests_js/test_000_native_harness.mjs::test_registry_generation_is_idempotent_and_repairs_missing_outputs
+ * @pair style-build:runtime-parity
+ */
+const generateStyleModules = () => {
+	for (const [output, content] of [
 		[
-			STYLE_PIPELINE.registry.virtual_module,
-			virtualStyleModuleSource(stylesYaml),
+			STYLE_PIPELINE.registry.javascript_styles,
+			javascriptStyleModuleSource(stylesYaml),
 		],
 		[
-			STYLE_PIPELINE.registry.icons_virtual_module,
-			virtualIconModuleSource(iconsYaml),
+			STYLE_PIPELINE.registry.javascript_icons,
+			javascriptIconModuleSource(iconsYaml),
 		],
-	]);
-	return {
-		name: "build-styles",
-		resolveId(source) {
-			return virtualModules.has(source) ? source : null;
-		},
-		load(id) {
-			return virtualModules.get(id) ?? null;
-		},
-		generateBundle() {
-			atomicWriteFileSync(
-				`./${STYLE_PIPELINE.registry.python_fonts}`,
-				pythonStyleModuleSource("FONTS", fontUrls),
-			);
-			atomicWriteFileSync(
-				`./${STYLE_PIPELINE.registry.python_icons}`,
-				pythonStyleModuleSource("ICONS", iconsYaml),
-			);
-			atomicWriteFileSync(
-				`./${STYLE_PIPELINE.registry.python_styles}`,
-				pythonStyleModuleSource("STYLES", stylesYaml),
-			);
-		},
-	};
+		[
+			STYLE_PIPELINE.registry.python_styles,
+			pythonStyleModuleSource("STYLES", stylesYaml),
+		],
+		[
+			STYLE_PIPELINE.registry.python_icons,
+			pythonStyleModuleSource("ICONS", iconsYaml),
+		],
+		[
+			STYLE_PIPELINE.registry.python_fonts,
+			pythonStyleModuleSource("FONTS", fontUrls),
+		],
+	])
+		atomicWriteFileSync(output, content);
 };
 
 /**
@@ -758,7 +762,10 @@ export {
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
+	generateStyleModules,
 	interactionFoundationChunk,
+	javascriptIconModuleSource,
+	javascriptStyleModuleSource,
 	normalizeIconRegistry,
 	normalizeStyleRegistry,
 	precacheUrls,
@@ -768,6 +775,4 @@ export {
 	updateConstantsBuildId,
 	updateServiceWorker,
 	versionChunkImports,
-	virtualIconModuleSource,
-	virtualStyleModuleSource,
 };

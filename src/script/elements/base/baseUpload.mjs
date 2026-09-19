@@ -1,6 +1,6 @@
-import { FormController } from "../../forms/controller";
-import { directUpload } from "../../shared/directUpload";
-import { uploadElement } from "../upload";
+import { FormController } from "../../forms/controller.mjs";
+import { directUpload } from "../../shared/directUpload.mjs";
+import { uploadElement } from "../upload.mjs";
 
 const PASTE_ERROR =
 	"File detected in clipboard but not accessible. Try pressing Cmd+V (Mac) or Ctrl+V (Windows/Linux) to paste instead.";

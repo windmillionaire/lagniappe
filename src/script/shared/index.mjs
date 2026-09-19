@@ -1,17 +1,17 @@
-export { analytics } from "./analytics";
-export { ConnectivityState, connectivity } from "./connectivity";
-export { DeferredOperationManager } from "./deferredOperations";
-export { ENDPOINTS } from "./endpoints";
+export { analytics } from "./analytics.mjs";
+export { ConnectivityState, connectivity } from "./connectivity.mjs";
+export { DeferredOperationManager } from "./deferredOperations.mjs";
+export { ENDPOINTS } from "./endpoints.mjs";
 export {
 	captureError,
 	captureNetworkError,
 	configureSentry,
 	isSkippedViewTransitionError,
-} from "./errors";
-export { initializeLogoutForms } from "./logout";
-export { DeleteModal, HelpModal, Modal, OfflineModal } from "./modal";
-export { OfflineQueue } from "./offlineQueue";
-export { PollingCoordinator } from "./polling";
+} from "./errors.mjs";
+export { initializeLogoutForms } from "./logout.mjs";
+export { DeleteModal, HelpModal, Modal, OfflineModal } from "./modal.mjs";
+export { OfflineQueue } from "./offlineQueue.mjs";
+export { PollingCoordinator } from "./polling.mjs";
 export {
 	BROWSER_PROTOCOL_ID,
 	BROWSER_PROTOCOL_VERSION,
@@ -20,12 +20,12 @@ export {
 	validateConnectivityState,
 	validateUpstreamUnavailableState,
 	WORKER_MESSAGES,
-} from "./protocol";
-export { QueryLifecycle } from "./queryLifecycle";
-export { request } from "./request";
-export { localStore, sessionStore } from "./storage";
-export { SyncManager } from "./sync";
-export { updateUserData, updateUserLocation } from "./user";
+} from "./protocol.mjs";
+export { QueryLifecycle } from "./queryLifecycle.mjs";
+export { request } from "./request.mjs";
+export { localStore, sessionStore } from "./storage.mjs";
+export { SyncManager } from "./sync.mjs";
+export { updateUserData, updateUserLocation } from "./user.mjs";
 export {
 	areEqual,
 	base64ToUint8Array,
@@ -35,4 +35,4 @@ export {
 	simpleHash,
 	uint8ArrayToBase64,
 	waitForAttribute,
-} from "./utilities";
+} from "./utilities.mjs";

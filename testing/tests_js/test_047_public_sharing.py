@@ -16,7 +16,7 @@ context.globalThis = context;
 vm.createContext(context);
 let source = fs.readFileSync("src/script/public.mjs", "utf8");
 source = source.replace(
-  'import { initializePublicSharing } from "./shared/publicShare";',
+  'import { initializePublicSharing } from "./shared/publicShare.mjs";',
   "const initializePublicSharing = globalThis.initializePublicSharing;",
 );
 source = source.replace(/export /g, "");
@@ -84,7 +84,7 @@ context.globalThis = context;
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/publicShare.mjs", "utf8");
 source = source.replace(
-  'import { withTransition } from "./transitions";',
+  'import { withTransition } from "./transitions.mjs";',
   "const withTransition = globalThis.withTransition;",
 );
 source = source.replace(/export /g, "");
@@ -171,7 +171,7 @@ context.globalThis = context;
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/publicShare.mjs", "utf8");
 source = source.replace(
-  'import { withTransition } from "./transitions";',
+  'import { withTransition } from "./transitions.mjs";',
   "const withTransition = globalThis.withTransition;",
 );
 source = source.replace(/export /g, "");

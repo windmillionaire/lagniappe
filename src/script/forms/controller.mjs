@@ -1,9 +1,9 @@
-import { primitives } from "../elements/primitives";
-import { createIcon } from "../shared/icons";
-import { withTransition } from "../shared/transitions";
-import { showBriefly } from "../shared/utilities";
-import { initFormControls } from "./controls/loader";
-import { FormRenderer } from "./renderer";
+import { primitives } from "../elements/primitives.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { showBriefly } from "../shared/utilities.mjs";
+import { initFormControls } from "./controls/loader.mjs";
+import { FormRenderer } from "./renderer.mjs";
 
 /**
  * @testable true

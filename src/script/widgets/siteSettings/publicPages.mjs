@@ -1,6 +1,6 @@
-import { buttons } from "../../elements/buttons";
-import { request } from "../../shared";
-import { SiteSetting } from "./base";
+import { buttons } from "../../elements/buttons.mjs";
+import { request } from "../../shared/index.mjs";
+import { SiteSetting } from "./base.mjs";
 
 const PUBLIC_PAGE_SETTINGS_ENDPOINT = "/l/site-settings/public-pages";
 

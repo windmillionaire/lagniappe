@@ -1,10 +1,10 @@
-import { captureError } from "../../shared/errors";
-import { request } from "../../shared/request";
-import { withTransition } from "../../shared/transitions";
-import { areEqual } from "../../shared/utilities";
-import { incompatibleSchema } from "../representation";
-import { FormRevisionModal, WholeFormRevisionModal } from "./modals";
-import { loadRevisionPreview } from "./preview";
+import { captureError } from "../../shared/errors.mjs";
+import { request } from "../../shared/request.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { areEqual } from "../../shared/utilities.mjs";
+import { incompatibleSchema } from "../representation.mjs";
+import { FormRevisionModal, WholeFormRevisionModal } from "./modals.mjs";
+import { loadRevisionPreview } from "./preview.mjs";
 
 /**
  * Per-marker authoritative revision probing, comparison, and resolution for

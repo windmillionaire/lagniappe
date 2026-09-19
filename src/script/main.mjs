@@ -1,10 +1,10 @@
 import "../style/main.css";
 
-import { connectivity } from "./shared/connectivity";
-import { applyNotificationStateHeader } from "./shared/notificationState";
-import { connectivityMessage } from "./shared/protocol";
-import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable";
-import { loadView } from "./viewRegistry";
+import { connectivity } from "./shared/connectivity.mjs";
+import { applyNotificationStateHeader } from "./shared/notificationState.mjs";
+import { connectivityMessage } from "./shared/protocol.mjs";
+import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.mjs";
+import { loadView } from "./viewRegistry.mjs";
 
 /**
  * @testable true
@@ -16,7 +16,7 @@ async function onError(event) {
 		captureError,
 		isSkippedViewTransitionError,
 		isTransientNetworkError,
-	} = await import("./shared/errors");
+	} = await import("./shared/errors.mjs");
 	const error = event.error || event.reason || event.message || "Unknown error";
 	if (isSkippedViewTransitionError(error) || isTransientNetworkError(error)) {
 		event.preventDefault();
@@ -99,7 +99,7 @@ const getView = async () => {
 	__activeView = (async () => {
 		const viewModule = await loadView(viewElt.dataset.kind);
 		if (!viewModule) {
-			const { captureError } = await import("./shared/errors");
+			const { captureError } = await import("./shared/errors.mjs");
 			captureError(
 				new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
 				viewElt,
@@ -405,7 +405,7 @@ function pageMode() {
  * @reason analytics startup is composition owned by the page-mode lifecycle
  */
 async function startAnalytics() {
-	const { analytics } = await import("./shared/analytics");
+	const { analytics } = await import("./shared/analytics.mjs");
 	analytics.view();
 }
 
@@ -433,7 +433,7 @@ function startErrorHandling() {
 function startServiceWorker() {
 	if (!("serviceWorker" in navigator)) return;
 	navigator.serviceWorker.register("/sw.js").catch(async (error) => {
-		const { captureNetworkError } = await import("./shared/errors");
+		const { captureNetworkError } = await import("./shared/errors.mjs");
 		captureNetworkError(error, "/sw.js", { context: "service_worker" });
 	});
 
@@ -443,7 +443,7 @@ function startServiceWorker() {
 				? "controlled"
 				: "uncontrolled",
 		});
-		const { clearRecentSearchResults } = await import("./shared/storage");
+		const { clearRecentSearchResults } = await import("./shared/storage.mjs");
 		clearRecentSearchResults();
 		syncView();
 	});
@@ -460,8 +460,8 @@ async function startAuthenticatedLifecycle() {
 	startErrorHandling();
 
 	const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
-		import("./shared/logout"),
-		import("./shared/user"),
+		import("./shared/logout.mjs"),
+		import("./shared/user.mjs"),
 	]);
 	initializeLogoutForms();
 	void startAnalytics();

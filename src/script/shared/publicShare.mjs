@@ -1,4 +1,4 @@
-import { withTransition } from "./transitions";
+import { withTransition } from "./transitions.mjs";
 
 /**
  * @testable false

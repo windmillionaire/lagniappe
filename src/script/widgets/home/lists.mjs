@@ -1,6 +1,6 @@
-import { BaseList } from "../../elements/base/baseList";
-import { localStore } from "../../shared/storage";
-import { withTransition } from "../../shared/transitions";
+import { BaseList } from "../../elements/base/baseList.mjs";
+import { localStore } from "../../shared/storage.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 
@@ -322,7 +322,7 @@ export class ToolReportList extends BaseList {
 		if (!element) return;
 		this._openingDelete = true;
 		try {
-			const { Modal } = await import("../../shared/modal");
+			const { Modal } = await import("../../shared/modal.mjs");
 			if (this._destroyed) return;
 			this._deleteModal?.destroy();
 			const modal = new Modal(this.view, trigger);
@@ -372,7 +372,7 @@ export class ToolReportList extends BaseList {
 		error.hidden = true;
 		this._renderFilters();
 		try {
-			const { request } = await import("../../shared/request");
+			const { request } = await import("../../shared/request.mjs");
 			const response = await request.delete(route, { keys });
 			if (!response?.ok)
 				throw new Error("Reports could not be deleted. Please try again.");

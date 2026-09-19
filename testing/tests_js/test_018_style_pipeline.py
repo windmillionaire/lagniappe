@@ -9,8 +9,8 @@ import assert from "node:assert/strict";
 import {
   normalizeStyleRegistry,
   pythonStyleModuleSource,
-  virtualIconModuleSource,
-  virtualStyleModuleSource,
+  javascriptIconModuleSource,
+  javascriptStyleModuleSource,
 } from "./build/utility.mjs";
 
 const typedRegistry = {
@@ -32,10 +32,10 @@ const typedRegistry = {
 const registry = normalizeStyleRegistry(typedRegistry);
 const icons = { page: { glyph: "draft", fill: 1 } };
 const virtualStyles = await import(
-  `data:text/javascript,${encodeURIComponent(virtualStyleModuleSource(registry))}`
+  `data:text/javascript,${encodeURIComponent(javascriptStyleModuleSource(registry))}`
 );
 const virtualIcons = await import(
-  `data:text/javascript,${encodeURIComponent(virtualIconModuleSource(icons))}`
+  `data:text/javascript,${encodeURIComponent(javascriptIconModuleSource(icons))}`
 );
 const pythonSource = pythonStyleModuleSource("STYLES", registry);
 const pythonPayload = JSON.parse(pythonSource.split("STYLES = ", 2)[1]);
@@ -174,8 +174,8 @@ assert.equal(STYLE_PIPELINE.registry.styles, "src/style/styles.yaml");
 assert.equal(STYLE_PIPELINE.registry.schema, "src/style/registry.schema.json");
 assert.equal(STYLE_PIPELINE.registry.icons, "src/style/icons.yaml");
 assert.equal(STYLE_PIPELINE.registry.icons_schema, "src/style/icons.schema.json");
-assert.equal(STYLE_PIPELINE.registry.virtual_module, "styles");
-assert.equal(STYLE_PIPELINE.registry.icons_virtual_module, "icons");
+assert.equal(STYLE_PIPELINE.registry.javascript_styles, "src/script/generated/styles.mjs");
+assert.equal(STYLE_PIPELINE.registry.javascript_icons, "src/script/generated/icons.mjs");
 assert.equal(
   STYLE_PIPELINE.registry.python_styles,
   "lagniappe/web/start/styles/styles.py",
@@ -195,17 +195,9 @@ assert.deepEqual(STYLE_PIPELINE.builds.production.transforms, [
   "cssnano",
 ]);
 const plugin = buildStyles();
-assert.equal(plugin.resolveId(STYLE_PIPELINE.registry.virtual_module), "styles");
-assert.equal(
-  plugin.resolveId(STYLE_PIPELINE.registry.icons_virtual_module),
-  "icons",
-);
-const runtimeStyles = await import(
-  `data:text/javascript,${encodeURIComponent(plugin.load(STYLE_PIPELINE.registry.virtual_module))}`
-);
-const runtimeIcons = await import(
-  `data:text/javascript,${encodeURIComponent(plugin.load(STYLE_PIPELINE.registry.icons_virtual_module))}`
-);
+plugin.buildStart();
+const runtimeStyles = await import(`./${STYLE_PIPELINE.registry.javascript_styles}`);
+const runtimeIcons = await import(`./${STYLE_PIPELINE.registry.javascript_icons}`);
 assert.equal(typeof runtimeStyles.STYLES.button.submit, "string");
 assert.match(runtimeStyles.STYLES.button.submit, /\bw-full\b/);
 assert.match(runtimeStyles.STYLES.button.submit, /\bgrow\b/);

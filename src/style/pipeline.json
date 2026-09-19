@@ -1,13 +1,13 @@
 {
-	"schema_version": 3,
+	"schema_version": 4,
 	"frontend_entry": "src/script/main.mjs",
 	"registry": {
 		"styles": "src/style/styles.yaml",
 		"schema": "src/style/registry.schema.json",
 		"icons": "src/style/icons.yaml",
 		"icons_schema": "src/style/icons.schema.json",
-		"virtual_module": "styles",
-		"icons_virtual_module": "icons",
+		"javascript_styles": "src/script/generated/styles.mjs",
+		"javascript_icons": "src/script/generated/icons.mjs",
 		"python_styles": "lagniappe/web/start/styles/styles.py",
 		"python_fonts": "lagniappe/web/start/styles/fonts.py",
 		"python_icons": "lagniappe/web/start/styles/icons.py"

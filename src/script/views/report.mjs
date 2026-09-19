@@ -1,7 +1,7 @@
-import { createIcon, setIcon } from "../shared/icons";
-import { request } from "../shared/request";
-import { withTransition } from "../shared/transitions";
-import Core from "./base/core";
+import { createIcon, setIcon } from "../shared/icons.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import Core from "./base/core.mjs";
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
@@ -46,7 +46,7 @@ export default class Report extends Core {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
-		const pending = import("../forms/controller")
+		const pending = import("../forms/controller.mjs")
 			.then(async ({ FormController }) => {
 				if (this._destroyed) return null;
 				await Promise.all([

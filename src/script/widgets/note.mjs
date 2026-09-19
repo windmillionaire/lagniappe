@@ -1,4 +1,4 @@
-import { FormWidget } from "./base/formWidget";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable true

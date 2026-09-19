@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { ENDPOINTS } from "../../shared/endpoints";
-import { request } from "../../shared/request";
-import { RemoteQueryCombobox } from "./remote";
-import { Results } from "./results";
+import { STYLES } from "../../generated/styles.mjs";
+import { ENDPOINTS } from "../../shared/endpoints.mjs";
+import { request } from "../../shared/request.mjs";
+import { RemoteQueryCombobox } from "./remote.mjs";
+import { Results } from "./results.mjs";
 
 /**
  * @testable true

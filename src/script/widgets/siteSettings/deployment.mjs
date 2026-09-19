@@ -1,7 +1,7 @@
-import { buttons } from "../../elements/buttons";
-import { SelectBox } from "../../elements/combobox";
-import { request } from "../../shared";
-import { SiteSetting } from "./base";
+import { buttons } from "../../elements/buttons.mjs";
+import { SelectBox } from "../../elements/combobox/index.mjs";
+import { request } from "../../shared/index.mjs";
+import { SiteSetting } from "./base.mjs";
 
 const INSTANCE_CLASSES = {
 	automatic: ["F1", "F2", "F4", "F4_1G"],

@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { buttons } from "../../elements/buttons";
-import { Modal, request } from "../../shared";
-import { clearRecentSearchResults } from "../../shared/storage";
-import { withTransition } from "../../shared/transitions";
-import { SiteSetting } from "./base";
+import { buttons } from "../../elements/buttons.mjs";
+import { STYLES } from "../../generated/styles.mjs";
+import { Modal, request } from "../../shared/index.mjs";
+import { clearRecentSearchResults } from "../../shared/storage.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { SiteSetting } from "./base.mjs";
 
 /**
  * @testable true

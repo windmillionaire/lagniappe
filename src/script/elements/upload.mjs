@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { createIcon } from "../shared/icons";
-import { buttons } from "./buttons";
-import { Dropdown } from "./combobox/dropdown";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { buttons } from "./buttons.mjs";
+import { Dropdown } from "./combobox/dropdown.mjs";
+import { primitives } from "./primitives.mjs";
 
 const DEFAULT_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";

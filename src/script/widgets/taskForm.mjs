@@ -1,7 +1,7 @@
-import { sections } from "../elements/sections";
-import { FormController } from "../forms/controller";
-import { captureError, request } from "../shared";
-import { FormWidget } from "./base/formWidget";
+import { sections } from "../elements/sections.mjs";
+import { FormController } from "../forms/controller.mjs";
+import { captureError, request } from "../shared/index.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable false

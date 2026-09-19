@@ -40,11 +40,11 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/elements/html.mjs", "utf8");
 source = source.replace(
-  /import \{([^}]+)\} from "\.\.\/shared";/,
+  /import \{([^}]+)\} from "\.\.\/shared\/index\.mjs";/,
   "const {$1} = dependencies;",
 );
 source = source.replace(
-  /import \{([^}]+)\} from "\.\/base\/baseElement";/,
+  /import \{([^}]+)\} from "\.\/base\/baseElement\.mjs";/,
   "const {$1} = dependencies;",
 );
 source = source.replace(

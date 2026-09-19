@@ -1,6 +1,6 @@
-import { primitives } from "../../../elements/primitives";
-import { generateElementId } from "../../../shared/utilities";
-import { Condition } from "./base";
+import { primitives } from "../../../elements/primitives.mjs";
+import { generateElementId } from "../../../shared/utilities.mjs";
+import { Condition } from "./base.mjs";
 
 /**
  * @testable true

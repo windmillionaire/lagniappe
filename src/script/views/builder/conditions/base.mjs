@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { SelectBox } from "../../../elements/combobox";
-import { primitives } from "../../../elements/primitives";
-import { FormController } from "../../../forms/controller";
-import { setIcon } from "../../../shared/icons";
-import { withTransition } from "../../../shared/transitions";
+import { SelectBox } from "../../../elements/combobox/index.mjs";
+import { primitives } from "../../../elements/primitives.mjs";
+import { FormController } from "../../../forms/controller.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { setIcon } from "../../../shared/icons.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure

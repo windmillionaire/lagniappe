@@ -106,15 +106,15 @@ const context = {
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/sync.mjs", "utf8");
 source = source.replace(
-  'import { loadHeadlessWidget } from "../elements/editor/headless";',
+  'import { loadHeadlessWidget } from "../elements/editor/headless.mjs";',
   "const loadHeadlessWidget = globalThis.loadHeadlessWidget;",
 );
 source = source.replace(
-  'import { ENDPOINTS } from "./endpoints";',
+  'import { ENDPOINTS } from "./endpoints.mjs";',
   "const ENDPOINTS = globalThis.ENDPOINTS;",
 );
 source = source.replace(
-  /import \{[\s\S]*?\} from "\.\/offline";/,
+  /import \{[\s\S]*?\} from "\.\/offline\.mjs";/,
   `const {
     deleteSyncRecord,
     deleteSyncRecords,
@@ -124,11 +124,11 @@ source = source.replace(
   } = globalThis.offline;`,
 );
 source = source.replace(
-  'import { request } from "./request";',
+  'import { request } from "./request.mjs";',
   "const request = globalThis.request;",
 );
 source = source.replace(
-  'import { waitForAttribute } from "./utilities";',
+  'import { waitForAttribute } from "./utilities.mjs";',
   "const waitForAttribute = globalThis.waitForAttribute;",
 );
 source = source.replace("export class SyncManager", "class SyncManager");

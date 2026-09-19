@@ -71,7 +71,7 @@ def _source_files(repo_root: Path):
                 continue
             relative = path.relative_to(repo_root).as_posix()
             if relative.startswith(
-                ("lagniappe/web/static/", "lagniappe/web/start/styles/")
+                ("lagniappe/web/static/", "lagniappe/web/start/styles/", "src/script/generated/")
             ):
                 continue
             yield path, relative

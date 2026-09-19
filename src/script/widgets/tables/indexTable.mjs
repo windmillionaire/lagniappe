@@ -1,4 +1,4 @@
-import { BaseTable } from "../../elements/base/baseTable";
+import { BaseTable } from "../../elements/base/baseTable.mjs";
 
 /**
  * @testable infrastructure

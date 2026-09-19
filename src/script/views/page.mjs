@@ -1,6 +1,6 @@
-import { setIcon } from "../shared/icons";
-import { withTransition } from "../shared/transitions";
-import Entity from "./base/entity";
+import { setIcon } from "../shared/icons.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import Entity from "./base/entity.mjs";
 
 /**
  * @testable true

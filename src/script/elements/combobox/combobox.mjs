@@ -5,10 +5,10 @@ import {
 	offset,
 	shift,
 } from "@floating-ui/dom";
-import { STYLES } from "styles";
-import { captureError } from "../../shared/errors";
-import { generateElementId } from "../../shared/utilities";
-import { primitives } from "../primitives";
+import { STYLES } from "../../generated/styles.mjs";
+import { captureError } from "../../shared/errors.mjs";
+import { generateElementId } from "../../shared/utilities.mjs";
+import { primitives } from "../primitives.mjs";
 
 /**
  * @testable true

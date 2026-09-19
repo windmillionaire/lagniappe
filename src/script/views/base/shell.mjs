@@ -1,4 +1,4 @@
-import { connectivity } from "../../shared/connectivity";
+import { connectivity } from "../../shared/connectivity.mjs";
 
 const MOBILE_QUERY = "(max-width: 640px)";
 
@@ -125,7 +125,7 @@ export default class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import("../../shared/polling");
+				const { PollingCoordinator } = await import("../../shared/polling.mjs");
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -135,7 +135,7 @@ export default class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import("../../elements/combobox/search");
+			const { SearchBox } = await import("../../elements/combobox/search.mjs");
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -150,7 +150,9 @@ export default class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import("../../elements/notifications");
+				const { Notifications } = await import(
+					"../../elements/notifications.mjs"
+				);
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();
@@ -194,7 +196,7 @@ export default class ShellView {
 	}
 
 	reportStartupError(error, element = this.elt, context = "lazy-control") {
-		void import("../../shared/errors")
+		void import("../../shared/errors.mjs")
 			.then(({ captureError }) => {
 				captureError(error, element, { context });
 			})

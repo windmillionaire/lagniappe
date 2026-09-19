@@ -1,5 +1,8 @@
 # Testing Writing Tests
 
+For native Node cases, shared fixtures, and the step-by-step migration recipe,
+see [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md).
+
 Use this guide when adding or reshaping tests. For a systematic review of an
 existing test, also read [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md).
 Commands and suite setup live in [TESTING.md](TESTING.md).
@@ -13,7 +16,7 @@ the behavior.
 | Layer | Use it for |
 | --- | --- |
 | Unit | Deterministic backend entities, properties, permissions, validation, retries, and service logic without a live app server. |
-| JavaScript | Frontend module behavior that can run in Node with small platform fakes and does not require a real DOM or server. |
+| JavaScript | Frontend module behavior in Node, including jsdom DOM operations and simulated persistence; no live browser/server. |
 | E2E | User workflows or browser lifecycle behavior that requires a real browser/server boundary, DOM, routing, storage, rendering, or multi-user interaction. |
 | Tooling | Setup/config smoke tests, repository health, reporters, and runner behavior. Tooling tests must not import `lagniappe.core` or `lagniappe.web`, or execute Node. |
 

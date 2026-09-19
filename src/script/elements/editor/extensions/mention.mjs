@@ -6,11 +6,11 @@ import {
 	shift,
 } from "@floating-ui/dom";
 import { mergeAttributes, Node } from "@tiptap/core";
-import { STYLES } from "styles";
-import { captureError } from "../../../shared/errors";
-import { QueryLifecycle } from "../../../shared/queryLifecycle";
-import { request } from "../../../shared/request";
-import { debounce, generateElementId } from "../../../shared/utilities";
+import { STYLES } from "../../../generated/styles.mjs";
+import { captureError } from "../../../shared/errors.mjs";
+import { QueryLifecycle } from "../../../shared/queryLifecycle.mjs";
+import { request } from "../../../shared/request.mjs";
+import { debounce, generateElementId } from "../../../shared/utilities.mjs";
 
 /**
  * @testable true

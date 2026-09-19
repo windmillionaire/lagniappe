@@ -1,8 +1,8 @@
-import { InputElement } from "../elements/input";
-import { SectionToggle } from "../elements/sectionToggle";
-import { TextareaElement } from "../elements/textarea";
-import { withTransition } from "../shared/transitions";
-import { FormWidget } from "./base/formWidget";
+import { InputElement } from "../elements/input.mjs";
+import { SectionToggle } from "../elements/sectionToggle.mjs";
+import { TextareaElement } from "../elements/textarea.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 const TASK_BUTTONS = {
 	selectUser: "facet",

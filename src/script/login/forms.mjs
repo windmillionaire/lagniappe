@@ -1,10 +1,10 @@
-import { createIcon } from "../shared/icons";
-import { captureLoginError } from "./error";
+import { createIcon } from "../shared/icons.mjs";
+import { captureLoginError } from "./error.mjs";
 import {
 	checkUserStatus,
 	getAuthErrorMessage,
 	handleIdentityUser,
-} from "./tools";
+} from "./tools.mjs";
 
 /**
  * @testable true

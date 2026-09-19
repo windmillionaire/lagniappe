@@ -1,7 +1,7 @@
-import { FacetedSearchElement } from "../elements/facetedSearch";
-import { InputElement } from "../elements/input";
-import { RadioElement } from "../elements/radio";
-import { FormWidget } from "./base/formWidget";
+import { FacetedSearchElement } from "../elements/facetedSearch.mjs";
+import { InputElement } from "../elements/input.mjs";
+import { RadioElement } from "../elements/radio.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable true

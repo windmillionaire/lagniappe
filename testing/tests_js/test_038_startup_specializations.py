@@ -119,7 +119,7 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
-  'import { connectivity } from "../../shared/connectivity";',
+  'import { connectivity } from "../../shared/connectivity.mjs";',
   "",
 );
 source = source.replaceAll("export const ", "const ");
@@ -263,10 +263,10 @@ const context = {
 vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/page.mjs", "utf8");
-source = source.replace('import { withTransition } from "../shared/transitions";\n', "");
-source = source.replace('import { setIcon } from "../shared/icons";\n', "");
+source = source.replace('import { withTransition } from "../shared/transitions.mjs";\n', "");
+source = source.replace('import { setIcon } from "../shared/icons.mjs";\n', "");
 source = source.replace(
-  'import Entity from "./base/entity";',
+  'import Entity from "./base/entity.mjs";',
   `
 const Entity = class {
   constructor(elt) { this.elt = elt; this.hash = "page"; this.key = "page-1"; }
@@ -364,7 +364,7 @@ const REPORT_FORM_SELECTOR =
 `,
 );
 source = source.replace(
-  'import("../forms/controller")',
+  'import("../forms/controller.mjs")',
   "globalThis.loadBaseForm()",
 );
 source = source.replace("export default class Report", "class Report");

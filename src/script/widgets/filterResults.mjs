@@ -1,5 +1,5 @@
-import { STYLES } from "styles";
-import { EmbeddedTable } from "../elements/base/baseTable";
+import { EmbeddedTable } from "../elements/base/baseTable.mjs";
+import { STYLES } from "../generated/styles.mjs";
 
 /**
  * @testable true

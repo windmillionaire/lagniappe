@@ -1,14 +1,14 @@
-import { loadHeadlessWidget } from "../elements/editor/headless";
-import { ENDPOINTS } from "./endpoints";
+import { loadHeadlessWidget } from "../elements/editor/headless.mjs";
+import { ENDPOINTS } from "./endpoints.mjs";
 import {
 	deleteSyncRecord,
 	deleteSyncRecords,
 	getAllOfflineRecords,
 	getSyncRecord,
 	updateSyncRecord,
-} from "./offline";
-import { request } from "./request";
-import { waitForAttribute } from "./utilities";
+} from "./offline.mjs";
+import { request } from "./request.mjs";
+import { waitForAttribute } from "./utilities.mjs";
 
 /**
  * Coordinate Yjs document updates through the shared polling protocol.

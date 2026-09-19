@@ -183,6 +183,17 @@ development requirements. Transitive Python packages update when required by
 the selected direct upgrades. The separate locked MCP environment remains
 managed by the MCP tooling.
 
+Development follows the latest stable releases. The Node upgrade records that
+resolved version in `.nvmrc`, updates the minimum engine in `package.json` and
+the lockfile, and resolves the matching official `node:<version>-bookworm-slim`
+image digest for hosted E2E. The installer reads the same `.nvmrc` floor.
+An unavailable or invalid image stops this declaration update before files
+are changed. No Docker installation or image-layer download is required.
+At release freeze, `run.py release-check` validates the staged `.nvmrc`, both
+npm engine declarations, and the hosted image's matching version and digest
+pin. It checks recorded versions without making network requests or requiring
+an older development compatibility range.
+
 The command prints each step and streams subprocess output, including prompts,
 while keeping a report. Quiet machine-readable lookups have closed stdin; npm
 version discovery runs once with a 90-second limit. Other commands have a

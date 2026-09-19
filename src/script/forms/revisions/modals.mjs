@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { Modal } from "../../shared/modal";
-import { areEqual } from "../../shared/utilities";
-import { compatibleField } from "../representation";
-import { loadRevisionPreview } from "./preview";
+import { STYLES } from "../../generated/styles.mjs";
+import { Modal } from "../../shared/modal.mjs";
+import { areEqual } from "../../shared/utilities.mjs";
+import { compatibleField } from "../representation.mjs";
+import { loadRevisionPreview } from "./preview.mjs";
 
 /**
  * @testable true

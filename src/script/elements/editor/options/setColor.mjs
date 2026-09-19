@@ -1,4 +1,4 @@
-import { COLOR_MENU } from "../config";
+import { COLOR_MENU } from "../config.mjs";
 
 /**
  * @testable true

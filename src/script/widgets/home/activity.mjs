@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { BaseList } from "../../elements/base/baseList";
-import { request } from "../../shared";
-import { setIcon } from "../../shared/icons";
-import { withTransition } from "../../shared/transitions";
+import { BaseList } from "../../elements/base/baseList.mjs";
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { request } from "../../shared/index.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure

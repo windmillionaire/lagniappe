@@ -1,10 +1,10 @@
-import { STYLES } from "styles";
-import { iconDefinition, setIcon } from "../shared/icons";
-import { withTransition } from "../shared/transitions";
-import { FacetsBox } from "./combobox/facets";
-import { DueDate } from "./dueDate";
-import { formatting } from "./formatting";
-import { TaskUpload } from "./taskUpload";
+import { STYLES } from "../generated/styles.mjs";
+import { iconDefinition, setIcon } from "../shared/icons.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { FacetsBox } from "./combobox/facets.mjs";
+import { DueDate } from "./dueDate.mjs";
+import { formatting } from "./formatting.mjs";
+import { TaskUpload } from "./taskUpload.mjs";
 
 /**
  * @testable infrastructure

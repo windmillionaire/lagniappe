@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { setIcon } from "../shared/icons";
-import { BaseElement } from "./base/baseElement";
-import { LocationBox } from "./combobox";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { LocationBox } from "./combobox/index.mjs";
+import { primitives } from "./primitives.mjs";
 
 const MAPS_SEARCH = "https://www.google.com/maps/search/";
 

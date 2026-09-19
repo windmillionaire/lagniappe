@@ -1,5 +1,5 @@
-import { PollingCoordinator } from "../../shared/polling";
-import { request } from "../../shared/request";
+import { PollingCoordinator } from "../../shared/polling.mjs";
+import { request } from "../../shared/request.mjs";
 
 /**
  * @testable true

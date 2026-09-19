@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { h as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=b158c05a';
-import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=b158c05a';
-import './upstreamUnavailable.js?v=b158c05a';
-import './connectivity.js?v=b158c05a';
+import { h as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=bdc1ce7d';
+import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=bdc1ce7d';
+import './upstreamUnavailable.js?v=bdc1ce7d';
+import './connectivity.js?v=bdc1ce7d';
 
 /** Sync-capable widgets that can run without a mounted view (offline replay). */
 const HEADLESS_WIDGETS = {
 	document: {
-		load: () => import('./collaborative.js?v=b158c05a'),
+		load: () => import('./collaborative.js?v=bdc1ce7d'),
 		name: "CollaborativeDocument",
 	},
 };

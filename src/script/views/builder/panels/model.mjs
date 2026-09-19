@@ -1,7 +1,7 @@
 import Sortable from "sortablejs";
-import { STYLES } from "styles";
-import { primitives } from "../../../elements/primitives";
-import { CONFIG } from "../config";
+import { primitives } from "../../../elements/primitives.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { CONFIG } from "../config.mjs";
 
 /**
  * @testable infrastructure

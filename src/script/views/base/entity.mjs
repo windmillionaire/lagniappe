@@ -1,7 +1,7 @@
-import { NavElement } from "../../elements/nav";
-import { withTransition } from "../../shared/transitions";
-import { debounce } from "../../shared/utilities";
-import Core from "./core";
+import { NavElement } from "../../elements/nav.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { debounce } from "../../shared/utilities.mjs";
+import Core from "./core.mjs";
 
 /**
  * @testable infrastructure

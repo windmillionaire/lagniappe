@@ -1,4 +1,4 @@
-import { FONT_MENU } from "../config";
+import { FONT_MENU } from "../config.mjs";
 
 /**
  * @testable true

@@ -1,6 +1,8 @@
 """Dependency maintenance remains observable, cancellable, and scoped."""
 
 import json
+import hashlib
+import io
 import os
 import queue
 import subprocess
@@ -12,6 +14,51 @@ import pytest
 from runner import upgrade
 
 pytestmark = pytest.mark.tooling
+
+
+# @matrix dependencies : node-version pinning upgrade
+def test_node_alignment_failure_preserves_all_declarations(monkeypatch, tmp_path):
+    pin = tmp_path / ".nvmrc"
+    package = tmp_path / "package.json"
+    docker = tmp_path / upgrade.NODE_DOCKERFILE_PATH
+    docker.parent.mkdir(parents=True)
+    pin.write_text("26.5.0\n")
+    package.write_text('{"engines":{"node":">=26.5.0"}}')
+    docker.write_text("FROM node:26.5.0-bookworm-slim@sha256:" + "a" * 64 + " AS node-runtime\n")
+    before = {path: path.read_bytes() for path in (pin, package, docker)}
+
+    def unavailable(version):
+        raise OSError("image has not been published")
+
+    monkeypatch.setattr(upgrade, "resolve_node_image", unavailable)
+    report = upgrade.UpgradeReport()
+    assert not upgrade.update_node_version_pin("26.8.2", report, pin)
+    assert "image has not been published" in report.errors[0]
+    assert {path: path.read_bytes() for path in before} == before
+
+
+# @matrix dependencies : node-version pinning upgrade
+def test_node_image_lookup_verifies_registry_digest(monkeypatch):
+    content = json.dumps({"schemaVersion": 2, "manifests": [{"platform": {"os": "linux", "architecture": "amd64"}}]}).encode()
+    digest = "sha256:" + hashlib.sha256(content).hexdigest()
+    requests = []
+    invalid = False
+
+    def open_response(request, *, timeout):
+        assert timeout == 30
+        requests.append(request)
+        if isinstance(request, str):
+            return io.BytesIO(b'{"token":"public-registry-token"}')
+        response = io.BytesIO(content)
+        response.headers = {"Docker-Content-Digest": "sha256:wrong" if invalid else digest}
+        return response
+
+    monkeypatch.setattr(upgrade, "urlopen", open_response)
+    assert upgrade.resolve_node_image("26.8.2") == f"node:26.8.2-bookworm-slim@{digest}"
+    assert requests[1].full_url.endswith("/manifests/26.8.2-bookworm-slim")
+    invalid = True
+    with pytest.raises(ValueError, match="digest verification"):
+        upgrade.resolve_node_image("26.8.2")
 
 
 # @matrix dependencies : subprocess-output cancellation

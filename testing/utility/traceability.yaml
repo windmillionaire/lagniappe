@@ -165,6 +165,7 @@ suggestions:
     - template
 
 exclude:
+  - "src/script/generated/**"
   - "**/__pycache__/**"
   - "**/*.pyc"
   - "**/*.map"

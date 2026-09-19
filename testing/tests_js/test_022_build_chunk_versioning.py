@@ -451,7 +451,7 @@ for (const fileName of sources) {
   assert.equal(bytes.subarray(0, 4).toString(), "wOF2");
   assert.deepEqual(asset.source, bytes);
 }
-buildStyles().generateBundle();
+buildStyles().buildStart();
 const python = readFileSync("lagniappe/web/start/styles/fonts.py", "utf8");
 const preloads = JSON.parse(python.slice(python.indexOf("{")));
 const css = await postcss([resolveFonts()]).process(readFileSync("src/style/fonts.css", "utf8"), { from: undefined });

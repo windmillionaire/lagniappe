@@ -1,7 +1,7 @@
-import { getFormElement } from "../../elements/loader";
-import { setIcon } from "../../shared/icons";
-import { request } from "../../shared/request";
-import { withTransition } from "../../shared/transitions";
+import { getFormElement } from "../../elements/loader.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { request } from "../../shared/request.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 const SAVED_STATE_MS = 1200;
 

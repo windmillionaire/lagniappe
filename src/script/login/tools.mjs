@@ -1,5 +1,5 @@
-import { analytics } from "../shared/analytics";
-import { request } from "../shared/request";
+import { analytics } from "../shared/analytics.mjs";
+import { request } from "../shared/request.mjs";
 
 /**
  * @testable true

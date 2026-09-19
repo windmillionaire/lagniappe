@@ -1,5 +1,5 @@
-import { BaseUpload } from "../elements/base/baseUpload";
-import { UploadMenu, uploadElement } from "../elements/upload";
+import { BaseUpload } from "../elements/base/baseUpload.mjs";
+import { UploadMenu, uploadElement } from "../elements/upload.mjs";
 
 const INGRESS_DROPZONE_TEXT =
 	"Drop a file here or click to upload. Only CSV files are supported.";

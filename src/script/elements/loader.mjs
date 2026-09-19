@@ -7,43 +7,43 @@ export async function getFormElement(renderer, schema, submission) {
 	let module;
 	switch (schema.type) {
 		case "checkbox":
-			module = await import(`./checkbox`);
+			module = await import(`./checkbox.mjs`);
 			return new module.CheckboxElement(renderer, schema, submission);
 		case "radio":
-			module = await import(`./radio`);
+			module = await import(`./radio.mjs`);
 			return new module.RadioElement(renderer, schema, submission);
 		case "textarea":
-			module = await import(`./textarea`);
+			module = await import(`./textarea.mjs`);
 			return new module.TextareaElement(renderer, schema, submission);
 		case "input":
-			module = await import(`./input`);
+			module = await import(`./input.mjs`);
 			return new module.InputElement(renderer, schema, submission);
 		case "select":
-			module = await import(`./select`);
+			module = await import(`./select.mjs`);
 			return new module.SelectElement(renderer, schema, submission);
 		case "html":
-			module = await import(`./html`);
+			module = await import(`./html.mjs`);
 			return new module.HtmlElement(renderer, schema, submission);
 		case "signature":
-			module = await import(`./signature`);
+			module = await import(`./signature.mjs`);
 			return new module.SignatureElement(renderer, schema, submission);
 		case "table":
-			module = await import(`./table`);
+			module = await import(`./table.mjs`);
 			return new module.TableElement(renderer, schema, submission);
 		case "todo":
-			module = await import(`./todo`);
+			module = await import(`./todo.mjs`);
 			return new module.TodoElement(renderer, schema, submission);
 		case "link":
-			module = await import(`./link`);
+			module = await import(`./link.mjs`);
 			return new module.LinkElement(renderer, schema, submission);
 		case "bookmark":
-			module = await import(`./bookmark`);
+			module = await import(`./bookmark.mjs`);
 			return new module.BookmarkElement(renderer, schema, submission);
 		case "location":
-			module = await import(`./location`);
+			module = await import(`./location.mjs`);
 			return new module.LocationElement(renderer, schema, submission);
 		case "status":
-			module = await import(`./status`);
+			module = await import(`./status.mjs`);
 			return new module.StatusElement(renderer, schema, submission);
 		default:
 			throw new Error(`Unknown form element type: ${schema.type}`);

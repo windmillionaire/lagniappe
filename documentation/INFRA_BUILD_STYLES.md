@@ -105,18 +105,23 @@ Update the pinned source and its existing third-party notice when upgrading.
 
 ## Generated consumers
 
-`buildStyles()` in `build/utility.mjs` creates separate virtual `"styles"` and
-`"icons"` modules for Rollup. During `generateBundle()` it writes matching
-Python dictionaries to:
+`generateStyleModules()` in `build/utility.mjs` writes tracked JavaScript modules
+and matching Python dictionaries from the same validated registries:
 
 ```text
+src/script/generated/styles.mjs
+src/script/generated/icons.mjs
 lagniappe/web/start/styles/styles.py
 lagniappe/web/start/styles/icons.py
 lagniappe/web/start/styles/fonts.py
 ```
 
 The YAML records are therefore the source of truth on both browser and server
-surfaces. Generated Python files are parity artifacts, not edit targets.
+surfaces. Import the JavaScript modules by their relative `.mjs` paths.
+Run `node build/generate-registries.mjs` to regenerate without Rollup. Builds
+run this before recording the source digest; JavaScript tests run it before
+execution. Unchanged content is not rewritten. These generated files are parity
+artifacts, not edit targets. The style reporter checks both language outputs.
 
 ## Style and icon checks
 
@@ -143,7 +148,8 @@ Normal runs write `reports/style-traceability.md` and the versioned
 ## JavaScript, CSS, and JSON
 
 Biome owns formatting, linting, and import organization for authored files in
-`src/script/`, `src/style/`, and `build/`. Generated static output is excluded.
+`src/script/`, `src/style/`, `build/`, and the native JavaScript tests and helpers.
+Generated registry modules and static output are excluded.
 
 ```bash
 npm run check

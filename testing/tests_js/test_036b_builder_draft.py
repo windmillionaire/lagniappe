@@ -313,9 +313,9 @@ const context = { console, crypto, ENDPOINTS: { createSchema: "/generate" }, cap
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/views/builder/panels/formSettings.mjs", "utf8")
-  .replace(/^import.*\n/gm, "").replace("export class FormSettings", "globalThis.FormSettings = class FormSettings"), context);
+  .replace(/^import[\s\S]*?;\n/gm, "").replace("export class FormSettings", "globalThis.FormSettings = class FormSettings"), context);
 vm.runInContext(fs.readFileSync("src/script/views/builder/panels/condition.mjs", "utf8")
-  .replace(/^import.*\n/gm, "").replace("export class ConditionPanel", "globalThis.ConditionPanel = class ConditionPanel"), context);
+  .replace(/^import[\s\S]*?;\n/gm, "").replace("export class ConditionPanel", "globalThis.ConditionPanel = class ConditionPanel"), context);
 let message, restores = 0;
 const submitter = { dataset: {}, disabled: false, setAttribute() {}, removeAttribute() {} };
 const textarea = { value: "Keep the prompt" };
@@ -388,7 +388,7 @@ vm.runInContext(fs.readFileSync("src/script/views/builder/builder.mjs", "utf8")
   .replace(/^import[\s\S]*?from ["'][^"']+["'];\n/gm, "")
   .replace("export default FormBuilder;", "globalThis.FormBuilder = FormBuilder;"), context);
 vm.runInContext(fs.readFileSync("src/script/views/builder/panels/model.mjs", "utf8")
-  .replace(/^import.*\n/gm, "").replaceAll("export ", "")
+  .replace(/^import[\s\S]*?;\n/gm, "").replaceAll("export ", "")
   + "\nglobalThis.ModelPanel = ModelPanel;", context);
 const state = { name: "Saved form", form_type: "task", selected_id: null,
   schema: [{ id: "notes", type: "input", title: "Notes" }], html_fields: {} };
@@ -438,7 +438,7 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/views/builder/builder.mjs", "utf8")
   .replace(/^import[\s\S]*?from ["'][^"']+["'];\n/gm, "").replace("export default FormBuilder;", "globalThis.FormBuilder = FormBuilder;"), context);
 vm.runInContext(fs.readFileSync("src/script/views/builder/conditions/base.mjs", "utf8")
-  .replace(/^import.*\n/gm, "").replaceAll("export class", "class") + "\nglobalThis.Condition = Condition;", context);
+  .replace(/^import[\s\S]*?;\n/gm, "").replaceAll("export class", "class") + "\nglobalThis.Condition = Condition;", context);
 const field = { id: "choice", type: "select", options: [{ value: "fixed", label: "Saved" }] };
 const buffer = { value: "fixed", label: "Still typing" };
 const panel = { contains: () => true, querySelectorAll: () => [restoredInput] };
@@ -491,7 +491,7 @@ const context = { IndependentDocument: class {}, BaseElement: class { constructo
   document: { createElement() { return { innerHTML: "", className: "" }; } }, request: { get() { throw new Error("Draft preview fetched persisted content"); } } };
 vm.createContext(context);
 for (const [path, name] of [["src/script/elements/editor/independent.mjs", "IndependentDocument"], ["src/script/views/builder/draftDocument.mjs", "DraftDocument"], ["src/script/elements/html.mjs", "HtmlElement"]]) {
-  vm.runInContext(fs.readFileSync(path, "utf8").replace(/^import.*\n/gm, "").replace(`export class ${name}`, `globalThis.${name} = class ${name}`), context);
+  vm.runInContext(fs.readFileSync(path, "utf8").replace(/^import[\s\S]*?;\n/gm, "").replace(`export class ${name}`, `globalThis.${name} = class ${name}`), context);
 }
 vm.runInContext(fs.readFileSync("src/script/views/builder/builder.mjs", "utf8")
   .replace(/^import[\s\S]*?from ["'][^"']+["'];\n/gm, "")
@@ -591,7 +591,7 @@ const context = { console, crypto: require("node:crypto").webcrypto, ENDPOINTS: 
 };
 vm.createContext(context);
 for (const [path, name] of [["src/script/forms/controller.mjs", "FormController"], ["src/script/views/builder/panels/formSettings.mjs", "FormSettings"]]) {
-  vm.runInContext(fs.readFileSync(path, "utf8").replace(/^import.*\n/gm, "")
+  vm.runInContext(fs.readFileSync(path, "utf8").replace(/^import[\s\S]*?;\n/gm, "")
     .replace(`export class ${name}`, `globalThis.${name} = class ${name}`), context);
 }
 (async () => {

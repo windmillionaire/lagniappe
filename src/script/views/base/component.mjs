@@ -1,7 +1,7 @@
-import { NavElement } from "../../elements/nav";
-import { captureError } from "../../shared/errors";
-import { withTransition } from "../../shared/transitions";
-import { loadWidget } from "../../widgets/loader";
+import { NavElement } from "../../elements/nav.mjs";
+import { captureError } from "../../shared/errors.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { loadWidget } from "../../widgets/loader.mjs";
 
 /**
  * @testable infrastructure

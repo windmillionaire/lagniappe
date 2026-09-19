@@ -43,7 +43,7 @@ let source = fs.readFileSync(
   "utf8",
 );
 source = source.replace(
-  'import { captureError } from "./errors";',
+  'import { captureError } from "./errors.mjs";',
   "const captureError = (...args) => captured.push(args);",
 );
 source = source.replace(/export const /g, "const ");

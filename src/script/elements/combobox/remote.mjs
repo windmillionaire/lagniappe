@@ -1,7 +1,7 @@
-import { captureError } from "../../shared/errors";
-import { QueryLifecycle } from "../../shared/queryLifecycle";
-import { debounce } from "../../shared/utilities";
-import { Combobox } from "./combobox";
+import { captureError } from "../../shared/errors.mjs";
+import { QueryLifecycle } from "../../shared/queryLifecycle.mjs";
+import { debounce } from "../../shared/utilities.mjs";
+import { Combobox } from "./combobox.mjs";
 
 /**
  * Shared input, cancellation, publication, and teardown lifecycle for remote

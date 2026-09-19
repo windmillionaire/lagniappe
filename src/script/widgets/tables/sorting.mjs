@@ -1,6 +1,6 @@
-import { primitives } from "../../elements/primitives";
-import { sessionStore } from "../../shared/storage";
-import { withTransition } from "../../shared/transitions";
+import { primitives } from "../../elements/primitives.mjs";
+import { sessionStore } from "../../shared/storage.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure

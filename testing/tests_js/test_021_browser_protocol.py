@@ -21,7 +21,7 @@ const context = {{
 context.globalThis = context;
 let source = fs.readFileSync({json.dumps(module_path)}, "utf8");
 source = source.replace(
-  /^import BROWSER_PROTOCOL from .*;$/m,
+  /^import BROWSER_PROTOCOL from [\\s\\S]*?;/m,
   `const BROWSER_PROTOCOL = ${{JSON.stringify(browserProtocol)}};`,
 );
 source = source.replace(/\\bexport\\s+/g, "");

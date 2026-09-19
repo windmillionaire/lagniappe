@@ -1,5 +1,5 @@
-import { FacetsBox } from "../../elements/combobox/facets";
-import { withTransition } from "../../shared/transitions";
+import { FacetsBox } from "../../elements/combobox/facets.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * Enhances server-rendered permission fields without owning a form lifecycle.

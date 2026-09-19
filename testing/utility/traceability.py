@@ -27,6 +27,8 @@ import yaml
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from testing.utility import native_js
+
 from testing.utility.artifacts import (
     limited as limited_items,
     markdown_code,
@@ -58,7 +60,7 @@ TEXT_SECTION_LIMIT = 10
 BROAD_OWNER_TEST_LIMIT = 5
 BROAD_OWNER_DIMENSION_LIMIT = 6
 TAG_RE = re.compile(r"^\s*@(?P<tag>[\w-]+)(?:\s*[:=]\s*|\s+)?(?P<value>.*)$")
-NODEID_LINE_RE = re.compile(r"^[^\s].+\.py::.+")
+NODEID_LINE_RE = re.compile(r"^[^\s].+\.(?:py|mjs)::.+")
 SOURCE_PATH_MENTION_RE = re.compile(
     r"\b(?:config|installer|lagniappe|runner|src)/"
     r"[A-Za-z0-9_./-]+\.(?:py|mjs)\b"
@@ -192,6 +194,7 @@ class TestCase:
     lineno: int = 0
     start_lineno: int = 0
     end_lineno: int = 0
+    _execution_dependencies: list[str] = field(default_factory=list, repr=False)
     collection_verified: bool = False
     _collected_nodeids: list[str] = field(default_factory=list, repr=False)
     execution: str = "not_run"
@@ -1148,6 +1151,19 @@ def collect_python_test_symbol_info(path: Path) -> dict[str, TestSymbolInfo]:
     return info_by_qualname
 
 
+def collect_file_test_symbol_info(path: Path) -> dict[str, TestSymbolInfo]:
+    if path.suffix != ".mjs":
+        return collect_python_test_symbol_info(path)
+    return {
+        row["name"]: TestSymbolInfo(
+            metadata=parse_metadata(row["metadata_text"]),
+            lineno=row["lineno"], start_lineno=row["start_lineno"],
+            end_lineno=row["end_lineno"], unfinished=row["status"] == "todo",
+        )
+        for row in native_js.inventory(path)["cases"]
+    }
+
+
 def collect_python_test_symbol_metadata(path: Path) -> dict[str, Metadata]:
     return {
         qualname: info.metadata
@@ -1170,7 +1186,7 @@ def collect_test_symbol_info(
 
         path = _test_source_path(repo_root, path_part)
         if path not in by_path:
-            by_path[path] = collect_python_test_symbol_info(path)
+            by_path[path] = collect_file_test_symbol_info(path)
 
         info_by_nodeid[nodeid] = by_path[path].get(
             "::".join(qualname_parts), TestSymbolInfo(Metadata(), 0)
@@ -1198,22 +1214,27 @@ def test_files_in_roots(repo_root: Path, roots: Iterable[object]) -> list[Path]:
         root = testing_root / relative
         if not root.resolve().is_relative_to(testing_root):
             raise ValueError("test roots must stay within testing/")
-        if root.is_file() and root.name.startswith("test_") and root.suffix == ".py":
+        if root.is_file() and root.name.startswith("test_") and root.suffix in {".py", ".mjs"}:
             files.add(root)
         elif root.is_dir():
             files.update(root.rglob("test_*.py"))
+            files.update(root.rglob("test_*.mjs"))
     return sorted(files)
 
 
 def discover_tests(repo_root: Path, roots: Iterable[object] = ()) -> dict[str, TestCase]:
     """Discover test functions statically without importing application modules."""
     tests: dict[str, TestCase] = {}
-    for path in test_files_in_roots(repo_root, roots):
+    paths = test_files_in_roots(repo_root, roots)
+    native_js.inventories(path for path in paths if path.suffix == ".mjs")
+    for path in paths:
+        dependencies = sorted(native_js.execution_dependencies(path, repo_root)) if path.suffix == ".mjs" else []
         test_path = _canonical_test_path(repo_root, path)
-        for qualname, info in collect_python_test_symbol_info(path).items():
+        for qualname, info in collect_file_test_symbol_info(path).items():
             nodeid = f"{test_path}::{qualname}"
             tests[nodeid] = TestCase(
                 nodeid=nodeid,
+                _execution_dependencies=dependencies,
                 runnable=not info.unfinished,
                 unfinished=info.unfinished,
                 metadata=info.metadata,
@@ -1236,7 +1257,11 @@ def changed_tests_for_paths(
         path.removeprefix("testing/") if path.startswith("testing/") else path
         for path in changed_paths
     }
-    candidates = [test for test in tests.values() if test.path in changed_test_paths]
+    dependency_affected = {
+        test.nodeid for test in tests.values()
+        if set(test._execution_dependencies) & set(changed_paths)
+    }
+    candidates = [test for test in tests.values() if test.path in changed_test_paths or test.nodeid in dependency_affected]
     if changed_line_ranges is None:
         return sorted(candidates, key=lambda test: test.nodeid)
 
@@ -1244,7 +1269,7 @@ def changed_tests_for_paths(
     for test in candidates:
         changed_path = f"testing/{test.path}"
         ranges = changed_line_ranges.get(changed_path)
-        if ranges is None:
+        if ranges is None or test.nodeid in dependency_affected:
             focused.append(test)
             continue
         start = test.start_lineno or test.lineno
@@ -1436,6 +1461,7 @@ def collect_tests(
     if verify_collection:
         verify_test_collection(tests, repo_root, configured_roots)
     attach_test_results(tests, repo_root, results_path)
+    apply_test_dependency_fingerprints(tests, {nodeid: set(test._execution_dependencies) for nodeid, test in tests.items()}, repo_root)
     return tests
 
 
@@ -1493,6 +1519,9 @@ def test_function_source(test: TestCase, repo_root: Path, cache: dict[str, str])
 
     try:
         source = path.read_text(encoding="utf-8")
+        if path.suffix == ".mjs":
+            cache[cache_key] = "\n".join(source.splitlines()[test.lineno - 1:test.end_lineno])
+            return cache[cache_key]
         tree = ast.parse(source, filename=str(path))
     except (OSError, SyntaxError):
         cache[cache_key] = ""
@@ -1516,6 +1545,9 @@ def test_uses_scaffold(test: TestCase, scaffold: SourceSymbol, repo_root: Path) 
         return False
 
     name = scaffold.qualname.split(".")[-1]
+    if test.path.endswith(".mjs"):
+        row = next((row for row in native_js.inventory(_test_source_path(repo_root, test.path))["cases"] if row["name"] == test.qualname), {})
+        return name in row.get("calls", [])
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -1942,11 +1974,11 @@ def annotation_scope_issues(
         _canonical_test_path(repo_root, path)
         for path in test_files_in_roots(repo_root, allowed_test_roots)
     }
-    for path in sorted((repo_root / "testing").rglob("test_*.py")):
+    for path in sorted([*(repo_root / "testing").rglob("test_*.py"), *(repo_root / "testing").rglob("test_*.mjs")]):
         test_path = relpath(path, repo_root / "testing")
         if test_path in configured_test_paths:
             continue
-        for qualname, info in collect_python_test_symbol_info(path).items():
+        for qualname, info in collect_file_test_symbol_info(path).items():
             if not info.metadata.has_tags:
                 continue
             issues.append(
@@ -2225,7 +2257,7 @@ def path_matches_test_target(test_path: str, target_path: str) -> bool:
     if not clean:
         return True
     path = Path(test_path)
-    if clean.endswith(".py"):
+    if clean.endswith((".py", ".mjs")):
         return (
             test_path == clean or path.name == clean or test_path.endswith(f"/{clean}")
         )

@@ -96,6 +96,7 @@ begin in the [README](../README.md).
 | Guide | Covers |
 | --- | --- |
 | [TESTING.md](TESTING.md) | Suites, commands, markers, strict checks, layout, and evidence. |
+| [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md) | Native Node cases, pytest integration, fixtures, and legacy-test migration recipe. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Test design and placement; read before adding or reshaping tests. |
 | [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) | Recorded live-model cases, paired before/after evaluation, scoring, and entry-point parity. |
 | [TESTING_SERVER.md](TESTING_SERVER.md) | Managed local server, seed packs, agent login, browser review, and teardown. |

@@ -1,8 +1,8 @@
-import { ENDPOINTS } from "../../shared/endpoints";
-import { request } from "../../shared/request";
-import { RemoteQueryCombobox } from "./remote";
-import { Results } from "./results";
-import { Submitter } from "./submitter";
+import { ENDPOINTS } from "../../shared/endpoints.mjs";
+import { request } from "../../shared/request.mjs";
+import { RemoteQueryCombobox } from "./remote.mjs";
+import { Results } from "./results.mjs";
+import { Submitter } from "./submitter.mjs";
 
 /**
  * @testable infrastructure

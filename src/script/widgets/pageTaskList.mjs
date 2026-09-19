@@ -1,5 +1,5 @@
-import { BaseList } from "../elements/base/baseList";
-import { withTransition } from "../shared/transitions";
+import { BaseList } from "../elements/base/baseList.mjs";
+import { withTransition } from "../shared/transitions.mjs";
 
 /**
  * @testable true

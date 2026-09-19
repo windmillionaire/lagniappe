@@ -1628,7 +1628,7 @@ const Task = class {};
 );
 source = source.replace("export default class Core", "class Core");
 source = source.replace(
-  'import("./offlineReplay")',
+  'import("./offlineReplay.mjs")',
   "Promise.resolve({ replayOfflineQueue: globalThis.replayOfflineQueue })",
 );
 source += "\nglobalThis.Core = Core;";

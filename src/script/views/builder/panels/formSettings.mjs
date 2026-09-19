@@ -1,5 +1,10 @@
-import { FormController } from "../../../forms/controller";
-import { captureError, ENDPOINTS, Modal, request } from "../../../shared";
+import { FormController } from "../../../forms/controller.mjs";
+import {
+	captureError,
+	ENDPOINTS,
+	Modal,
+	request,
+} from "../../../shared/index.mjs";
 
 /**
  * @testable infrastructure

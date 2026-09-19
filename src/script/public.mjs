@@ -1,4 +1,4 @@
-import { initializePublicSharing } from "./shared/publicShare";
+import { initializePublicSharing } from "./shared/publicShare.mjs";
 
 /**
  * @testable true

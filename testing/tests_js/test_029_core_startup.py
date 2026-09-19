@@ -59,7 +59,7 @@ vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").r
 
 let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
-  'import { connectivity } from "../../shared/connectivity";',
+  'import { connectivity } from "../../shared/connectivity.mjs";',
   "",
 );
 source = source.replaceAll("export const ", "const ");
@@ -272,7 +272,7 @@ vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").r
 
 let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
-  'import { connectivity } from "../../shared/connectivity";',
+  'import { connectivity } from "../../shared/connectivity.mjs";',
   "",
 );
 source = source.replaceAll("export const ", "const ");
@@ -809,9 +809,9 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/script/forms/representation.mjs", "utf8").replaceAll("export ", ""), context);
 
 let source = fs.readFileSync("src/script/widgets/base/formWidget.mjs", "utf8");
-source = source.replace('import { withTransition } from "../../shared/transitions";\n', "");
+source = source.replace('import { withTransition } from "../../shared/transitions.mjs";\n', "");
 source = source.replace(
-  'import { FormController } from "../../forms/controller";',
+  'import { FormController } from "../../forms/controller.mjs";',
   "const FormController = class {};",
 );
 source = source.replace(/^import.*\n/gm, "");

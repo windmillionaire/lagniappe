@@ -1,5 +1,5 @@
-import { captureError } from "../../shared/errors";
-import { EditReconciler } from "./reconciler";
+import { captureError } from "../../shared/errors.mjs";
+import { EditReconciler } from "./reconciler.mjs";
 
 /**
  * View-scoped detector for committed edits to forms represented by

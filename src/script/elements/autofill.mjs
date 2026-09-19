@@ -1,6 +1,6 @@
-import { withTransition } from "../shared/transitions";
-import { BaseUpload } from "./base/baseUpload";
-import { UploadMenu, uploadElement } from "./upload";
+import { withTransition } from "../shared/transitions.mjs";
+import { BaseUpload } from "./base/baseUpload.mjs";
+import { UploadMenu, uploadElement } from "./upload.mjs";
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
 

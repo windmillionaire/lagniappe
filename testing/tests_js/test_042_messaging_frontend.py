@@ -379,7 +379,7 @@ let source = fs.readFileSync("src/script/elements/notifications.mjs", "utf8");
 source = source.replace(/^import .*;$/gm, "");
 source = source.replace("export class Notifications", "class Notifications");
 source = source.replace(
-  'const { ensureMessageComposer } = await import("./messageComposer");',
+  'const { ensureMessageComposer } = await import("./messageComposer.mjs");',
   "const { ensureMessageComposer } = globalThis;",
 );
 source += "\nglobalThis.Notifications = Notifications;";
@@ -886,7 +886,7 @@ if (
 ) {
   throw new Error("empty messages view did not hide its unselected dropdown");
 }
-if (!source.includes('../elements/combobox/dropdown')) {
+if (!source.includes('../elements/combobox/dropdown.mjs')) {
   throw new Error("messages view does not use the shared dropdown combobox");
 }
 })().catch((error) => { console.error(error); process.exit(1); });

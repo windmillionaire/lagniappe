@@ -6,9 +6,19 @@ import subprocess
 
 import pytest
 
+from testing.utility.native_js_pytest import collect_file, prepare_registries
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUITE_ROOT = Path(__file__).resolve().parent
+
+
+def pytest_collect_file(parent, file_path):
+    return collect_file(parent, file_path)
+
+
+def pytest_runtest_setup(item):
+    prepare_registries(item)
 
 
 def pytest_collection_modifyitems(items):

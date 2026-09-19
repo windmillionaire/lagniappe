@@ -1,4 +1,4 @@
-import { captureError, isSkippedViewTransitionError } from "./errors";
+import { captureError, isSkippedViewTransitionError } from "./errors.mjs";
 
 /**
  * @testable false

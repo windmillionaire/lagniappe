@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../shared";
-import { createIcon } from "../shared/icons";
-import { renderNotificationBadge } from "../shared/notificationState";
-import { withTransition } from "../shared/transitions";
-import { Dropdown } from "./combobox/dropdown";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { ENDPOINTS, request } from "../shared/index.mjs";
+import { renderNotificationBadge } from "../shared/notificationState.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { Dropdown } from "./combobox/dropdown.mjs";
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";
 
@@ -213,7 +213,7 @@ export class Notifications {
 		const action = option?.dataset?.action;
 		if (action === "message-user") {
 			event?.preventDefault();
-			const { ensureMessageComposer } = await import("./messageComposer");
+			const { ensureMessageComposer } = await import("./messageComposer.mjs");
 			ensureMessageComposer(this.view).open();
 			return;
 		}

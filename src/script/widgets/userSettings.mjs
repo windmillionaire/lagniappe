@@ -1,8 +1,8 @@
-import { InputElement } from "../elements/input";
-import { RadioElement } from "../elements/radio";
-import { SectionToggle } from "../elements/sectionToggle";
-import { captureError, Modal, request } from "../shared";
-import { FormWidget } from "./base/formWidget";
+import { InputElement } from "../elements/input.mjs";
+import { RadioElement } from "../elements/radio.mjs";
+import { SectionToggle } from "../elements/sectionToggle.mjs";
+import { captureError, Modal, request } from "../shared/index.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable infrastructure

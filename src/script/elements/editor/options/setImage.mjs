@@ -1,6 +1,6 @@
-import { STYLES } from "styles";
-import { IMAGE_GROUPS } from "../config";
-import { ToolbarButton } from "./toolbarButtons";
+import { STYLES } from "../../../generated/styles.mjs";
+import { IMAGE_GROUPS } from "../config.mjs";
+import { ToolbarButton } from "./toolbarButtons.mjs";
 
 /**
  * @testable infrastructure

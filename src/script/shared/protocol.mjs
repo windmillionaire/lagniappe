@@ -1,4 +1,6 @@
-import BROWSER_PROTOCOL from "../../../config/browser_protocol.json";
+import BROWSER_PROTOCOL from "../../../config/browser_protocol.json" with {
+	type: "json",
+};
 
 export const BROWSER_PROTOCOL_ID = BROWSER_PROTOCOL.id;
 export const BROWSER_PROTOCOL_VERSION = BROWSER_PROTOCOL.version;

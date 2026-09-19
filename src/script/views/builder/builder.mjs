@@ -1,5 +1,6 @@
-import { SearchBox } from "../../elements/combobox/search";
-import { EntityMenu } from "../../elements/entityMenu";
+import { SearchBox } from "../../elements/combobox/search.mjs";
+import { EntityMenu } from "../../elements/entityMenu.mjs";
+import { directUpload } from "../../shared/directUpload.mjs";
 import {
 	captureError,
 	connectivity,
@@ -8,19 +9,18 @@ import {
 	HelpModal,
 	OfflineModal,
 	request,
-} from "../../shared";
-import { directUpload } from "../../shared/directUpload";
-import { withTransition } from "../../shared/transitions";
-import { FormChangeStatus } from "./changeStatus";
-import { loadCondition } from "./conditions/loader";
-import { BuilderDraft } from "./draft";
-import { fieldKind, needsMigration, repairConditions } from "./migrations";
-import { ComponentsPanel } from "./panels/components";
-import { ConditionPanel } from "./panels/condition";
-import { ElementSettings } from "./panels/elementSettings";
-import { FormSettings } from "./panels/formSettings";
-import { Header } from "./panels/header";
-import { ModelElement, ModelPanel } from "./panels/model";
+} from "../../shared/index.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { FormChangeStatus } from "./changeStatus.mjs";
+import { loadCondition } from "./conditions/loader.mjs";
+import { BuilderDraft } from "./draft.mjs";
+import { fieldKind, needsMigration, repairConditions } from "./migrations.mjs";
+import { ComponentsPanel } from "./panels/components.mjs";
+import { ConditionPanel } from "./panels/condition.mjs";
+import { ElementSettings } from "./panels/elementSettings.mjs";
+import { FormSettings } from "./panels/formSettings.mjs";
+import { Header } from "./panels/header.mjs";
+import { ModelElement, ModelPanel } from "./panels/model.mjs";
 
 /**
  * @testable true
@@ -540,7 +540,7 @@ class FormBuilder {
 	 * @matrix html-field : generated-document-undo retained-editor
 	 */
 	async prepareGeneratedDocuments(htmlFields) {
-		const { default: HtmlEditor } = await import("./conditions/html");
+		const { default: HtmlEditor } = await import("./conditions/html.mjs");
 		for (const [id, html] of Object.entries(htmlFields || {})) {
 			const element = this.elements.get(id);
 			if (

@@ -49,7 +49,7 @@ const context = {{
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/transitions.mjs", "utf8");
 source = source.replace(
-  'import {{ captureError, isSkippedViewTransitionError }} from "./errors";',
+  'import {{ captureError, isSkippedViewTransitionError }} from "./errors.mjs";',
   `
 const captureError = (...args) => capturedErrors.push(args);
 const isSkippedViewTransitionError = () => false;
@@ -173,7 +173,7 @@ const context = {
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/transitions.mjs", "utf8");
 source = source.replace(
-  'import { captureError, isSkippedViewTransitionError } from "./errors";',
+  'import { captureError, isSkippedViewTransitionError } from "./errors.mjs";',
   `
 const captureError = (...args) => capturedErrors.push(args);
 const isSkippedViewTransitionError = (error) => /skipped/i.test(error?.message || "");

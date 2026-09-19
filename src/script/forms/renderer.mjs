@@ -1,7 +1,7 @@
-import { getFormElement } from "../elements/loader";
-import { captureError } from "../shared/errors";
-import { withTransition } from "../shared/transitions";
-import { generateElementId } from "../shared/utilities";
+import { getFormElement } from "../elements/loader.mjs";
+import { captureError } from "../shared/errors.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { generateElementId } from "../shared/utilities.mjs";
 
 /**
  * @testable infrastructure

@@ -192,23 +192,23 @@ source = source.replace(
   "",
 );
 source = source.replaceAll(
-  'import("./shared/analytics")',
+  'import("./shared/analytics.mjs")',
   "Promise.resolve({{ analytics: globalThis.analytics }})",
 );
 source = source.replaceAll(
-  'import("./shared/logout")',
+  'import("./shared/logout.mjs")',
   "Promise.resolve({{ initializeLogoutForms: globalThis.initializeLogoutForms }})",
 );
 source = source.replaceAll(
-  'import("./shared/user")',
+  'import("./shared/user.mjs")',
   "Promise.resolve({{ updateUserData: globalThis.updateUserData }})",
 );
 source = source.replaceAll(
-  'import("./shared/storage")',
+  'import("./shared/storage.mjs")',
   "Promise.resolve({{ clearRecentSearchResults: globalThis.clearRecentSearchResults }})",
 );
 source = source.replaceAll(
-  'import("./shared/errors")',
+  'import("./shared/errors.mjs")',
   `Promise.resolve({{
     captureError: globalThis.captureError,
     captureNetworkError: globalThis.captureNetworkError,
@@ -217,11 +217,11 @@ source = source.replaceAll(
   }})`,
 );
 source = source.replaceAll(
-  'import("./shared/request")',
+  'import("./shared/request.mjs")',
   "Promise.resolve({{ request: {{ get: async () => ({{ ok: true }}) }} }})",
 );
 source = source.replaceAll(
-  'import("./shared/upstreamUnavailable")',
+  'import("./shared/upstreamUnavailable.mjs")',
   `Promise.resolve({{
     installUpstreamUnavailableBanner: globalThis.installUpstreamUnavailableBanner,
     receiveUpstreamUnavailable: globalThis.receiveUpstreamUnavailable,
@@ -230,7 +230,7 @@ source = source.replaceAll(
 );
 source = source.replace(
   `import(
-\t\t\t"./shared/upstreamUnavailable"
+\t\t\t"./shared/upstreamUnavailable.mjs"
 \t\t)`,
   `Promise.resolve({{
     installUpstreamUnavailableBanner: globalThis.installUpstreamUnavailableBanner,

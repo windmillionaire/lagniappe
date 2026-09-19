@@ -56,7 +56,7 @@ const context = {
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/user.mjs", "utf8");
 source = source.replace(
-  'import { request } from "./request";',
+  'import { request } from "./request.mjs";',
   "const request = globalThis.request;",
 );
 source = source.replaceAll("export async function ", "async function ");
@@ -107,7 +107,7 @@ const context = {{
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/utilities.mjs", "utf8");
 source = source.replace(
-  'import {{ withTransition }} from "./transitions";',
+  'import {{ withTransition }} from "./transitions.mjs";',
   "",
 );
 source = source.replaceAll("export const ", "const ");

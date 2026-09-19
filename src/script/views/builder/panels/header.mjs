@@ -1,6 +1,6 @@
-import { FormRenderer } from "../../../forms/renderer";
-import { areEqual, captureError, request } from "../../../shared";
-import { withTransition } from "../../../shared/transitions";
+import { FormRenderer } from "../../../forms/renderer.mjs";
+import { areEqual, captureError, request } from "../../../shared/index.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure

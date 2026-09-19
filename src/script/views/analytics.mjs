@@ -1,6 +1,6 @@
-import { request } from "../shared/request";
-import { withTransition } from "../shared/transitions";
-import ShellView from "./base/shell";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import ShellView from "./base/shell.mjs";
 
 /**
  * @testable true

@@ -1,5 +1,8 @@
 # Testing Traceability
 
+For native Node cases, shared fixtures, and the step-by-step migration recipe,
+see [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md).
+
 `testing/utility/traceability.py` connects durable source symbols to the tests
 that exercise them. It is designed to answer three practical questions:
 
@@ -122,6 +125,12 @@ venv/bin/python run.py traceability --changed --check
 The final traceability command fails when a changed or referenced test is not
 recorded as passing for the current fingerprint. This makes “tests passed” a
 checkable artifact rather than prose in an agent response.
+
+Native `.mjs` cases use the same metadata tags in comments immediately before
+`test("test_name", ...)`. Their runner/fixture code, imported test helpers,
+package manifests, and registry inputs are execution dependencies; they do not
+create inferred application coverage links. Deleted native cases are pruned
+from evidence just like Python definitions.
 
 Static AST discovery is the default and does not import the application.
 `--verify-collection` is an opt-in diagnostic that compares the inventory with
@@ -324,7 +333,7 @@ Absolute paths, traversal and the retired `repo:` client-test roots are rejected
 Suite placement remains independent of traceability:
 
 - backend logic: `testing/tests_unit/`
-- JavaScript without DOM/browser dependency: `testing/tests_js/`
+- JavaScript without a live browser/server dependency: `testing/tests_js/`
 - repository setup/config/tool health: `testing/tests_tooling/`
 - browser/server workflows: `testing/tests_e2e/`
 

@@ -1,6 +1,6 @@
-import { FormController } from "../../../forms/controller";
-import { buttons } from "../../buttons";
-import { primitives } from "../../primitives";
+import { FormController } from "../../../forms/controller.mjs";
+import { buttons } from "../../buttons.mjs";
+import { primitives } from "../../primitives.mjs";
 
 /**
  * @testable true

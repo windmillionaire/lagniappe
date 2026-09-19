@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { ENDPOINTS } from "../../shared/endpoints";
-import { setIcon } from "../../shared/icons";
-import { request } from "../../shared/request";
-import { updateUserLocation } from "../../shared/user";
-import { RemoteQueryCombobox } from "./remote";
+import { STYLES } from "../../generated/styles.mjs";
+import { ENDPOINTS } from "../../shared/endpoints.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { request } from "../../shared/request.mjs";
+import { updateUserLocation } from "../../shared/user.mjs";
+import { RemoteQueryCombobox } from "./remote.mjs";
 
 /**
  * @testable true

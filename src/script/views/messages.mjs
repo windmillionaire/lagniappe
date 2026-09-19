@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { ensureMessageComposer } from "../elements/messageComposer";
-import { ENDPOINTS, request } from "../shared";
-import { createIcon } from "../shared/icons";
-import Core from "./base/core";
+import { ensureMessageComposer } from "../elements/messageComposer.mjs";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { ENDPOINTS, request } from "../shared/index.mjs";
+import Core from "./base/core.mjs";
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
@@ -247,7 +247,9 @@ export default class Messages extends Core {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
 			return this.conversationDropdown || this._conversationDropdownPromise;
 		}
-		this._conversationDropdownPromise = import("../elements/combobox/dropdown")
+		this._conversationDropdownPromise = import(
+			"../elements/combobox/dropdown.mjs"
+		)
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				this.conversationDropdown = new Dropdown(this.selector).init({

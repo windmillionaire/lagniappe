@@ -1,4 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
+// This file is auto-generated. Do not edit manually.
 const STYLES = {
   "attributes": {
     "container": "flex flex-row items-center gap-2 flex-wrap",

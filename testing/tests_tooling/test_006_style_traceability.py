@@ -254,6 +254,8 @@ modal:
 
 
 def test_style_pipeline_inventory_checks_imports_sources_and_python_parity(tmp_path):
+    write_file(tmp_path / "src/script/generated/styles.mjs", 'const STYLES = {"button":{"submit":"flex items-center"}};\nexport { STYLES };')
+    write_file(tmp_path / "src/script/generated/icons.mjs", 'const ICONS = {"dueDate":{"glyph":"event","fill":1}};\nexport { ICONS };')
     write_file(
         tmp_path / "src/style/styles.yaml",
         """
@@ -266,14 +268,15 @@ button:
         tmp_path / "src/style/pipeline.json",
         json.dumps(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "frontend_entry": "src/script/main.mjs",
                 "registry": {
                     "styles": "src/style/styles.yaml",
                     "schema": "src/style/registry.schema.json",
                     "icons": "src/style/icons.yaml",
                     "icons_schema": "src/style/icons.schema.json",
-                    "virtual_module": "styles",
+                    "javascript_styles": "src/script/generated/styles.mjs",
+                    "javascript_icons": "src/script/generated/icons.mjs",
                     "python_styles": "lagniappe/web/start/styles/styles.py",
                     "python_icons": "lagniappe/web/start/styles/icons.py",
                 },

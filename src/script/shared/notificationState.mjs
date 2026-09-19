@@ -1,4 +1,4 @@
-import { captureError } from "./errors";
+import { captureError } from "./errors.mjs";
 
 export const NOTIFICATION_STATE_HEADER = "X-Lagniappe-Notification-State";
 

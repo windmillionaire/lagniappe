@@ -1,16 +1,16 @@
-import { STYLES } from "styles";
-import { ENDPOINTS } from "../shared/endpoints";
-import { captureError } from "../shared/errors";
-import { setIcon } from "../shared/icons";
-import { request } from "../shared/request";
-import { withTransition } from "../shared/transitions";
-import { areEqual } from "../shared/utilities";
-import { BaseElement } from "./base/baseElement";
-import { CheckboxElement } from "./checkbox";
-import { InputElement } from "./input";
-import { LinkElement } from "./link";
-import { getFormElement } from "./loader";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { ENDPOINTS } from "../shared/endpoints.mjs";
+import { captureError } from "../shared/errors.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { areEqual } from "../shared/utilities.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { CheckboxElement } from "./checkbox.mjs";
+import { InputElement } from "./input.mjs";
+import { LinkElement } from "./link.mjs";
+import { getFormElement } from "./loader.mjs";
+import { primitives } from "./primitives.mjs";
 
 const COMPACT_COLUMN_TYPES = new Set(["checkbox"]);
 const TABLE_CELL_ELEMENTS = {

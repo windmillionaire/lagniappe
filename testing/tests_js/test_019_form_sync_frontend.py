@@ -460,9 +460,9 @@ const context = {
 vm.createContext(context);
 let source = fs.readFileSync("src/script/views/builder/panels/model.mjs", "utf8");
 source = source.replace('import Sortable from "sortablejs";', "const Sortable = globalThis.Sortable;");
-source = source.replace('import { STYLES } from "styles";', "const STYLES = globalThis.STYLES;");
-source = source.replace('import { CONFIG } from "../config";', "const CONFIG = globalThis.CONFIG;");
-source = source.replace('import { primitives } from "../../../elements/primitives";', "const primitives = globalThis.primitives;");
+source = source.replace(/import \{ STYLES \} from "(?:\.\.\/)+generated\/styles\.mjs";/, "const STYLES = globalThis.STYLES;");
+source = source.replace('import { CONFIG } from "../config.mjs";', "const CONFIG = globalThis.CONFIG;");
+source = source.replace('import { primitives } from "../../../elements/primitives.mjs";', "const primitives = globalThis.primitives;");
 source = source.replace("export class ModelPanel", "class ModelPanel");
 source = source.replace("export const ModelElement", "const ModelElement");
 source += "\nglobalThis.ModelElement = ModelElement;";

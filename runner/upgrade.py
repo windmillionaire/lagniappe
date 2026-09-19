@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import codecs
+import hashlib
 import json
 import os
 import re
@@ -15,6 +16,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 from config import Directory
 from runner.context import NODE_CLI, NPM_CLI
@@ -29,6 +31,7 @@ REQUIREMENTS_PATHS = (
     Path("build/font-requirements.txt"),
 )
 NODE_VERSION_PIN_PATH = Path(".nvmrc")
+NODE_DOCKERFILE_PATH = Path("runner/hosted_e2e_container/Dockerfile")
 
 
 @dataclass
@@ -395,23 +398,88 @@ def _node_version_from_output(output: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_updates_node_version_pin
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_failure_preserves_all_declarations
 # @matrix dependencies : node-version pinning upgrade
 def update_node_version_pin(
     version: str,
     report: UpgradeReport,
     path: Path = NODE_VERSION_PIN_PATH,
 ) -> bool:
-    """Write the resolved Node version to the repository's nvm pin."""
+    """Align the nvm pin, npm engine, and hosted image with upgraded Node."""
     match = re.fullmatch(r"v?(\d+\.\d+\.\d+)", str(version).strip())
     if not match:
         report.add_error("Node.js pin", f"Could not normalize Node version: {version}")
         return False
 
     normalized = match.group(1)
-    before = path.read_text(encoding="utf-8").strip() if path.exists() else None
-    path.write_text(f"{normalized}\n", encoding="utf-8")
+    root = path.resolve().parent
+    package_path = root / "package.json"
+    lock_path = root / "package-lock.json"
+    docker_path = root / NODE_DOCKERFILE_PATH
+    try:
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+        docker = docker_path.read_text(encoding="utf-8")
+        matches = list(re.finditer(r"^FROM (node:\S+) AS node-runtime$", docker, re.MULTILINE))
+        if len(matches) != 1:
+            raise ValueError("Expected one named node-runtime stage in hosted E2E Dockerfile")
+        image = resolve_node_image(normalized)
+        engine = f">={normalized}"
+        before_engine = package.get("engines", {}).get("node")
+        package.setdefault("engines", {})["node"] = engine
+        replacements = {
+            path: f"{normalized}\n",
+            package_path: json.dumps(package, indent=2) + "\n",
+            docker_path: docker[:matches[0].start(1)] + image + docker[matches[0].end(1):],
+        }
+        if lock_path.exists():
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            lock.setdefault("packages", {}).setdefault("", {}).setdefault("engines", {})["node"] = engine
+            replacements[lock_path] = json.dumps(lock, indent=2) + "\n"
+        before = path.read_text(encoding="utf-8").strip() if path.exists() else None
+    except (OSError, ValueError) as error:
+        report.add_error("Node.js declarations", f"Could not align {normalized}: {error}")
+        return False
+
+    # Resolve the exact published image and validate every input before writing.
+    for output, content in replacements.items():
+        if not output.exists() or output.read_text(encoding="utf-8") != content:
+            output.write_text(content, encoding="utf-8")
     report.add_change("node", "Node.js pin", before, normalized, str(path))
+    report.add_change("node", "Node.js engine", before_engine, engine, str(package_path))
+    report.add_change("node", "Hosted Node image", matches[0].group(1), image, str(docker_path))
     return True
+
+
+# @testable true
+# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_image_lookup_verifies_registry_digest
+# @matrix dependencies : node-version pinning upgrade
+def resolve_node_image(version: str) -> str:
+    """Resolve an exact official Node tag without installing Docker or layers."""
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("Node image version must be an exact stable version")
+    token_url = "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull"
+    with urlopen(token_url, timeout=30) as response:
+        credentials = json.load(response)
+    token = credentials.get("token") if isinstance(credentials, dict) else None
+    if not isinstance(token, str) or not token:
+        raise ValueError("Node image registry did not return an access token")
+    tag = f"{version}-bookworm-slim"
+    request = Request(
+        f"https://registry-1.docker.io/v2/library/node/manifests/{tag}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json",
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        content = response.read(2_000_001)
+        digest = response.headers.get("Docker-Content-Digest", "")
+    if len(content) > 2_000_000 or digest != f"sha256:{hashlib.sha256(content).hexdigest()}":
+        raise ValueError("Node image manifest digest verification failed")
+    manifest = json.loads(content)
+    if manifest.get("schemaVersion") != 2 or not manifest.get("manifests"):
+        raise ValueError("Expected a multi-platform Node image manifest")
+    return f"node:{tag}@{digest}"
 
 
 # @testable true

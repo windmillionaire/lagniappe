@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { SelectBox } from "../elements/combobox";
-import { primitives } from "../elements/primitives";
-import { FormWidget } from "./base/formWidget";
+import { SelectBox } from "../elements/combobox/index.mjs";
+import { primitives } from "../elements/primitives.mjs";
+import { STYLES } from "../generated/styles.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
 

@@ -1,7 +1,7 @@
-import { InputElement } from "../elements/input";
-import { sections } from "../elements/sections";
-import { TextareaElement } from "../elements/textarea";
-import { FormWidget } from "./base/formWidget";
+import { InputElement } from "../elements/input.mjs";
+import { sections } from "../elements/sections.mjs";
+import { TextareaElement } from "../elements/textarea.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable false

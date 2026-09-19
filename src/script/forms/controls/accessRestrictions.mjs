@@ -1,4 +1,4 @@
-import { FacetsBox } from "../../elements/combobox/facets";
+import { FacetsBox } from "../../elements/combobox/facets.mjs";
 
 /**
  * Local administrator/group choices shared by Page, User Settings and Builder.

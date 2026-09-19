@@ -463,7 +463,7 @@ def test_development_setup_is_additive_and_idempotent(monkeypatch):
     monkeypatch.setattr(development, "_missing_installation_files", lambda: [])
     monkeypatch.setattr(development, "NODE_CLI", "/tools/node")
     monkeypatch.setattr(development, "NPM_CLI", "/tools/npm")
-    monkeypatch.setattr(development, "_installed_node_version", lambda: "v26.5.0")
+    monkeypatch.setattr(development, "_installed_node_version", lambda: "v" + (development.APP_ROOT / ".nvmrc").read_text().strip())
     monkeypatch.setattr(
         development,
         "_run_command",
@@ -531,13 +531,16 @@ def test_development_setup_validates_node_range():
         node_version_supported,
     )
 
-    for supported in ("v22.18.0", "22.20.1", "24.11.0", "v26.5.0"):
+    pinned = (APP_ROOT / ".nvmrc").read_text(encoding="utf-8").strip()
+    major, minor, patch = map(int, pinned.split("."))
+    for supported in (pinned, f"v{pinned}", f"{major + 1}.0.0"):
         assert node_version_supported(supported)
     for unsupported in (
         "22.17.9",
         "v23.0.0",
         "24.10.9",
-        "24.11.0junk",
+        f"{major}.{minor}.{patch - 1}" if patch else f"{major - 1}.99.99",
+        pinned + "junk",
         "not-a-version",
     ):
         assert not node_version_supported(unsupported)

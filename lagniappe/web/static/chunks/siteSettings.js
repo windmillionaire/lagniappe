@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, w as withTransition } from './foundation.js?v=b158c05a';
-import { b as buttons } from './buttons.js?v=b158c05a';
-import './connectivity.js?v=b158c05a';
-import { S as SiteSetting } from './base.js?v=b158c05a';
-import './upstreamUnavailable.js?v=b158c05a';
-import './styles.js?v=b158c05a';
-import './icons.js?v=b158c05a';
-import './formatting.js?v=b158c05a';
+import { r as request, w as withTransition } from './foundation.js?v=bdc1ce7d';
+import { b as buttons } from './buttons.js?v=bdc1ce7d';
+import './connectivity.js?v=bdc1ce7d';
+import { S as SiteSetting } from './base.js?v=bdc1ce7d';
+import './upstreamUnavailable.js?v=bdc1ce7d';
+import './styles.js?v=bdc1ce7d';
+import './icons.js?v=bdc1ce7d';
+import './formatting.js?v=bdc1ce7d';
 
 const PUBLIC_PAGE_SETTINGS_ENDPOINT = "/l/site-settings/public-pages";
 

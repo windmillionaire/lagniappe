@@ -304,7 +304,7 @@ let source = fs.readFileSync(
   "src/script/views/builder/panels/formSettings.mjs",
   "utf8",
 );
-source = source.replace(/^import .*$/gm, "");
+source = source.replace(/^import[\s\S]*?;\n/gm, "");
 source = source.replace("export class FormSettings", "class FormSettings");
 source += "\nglobalThis.FormSettings = FormSettings;";
 vm.runInContext(source, context);
@@ -580,7 +580,7 @@ let source = fs.readFileSync(
   "src/script/views/builder/panels/elementSettings.mjs",
   "utf8",
 );
-source = source.replace(/^import .*$/gm, "");
+source = source.replace(/^import[\s\S]*?;\n/gm, "");
 source = source.replace("export class ElementSettings", "class ElementSettings");
 source += `
 globalThis.settingFactories = { _condition, _option, _column, _toggle };
@@ -645,7 +645,7 @@ const context = {
 };
 vm.createContext(context);
 let source = fs.readFileSync("src/script/views/builder/panels/formSettings.mjs", "utf8")
-  .replace(/^import .*$/gm, "")
+  .replace(/^import[\s\S]*?;\n/gm, "")
   .replace("export class FormSettings", "class FormSettings");
 vm.runInContext(source + "\nglobalThis.FormSettings = FormSettings;", context);
 (async () => {

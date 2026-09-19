@@ -1,5 +1,5 @@
-import { captureError, ENDPOINTS, request } from "../shared";
-import { BaseElement } from "./base/baseElement";
+import { captureError, ENDPOINTS, request } from "../shared/index.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
 
 /**
  * @testable infrastructure

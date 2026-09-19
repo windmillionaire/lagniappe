@@ -1,5 +1,5 @@
-import { withTransition } from "../shared/transitions";
-import { SitePublicPages } from "./siteSettings/publicPages";
+import { withTransition } from "../shared/transitions.mjs";
+import { SitePublicPages } from "./siteSettings/publicPages.mjs";
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
 const DEFAULT_SECTION = "maintenance";

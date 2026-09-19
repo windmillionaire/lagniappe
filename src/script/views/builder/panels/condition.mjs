@@ -1,4 +1,4 @@
-import { withTransition } from "../../../shared/transitions";
+import { withTransition } from "../../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure

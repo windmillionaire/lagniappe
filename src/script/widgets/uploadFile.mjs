@@ -1,6 +1,6 @@
-import { BaseUpload } from "../elements/base/baseUpload";
-import { buttons } from "../elements/buttons";
-import { UploadMenu, uploadElement } from "../elements/upload";
+import { BaseUpload } from "../elements/base/baseUpload.mjs";
+import { buttons } from "../elements/buttons.mjs";
+import { UploadMenu, uploadElement } from "../elements/upload.mjs";
 
 const FILE_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";

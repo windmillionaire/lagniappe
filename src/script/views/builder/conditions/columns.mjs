@@ -1,9 +1,9 @@
-import { SelectBox } from "../../../elements/combobox";
-import { primitives } from "../../../elements/primitives";
-import { generateElementId } from "../../../shared/utilities";
-import { CONFIG } from "../config";
-import { fieldKind } from "../migrations";
-import { Condition } from "./base";
+import { SelectBox } from "../../../elements/combobox/index.mjs";
+import { primitives } from "../../../elements/primitives.mjs";
+import { generateElementId } from "../../../shared/utilities.mjs";
+import { CONFIG } from "../config.mjs";
+import { fieldKind } from "../migrations.mjs";
+import { Condition } from "./base.mjs";
 
 /**
  * @testable true

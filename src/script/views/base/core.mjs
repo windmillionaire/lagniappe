@@ -1,14 +1,14 @@
-import { connectivity } from "../../shared/connectivity";
-import { ENDPOINTS } from "../../shared/endpoints";
-import { captureError } from "../../shared/errors";
-import { request } from "../../shared/request";
-import { withTransition } from "../../shared/transitions";
-import ViewComponent from "./component";
+import { connectivity } from "../../shared/connectivity.mjs";
+import { ENDPOINTS } from "../../shared/endpoints.mjs";
+import { captureError } from "../../shared/errors.mjs";
+import { request } from "../../shared/request.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import ViewComponent from "./component.mjs";
 import {
 	collectRefreshTargets,
 	reconcileChange,
 	refreshCollectionComponents,
-} from "./reconciliation";
+} from "./reconciliation.mjs";
 import {
 	ensureDeferredOperations,
 	ensureEditWatcher,
@@ -22,9 +22,9 @@ import {
 	ensureSubmissionManager,
 	ensureSyncManager,
 	initializeCoreServices,
-} from "./services";
-import ShellView from "./shell";
-import { Task } from "./task";
+} from "./services.mjs";
+import ShellView from "./shell.mjs";
+import { Task } from "./task.mjs";
 
 /**
  * @testable infrastructure
@@ -424,8 +424,8 @@ export default class Core extends ShellView {
 	 */
 	scheduleOfflineReplay() {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
-		const replay = import("./offlineReplay").then(({ replayOfflineQueue }) =>
-			replayOfflineQueue(this),
+		const replay = import("./offlineReplay.mjs").then(
+			({ replayOfflineQueue }) => replayOfflineQueue(this),
 		);
 		this._offlineReplayTask = replay;
 		this.replayReady = replay;

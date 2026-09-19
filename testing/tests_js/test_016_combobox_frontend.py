@@ -287,17 +287,17 @@ comboboxSource = comboboxSource.replace(
   /import \{[\s\S]*?\} from "@floating-ui\/dom";\n/,
   "",
 );
-comboboxSource = comboboxSource.replace('import { STYLES } from "styles";\n', "");
+comboboxSource = comboboxSource.replace(/import \{ STYLES \} from "(?:\.\.\/)+generated\/styles\.mjs";\n/, "");
 comboboxSource = comboboxSource.replace(
-  'import { captureError } from "../../shared/errors";\n',
+  'import { captureError } from "../../shared/errors.mjs";\n',
   "",
 );
 comboboxSource = comboboxSource.replace(
-  'import { generateElementId } from "../../shared/utilities";\n',
+  'import { generateElementId } from "../../shared/utilities.mjs";\n',
   "",
 );
 comboboxSource = comboboxSource.replace(
-  'import { primitives } from "../primitives";\n',
+  'import { primitives } from "../primitives.mjs";\n',
   "",
 );
 comboboxSource = comboboxSource.replace("export class Combobox", "class Combobox");
@@ -412,9 +412,9 @@ const context = {
 };
 vm.createContext(context);
 let source = fs.readFileSync("src/script/elements/entityMenu.mjs", "utf8");
-source = source.replace('import { STYLES } from "styles";\n', "");
+source = source.replace(/import \{ STYLES \} from "(?:\.\.\/)+generated\/styles\.mjs";\n/, "");
 source = source.replace(
-  'import { Dropdown } from "./combobox/dropdown";\n',
+  'import { Dropdown } from "./combobox/dropdown.mjs";\n',
   "",
 );
 source = source.replace("export class EntityMenu", "class EntityMenu");

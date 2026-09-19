@@ -2633,7 +2633,16 @@ def _release_check_repository(tmp_path: Path) -> Path:
 
     files = {
         ".gitignore": "config/files/\nlagniappe.yaml\nindex.yaml\n",
+        ".nvmrc": "26.8.2\n",
+        "runner/hosted_e2e_container/Dockerfile": (
+            f"FROM node:26.8.2-bookworm-slim@sha256:{'a' * 64} AS node-runtime\n"
+        ),
         "runner/__init__.py": "",
+        "runner/terminal.py": (
+            (Path(run.__file__).parent / "runner/terminal.py").read_text(
+                encoding="utf-8"
+            )
+        ),
         "runner/console.py": (
             (Path(run.__file__).parent / "runner" / "console.py").read_text(
                 encoding="utf-8"
@@ -2680,10 +2689,10 @@ def _release_check_repository(tmp_path: Path) -> Path:
             )
         ),
         "run.py": Path(run.__file__).read_text(encoding="utf-8"),
-        "package.json": '{"name": "lagniappe", "version": "0.1.0"}\n',
+        "package.json": '{"name": "lagniappe", "version": "0.1.0", "engines": {"node": ">=26.8.2"}}\n',
         "package-lock.json": (
             '{"name": "lagniappe", "version": "0.1.0", '
-            '"packages": {"": {"name": "lagniappe", "version": "0.1.0"}}}\n'
+            '"packages": {"": {"name": "lagniappe", "version": "0.1.0", "engines": {"node": ">=26.8.2"}}}}\n'
         ),
         "documentation/releases/0.1.0.md": (
             "# Version 0.1.0\n\n- Initial test release.\n"
@@ -2735,12 +2744,13 @@ def _write_release_candidate(
     release_note = release_note or (
         f"# Version {version}\n\n- Added the release workflow.\n"
     )
+    package = json.loads((repo / "package.json").read_text())
+    package["version"] = version
+    lock = json.loads((repo / "package-lock.json").read_text())
+    lock["version"] = lock["packages"][""]["version"] = version
     updates = {
-        "package.json": f'{{"name": "lagniappe", "version": "{version}"}}\n',
-        "package-lock.json": (
-            f'{{"name": "lagniappe", "version": "{version}", '
-            f'"packages": {{"": {{"name": "lagniappe", "version": "{version}"}}}}}}\n'
-        ),
+        "package.json": json.dumps(package) + "\n",
+        "package-lock.json": json.dumps(lock) + "\n",
         f"documentation/releases/{version}.md": release_note,
         "lagniappe/web/static/sw.js": f'const BUILD_ID = "{build_id}";\n',
         "config/constants.py": (f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'),
@@ -2821,6 +2831,38 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     )
     assert result.returncode == 0
     assert "Release check passed against main" in result.stdout
+
+
+# @pair release:delivery-tree
+@pytest.mark.parametrize(
+    "declaration",
+    [".nvmrc", "package.json", "package-lock.json", "docker-version", "docker-digest"],
+)
+def test_run_py_release_check_requires_aligned_node_declarations(tmp_path, declaration):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo)
+    relative = (
+        "runner/hosted_e2e_container/Dockerfile"
+        if declaration.startswith("docker-") else declaration
+    )
+    path = repo / relative
+    original = path.read_text()
+    if declaration == ".nvmrc":
+        changed, message = "node\n", ".nvmrc must pin"
+    elif declaration == "docker-digest":
+        changed = original.replace(f"@sha256:{'a' * 64}", "")
+        message = "must pin the node-runtime image"
+    else:
+        changed = original.replace("26.8.2", "25.0.0")
+        message = (
+            "must pin the node-runtime image"
+            if declaration == "docker-version" else "Node engine must match"
+        )
+    path.write_text(changed)
+    _git(repo, "add", relative)
+    path.write_text(original)  # Freeze validates the index, including unstaged fixes.
+    _, issues = run.release_readiness_issues(repo, "main")
+    assert any(message in issue for issue in issues), issues
 
 
 def _write_candidate_migration(repo: Path, *, introduced_in: str) -> None:

@@ -1,5 +1,5 @@
-import { primitives } from "../../elements/primitives";
-import { TableVisibilityState } from "./visibilityState";
+import { primitives } from "../../elements/primitives.mjs";
+import { TableVisibilityState } from "./visibilityState.mjs";
 
 /**
  * @testable infrastructure

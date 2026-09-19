@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b158c05a';
-import { STYLES } from './styles.js?v=b158c05a';
-import { s as setIcon } from './icons.js?v=b158c05a';
-import { p as primitives } from './primitives.js?v=b158c05a';
-import { TableElement } from './table.js?v=b158c05a';
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=bdc1ce7d';
+import { STYLES } from './styles.js?v=bdc1ce7d';
+import { s as setIcon } from './icons.js?v=bdc1ce7d';
+import { p as primitives } from './primitives.js?v=bdc1ce7d';
+import { TableElement } from './table.js?v=bdc1ce7d';
 
 /**
  * @testable true

@@ -1,10 +1,10 @@
-import { STYLES } from "styles";
-import { SelectBox } from "../../../elements/combobox";
-import { primitives } from "../../../elements/primitives";
-import { withTransition } from "../../../shared/transitions";
-import { CONFIG } from "../config";
-import { fieldKind } from "../migrations";
-import { Condition } from "./base";
+import { SelectBox } from "../../../elements/combobox/index.mjs";
+import { primitives } from "../../../elements/primitives.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
+import { CONFIG } from "../config.mjs";
+import { fieldKind } from "../migrations.mjs";
+import { Condition } from "./base.mjs";
 
 const MESSAGES = {
 	checkbox: {

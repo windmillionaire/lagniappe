@@ -1,5 +1,5 @@
-import { primitives } from "../../../elements/primitives";
-import { ConditionTarget } from "./base";
+import { primitives } from "../../../elements/primitives.mjs";
+import { ConditionTarget } from "./base.mjs";
 
 /**
  * @testable true

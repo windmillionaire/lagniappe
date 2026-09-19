@@ -1,7 +1,7 @@
-import { ENDPOINTS } from "../shared/endpoints";
-import { request } from "../shared/request";
-import { withTransition } from "../shared/transitions";
-import ShellView from "./base/shell";
+import { ENDPOINTS } from "../shared/endpoints.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import ShellView from "./base/shell.mjs";
 
 /**
  * @testable true
@@ -87,7 +87,7 @@ export default class Manual extends ShellView {
 		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
-		this._mobileDropdownPromise = import("../elements/combobox/dropdown")
+		this._mobileDropdownPromise = import("../elements/combobox/dropdown.mjs")
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				const menu = {

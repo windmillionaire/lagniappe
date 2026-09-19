@@ -1,4 +1,4 @@
-import { ICONS } from "icons";
+import { ICONS } from "../generated/icons.mjs";
 
 /**
  * @testable true

@@ -274,23 +274,23 @@ const context = { console, dependencies, TextEncoder };
 vm.createContext(context);
 let source = fs.readFileSync("src/script/elements/editor/independent.mjs", "utf8");
 source = source.replace(
-  /import \{ STYLES \} from "styles";/,
+  /import \{ STYLES \} from "(?:\.\.\/)+generated\/styles\.mjs";/,
   "const { STYLES } = dependencies;",
 );
 source = source.replace(
-  /import \{ captureError \} from "\.\.\/\.\.\/shared\/errors";/,
+  /import \{ captureError \} from "\.\.\/\.\.\/shared\/errors\.mjs";/,
   "const { captureError } = dependencies;",
 );
 source = source.replace(
-  /import \{ request \} from "\.\.\/\.\.\/shared\/request";/,
+  /import \{ request \} from "\.\.\/\.\.\/shared\/request\.mjs";/,
   "const { request } = dependencies;",
 );
 source = source.replace(
-  /import \{ independentEditor \} from "\.\/editor";/,
+  /import \{ independentEditor \} from "\.\/editor\.mjs";/,
   "const { independentEditor } = dependencies;",
 );
 source = source.replace(
-  /import \{ Toolbar \} from "\.\/toolbar";/,
+  /import \{ Toolbar \} from "\.\/toolbar\.mjs";/,
   "const { Toolbar } = dependencies;",
 );
 source = source.replace(

@@ -1,4 +1,4 @@
-import { EmbeddedTable } from "../elements/base/baseTable";
+import { EmbeddedTable } from "../elements/base/baseTable.mjs";
 
 /**
  * @testable true

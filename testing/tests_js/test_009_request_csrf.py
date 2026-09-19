@@ -365,7 +365,7 @@ const FormData = context.FormData;
 const window = context.window;
 
 let logoutSource = fs.readFileSync("src/script/shared/logout.mjs", "utf8");
-logoutSource = logoutSource.replace('import {{ request }} from "./request";', "");
+logoutSource = logoutSource.replace('import {{ request }} from "./request.mjs";', "");
 logoutSource = logoutSource.replace(
   "export const initializeLogoutForms =",
   "const initializeLogoutForms =",

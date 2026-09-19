@@ -1,11 +1,11 @@
-import { STYLES } from "styles";
-import { withTransition } from "../../shared/transitions";
-import { debounce } from "../../shared/utilities";
-import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "./config";
-import { toolbarDropdown } from "./dropdowns";
-import { MarkdownPastePrompt } from "./options/markdownPaste";
-import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry";
-import { UserManager } from "./users";
+import { STYLES } from "../../generated/styles.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { debounce } from "../../shared/utilities.mjs";
+import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "./config.mjs";
+import { toolbarDropdown } from "./dropdowns.mjs";
+import { MarkdownPastePrompt } from "./options/markdownPaste.mjs";
+import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry.mjs";
+import { UserManager } from "./users.mjs";
 
 const DEBOUNCE_DELAY_MS = 100;
 

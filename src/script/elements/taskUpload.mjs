@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../shared";
-import { createIcon, setIcon } from "../shared/icons";
-import { withTransition } from "../shared/transitions";
-import { BaseUpload } from "./base/baseUpload";
-import { UploadMenu, uploadElement } from "./upload";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon, setIcon } from "../shared/icons.mjs";
+import { ENDPOINTS, request } from "../shared/index.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { BaseUpload } from "./base/baseUpload.mjs";
+import { UploadMenu, uploadElement } from "./upload.mjs";
 
 const UPLOAD_DROPZONE_TEXT =
 	"Drop file/photo here, click to upload, or tap to choose camera/files";

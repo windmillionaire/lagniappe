@@ -1,4 +1,6 @@
-import BROWSER_PROTOCOL from "../../../config/browser_protocol.json";
+import BROWSER_PROTOCOL from "../../../config/browser_protocol.json" with {
+	type: "json",
+};
 
 const DEFAULT_STATE = Object.freeze({
 	browser: "online",

@@ -10,7 +10,7 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { Typography } from "@tiptap/extension-typography";
 import { Youtube } from "@tiptap/extension-youtube";
 import { StarterKit } from "@tiptap/starter-kit";
-import { STYLES } from "styles";
+import { STYLES } from "../../generated/styles.mjs";
 import {
 	CustomImage,
 	CustomLink,
@@ -21,7 +21,7 @@ import {
 	SelectionHighlight,
 	TabCharacter,
 	TrackedRanges,
-} from "./extensions";
+} from "./extensions/index.mjs";
 
 /**
  * @testable infrastructure

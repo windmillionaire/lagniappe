@@ -1,10 +1,10 @@
-import { STYLES } from "styles";
-import { InputElement } from "../elements/input";
-import { primitives } from "../elements/primitives";
-import { SectionToggle } from "../elements/sectionToggle";
-import { TextareaElement } from "../elements/textarea";
-import { setIcon } from "../shared/icons";
-import { FormWidget } from "./base/formWidget";
+import { InputElement } from "../elements/input.mjs";
+import { primitives } from "../elements/primitives.mjs";
+import { SectionToggle } from "../elements/sectionToggle.mjs";
+import { TextareaElement } from "../elements/textarea.mjs";
+import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable true

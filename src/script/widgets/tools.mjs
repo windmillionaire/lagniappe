@@ -1,5 +1,5 @@
-import { BaseUpload } from "../elements/base/baseUpload";
-import { UploadMenu, uploadElement } from "../elements/upload";
+import { BaseUpload } from "../elements/base/baseUpload.mjs";
+import { UploadMenu, uploadElement } from "../elements/upload.mjs";
 
 const AI_DROPZONE_TEXT =
 	"Drop files here, click to upload, or paste a screenshot.";

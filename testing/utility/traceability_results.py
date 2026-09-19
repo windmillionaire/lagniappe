@@ -7,7 +7,10 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
+
+from testing.utility import native_js
 
 from testing.utility.traceability_common import (
     LATEST_TEST_RUN,
@@ -133,6 +136,11 @@ def _test_node_exists(
 
     base_nodeid = PARAMETER_SUFFIX_RE.sub("", nodeid)
     symbols = base_nodeid.split("::")[1:]
+    if symbols and path.suffix == ".mjs":
+        try:
+            return symbols[0] in {row["name"] for row in native_js.inventory(path)["cases"]}
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return True  # Retain evidence when a collection problem prevents discovery.
     if not symbols or path.suffix != ".py":
         return True
 

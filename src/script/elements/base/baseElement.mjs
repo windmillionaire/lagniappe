@@ -1,6 +1,6 @@
-import { STYLES } from "styles";
-import { setIcon } from "../../shared/icons";
-import { primitives } from "../primitives";
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { primitives } from "../primitives.mjs";
 
 const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 
