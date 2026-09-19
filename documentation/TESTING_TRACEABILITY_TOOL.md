@@ -58,6 +58,15 @@ worthwhile, and clearly hand off any affected tests that were not rerun. The
 release workflow still establishes the complete validated evidence set before
 main.
 
+Each report shares a lazy in-memory file index across Python source inventory,
+test discovery, scaffold matching, and source suggestions. Those stages read
+each file and parse its Python syntax once, then reuse function spans, source
+segments, and called names. Scaffold matching excludes the test's own decorators
+while retaining calls in its defaults and nested functions. The index is
+discarded after the report, including on failure, so subsequent reports see
+file edits. This adds no persistent cache; semantic fingerprints and the
+template/style analyzers keep their existing inspection rules.
+
 ## Closing the agent feedback loop
 
 Tests run through `run.py test` automatically record outcomes in

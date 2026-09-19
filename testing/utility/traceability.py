@@ -11,9 +11,13 @@ from __future__ import annotations
 import argparse
 import ast
 from collections import Counter
+from contextlib import contextmanager
+from contextvars import ContextVar
+from copy import copy
 from dataclasses import asdict, dataclass, field
 import difflib
 import fnmatch
+from functools import cached_property
 import json
 import os
 from pathlib import Path
@@ -113,7 +117,91 @@ CONTEXT_TOKEN_STOPWORDS = {
 TESTABLE_INFRASTRUCTURE = "infrastructure"
 TESTABLE_ARCHITECTURE_ALIASES = {"architecture", "infra", "infrastructure"}
 SUPPRESSIVE_TESTABLE_VALUES = {True, False, TESTABLE_INFRASTRUCTURE}
-TEST_FUNCTION_SOURCE_CACHE: dict[str, str] = {}
+
+
+@dataclass
+class IndexedFunction:
+    source: str
+    node: ast.FunctionDef | ast.AsyncFunctionDef
+
+    @cached_property
+    def text(self) -> str:
+        return ast.get_source_segment(self.source, self.node) or ""
+
+    @cached_property
+    def calls(self) -> frozenset[str]:
+        # Extracted function text starts at def, excluding its own decorators.
+        # Keep nested decorators and calls in defaults/annotations, as before.
+        node = copy(self.node)
+        node.decorator_list = []
+        return frozenset(
+            call.func.attr if isinstance(call.func, ast.Attribute) else call.func.id
+            for call in ast.walk(node)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, (ast.Attribute, ast.Name))
+        )
+
+
+@dataclass
+class IndexedFile:
+    path: Path
+    source: str
+
+    @cached_property
+    def lines(self) -> list[str]:
+        return self.source.splitlines()
+
+    @cached_property
+    def _parsed(self) -> ast.Module | SyntaxError:
+        try:
+            return ast.parse(self.source, filename=str(self.path))
+        except SyntaxError as error:
+            return error
+
+    @property
+    def tree(self) -> ast.Module:
+        if isinstance(self._parsed, SyntaxError):
+            raise self._parsed
+        return self._parsed
+
+    @cached_property
+    def functions(self) -> dict[tuple[str, int], IndexedFunction]:
+        return {
+            (node.name, node.lineno): IndexedFunction(self.source, node)
+            for node in ast.walk(self.tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+
+
+FILE_INDEX: ContextVar[dict[Path, IndexedFile | OSError] | None] = ContextVar(
+    "traceability_file_index", default=None
+)
+
+
+@contextmanager
+def file_index_scope():
+    """Share file snapshots for one report, releasing them even on failure."""
+    token = FILE_INDEX.set({})
+    try:
+        yield
+    finally:
+        FILE_INDEX.reset(token)
+
+
+def indexed_file(path: Path) -> IndexedFile:
+    path = path.resolve()
+    cache = FILE_INDEX.get()
+    if cache is None:
+        return IndexedFile(path, path.read_text(encoding="utf-8"))
+    if path not in cache:
+        try:
+            cache[path] = IndexedFile(path, path.read_text(encoding="utf-8"))
+        except OSError as error:
+            cache[path] = error
+    result = cache[path]
+    if isinstance(result, OSError):
+        raise result
+    return result
 
 
 @dataclass(frozen=True)
@@ -741,9 +829,9 @@ def metadata_start_lineno_for_python_node(node: ast.AST, lines: list[str]) -> in
 
 
 def inventory_python_file(path: Path, repo_root: Path) -> list[SourceSymbol]:
-    source = path.read_text(encoding="utf-8")
-    lines = source.splitlines()
-    tree = ast.parse(source, filename=str(path))
+    indexed = indexed_file(path)
+    lines = indexed.lines
+    tree = indexed.tree
     symbols: list[SourceSymbol] = []
 
     def visit_body(body: list[ast.stmt], stack: list[str]) -> None:
@@ -1127,9 +1215,9 @@ def test_path_from_nodeid(nodeid: str, repo_root: Path) -> Path:
 
 
 def collect_python_test_symbol_info(path: Path) -> dict[str, TestSymbolInfo]:
-    source = path.read_text(encoding="utf-8")
-    lines = source.splitlines()
-    tree = ast.parse(source, filename=str(path))
+    indexed = indexed_file(path)
+    lines = indexed.lines
+    tree = indexed.tree
     info_by_qualname: dict[str, TestSymbolInfo] = {}
 
     def visit_body(body: list[ast.stmt], stack: list[str]) -> None:
@@ -1542,60 +1630,39 @@ def is_test_pattern(reference: str) -> bool:
     return "*" in reference or "?" in reference
 
 
-def test_function_source(test: TestCase, repo_root: Path, cache: dict[str, str]) -> str:
+def indexed_test_function(test: TestCase, repo_root: Path) -> IndexedFunction | None:
+    if not test.path or not test.lineno:
+        return None
+    indexed = indexed_file(_test_source_path(repo_root, test.path))
+    return indexed.functions.get((test.qualname.split("::")[-1], test.lineno))
+
+
+def test_function_source(test: TestCase, repo_root: Path) -> str:
     if not test.path or not test.lineno:
         return ""
 
-    path = _test_source_path(repo_root, test.path)
-    cache_key = f"{path}:{test.lineno}"
-    if cache_key in cache:
-        return cache[cache_key]
-
     try:
-        source = path.read_text(encoding="utf-8")
+        path = _test_source_path(repo_root, test.path)
         if path.suffix == ".mjs":
-            cache[cache_key] = "\n".join(source.splitlines()[test.lineno - 1:test.end_lineno])
-            return cache[cache_key]
-        tree = ast.parse(source, filename=str(path))
+            return "\n".join(indexed_file(path).lines[test.lineno - 1:test.end_lineno])
+        function = indexed_test_function(test, repo_root)
+        return function.text if function is not None else ""
     except (OSError, SyntaxError):
-        cache[cache_key] = ""
         return ""
-
-    target_name = test.qualname.split("::")[-1]
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if node.name == target_name and node.lineno == test.lineno:
-            cache[cache_key] = ast.get_source_segment(source, node) or ""
-            return cache[cache_key]
-
-    cache[cache_key] = ""
-    return ""
 
 
 def test_uses_scaffold(test: TestCase, scaffold: SourceSymbol, repo_root: Path) -> bool:
-    source = test_function_source(test, repo_root, TEST_FUNCTION_SOURCE_CACHE)
-    if not source:
-        return False
-
     name = scaffold.qualname.split(".")[-1]
     if test.path.endswith(".mjs"):
+        if not test_function_source(test, repo_root):
+            return False
         row = next((row for row in native_js.inventory(_test_source_path(repo_root, test.path))["cases"] if row["name"] == test.qualname), {})
         return name in row.get("calls", [])
     try:
-        tree = ast.parse(source)
-    except SyntaxError:
+        function = indexed_test_function(test, repo_root)
+        return function is not None and name in function.calls
+    except (OSError, SyntaxError):
         return False
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        func = node.func
-        if isinstance(func, ast.Attribute) and func.attr == name:
-            return True
-        if isinstance(func, ast.Name) and func.id == name:
-            return True
-    return False
 
 
 def scaffold_symbols_by_reference(
@@ -1990,7 +2057,7 @@ def annotation_scope_issues(
             if relative in included_paths or relative.startswith("lagniappe/web/static/"):
                 continue
             try:
-                tagged = "@testable" in path.read_text(encoding="utf-8")
+                tagged = "@testable" in indexed_file(path).source
             except OSError:
                 continue
             if tagged:
@@ -2648,7 +2715,7 @@ def focused_test_context_paths(
         if not test_path.exists():
             continue
         try:
-            text = test_path.read_text(encoding="utf-8")
+            text = indexed_file(test_path).source
         except OSError:
             continue
         context_tokens.update(context_token_variants(text))
@@ -2749,7 +2816,7 @@ def source_suggestions_for_tests(
 def source_code_segment(symbol: SourceSymbol, repo_root: Path) -> str:
     path = repo_root / symbol.path
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = indexed_file(path).lines
     except OSError:
         return ""
 
@@ -2779,7 +2846,7 @@ def test_context_tokens(test: TestCase, repo_root: Path) -> set[str]:
         " ".join(test.metadata.dimensions),
         " ".join(test.metadata.todos),
         " ".join(test.metadata.templates),
-        test_function_source(test, repo_root, TEST_FUNCTION_SOURCE_CACHE),
+        test_function_source(test, repo_root),
     ]
     return set().union(*(context_token_variants(part) for part in parts if part))
 
@@ -2801,7 +2868,7 @@ def test_mentions_source_path(
 
     path = _test_source_path(repo_root, test.path)
     try:
-        text = path.read_text(encoding="utf-8")
+        text = indexed_file(path).source
     except OSError:
         return False
     return symbol.path in text
@@ -2813,9 +2880,7 @@ def source_test_candidate_matches(
     repo_root: Path,
 ) -> list[dict[str, str]]:
     matches = metadata_tag_matches(symbol.metadata, test.metadata)
-    test_source = test_function_source(
-        test, repo_root, TEST_FUNCTION_SOURCE_CACHE
-    ).lower()
+    test_source = test_function_source(test, repo_root).lower()
     source_tokens = source_context_tokens(symbol, repo_root)
     test_tokens = test_context_tokens(test, repo_root)
 
@@ -3513,6 +3578,7 @@ def attach_contract_traceability(
     )
 
 
+@file_index_scope()
 def build_report(
     repo_root: Path,
     config_path: Path,
@@ -3553,7 +3619,6 @@ def build_report(
     ):
         raise ValueError("--suggest-sources requires --test, --source, or --changed")
 
-    TEST_FUNCTION_SOURCE_CACHE.clear()
     config = load_config(config_path, repo_root)
     scaffold_symbols = inventory_test_scaffolds(config, repo_root)
     source_scope_paths: list[str] = []
