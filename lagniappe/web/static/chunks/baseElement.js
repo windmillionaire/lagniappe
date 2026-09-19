@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bc63f152';
-import { s as setIcon } from './icons.js?v=bc63f152';
-import { p as primitives } from './primitives.js?v=bc63f152';
+import { STYLES } from './styles.js?v=b158c05a';
+import { s as setIcon } from './icons.js?v=b158c05a';
+import { p as primitives } from './primitives.js?v=b158c05a';
 
 const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 

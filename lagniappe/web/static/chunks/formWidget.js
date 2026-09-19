@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormController } from './controller.js?v=bc63f152';
-import { STYLES } from './styles.js?v=bc63f152';
-import { Modal } from './modal.js?v=bc63f152';
-import { c as compatibleField } from './representation.js?v=bc63f152';
-import { w as withTransition } from './foundation.js?v=bc63f152';
+import { F as FormController } from './controller.js?v=b158c05a';
+import { STYLES } from './styles.js?v=b158c05a';
+import { Modal } from './modal.js?v=b158c05a';
+import { c as compatibleField } from './representation.js?v=b158c05a';
+import { w as withTransition } from './foundation.js?v=b158c05a';
 
 /**
  * @testable true

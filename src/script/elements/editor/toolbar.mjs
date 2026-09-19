@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
-import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "../../config/editor";
-import { debounce } from "../../shared";
 import { withTransition } from "../../shared/transitions";
+import { debounce } from "../../shared/utilities";
+import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "./config";
 import { toolbarDropdown } from "./dropdowns";
 import { MarkdownPastePrompt } from "./options/markdownPaste";
 import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry";

@@ -7,13 +7,10 @@ import {
 } from "@floating-ui/dom";
 import { mergeAttributes, Node } from "@tiptap/core";
 import { STYLES } from "styles";
-import {
-	captureError,
-	debounce,
-	generateElementId,
-	QueryLifecycle,
-	request,
-} from "../../../shared";
+import { captureError } from "../../../shared/errors";
+import { QueryLifecycle } from "../../../shared/queryLifecycle";
+import { request } from "../../../shared/request";
+import { debounce, generateElementId } from "../../../shared/utilities";
 
 /**
  * @testable true

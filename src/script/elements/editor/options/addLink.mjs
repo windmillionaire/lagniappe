@@ -1,7 +1,8 @@
 import { getMarkRange } from "@tiptap/core";
 import { STYLES } from "styles";
 import { FormController } from "../../../forms/controller";
-import { ENDPOINTS, request } from "../../../shared";
+import { ENDPOINTS } from "../../../shared/endpoints";
+import { request } from "../../../shared/request";
 import { buttons } from "../../buttons";
 import { RemoteQueryCombobox } from "../../combobox/remote";
 import { Results } from "../../combobox/results";

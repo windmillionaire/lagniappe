@@ -1,5 +1,6 @@
 import { STYLES } from "styles";
-import { Modal, request } from "../../../shared";
+import { Modal } from "../../../shared/modal";
+import { request } from "../../../shared/request";
 import { Dropdown } from "../../combobox/dropdown";
 import { createMenuButton } from "../dropdowns";
 

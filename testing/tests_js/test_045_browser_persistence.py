@@ -278,8 +278,12 @@ source = source.replace(
   "const { STYLES } = dependencies;",
 );
 source = source.replace(
-  /import \{ captureError, request \} from "\.\.\/\.\.\/shared";/,
-  "const { captureError, request } = dependencies;",
+  /import \{ captureError \} from "\.\.\/\.\.\/shared\/errors";/,
+  "const { captureError } = dependencies;",
+);
+source = source.replace(
+  /import \{ request \} from "\.\.\/\.\.\/shared\/request";/,
+  "const { request } = dependencies;",
 );
 source = source.replace(
   /import \{ independentEditor \} from "\.\/editor";/,

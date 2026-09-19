@@ -1,5 +1,5 @@
 import { primitives } from "../../../elements/primitives";
-import { generateElementId } from "../../../shared";
+import { generateElementId } from "../../../shared/utilities";
 import { Condition } from "./base";
 
 /**

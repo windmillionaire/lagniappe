@@ -1,6 +1,6 @@
 import { STYLES } from "styles";
-import { USER_COLORS } from "../../config/editor";
 import { Dropdown } from "../combobox";
+import { USER_COLORS } from "./config";
 import { createMenuButton } from "./dropdowns";
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";

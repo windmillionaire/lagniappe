@@ -111,11 +111,18 @@ final flush ownership to `FormBuilder`. Collaborative documents leave
 visibility and final save behavior to the widget/component lifecycle plus
 `SyncManager`.
 
-## Editor Configuration (`editor.mjs`)
+## Editor Construction (`editor.mjs`)
 
 Two factory functions create TipTap `Editor` instances with shared extension configuration:
 
-**`collaborativeEditor(target, ydoc)`** -- includes `Collaboration` extension (Yjs), `FlashRemoteChanges`, disables built-in history (Yjs handles undo).
+Private `createFormattingExtensions()` and `createEditingExtensions()` helpers
+construct the common blocks. Each call creates fresh arrays and configured
+extensions. The factories retain StarterKit history settings and constructor
+options explicitly; collaborative setup inserts Collaboration and remote-change
+highlighting between the common blocks, then appends mentions. Its Yjs document
+and undo-origin set remain local to that editor instance.
+
+**`collaborativeEditor(target, ydoc, editable = true)`** -- includes `Collaboration` extension (Yjs), `FlashRemoteChanges`, disables built-in history (Yjs handles undo).
 
 **`independentEditor(target, content)`** -- enables built-in history, no
 collaboration extensions. Initial HTML is passed to the editor constructor so
@@ -233,6 +240,14 @@ is not migrated by public rendering.
 ## Toolbar (`toolbar.mjs`)
 
 The toolbar is shared between both document types. It creates tool buttons and dropdown menus, manages toolbar forms (color picker, image settings, link insertion), and tracks the active editor state.
+
+Feature configuration lives beside the toolbar in `elements/editor/config.mjs`:
+`TOOLBAR_TOOLS`, `TOOLBAR_MENUS`, `IMAGE_GROUPS`, `COLOR_MENU`, `FONT_MENU`, and
+`USER_COLORS`. This module contains only configuration data. Toolbar options
+remain lazy through the literal registries in `options/registry.mjs`.
+Editor commands, extensions, and the independent controller import shared
+helpers directly from their endpoint, request, error, query-lifecycle, utility,
+or modal owners.
 
 ### Initialization
 

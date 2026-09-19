@@ -1,5 +1,5 @@
 import { STYLES } from "styles";
-import { IMAGE_GROUPS } from "../../../config/editor";
+import { IMAGE_GROUPS } from "../config";
 import { ToolbarButton } from "./toolbarButtons";
 
 /**

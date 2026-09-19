@@ -1,7 +1,7 @@
 import Sortable from "sortablejs";
 import { STYLES } from "styles";
-import { CONFIG } from "../../../config/builder";
 import { setIcon } from "../../../shared/icons";
+import { CONFIG } from "../config";
 
 /**
  * @testable infrastructure

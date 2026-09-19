@@ -1,4 +1,4 @@
-import { COLOR_MENU } from "../../../config/editor";
+import { COLOR_MENU } from "../config";
 
 /**
  * @testable true

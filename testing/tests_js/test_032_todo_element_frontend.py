@@ -261,7 +261,7 @@ const vm = require("node:vm");
 
 const context = {};
 vm.createContext(context);
-let source = fs.readFileSync("src/script/config/builder.mjs", "utf8");
+let source = fs.readFileSync("src/script/views/builder/config.mjs", "utf8");
 source = source.replace("const CONFIG =", "globalThis.CONFIG =");
 source = source.replace("export { CONFIG };", "");
 vm.runInContext(source, context);

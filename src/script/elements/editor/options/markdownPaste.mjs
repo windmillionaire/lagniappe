@@ -1,5 +1,7 @@
 import { STYLES } from "styles";
-import { ENDPOINTS, generateElementId, request } from "../../../shared";
+import { ENDPOINTS } from "../../../shared/endpoints";
+import { request } from "../../../shared/request";
+import { generateElementId } from "../../../shared/utilities";
 import { buttons } from "../../buttons";
 
 /**

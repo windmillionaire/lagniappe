@@ -8,7 +8,8 @@ import {
 import { getMarkRange, Mark } from "@tiptap/core";
 import { isAllowedUri, Link } from "@tiptap/extension-link";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { ENDPOINTS, request } from "../../../shared";
+import { ENDPOINTS } from "../../../shared/endpoints";
+import { request } from "../../../shared/request";
 import { normalizeLinkAttributes } from "./linkAttributes.mjs";
 
 const LINK_EDIT_EVENT = "editor-link-edit";

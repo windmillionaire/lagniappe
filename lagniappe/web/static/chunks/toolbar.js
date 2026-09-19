@@ -1,12 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bc63f152';
-import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=bc63f152';
-import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=bc63f152';
-import './connectivity.js?v=bc63f152';
-import { Q as QueryLifecycle } from './queryLifecycle.js?v=bc63f152';
-import { s as setIcon } from './icons.js?v=bc63f152';
-import { Dropdown } from './dropdown.js?v=bc63f152';
-import { b as buttons } from './buttons.js?v=bc63f152';
+import { STYLES } from './styles.js?v=b158c05a';
+import { a as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip } from './combobox.js?v=b158c05a';
+import { r as request, E as ENDPOINTS, d as debounce, c as captureError, g as generateElementId, w as withTransition } from './foundation.js?v=b158c05a';
+import { Q as QueryLifecycle } from './queryLifecycle.js?v=b158c05a';
+import { s as setIcon } from './icons.js?v=b158c05a';
+import { Dropdown } from './dropdown.js?v=b158c05a';
+import { b as buttons } from './buttons.js?v=b158c05a';
 
 /**
  * Utility module to work with key-value stores.
@@ -48207,6 +48206,61 @@ const focusEditorOnSurfacePointerDown = (editor, target) => {
 /**
  * @testable infrastructure
  */
+const createFormattingExtensions = () => [
+	TaskList,
+	TaskItem.configure({
+		nested: true,
+	}),
+	CustomLink.configure({
+		openOnClick: false,
+		autolink: true,
+		defaultProtocol: "https",
+	}),
+	Typography,
+	TableKit.configure({
+		table: {
+			HTMLAttributes: {
+				class: "editor-table",
+			},
+			renderWrapper: true,
+		},
+	}),
+	Color,
+	TextStyle,
+	TextAlign.configure({
+		types: ["heading", "paragraph"],
+	}),
+	Superscript,
+	Subscript,
+	Youtube.configure({
+		nocookie: true,
+	}),
+	CustomImage.configure({
+		HTMLAttributes: {
+			class: "editor-image",
+		},
+	}),
+	FontFamily.configure({
+		types: ["textStyle"],
+	}),
+];
+
+/**
+ * @testable infrastructure
+ */
+const createEditingExtensions = () => [
+	TrackedRanges,
+	SelectionHighlight,
+	MarkdownSource.configure({
+		HTMLAttributes: { class: STYLES.editor.markdownSource },
+	}),
+	EditorPaste,
+	TabCharacter,
+];
+
+/**
+ * @testable infrastructure
+ */
 const collaborativeEditor = (target, ydoc, editable = true) => {
 	const extensions = [
 		StarterKit.configure({
@@ -48214,42 +48268,7 @@ const collaborativeEditor = (target, ydoc, editable = true) => {
 			underline: true,
 			history: false,
 		}),
-		TaskList,
-		TaskItem.configure({
-			nested: true,
-		}),
-		CustomLink.configure({
-			openOnClick: false,
-			autolink: true,
-			defaultProtocol: "https",
-		}),
-		Typography,
-		TableKit.configure({
-			table: {
-				HTMLAttributes: {
-					class: "editor-table",
-				},
-				renderWrapper: true,
-			},
-		}),
-		Color,
-		TextStyle,
-		TextAlign.configure({
-			types: ["heading", "paragraph"],
-		}),
-		Superscript,
-		Subscript,
-		Youtube.configure({
-			nocookie: true,
-		}),
-		CustomImage.configure({
-			HTMLAttributes: {
-				class: "editor-image",
-			},
-		}),
-		FontFamily.configure({
-			types: ["textStyle"],
-		}),
+		...createFormattingExtensions(),
 		Collaboration.configure({
 			document: ydoc,
 			field: "default",
@@ -48259,13 +48278,7 @@ const collaborativeEditor = (target, ydoc, editable = true) => {
 			},
 		}),
 		FlashRemoteChanges,
-		TrackedRanges,
-		SelectionHighlight,
-		MarkdownSource.configure({
-			HTMLAttributes: { class: STYLES.editor.markdownSource },
-		}),
-		EditorPaste,
-		TabCharacter,
+		...createEditingExtensions(),
 		LagniappeMention,
 	];
 
@@ -48292,49 +48305,8 @@ const independentEditor = (target, content = "") => {
 			underline: true,
 			history: true,
 		}),
-		TaskList,
-		TaskItem.configure({
-			nested: true,
-		}),
-		CustomLink.configure({
-			openOnClick: false,
-			autolink: true,
-			defaultProtocol: "https",
-		}),
-		Typography,
-		TableKit.configure({
-			table: {
-				HTMLAttributes: {
-					class: "editor-table",
-				},
-				renderWrapper: true,
-			},
-		}),
-		Color,
-		TextStyle,
-		TextAlign.configure({
-			types: ["heading", "paragraph"],
-		}),
-		Superscript,
-		Subscript,
-		Youtube.configure({
-			nocookie: true,
-		}),
-		CustomImage.configure({
-			HTMLAttributes: {
-				class: "editor-image",
-			},
-		}),
-		FontFamily.configure({
-			types: ["textStyle"],
-		}),
-		TrackedRanges,
-		SelectionHighlight,
-		MarkdownSource.configure({
-			HTMLAttributes: { class: STYLES.editor.markdownSource },
-		}),
-		EditorPaste,
-		TabCharacter,
+		...createFormattingExtensions(),
+		...createEditingExtensions(),
 	];
 
 	const editor = new Editor({
@@ -48927,53 +48899,53 @@ class MarkdownPastePrompt {
 }
 
 const OPTION_REGISTRY = {
-	toggleFocus: () => import('./toolbarButtons.js?v=bc63f152'),
-	toggleBold: () => import('./toolbarButtons.js?v=bc63f152'),
-	toggleItalic: () => import('./toolbarButtons.js?v=bc63f152'),
-	toggleBulletList: () => import('./menuItems.js?v=bc63f152'),
-	toggleOrderedList: () => import('./menuItems.js?v=bc63f152'),
-	toggleTaskList: () => import('./menuItems.js?v=bc63f152'),
-	insertTable: () => import('./menuItems.js?v=bc63f152'),
-	toggleHeaderRow: () => import('./menuItems.js?v=bc63f152'),
-	addRowBefore: () => import('./menuItems.js?v=bc63f152'),
-	addRowAfter: () => import('./menuItems.js?v=bc63f152'),
-	addColumnBefore: () => import('./menuItems.js?v=bc63f152'),
-	addColumnAfter: () => import('./menuItems.js?v=bc63f152'),
-	deleteRow: () => import('./menuItems.js?v=bc63f152'),
-	deleteColumn: () => import('./menuItems.js?v=bc63f152'),
-	deleteTable: () => import('./menuItems.js?v=bc63f152'),
-	undo: () => import('./toolbarButtons.js?v=bc63f152'),
-	redo: () => import('./toolbarButtons.js?v=bc63f152'),
-	documentHistory: () => import('./documentHistory.js?v=bc63f152'),
-	setFontFamily: () => import('./menuItems.js?v=bc63f152'),
-	setColor: () => import('./menuItems.js?v=bc63f152'),
-	toggleUnderline: () => import('./menuItems.js?v=bc63f152'),
-	toggleStrike: () => import('./menuItems.js?v=bc63f152'),
-	toggleCode: () => import('./menuItems.js?v=bc63f152'),
-	toggleSuperscript: () => import('./menuItems.js?v=bc63f152'),
-	toggleSubscript: () => import('./menuItems.js?v=bc63f152'),
-	clearFormat: () => import('./menuItems.js?v=bc63f152'),
-	toggleHeading: () => import('./menuItems.js?v=bc63f152'),
-	setParagraph: () => import('./menuItems.js?v=bc63f152'),
-	addLink: () => import('./menuItems.js?v=bc63f152'),
-	addImage: () => import('./menuItems.js?v=bc63f152'),
-	addYouTube: () => import('./menuItems.js?v=bc63f152'),
-	generateText: () => import('./menuItems.js?v=bc63f152'),
-	setHorizontalRule: () => import('./menuItems.js?v=bc63f152'),
-	toggleCodeBlock: () => import('./menuItems.js?v=bc63f152'),
-	toggleBlockquote: () => import('./menuItems.js?v=bc63f152'),
-	setTextAlign: () => import('./menuItems.js?v=bc63f152'),
+	toggleFocus: () => import('./toolbarButtons.js?v=b158c05a'),
+	toggleBold: () => import('./toolbarButtons.js?v=b158c05a'),
+	toggleItalic: () => import('./toolbarButtons.js?v=b158c05a'),
+	toggleBulletList: () => import('./menuItems.js?v=b158c05a'),
+	toggleOrderedList: () => import('./menuItems.js?v=b158c05a'),
+	toggleTaskList: () => import('./menuItems.js?v=b158c05a'),
+	insertTable: () => import('./menuItems.js?v=b158c05a'),
+	toggleHeaderRow: () => import('./menuItems.js?v=b158c05a'),
+	addRowBefore: () => import('./menuItems.js?v=b158c05a'),
+	addRowAfter: () => import('./menuItems.js?v=b158c05a'),
+	addColumnBefore: () => import('./menuItems.js?v=b158c05a'),
+	addColumnAfter: () => import('./menuItems.js?v=b158c05a'),
+	deleteRow: () => import('./menuItems.js?v=b158c05a'),
+	deleteColumn: () => import('./menuItems.js?v=b158c05a'),
+	deleteTable: () => import('./menuItems.js?v=b158c05a'),
+	undo: () => import('./toolbarButtons.js?v=b158c05a'),
+	redo: () => import('./toolbarButtons.js?v=b158c05a'),
+	documentHistory: () => import('./documentHistory.js?v=b158c05a'),
+	setFontFamily: () => import('./menuItems.js?v=b158c05a'),
+	setColor: () => import('./menuItems.js?v=b158c05a'),
+	toggleUnderline: () => import('./menuItems.js?v=b158c05a'),
+	toggleStrike: () => import('./menuItems.js?v=b158c05a'),
+	toggleCode: () => import('./menuItems.js?v=b158c05a'),
+	toggleSuperscript: () => import('./menuItems.js?v=b158c05a'),
+	toggleSubscript: () => import('./menuItems.js?v=b158c05a'),
+	clearFormat: () => import('./menuItems.js?v=b158c05a'),
+	toggleHeading: () => import('./menuItems.js?v=b158c05a'),
+	setParagraph: () => import('./menuItems.js?v=b158c05a'),
+	addLink: () => import('./menuItems.js?v=b158c05a'),
+	addImage: () => import('./menuItems.js?v=b158c05a'),
+	addYouTube: () => import('./menuItems.js?v=b158c05a'),
+	generateText: () => import('./menuItems.js?v=b158c05a'),
+	setHorizontalRule: () => import('./menuItems.js?v=b158c05a'),
+	toggleCodeBlock: () => import('./menuItems.js?v=b158c05a'),
+	toggleBlockquote: () => import('./menuItems.js?v=b158c05a'),
+	setTextAlign: () => import('./menuItems.js?v=b158c05a'),
 };
 
 const FORM_REGISTRY = {
-	pinVersion: () => import('./pinVersion.js?v=bc63f152'),
-	setColor: () => import('./setColor.js?v=bc63f152'),
-	setFontFamily: () => import('./setFontFamily.js?v=bc63f152'),
-	setImage: () => import('./setImage.js?v=bc63f152'),
-	addLink: () => import('./addLink.js?v=bc63f152'),
-	addImage: () => import('./addImage.js?v=bc63f152'),
-	addYouTube: () => import('./addYouTube.js?v=bc63f152'),
-	generateText: () => import('./generateText.js?v=bc63f152'),
+	pinVersion: () => import('./pinVersion.js?v=b158c05a'),
+	setColor: () => import('./setColor.js?v=b158c05a'),
+	setFontFamily: () => import('./setFontFamily.js?v=b158c05a'),
+	setImage: () => import('./setImage.js?v=b158c05a'),
+	addLink: () => import('./addLink.js?v=b158c05a'),
+	addImage: () => import('./addImage.js?v=b158c05a'),
+	addYouTube: () => import('./addYouTube.js?v=b158c05a'),
+	generateText: () => import('./generateText.js?v=b158c05a'),
 };
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";

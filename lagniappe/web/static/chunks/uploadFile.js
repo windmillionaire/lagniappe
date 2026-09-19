@@ -1,18 +1,18 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=bc63f152';
-import { b as buttons } from './buttons.js?v=bc63f152';
-import './controller.js?v=bc63f152';
-import './primitives.js?v=bc63f152';
-import './styles.js?v=bc63f152';
-import './icons.js?v=bc63f152';
-import './foundation.js?v=bc63f152';
-import './upstreamUnavailable.js?v=bc63f152';
-import './connectivity.js?v=bc63f152';
-import './loader.js?v=bc63f152';
-import './directUpload.js?v=bc63f152';
-import './dropdown.js?v=bc63f152';
-import './combobox.js?v=bc63f152';
-import './formatting.js?v=bc63f152';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b158c05a';
+import { b as buttons } from './buttons.js?v=b158c05a';
+import './controller.js?v=b158c05a';
+import './primitives.js?v=b158c05a';
+import './styles.js?v=b158c05a';
+import './icons.js?v=b158c05a';
+import './foundation.js?v=b158c05a';
+import './upstreamUnavailable.js?v=b158c05a';
+import './connectivity.js?v=b158c05a';
+import './loader.js?v=b158c05a';
+import './directUpload.js?v=b158c05a';
+import './dropdown.js?v=b158c05a';
+import './combobox.js?v=b158c05a';
+import './formatting.js?v=b158c05a';
 
 const FILE_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";

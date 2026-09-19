@@ -1,5 +1,6 @@
 import { STYLES } from "styles";
-import { captureError, request } from "../../shared";
+import { captureError } from "../../shared/errors";
+import { request } from "../../shared/request";
 import { independentEditor } from "./editor";
 import { Toolbar } from "./toolbar";
 

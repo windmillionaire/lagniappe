@@ -1,6 +1,7 @@
 import { STYLES } from "styles";
 import { FormController } from "../../../forms/controller";
-import { Modal, request } from "../../../shared";
+import { Modal } from "../../../shared/modal";
+import { request } from "../../../shared/request";
 import { buttons } from "../../buttons";
 import { primitives } from "../../primitives";
 

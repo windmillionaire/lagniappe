@@ -1,4 +1,4 @@
-import { FONT_MENU } from "../../../config/editor";
+import { FONT_MENU } from "../config";
 
 /**
  * @testable true

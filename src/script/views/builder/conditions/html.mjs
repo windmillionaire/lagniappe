@@ -1,4 +1,4 @@
-import { ENDPOINTS } from "../../../shared";
+import { ENDPOINTS } from "../../../shared/endpoints";
 import { DraftDocument } from "../draftDocument";
 import { Condition } from "./base";
 

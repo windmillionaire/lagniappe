@@ -1,7 +1,7 @@
-import { CONFIG } from "../../../config/builder";
 import { SelectBox } from "../../../elements/combobox";
 import { primitives } from "../../../elements/primitives";
-import { generateElementId } from "../../../shared";
+import { generateElementId } from "../../../shared/utilities";
+import { CONFIG } from "../config";
 import { fieldKind } from "../migrations";
 import { Condition } from "./base";
 
