@@ -1,148 +1,148 @@
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "bf429679";
+const SW_VERSION = "b43106f0";
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = [
-	"/chunks/accessRestrictions.js?v=bf429679",
-	"/chunks/activity.js?v=bf429679",
-	"/chunks/addImage.js?v=bf429679",
-	"/chunks/addLink.js?v=bf429679",
-	"/chunks/addYouTube.js?v=bf429679",
-	"/chunks/administrators.js?v=bf429679",
-	"/chunks/aiModels.js?v=bf429679",
-	"/chunks/analytics.js?v=bf429679",
-	"/chunks/base.js?v=bf429679",
-	"/chunks/base2.js?v=bf429679",
-	"/chunks/baseElement.js?v=bf429679",
-	"/chunks/baseList.js?v=bf429679",
-	"/chunks/baseTable.js?v=bf429679",
-	"/chunks/baseUpload.js?v=bf429679",
-	"/chunks/bookmark.js?v=bf429679",
-	"/chunks/builder.js?v=bf429679",
-	"/chunks/buttons.js?v=bf429679",
-	"/chunks/category.js?v=bf429679",
-	"/chunks/checkbox.js?v=bf429679",
-	"/chunks/collaborative.js?v=bf429679",
-	"/chunks/columns.js?v=bf429679",
-	"/chunks/combobox.js?v=bf429679",
-	"/chunks/connectivity.js?v=bf429679",
-	"/chunks/controller.js?v=bf429679",
-	"/chunks/core-foundation.js?v=bf429679",
-	"/chunks/deferredOperations.js?v=bf429679",
-	"/chunks/deployment.js?v=bf429679",
-	"/chunks/directUpload.js?v=bf429679",
-	"/chunks/documentHistory.js?v=bf429679",
-	"/chunks/documentSettings.js?v=bf429679",
-	"/chunks/dropdown.js?v=bf429679",
-	"/chunks/editor.js?v=bf429679",
-	"/chunks/entity-foundation.js?v=bf429679",
-	"/chunks/entityMenu.js?v=bf429679",
-	"/chunks/facets.js?v=bf429679",
-	"/chunks/fileInfo.js?v=bf429679",
-	"/chunks/filePdfPreview.js?v=bf429679",
-	"/chunks/filterResults.js?v=bf429679",
-	"/chunks/filters.js?v=bf429679",
-	"/chunks/form.js?v=bf429679",
-	"/chunks/formWidget.js?v=bf429679",
-	"/chunks/formatting.js?v=bf429679",
-	"/chunks/foundation.js?v=bf429679",
-	"/chunks/generateText.js?v=bf429679",
-	"/chunks/html.js?v=bf429679",
-	"/chunks/html2.js?v=bf429679",
-	"/chunks/icons.js?v=bf429679",
-	"/chunks/image.js?v=bf429679",
-	"/chunks/index-foundation.js?v=bf429679",
-	"/chunks/indexTable.js?v=bf429679",
-	"/chunks/ingress.js?v=bf429679",
-	"/chunks/ingressUpload.js?v=bf429679",
-	"/chunks/input.js?v=bf429679",
-	"/chunks/installationAccess.js?v=bf429679",
-	"/chunks/link.js?v=bf429679",
-	"/chunks/lists.js?v=bf429679",
-	"/chunks/loader.js?v=bf429679",
-	"/chunks/location.js?v=bf429679",
-	"/chunks/logout.js?v=bf429679",
-	"/chunks/maintenance.js?v=bf429679",
-	"/chunks/menuItems.js?v=bf429679",
-	"/chunks/messageComposer.js?v=bf429679",
-	"/chunks/mobileControls.js?v=bf429679",
-	"/chunks/modal.js?v=bf429679",
-	"/chunks/modelTasks.js?v=bf429679",
-	"/chunks/modify.js?v=bf429679",
-	"/chunks/note.js?v=bf429679",
-	"/chunks/notifications.js?v=bf429679",
-	"/chunks/offline.js?v=bf429679",
-	"/chunks/offlineQueue.js?v=bf429679",
-	"/chunks/offlineReplay.js?v=bf429679",
-	"/chunks/offlineWork.js?v=bf429679",
-	"/chunks/options.js?v=bf429679",
-	"/chunks/pageInfo.js?v=bf429679",
-	"/chunks/pagePermissions.js?v=bf429679",
-	"/chunks/pagePhoto.js?v=bf429679",
-	"/chunks/pageTaskList.js?v=bf429679",
-	"/chunks/permissionSections.js?v=bf429679",
-	"/chunks/pinVersion.js?v=bf429679",
-	"/chunks/polling.js?v=bf429679",
-	"/chunks/primitives.js?v=bf429679",
-	"/chunks/projectInfo.js?v=bf429679",
-	"/chunks/providers.js?v=bf429679",
-	"/chunks/queryLifecycle.js?v=bf429679",
-	"/chunks/radio.js?v=bf429679",
-	"/chunks/remote.js?v=bf429679",
-	"/chunks/representation.js?v=bf429679",
-	"/chunks/results.js?v=bf429679",
-	"/chunks/search.js?v=bf429679",
-	"/chunks/sectionToggle.js?v=bf429679",
-	"/chunks/sections.js?v=bf429679",
-	"/chunks/select.js?v=bf429679",
-	"/chunks/select2.js?v=bf429679",
-	"/chunks/setColor.js?v=bf429679",
-	"/chunks/setFontFamily.js?v=bf429679",
-	"/chunks/setImage.js?v=bf429679",
-	"/chunks/signature.js?v=bf429679",
-	"/chunks/siteSettings.js?v=bf429679",
-	"/chunks/sorting.js?v=bf429679",
-	"/chunks/status.js?v=bf429679",
-	"/chunks/status2.js?v=bf429679",
-	"/chunks/storage.js?v=bf429679",
-	"/chunks/styles.js?v=bf429679",
-	"/chunks/submission.js?v=bf429679",
-	"/chunks/submitter.js?v=bf429679",
-	"/chunks/sync.js?v=bf429679",
-	"/chunks/table.js?v=bf429679",
-	"/chunks/taskForm.js?v=bf429679",
-	"/chunks/taskHistory.js?v=bf429679",
-	"/chunks/taskSettings.js?v=bf429679",
-	"/chunks/tasks.js?v=bf429679",
-	"/chunks/textarea.js?v=bf429679",
-	"/chunks/todo.js?v=bf429679",
-	"/chunks/toolbar.js?v=bf429679",
-	"/chunks/toolbarButtons.js?v=bf429679",
-	"/chunks/tools.js?v=bf429679",
-	"/chunks/uploadFile.js?v=bf429679",
-	"/chunks/upstreamUnavailable.js?v=bf429679",
-	"/chunks/user.js?v=bf429679",
-	"/chunks/user2.js?v=bf429679",
-	"/chunks/userPermissions.js?v=bf429679",
-	"/chunks/userSettings.js?v=bf429679",
-	"/chunks/views/admin.js?v=bf429679",
-	"/chunks/views/analytics.js?v=bf429679",
-	"/chunks/views/builder.js?v=bf429679",
-	"/chunks/views/file.js?v=bf429679",
-	"/chunks/views/help.js?v=bf429679",
-	"/chunks/views/home.js?v=bf429679",
-	"/chunks/views/index.js?v=bf429679",
-	"/chunks/views/manual.js?v=bf429679",
-	"/chunks/views/messages.js?v=bf429679",
-	"/chunks/views/page.js?v=bf429679",
-	"/chunks/views/project.js?v=bf429679",
-	"/chunks/views/public.js?v=bf429679",
-	"/chunks/views/report.js?v=bf429679",
-	"/chunks/views/results.js?v=bf429679",
-	"/chunks/views/user.js?v=bf429679",
-	"/chunks/visibility.js?v=bf429679",
-	"/chunks/visibility2.js?v=bf429679",
-	"/chunks/watcher.js?v=bf429679"
+	"/chunks/accessRestrictions.js?v=b43106f0",
+	"/chunks/activity.js?v=b43106f0",
+	"/chunks/addImage.js?v=b43106f0",
+	"/chunks/addLink.js?v=b43106f0",
+	"/chunks/addYouTube.js?v=b43106f0",
+	"/chunks/administrators.js?v=b43106f0",
+	"/chunks/aiModels.js?v=b43106f0",
+	"/chunks/analytics.js?v=b43106f0",
+	"/chunks/base.js?v=b43106f0",
+	"/chunks/base2.js?v=b43106f0",
+	"/chunks/baseElement.js?v=b43106f0",
+	"/chunks/baseList.js?v=b43106f0",
+	"/chunks/baseTable.js?v=b43106f0",
+	"/chunks/baseUpload.js?v=b43106f0",
+	"/chunks/bookmark.js?v=b43106f0",
+	"/chunks/builder.js?v=b43106f0",
+	"/chunks/buttons.js?v=b43106f0",
+	"/chunks/category.js?v=b43106f0",
+	"/chunks/checkbox.js?v=b43106f0",
+	"/chunks/collaborative.js?v=b43106f0",
+	"/chunks/columns.js?v=b43106f0",
+	"/chunks/combobox.js?v=b43106f0",
+	"/chunks/connectivity.js?v=b43106f0",
+	"/chunks/controller.js?v=b43106f0",
+	"/chunks/core-foundation.js?v=b43106f0",
+	"/chunks/deferredOperations.js?v=b43106f0",
+	"/chunks/deployment.js?v=b43106f0",
+	"/chunks/directUpload.js?v=b43106f0",
+	"/chunks/documentHistory.js?v=b43106f0",
+	"/chunks/documentSettings.js?v=b43106f0",
+	"/chunks/dropdown.js?v=b43106f0",
+	"/chunks/editor.js?v=b43106f0",
+	"/chunks/entity-foundation.js?v=b43106f0",
+	"/chunks/entityMenu.js?v=b43106f0",
+	"/chunks/facets.js?v=b43106f0",
+	"/chunks/fileInfo.js?v=b43106f0",
+	"/chunks/filePdfPreview.js?v=b43106f0",
+	"/chunks/filterResults.js?v=b43106f0",
+	"/chunks/filters.js?v=b43106f0",
+	"/chunks/form.js?v=b43106f0",
+	"/chunks/formWidget.js?v=b43106f0",
+	"/chunks/formatting.js?v=b43106f0",
+	"/chunks/foundation.js?v=b43106f0",
+	"/chunks/generateText.js?v=b43106f0",
+	"/chunks/html.js?v=b43106f0",
+	"/chunks/html2.js?v=b43106f0",
+	"/chunks/icons.js?v=b43106f0",
+	"/chunks/image.js?v=b43106f0",
+	"/chunks/index-foundation.js?v=b43106f0",
+	"/chunks/indexTable.js?v=b43106f0",
+	"/chunks/ingress.js?v=b43106f0",
+	"/chunks/ingressUpload.js?v=b43106f0",
+	"/chunks/input.js?v=b43106f0",
+	"/chunks/installationAccess.js?v=b43106f0",
+	"/chunks/link.js?v=b43106f0",
+	"/chunks/lists.js?v=b43106f0",
+	"/chunks/loader.js?v=b43106f0",
+	"/chunks/location.js?v=b43106f0",
+	"/chunks/logout.js?v=b43106f0",
+	"/chunks/maintenance.js?v=b43106f0",
+	"/chunks/menuItems.js?v=b43106f0",
+	"/chunks/messageComposer.js?v=b43106f0",
+	"/chunks/mobileControls.js?v=b43106f0",
+	"/chunks/modal.js?v=b43106f0",
+	"/chunks/modelTasks.js?v=b43106f0",
+	"/chunks/modify.js?v=b43106f0",
+	"/chunks/note.js?v=b43106f0",
+	"/chunks/notifications.js?v=b43106f0",
+	"/chunks/offline.js?v=b43106f0",
+	"/chunks/offlineQueue.js?v=b43106f0",
+	"/chunks/offlineReplay.js?v=b43106f0",
+	"/chunks/offlineWork.js?v=b43106f0",
+	"/chunks/options.js?v=b43106f0",
+	"/chunks/pageInfo.js?v=b43106f0",
+	"/chunks/pagePermissions.js?v=b43106f0",
+	"/chunks/pagePhoto.js?v=b43106f0",
+	"/chunks/pageTaskList.js?v=b43106f0",
+	"/chunks/permissionSections.js?v=b43106f0",
+	"/chunks/pinVersion.js?v=b43106f0",
+	"/chunks/polling.js?v=b43106f0",
+	"/chunks/primitives.js?v=b43106f0",
+	"/chunks/projectInfo.js?v=b43106f0",
+	"/chunks/providers.js?v=b43106f0",
+	"/chunks/queryLifecycle.js?v=b43106f0",
+	"/chunks/radio.js?v=b43106f0",
+	"/chunks/remote.js?v=b43106f0",
+	"/chunks/representation.js?v=b43106f0",
+	"/chunks/results.js?v=b43106f0",
+	"/chunks/search.js?v=b43106f0",
+	"/chunks/sectionToggle.js?v=b43106f0",
+	"/chunks/sections.js?v=b43106f0",
+	"/chunks/select.js?v=b43106f0",
+	"/chunks/select2.js?v=b43106f0",
+	"/chunks/setColor.js?v=b43106f0",
+	"/chunks/setFontFamily.js?v=b43106f0",
+	"/chunks/setImage.js?v=b43106f0",
+	"/chunks/signature.js?v=b43106f0",
+	"/chunks/siteSettings.js?v=b43106f0",
+	"/chunks/sorting.js?v=b43106f0",
+	"/chunks/status.js?v=b43106f0",
+	"/chunks/status2.js?v=b43106f0",
+	"/chunks/storage.js?v=b43106f0",
+	"/chunks/styles.js?v=b43106f0",
+	"/chunks/submission.js?v=b43106f0",
+	"/chunks/submitter.js?v=b43106f0",
+	"/chunks/sync.js?v=b43106f0",
+	"/chunks/table.js?v=b43106f0",
+	"/chunks/taskForm.js?v=b43106f0",
+	"/chunks/taskHistory.js?v=b43106f0",
+	"/chunks/taskSettings.js?v=b43106f0",
+	"/chunks/tasks.js?v=b43106f0",
+	"/chunks/textarea.js?v=b43106f0",
+	"/chunks/todo.js?v=b43106f0",
+	"/chunks/toolbar.js?v=b43106f0",
+	"/chunks/toolbarButtons.js?v=b43106f0",
+	"/chunks/tools.js?v=b43106f0",
+	"/chunks/uploadFile.js?v=b43106f0",
+	"/chunks/upstreamUnavailable.js?v=b43106f0",
+	"/chunks/user.js?v=b43106f0",
+	"/chunks/user2.js?v=b43106f0",
+	"/chunks/userPermissions.js?v=b43106f0",
+	"/chunks/userSettings.js?v=b43106f0",
+	"/chunks/views/admin.js?v=b43106f0",
+	"/chunks/views/analytics.js?v=b43106f0",
+	"/chunks/views/builder.js?v=b43106f0",
+	"/chunks/views/file.js?v=b43106f0",
+	"/chunks/views/help.js?v=b43106f0",
+	"/chunks/views/home.js?v=b43106f0",
+	"/chunks/views/index.js?v=b43106f0",
+	"/chunks/views/manual.js?v=b43106f0",
+	"/chunks/views/messages.js?v=b43106f0",
+	"/chunks/views/page.js?v=b43106f0",
+	"/chunks/views/project.js?v=b43106f0",
+	"/chunks/views/public.js?v=b43106f0",
+	"/chunks/views/report.js?v=b43106f0",
+	"/chunks/views/results.js?v=b43106f0",
+	"/chunks/views/user.js?v=b43106f0",
+	"/chunks/visibility.js?v=b43106f0",
+	"/chunks/visibility2.js?v=b43106f0",
+	"/chunks/watcher.js?v=b43106f0"
 ];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
 const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
@@ -198,7 +198,7 @@ function captureError(error, context = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_activation_clears_only_application_owned_caches
+ * @tests tests_js/test_008_service_worker.mjs::test_activation_clears_only_application_owned_caches
  * @matrix cache : activation ownership service-worker
  */
 async function updateCaches() {
@@ -210,7 +210,7 @@ async function updateCaches() {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_precache_static_assets_warms_configured_urls_and_ignores_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_precache_static_assets_warms_configured_urls_and_ignores_failures
  * @matrix cache : precache service-worker static-assets
  */
 async function precacheStaticAssets() {
@@ -367,9 +367,9 @@ function validateUserOnce(cacheConfirmation) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_confirmation_posts_after_local_clear
- * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_requires_explicit_server_acknowledgement
- * @tests tests_js/test_008_service_worker.py::test_cache_acknowledgements_do_not_coalesce_different_revisions
+ * @tests tests_js/test_008_service_worker.mjs::test_cache_invalidation_confirmation_posts_after_local_clear
+ * @tests tests_js/test_008_service_worker.mjs::test_cache_invalidation_requires_explicit_server_acknowledgement
+ * @tests tests_js/test_008_service_worker.mjs::test_cache_acknowledgements_do_not_coalesce_different_revisions
  * @matrix cache : acknowledgement concurrency failure invalidation retry service-worker
  */
 async function checkForCacheInvalidation(response, options = {}) {
@@ -390,7 +390,7 @@ async function checkForCacheInvalidation(response, options = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes
+ * @tests tests_js/test_008_service_worker.mjs::test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes
  * @matrix cache : etag query route-class service-worker sibling-invalidation
  */
 async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
@@ -445,8 +445,8 @@ async function discardCachedResponse(cache, request) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.mjs::test_no_store_304_discards_cached_response
+ * @tests tests_js/test_008_service_worker.mjs::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
  * @matrix cache : acknowledgement invalidation no-store service-worker
  */
 async function handleUncacheableResponse(
@@ -474,8 +474,8 @@ const EVICTION_THROTTLE_MS = 60_000;
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_quota_eviction_is_throttled_and_bounded_to_oldest_entries
- * @tests tests_js/test_008_service_worker.py::test_quota_eviction_tolerates_unavailable_and_failed_estimates
+ * @tests tests_js/test_008_service_worker.mjs::test_quota_eviction_is_throttled_and_bounded_to_oldest_entries
+ * @tests tests_js/test_008_service_worker.mjs::test_quota_eviction_tolerates_unavailable_and_failed_estimates
  * @matrix cache : batch eviction failure quota service-worker throttle unavailable
  */
 async function maybeEvictForQuota() {
@@ -514,7 +514,7 @@ let _connectivity = {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_worker_accepts_only_versioned_valid_connectivity_messages
+ * @tests tests_js/test_008_service_worker.mjs::test_worker_accepts_only_versioned_valid_connectivity_messages
  * @matrix browser-protocol connectivity : controller service-worker validation version
  */
 function receiveConnectivityMessage(data) {
@@ -539,7 +539,7 @@ function receiveConnectivityMessage(data) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_worker_classifies_only_unmarked_upstream_html_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_worker_classifies_only_unmarked_upstream_html_failures
  * @matrix request-errors service-worker : application-error-marker classification upstream-unavailable
  */
 function isUpstreamUnavailableResponse(response) {
@@ -596,7 +596,7 @@ function boundedServer(response) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_upstream_failure_notifies_controlled_clients_with_bounded_state
+ * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_notifies_controlled_clients_with_bounded_state
  * @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable
  */
 async function notifyUpstreamUnavailable(
@@ -660,7 +660,7 @@ function upstreamHeaders(
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
+ * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
  * @matrix cache request-errors service-worker : stale-cache upstream-unavailable
  */
 function markedStaleResponse(cached, upstream) {
@@ -676,8 +676,8 @@ function markedStaleResponse(cached, upstream) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_upstream_failure_without_cache_returns_branded_retryable_503
- * @tests tests_js/test_008_service_worker.py::test_mutation_upstream_failure_returns_uncertain_json_without_replay
+ * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_without_cache_returns_branded_retryable_503
+ * @tests tests_js/test_008_service_worker.mjs::test_mutation_upstream_failure_returns_uncertain_json_without_replay
  * @matrix request-errors service-worker : branded-response mutation no-replay retry upstream-unavailable
  */
 function brandedUpstreamResponse(request, upstream) {
@@ -795,7 +795,7 @@ self.addEventListener("fetch", (event) => {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_no_store_static_response_is_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached
  * @matrix cache : no-store service-worker static-assets
  */
 async function handleStatic(event) {
@@ -829,7 +829,7 @@ async function handleStatic(event) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_navigation_failure_without_cached_offline_document_returns_503
+ * @tests tests_js/test_008_service_worker.mjs::test_navigation_failure_without_cached_offline_document_returns_503
  * @matrix cache offline : cache-miss fallback navigation service-worker
  */
 async function offlineFallback() {
@@ -841,8 +841,8 @@ async function offlineFallback() {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_application_get_failure_returns_503_instead_of_offline_html
- * @tests tests_js/test_008_service_worker.py::test_navigation_failure_uses_offline_document
+ * @tests tests_js/test_008_service_worker.mjs::test_application_get_failure_returns_503_instead_of_offline_html
+ * @tests tests_js/test_008_service_worker.mjs::test_navigation_failure_uses_offline_document
  * @matrix cache offline : ajax navigation response-shape service-worker
  */
 async function unavailableResponse(request) {
@@ -872,9 +872,9 @@ async function unavailableResponse(request) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_dynamic_fetch_preserves_browser_validators_without_stored_etag
- * @tests tests_js/test_008_service_worker.py::test_conditional_fetch_preserves_original_request_redirect_mode
- * @tests tests_js/test_008_service_worker.py::test_304_response_with_invalidation_header_fetches_fresh_response
+ * @tests tests_js/test_008_service_worker.mjs::test_dynamic_fetch_preserves_browser_validators_without_stored_etag
+ * @tests tests_js/test_008_service_worker.mjs::test_conditional_fetch_preserves_original_request_redirect_mode
+ * @tests tests_js/test_008_service_worker.mjs::test_304_response_with_invalidation_header_fetches_fresh_response
  * @matrix cache : browser-validators etag invalidation redirect-mode service-worker
  */
 function networkRequest(request, { etag, cache } = {}) {
@@ -895,7 +895,7 @@ function networkRequest(request, { etag, cache } = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_cached_304_marks_response_not_updated
+ * @tests tests_js/test_008_service_worker.mjs::test_cached_304_marks_response_not_updated
  * @matrix cache request : conditional-response dom-refresh service-worker
  */
 function markResponseNotUpdated(response) {
@@ -910,7 +910,7 @@ function markResponseNotUpdated(response) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_token_request_is_network_only_without_client_cache_directives
+ * @tests tests_js/test_008_service_worker.mjs::test_token_request_is_network_only_without_client_cache_directives
  * @matrix cache csrf : network-only service-worker token
  */
 async function handleNetworkOnlyGet(event) {
@@ -935,14 +935,14 @@ async function handleNetworkOnlyGet(event) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @tests tests_js/test_008_service_worker.py::test_cached_304_marks_response_not_updated
- * @tests tests_js/test_008_service_worker.py::test_304_response_with_invalidation_header_fetches_fresh_response
- * @tests tests_js/test_008_service_worker.py::test_redirect_response_with_invalidation_header_clears_cache
- * @tests tests_js/test_008_service_worker.py::test_redirected_responses_are_discarded_and_not_cached
- * @tests tests_js/test_008_service_worker.py::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
- * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
- * @tests tests_js/test_008_service_worker.py::test_previously_stored_invalidation_is_discarded_before_reuse
+ * @tests tests_js/test_008_service_worker.mjs::test_no_store_304_discards_cached_response
+ * @tests tests_js/test_008_service_worker.mjs::test_cached_304_marks_response_not_updated
+ * @tests tests_js/test_008_service_worker.mjs::test_304_response_with_invalidation_header_fetches_fresh_response
+ * @tests tests_js/test_008_service_worker.mjs::test_redirect_response_with_invalidation_header_clears_cache
+ * @tests tests_js/test_008_service_worker.mjs::test_redirected_responses_are_discarded_and_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
+ * @tests tests_js/test_008_service_worker.mjs::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.mjs::test_previously_stored_invalidation_is_discarded_before_reuse
  * @matrix cache : browser-validators cached-response invalidation network-validation no-store redirected-response service-worker
  */
 async function handleCacheable(event, pathname) {
@@ -1069,7 +1069,7 @@ async function handleCacheable(event, pathname) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_mutation_failure_returns_json_503
+ * @tests tests_js/test_008_service_worker.mjs::test_mutation_failure_returns_json_503
  * @matrix offline request : mutation response-shape service-worker
  */
 async function handleRequest(event, pathname) {

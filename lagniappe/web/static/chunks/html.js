@@ -1,2 +1,500 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1fabd594-8a60-4b1f-a6c0-b62f37d1a4a1",e._sentryDebugIdIdentifier="sentry-dbid-1fabd594-8a60-4b1f-a6c0-b62f37d1a4a1");}catch(e){}}();import{r as d,c as l,E as u}from"./foundation.js?v=bf429679";import{STYLES as a}from"./styles.js?v=bf429679";import{i as c,T as m}from"./toolbar.js?v=bf429679";import{C as p}from"./base2.js?v=bf429679";import"./upstreamUnavailable.js?v=bf429679";import"./connectivity.js?v=bf429679";import"./combobox.js?v=bf429679";import"./primitives.js?v=bf429679";import"./icons.js?v=bf429679";import"./queryLifecycle.js?v=bf429679";import"./dropdown.js?v=bf429679";import"./buttons.js?v=bf429679";import"./formatting.js?v=bf429679";import"./select2.js?v=bf429679";import"./results.js?v=bf429679";import"./storage.js?v=bf429679";import"./submitter.js?v=bf429679";import"./controller.js?v=bf429679";import"./loader.js?v=bf429679";const _=new Set(["","<p></p>","<p><br></p>"]),y=64*1024,h=s=>{const t=typeof s=="string"?s.trim():"";return _.has(t)?"":t},f=s=>{const t=JSON.stringify(s);return new TextEncoder().encode(t).byteLength<=y};class g{constructor(t){Object.assign(this,t),this.acknowledgedContent=null,this.dirtyContent=null,this.pendingContent=null,this._destroyed=!1,this._loadPromise=null,this._savePromise=null,this._pendingKeepalive=!1,this._statusScope=null}init(){return this._createSurface(),this.ready=this.load(),this.ready}load(){if(this._destroyed)return Promise.resolve(!1);if(this.container?.hasAttribute("loaded"))return Promise.resolve(!0);if(this._loadPromise)return this._loadPromise;const t=(async()=>{this._showLoading();const e=await d.get(this.endpoints.getContent,null,{replaceErrorPage:!1});if(e?.ok!==!0)return this._showFailure(e?.error||"Could not load this text. Try again.","load"),!1;const i=h(e.markup??e.html);return this.acknowledgedContent=i,this.dirtyContent=null,this.pendingContent=null,await this._publishLoadedContent(i),this._destroyed?!1:(this._hideStatus(),!0)})().catch(e=>(this.acknowledgedContent=null,this._captureUnexpected(e,"independent-document-load"),this._showFailure("Could not load this text. Try again.","load"),!1)).finally(()=>{this._loadPromise===t&&(this._loadPromise=null)});return this._loadPromise=t,this.ready=t,t}_createSurface(){this.status=document.createElement("div"),this.status.className=a.message,this.status.dataset.kind="error",this.status.dataset.role="editor-status",this.status.dataset.visible="false",this.status.setAttribute("aria-live","polite"),this.status.hidden=!0,this.statusMessage=document.createElement("span"),this.statusMessage.dataset.role="message",this.retryButton=document.createElement("button"),this.retryButton.type="button",this.retryButton.className=a.button.submit,this.retryButton.dataset.role="retry",this.retryButton.textContent="Retry",this.retryButton.hidden=!0,this._retry=this._retryFailedOperation.bind(this),this.retryButton.addEventListener("click",this._retry),this.status.append(this.statusMessage,this.retryButton),this.container=document.createElement("div"),this.container.dataset.role="editor",this.container.className=`${a.editor.container} opacity-50 pointer-events-none`,this.container.inert=!0,this.container.setAttribute("aria-busy","true"),this.target.replaceChildren(this.status,this.container)}_showLoading(){this._destroyed||(this._statusScope="load",this.status.dataset.kind="form",this.statusMessage.textContent="Loading text\u2026",this.retryButton.hidden=!0,this.retryButton.disabled=!0,this.status.hidden=!1,this.status.dataset.visible="true",this.container.inert=!0,this.container.setAttribute("aria-busy","true"))}_showFailure(t,e){this._destroyed||(this._statusScope=e,this.status.dataset.kind="error",this.statusMessage.textContent=t,this.retryButton.hidden=!1,this.retryButton.disabled=!1,this.status.hidden=!1,this.status.dataset.visible="true",e==="load"&&this.container.removeAttribute("aria-busy"))}_hideStatus(t=null){!this.status||t&&this._statusScope!==t||(this._statusScope=null,this.statusMessage.textContent="",this.retryButton.hidden=!0,this.retryButton.disabled=!1,this.status.hidden=!0,this.status.dataset.visible="false")}_retryFailedOperation(){if(this._destroyed||this.retryButton.disabled)return;this.retryButton.disabled=!0,(this._statusScope==="load"?this.load():this.flush()).finally(()=>{this._destroyed||(this.retryButton.disabled=!1)})}async _publishLoadedContent(t){if(this._destroyed)return;if(this.readonly){this.container.innerHTML=t,this._markLoaded();return}const e=this._initEditor(t);this._initToolbar(),await e}_markLoaded(){this._destroyed||(this.container.inert=!1,this.container.removeAttribute("aria-busy"),this.container.classList.remove("opacity-50","pointer-events-none"),this.container.setAttribute("loaded",""))}flush({keepalive:t=!1}={}){if(this.readonly||this._destroyed||!this.editor)return Promise.resolve(this.dirtyContent===null);const e=this._currentContent();if(this.dirtyContent=e===this.acknowledgedContent?null:e,this._savePromise)return this.pendingContent=e,this._pendingKeepalive||=t,this._savePromise;if(this.dirtyContent===null)return this._hideStatus("save"),Promise.resolve(!0);this.pendingContent=e,this._pendingKeepalive=t;const i=this._drainSaves().catch(n=>(this._captureUnexpected(n,"independent-document-save"),this._destroyed||(this.dirtyContent=this._currentContent(),this.pendingContent=null,this._pendingKeepalive=!1,this._showFailure("Changes were not saved. Try again.","save")),!1)).finally(()=>{this._savePromise===i&&(this._savePromise=null)});return this._savePromise=i,i}async _drainSaves(){for(;this.pendingContent!==null&&!this._destroyed;){const t=this.pendingContent,e=this._pendingKeepalive;if(this.pendingContent=null,this._pendingKeepalive=!1,t===this.acknowledgedContent){const o=this._currentContent();o===this.acknowledgedContent?(this.dirtyContent=null,this._hideStatus("save")):(this.dirtyContent=o,this.pendingContent=o,this._pendingKeepalive=e);continue}const i={html:t},n=await d.put(this.endpoints.save,i,{keepalive:e&&f(i),replaceErrorPage:!1});if(n?.ok!==!0)return this.dirtyContent=this._destroyed?null:this._currentContent(),this.pendingContent=null,this._pendingKeepalive=!1,this._showFailure(n?.error||"Changes were not saved. Try again.","save"),!1;if(this.acknowledgedContent=t,this._destroyed)return this.dirtyContent=null,!0;const r=this._currentContent();if(r===this.acknowledgedContent){this.dirtyContent=null,this._hideStatus("save");continue}this.dirtyContent=r,this.pendingContent=r,this._pendingKeepalive||=e}return this.dirtyContent===null}_currentContent(){return h(this.editor.getHTML())}_initEditor(t){return new Promise(e=>{this.editor=c(this.container,t),this.editor.on("create",()=>{if(this._destroyed){e(!1);return}t.length||(this.container.querySelector(".ProseMirror").classList.add("min-h-[200px]"),this.editor.commands.focus("start")),this._markLoaded(),e(!0)}),this.editor.on("blur",()=>{requestAnimationFrame(()=>{document.activeElement?.closest("[data-role='toolbar'], [role='listbox']")||this.flush({keepalive:!0})})})})}_initToolbar(){this.toolbar=new m(this),this.toolbar.init(),this.target.prepend(this.toolbar.element)}_captureUnexpected(t,e){l(t,this.target,{context:e})}hide(){this.target.classList.add("hidden")}show(){this.target.classList.remove("hidden")}destroy(){this._destroyed||(this._destroyed=!0,this.retryButton?.removeEventListener("click",this._retry),this.pendingContent=null,this._pendingKeepalive=!1,this.toolbar?.destroy(),this.editor?.destroy(),this.editor=null,this.toolbar=null)}}class v extends g{constructor(t){super(t),this.draftOnly=!0}load(){return this._destroyed?Promise.resolve(!1):this.container.hasAttribute("loaded")?Promise.resolve(!0):this._loadPromise?this._loadPromise:(this._loadPromise=(async()=>{const t=this.builder.htmlFields[this.fieldId];return typeof t!="string"?(this._showFailure("Original text is unavailable. Reload the builder to try again.","load"),!1):(this.acknowledgedContent=t,await this._publishLoadedContent(this.builder.previewHtml(t)),this._destroyed?!1:(this._lastFlushedContent=this._currentContent(),this.editor.on("update",()=>this.flush()),this._hideStatus(),!0))})().finally(()=>{this._loadPromise=null}),this._loadPromise)}flush(){if(this._destroyed||!this.editor||!this.container.hasAttribute("loaded"))return Promise.resolve(!1);const t=this._currentContent();return t!==this._lastFlushedContent&&(this.builder.setHtml(this.fieldId,t),this._lastFlushedContent=t),Promise.resolve(!0)}addDraftImage(t){return this.builder.addDraftImage(this.fieldId,t)}}class C extends p{constructor(t){super(t),this.expand=!0,this.endpoints=u.html(t.key,this.element.schema.id),this.kind="form",this._initialized=!1}init(){if(this._initialized)return this.document?.ready;this._initialized=!0;const t=document.createElement("div");t.className="border-1 border-slate-300 rounded-md overflow-hidden",this.document=new v({target:t,kind:this.kind,endpoints:this.endpoints,builder:this.builder,fieldId:this.element.schema.id}),this.builder.registerIndependentDocument(this.document);const e=this.document.init();return this.destroyables.push(this.document),this.setTitle("Text Editor"),this.target.append(this.header,t),e}destroy(){this.document&&this.builder.unregisterIndependentDocument(this.document),super.destroy(),this.document=null}}export{C as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, c as captureError, E as ENDPOINTS } from './foundation.js?v=b43106f0';
+import { STYLES } from './styles.js?v=b43106f0';
+import { i as independentEditor, T as Toolbar } from './toolbar.js?v=b43106f0';
+import { C as Condition } from './base2.js?v=b43106f0';
+import './upstreamUnavailable.js?v=b43106f0';
+import './connectivity.js?v=b43106f0';
+import './combobox.js?v=b43106f0';
+import './primitives.js?v=b43106f0';
+import './icons.js?v=b43106f0';
+import './queryLifecycle.js?v=b43106f0';
+import './dropdown.js?v=b43106f0';
+import './buttons.js?v=b43106f0';
+import './formatting.js?v=b43106f0';
+import './select2.js?v=b43106f0';
+import './results.js?v=b43106f0';
+import './storage.js?v=b43106f0';
+import './submitter.js?v=b43106f0';
+import './controller.js?v=b43106f0';
+import './loader.js?v=b43106f0';
+
+const EMPTY_HTML = new Set(["", "<p></p>", "<p><br></p>"]);
+const KEEPALIVE_BODY_LIMIT = 64 * 1024;
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/editor/independent.mjs::IndependentDocument.flush
+ * @reason content normalization is exercised through the editor acknowledgement boundary
+ */
+const normalizeHTML = (html) => {
+	const normalized = typeof html === "string" ? html.trim() : "";
+	return EMPTY_HTML.has(normalized) ? "" : normalized;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/editor/independent.mjs::IndependentDocument.flush
+ * @reason keepalive eligibility is private flush transport policy
+ */
+const keepaliveCompatible = (body) => {
+	const serialized = JSON.stringify(body);
+	return (
+		new TextEncoder().encode(serialized).byteLength <= KEEPALIVE_BODY_LIMIT
+	);
+};
+
+/**
+ * @testable infrastructure
+ */
+class IndependentDocument {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.acknowledgedContent = null;
+		this.dirtyContent = null;
+		this.pendingContent = null;
+
+		this._destroyed = false;
+		this._loadPromise = null;
+		this._savePromise = null;
+		this._pendingKeepalive = false;
+		this._statusScope = null;
+	}
+
+	init() {
+		this._createSurface();
+		this.ready = this.load();
+		return this.ready;
+	}
+
+	/**
+	 * Keep the independent editor inert until the authoritative value is known.
+	 * A failed request remains visibly retryable and never publishes blank
+	 * content as loaded state.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_failed_load_stays_inert_and_retries
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
+	 * @matrix editor html-field : authoritative-content error-reporting initial-load retry
+	 */
+	load() {
+		if (this._destroyed) return Promise.resolve(false);
+		if (this.container?.hasAttribute("loaded")) return Promise.resolve(true);
+		if (this._loadPromise) return this._loadPromise;
+
+		const pending = (async () => {
+			this._showLoading();
+			const response = await request.get(this.endpoints.getContent, null, {
+				replaceErrorPage: false,
+			});
+			if (response?.ok !== true) {
+				this._showFailure(
+					response?.error || "Could not load this text. Try again.",
+					"load",
+				);
+				return false;
+			}
+
+			const html = normalizeHTML(response.markup ?? response.html);
+			this.acknowledgedContent = html;
+			this.dirtyContent = null;
+			this.pendingContent = null;
+			await this._publishLoadedContent(html);
+			if (this._destroyed) return false;
+			this._hideStatus();
+			return true;
+		})()
+			.catch((error) => {
+				this.acknowledgedContent = null;
+				this._captureUnexpected(error, "independent-document-load");
+				this._showFailure("Could not load this text. Try again.", "load");
+				return false;
+			})
+			.finally(() => {
+				if (this._loadPromise === pending) this._loadPromise = null;
+			});
+		this._loadPromise = pending;
+		this.ready = pending;
+		return pending;
+	}
+
+	_createSurface() {
+		this.status = document.createElement("div");
+		this.status.className = STYLES.message;
+		this.status.dataset.kind = "error";
+		this.status.dataset.role = "editor-status";
+		this.status.dataset.visible = "false";
+		this.status.setAttribute("aria-live", "polite");
+		this.status.hidden = true;
+
+		this.statusMessage = document.createElement("span");
+		this.statusMessage.dataset.role = "message";
+		this.retryButton = document.createElement("button");
+		this.retryButton.type = "button";
+		this.retryButton.className = STYLES.button.submit;
+		this.retryButton.dataset.role = "retry";
+		this.retryButton.textContent = "Retry";
+		this.retryButton.hidden = true;
+		this._retry = this._retryFailedOperation.bind(this);
+		this.retryButton.addEventListener("click", this._retry);
+		this.status.append(this.statusMessage, this.retryButton);
+
+		this.container = document.createElement("div");
+		this.container.dataset.role = "editor";
+		this.container.className = `${STYLES.editor.container} opacity-50 pointer-events-none`;
+		this.container.inert = true;
+		this.container.setAttribute("aria-busy", "true");
+		this.target.replaceChildren(this.status, this.container);
+	}
+
+	_showLoading() {
+		if (this._destroyed) return;
+		this._statusScope = "load";
+		this.status.dataset.kind = "form";
+		this.statusMessage.textContent = "Loading text…";
+		this.retryButton.hidden = true;
+		this.retryButton.disabled = true;
+		this.status.hidden = false;
+		this.status.dataset.visible = "true";
+		this.container.inert = true;
+		this.container.setAttribute("aria-busy", "true");
+	}
+
+	_showFailure(message, scope) {
+		if (this._destroyed) return;
+		this._statusScope = scope;
+		this.status.dataset.kind = "error";
+		this.statusMessage.textContent = message;
+		this.retryButton.hidden = false;
+		this.retryButton.disabled = false;
+		this.status.hidden = false;
+		this.status.dataset.visible = "true";
+		if (scope === "load") this.container.removeAttribute("aria-busy");
+	}
+
+	_hideStatus(scope = null) {
+		if (!this.status || (scope && this._statusScope !== scope)) return;
+		this._statusScope = null;
+		this.statusMessage.textContent = "";
+		this.retryButton.hidden = true;
+		this.retryButton.disabled = false;
+		this.status.hidden = true;
+		this.status.dataset.visible = "false";
+	}
+
+	_retryFailedOperation() {
+		if (this._destroyed || this.retryButton.disabled) return;
+		this.retryButton.disabled = true;
+		const retry = this._statusScope === "load" ? this.load() : this.flush();
+		void retry.finally(() => {
+			if (!this._destroyed) this.retryButton.disabled = false;
+		});
+	}
+
+	async _publishLoadedContent(html) {
+		if (this._destroyed) return;
+		if (this.readonly) {
+			this.container.innerHTML = html;
+			this._markLoaded();
+			return;
+		}
+
+		const ready = this._initEditor(html);
+		this._initToolbar();
+		await ready;
+	}
+
+	_markLoaded() {
+		if (this._destroyed) return;
+		this.container.inert = false;
+		this.container.removeAttribute("aria-busy");
+		this.container.classList.remove("opacity-50", "pointer-events-none");
+		this.container.setAttribute("loaded", "");
+	}
+
+	/**
+	 * Serialize saves and advance the baseline only after the server accepts the
+	 * exact submitted value. Edits made while a PUT is active are coalesced into
+	 * one latest follow-up value.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_failed_save_stays_dirty_and_retries
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_saves_intentional_clear
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
+	 * @matrix editor html-field : concurrent-edit error-reporting intentional-clear keepalive retry serialized-save server-acknowledgement
+	 */
+	flush({ keepalive = false } = {}) {
+		if (this.readonly || this._destroyed || !this.editor) {
+			return Promise.resolve(this.dirtyContent === null);
+		}
+
+		const html = this._currentContent();
+		this.dirtyContent = html === this.acknowledgedContent ? null : html;
+		if (this._savePromise) {
+			this.pendingContent = html;
+			this._pendingKeepalive ||= keepalive;
+			return this._savePromise;
+		}
+		if (this.dirtyContent === null) {
+			this._hideStatus("save");
+			return Promise.resolve(true);
+		}
+
+		this.pendingContent = html;
+		this._pendingKeepalive = keepalive;
+		const pending = this._drainSaves()
+			.catch((error) => {
+				this._captureUnexpected(error, "independent-document-save");
+				if (!this._destroyed) {
+					this.dirtyContent = this._currentContent();
+					this.pendingContent = null;
+					this._pendingKeepalive = false;
+					this._showFailure("Changes were not saved. Try again.", "save");
+				}
+				return false;
+			})
+			.finally(() => {
+				if (this._savePromise === pending) this._savePromise = null;
+			});
+		this._savePromise = pending;
+		return pending;
+	}
+
+	async _drainSaves() {
+		while (this.pendingContent !== null && !this._destroyed) {
+			const html = this.pendingContent;
+			const keepalive = this._pendingKeepalive;
+			this.pendingContent = null;
+			this._pendingKeepalive = false;
+			if (html === this.acknowledgedContent) {
+				const latest = this._currentContent();
+				if (latest === this.acknowledgedContent) {
+					this.dirtyContent = null;
+					this._hideStatus("save");
+				} else {
+					this.dirtyContent = latest;
+					this.pendingContent = latest;
+					this._pendingKeepalive = keepalive;
+				}
+				continue;
+			}
+
+			const body = { html };
+			const response = await request.put(this.endpoints.save, body, {
+				keepalive: keepalive && keepaliveCompatible(body),
+				replaceErrorPage: false,
+			});
+			if (response?.ok !== true) {
+				this.dirtyContent = this._destroyed ? null : this._currentContent();
+				this.pendingContent = null;
+				this._pendingKeepalive = false;
+				this._showFailure(
+					response?.error || "Changes were not saved. Try again.",
+					"save",
+				);
+				return false;
+			}
+
+			this.acknowledgedContent = html;
+			if (this._destroyed) {
+				this.dirtyContent = null;
+				return true;
+			}
+
+			const latest = this._currentContent();
+			if (latest === this.acknowledgedContent) {
+				this.dirtyContent = null;
+				this._hideStatus("save");
+				continue;
+			}
+			this.dirtyContent = latest;
+			this.pendingContent = latest;
+			this._pendingKeepalive ||= keepalive;
+		}
+		return this.dirtyContent === null;
+	}
+
+	_currentContent() {
+		return normalizeHTML(this.editor.getHTML());
+	}
+
+	/**
+	 * @testable true
+	 * @matrix editor : initial-load
+	 */
+	_initEditor(html) {
+		return new Promise((resolve) => {
+			this.editor = independentEditor(this.container, html);
+
+			this.editor.on("create", () => {
+				if (this._destroyed) {
+					resolve(false);
+					return;
+				}
+				if (!html.length) {
+					this.container
+						.querySelector(".ProseMirror")
+						.classList.add("min-h-[200px]");
+					this.editor.commands.focus("start");
+				}
+				this._markLoaded();
+				resolve(true);
+			});
+
+			this.editor.on("blur", () => {
+				requestAnimationFrame(() => {
+					const activeElement = document.activeElement;
+					if (activeElement?.closest("[data-role='toolbar'], [role='listbox']"))
+						return;
+					void this.flush({ keepalive: true });
+				});
+			});
+		});
+	}
+
+	_initToolbar() {
+		this.toolbar = new Toolbar(this);
+		this.toolbar.init();
+		this.target.prepend(this.toolbar.element);
+	}
+
+	_captureUnexpected(error, context) {
+		captureError(error, this.target, { context });
+	}
+
+	hide() {
+		this.target.classList.add("hidden");
+	}
+
+	show() {
+		this.target.classList.remove("hidden");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @matrix editor html-field : listener-teardown builder-save
+	 */
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.retryButton?.removeEventListener("click", this._retry);
+		this.pendingContent = null;
+		this._pendingKeepalive = false;
+		this.toolbar?.destroy();
+		this.editor?.destroy();
+		this.editor = null;
+		this.toolbar = null;
+	}
+}
+
+/**
+ * @testable infrastructure
+ * @covered-by src/script/views/builder/draft.mjs::BuilderDraft
+ */
+class DraftDocument extends IndependentDocument {
+	constructor(attributes) {
+		super(attributes);
+		this.draftOnly = true;
+	}
+
+	load() {
+		if (this._destroyed) return Promise.resolve(false);
+		if (this.container.hasAttribute("loaded")) return Promise.resolve(true);
+		if (this._loadPromise) return this._loadPromise;
+		this._loadPromise = (async () => {
+			const html = this.builder.htmlFields[this.fieldId];
+			if (typeof html !== "string") {
+				this._showFailure(
+					"Original text is unavailable. Reload the builder to try again.",
+					"load",
+				);
+				return false;
+			}
+			this.acknowledgedContent = html;
+			await this._publishLoadedContent(this.builder.previewHtml(html));
+			if (this._destroyed) return false;
+			this._lastFlushedContent = this._currentContent();
+			this.editor.on("update", () => this.flush());
+			this._hideStatus();
+			return true;
+		})().finally(() => {
+			this._loadPromise = null;
+		});
+		return this._loadPromise;
+	}
+
+	/**
+	 * @testable true
+	 * @matrix forms : draft-history
+	 */
+	flush() {
+		if (
+			this._destroyed ||
+			!this.editor ||
+			!this.container.hasAttribute("loaded")
+		)
+			return Promise.resolve(false);
+		const html = this._currentContent();
+		if (html !== this._lastFlushedContent) {
+			this.builder.setHtml(this.fieldId, html);
+			this._lastFlushedContent = html;
+		}
+		return Promise.resolve(true);
+	}
+
+	addDraftImage(file) {
+		return this.builder.addDraftImage(this.fieldId, file);
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
+ * @pair html-field:builder-html-field
+ */
+class HtmlEditor extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.expand = true;
+		this.endpoints = ENDPOINTS.html(builder.key, this.element.schema.id);
+		this.kind = "form";
+		this._initialized = false;
+	}
+
+	init() {
+		if (this._initialized) return this.document?.ready;
+		this._initialized = true;
+
+		const container = document.createElement("div");
+		container.className =
+			"border-1 border-slate-300 rounded-md overflow-hidden";
+
+		this.document = new DraftDocument({
+			target: container,
+			kind: this.kind,
+			endpoints: this.endpoints,
+			builder: this.builder,
+			fieldId: this.element.schema.id,
+		});
+		this.builder.registerIndependentDocument(this.document);
+		const ready = this.document.init();
+		this.destroyables.push(this.document);
+
+		this.setTitle("Text Editor");
+		this.target.append(this.header, container);
+		return ready;
+	}
+
+	destroy() {
+		if (this.document) {
+			this.builder.unregisterIndependentDocument(this.document);
+		}
+		super.destroy();
+		this.document = null;
+	}
+}
+
+export { HtmlEditor as default };

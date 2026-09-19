@@ -126,6 +126,19 @@ The final traceability command fails when a changed or referenced test is not
 recorded as passing for the current fingerprint. This makes “tests passed” a
 checkable artifact rather than prose in an agent response.
 
+After changing a Python test's parameter IDs or converting it to a parameterized
+test, run its whole function nodeid explicitly, without a `[case-id]` suffix or
+selection filters:
+
+```bash
+venv/bin/python run.py test testing/tests_unit/test_file.py::test_name
+```
+
+A successful whole-function run replaces that function's old parameter
+records. A file-level run merges results and may leave retired cases in the
+manifest, making otherwise passing current cases appear stale. Do not edit the
+evidence file manually to remove them.
+
 Native `.mjs` cases use the same metadata tags in comments immediately before
 `test("test_name", ...)`. Their runner/fixture code, imported test helpers,
 package manifests, and registry inputs are execution dependencies; they do not
@@ -351,7 +364,8 @@ Template selector and macro contracts are a related but separate report. See
 ## Important limits
 
 A link proves that evidence is declared and current; it does not prove that the
-assertions are strong. Test review still needs to reject tests that only inspect
-source text, imports, or symbol existence without validating behavior. See
-[TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) and
+assertions are strong. Check whether a test proves its claimed behavior;
+source text or imports can be legitimate inputs for a repository policy test,
+but do not prove runtime behavior. See the
+[test-writing checklist](TESTING_WRITING_TESTS.md#basic-test-review-checklist) and
 [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md).

@@ -6,8 +6,8 @@ each named case and runs it in a fresh Node process. Continue using the repo
 runner: selection, failures, reports, and traceability evidence stay in pytest.
 
 Read [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) and
-[TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) before migrating a test.
-The completed example is `testing/tests_js/test_045_offline_queue.mjs`.
+[TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) before adding or
+reshaping a test. An example is `testing/tests_js/test_045_offline_queue.mjs`.
 Harness contracts are exercised in `test_000_native_harness.mjs` and
 `test_000_native_runner.py`; the latter intentionally tests the Python bridge.
 

@@ -162,7 +162,8 @@ source/template/style dependencies. Use:
   report behavior;
 - [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) when reviewing source
   ownership;
-- [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) when reviewing a test; and
+- [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md#basic-test-review-checklist)
+  for the behavior checklist when writing or reviewing a test; and
 - [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) for Jinja DOM
   contracts.
 

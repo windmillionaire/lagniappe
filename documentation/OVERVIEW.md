@@ -101,7 +101,6 @@ begin in the [README](../README.md).
 | [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) | Recorded live-model cases, paired before/after evaluation, scoring, and entry-point parity. |
 | [TESTING_SERVER.md](TESTING_SERVER.md) | Managed local server, seed packs, agent login, browser review, and teardown. |
 | [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) | Cloud Run test job, exact-source candidate, artifacts, evidence, and teardown. |
-| [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) | Reviewing a test and the source claims it makes. |
 | [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) | Reviewing source annotations and meaningful coverage. |
 | [TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) | Annotation schema, reporter modes, evidence, checks, and manifests. |
 | [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) | Macro, DOM, selector, and route evidence tracking. |

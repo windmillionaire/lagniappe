@@ -1,2 +1,128 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6d48a5e4-bef7-4097-a62d-4573f9194cd1",e._sentryDebugIdIdentifier="sentry-dbid-6d48a5e4-bef7-4097-a62d-4573f9194cd1");}catch(e){}}();import{InputElement as o}from"./input.js?v=bf429679";import{s}from"./sections.js?v=bf429679";import{TextareaElement as a}from"./textarea.js?v=bf429679";import{F as n}from"./formWidget.js?v=bf429679";import"./styles.js?v=bf429679";import"./baseElement.js?v=bf429679";import"./icons.js?v=bf429679";import"./primitives.js?v=bf429679";import"./formatting.js?v=bf429679";import"./foundation.js?v=bf429679";import"./upstreamUnavailable.js?v=bf429679";import"./connectivity.js?v=bf429679";import"./baseUpload.js?v=bf429679";import"./controller.js?v=bf429679";import"./loader.js?v=bf429679";import"./directUpload.js?v=bf429679";import"./buttons.js?v=bf429679";import"./dropdown.js?v=bf429679";import"./combobox.js?v=bf429679";import"./modal.js?v=bf429679";import"./representation.js?v=bf429679";class i extends n{get nameElement(){return new o({kind:"project",readonly:this.readonly},{id:"name",label:"Project Name",input:"text",placeholder:"name this project..."},this.target.dataset.name||"").elt}get descriptionElement(){return new a({kind:"project",readonly:this.readonly},{id:"description",label:"Project Description",input:"textarea",placeholder:"describe this project..."},this.target.dataset.description||"").elt}}class m extends i{constructor(t){super(t),this.messages={submit:"Update Project",submitting:"Updating Project",submitted:"Project Updated"}}get html(){return[this.nameElement,this.descriptionElement]}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class p extends i{constructor(t){super(t),this.messages={submit:"Create Project",submitting:"Creating Project",submitted:"Project Created"},this.target.dataset.mode="manual",this.target.dataset.role="generate"}get html(){const t=this.nameElement,r=this.descriptionElement;return t.dataset.role="manual",r.dataset.role="manual",[s.generateEntityForm(this),t,r]}postreconcile(){this.target.querySelectorAll("input, textarea").forEach(t=>{t.type!=="checkbox"&&(t.value="")}),this.target.dataset.mode="manual",this.form.resetSubmitButton()}}export{p as CreateProject,m as ProjectInfo};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { InputElement } from './input.js?v=b43106f0';
+import { s as sections } from './sections.js?v=b43106f0';
+import { TextareaElement } from './textarea.js?v=b43106f0';
+import { F as FormWidget } from './formWidget.js?v=b43106f0';
+import './styles.js?v=b43106f0';
+import './baseElement.js?v=b43106f0';
+import './icons.js?v=b43106f0';
+import './primitives.js?v=b43106f0';
+import './formatting.js?v=b43106f0';
+import './foundation.js?v=b43106f0';
+import './upstreamUnavailable.js?v=b43106f0';
+import './connectivity.js?v=b43106f0';
+import './baseUpload.js?v=b43106f0';
+import './controller.js?v=b43106f0';
+import './loader.js?v=b43106f0';
+import './directUpload.js?v=b43106f0';
+import './buttons.js?v=b43106f0';
+import './dropdown.js?v=b43106f0';
+import './combobox.js?v=b43106f0';
+import './modal.js?v=b43106f0';
+import './representation.js?v=b43106f0';
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/projectInfo.mjs::CreateProject
+ * @covered-by src/script/widgets/projectInfo.mjs::ProjectInfo
+ * @reason shared field construction is exercised through concrete project widgets
+ */
+class ProjectForm extends FormWidget {
+	get nameElement() {
+		return new InputElement(
+			{
+				kind: "project",
+				readonly: this.readonly,
+			},
+			{
+				id: "name",
+				label: "Project Name",
+				input: "text",
+				placeholder: "name this project...",
+			},
+			this.target.dataset.name || "",
+		).elt;
+	}
+
+	get descriptionElement() {
+		return new TextareaElement(
+			{
+				kind: "project",
+				readonly: this.readonly,
+			},
+			{
+				id: "description",
+				label: "Project Description",
+				input: "textarea",
+				placeholder: "describe this project...",
+			},
+			this.target.dataset.description || "",
+		).elt;
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
+ * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
+ * @matrix projects : info-form metadata-sync readonly
+ */
+class ProjectInfo extends ProjectForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Project",
+			submitting: "Updating Project",
+			submitted: "Project Updated",
+		};
+	}
+
+	get html() {
+		return [this.nameElement, this.descriptionElement];
+	}
+
+	postreconcile() {
+		super.postreconcile();
+		this.setEntityMetadata();
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
+ * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
+ * @matrix projects : ai-form manual-form
+ */
+class CreateProject extends ProjectForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Project",
+			submitting: "Creating Project",
+			submitted: "Project Created",
+		};
+		this.target.dataset.mode = "manual";
+		this.target.dataset.role = "generate";
+	}
+
+	get html() {
+		const name = this.nameElement;
+		const description = this.descriptionElement;
+		name.dataset.role = "manual";
+		description.dataset.role = "manual";
+
+		return [sections.generateEntityForm(this), name, description];
+	}
+
+	postreconcile() {
+		this.target.querySelectorAll("input, textarea").forEach((element) => {
+			if (element.type !== "checkbox") {
+				element.value = "";
+			}
+		});
+		this.target.dataset.mode = "manual";
+		this.form.resetSubmitButton();
+	}
+}
+
+export { CreateProject, ProjectInfo };

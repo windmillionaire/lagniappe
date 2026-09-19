@@ -1,2 +1,250 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="c5b4aa45-5441-4e8a-a2f1-ed9a521c3fa5",e._sentryDebugIdIdentifier="sentry-dbid-c5b4aa45-5441-4e8a-a2f1-ed9a521c3fa5");}catch(e){}}();import{B as l}from"./baseTable.js?v=bf429679";import"./foundation.js?v=bf429679";import"./upstreamUnavailable.js?v=bf429679";import"./connectivity.js?v=bf429679";import"./styles.js?v=bf429679";import"./icons.js?v=bf429679";import"./primitives.js?v=bf429679";import"./table.js?v=bf429679";import"./baseElement.js?v=bf429679";import"./checkbox.js?v=bf429679";import"./input.js?v=bf429679";import"./formatting.js?v=bf429679";import"./link.js?v=bf429679";import"./facets.js?v=bf429679";import"./remote.js?v=bf429679";import"./queryLifecycle.js?v=bf429679";import"./combobox.js?v=bf429679";import"./results.js?v=bf429679";import"./storage.js?v=bf429679";import"./submitter.js?v=bf429679";import"./loader.js?v=bf429679";class h extends l{constructor(t){super(t),this.refreshScope="collection",this.loading=!1,this.loaded=!this.prefetched||this.target.hasAttribute("loaded"),this._empty=!1,this._updated=[],this._created=[]}async updated(t){this._updated=t.html?.querySelectorAll("tr[lp-entity]")||[];const e=t.html?.querySelector("tr[lp-load]");return this.loaded=!e,e}async created(t){this._created=t.html.querySelectorAll("tr")}get selector(){return this.component.elt.querySelector("th[data-column='selector'] button")}setEmptyRowVisibility(){const t=this.target.querySelector("tr[data-role='empty']"),e=this.target.querySelector("tr[lp-entity]");t&&(this.view.mobile?t.style.display=e?"none":"block":t.dataset.visible=e?"false":"true"),e||(this.loaded=!0,this.target.setAttribute("loaded",""))}get prefetched(){return this.target.hasAttribute("lp-prefetch")}refreshDescriptor(){return this.component.name!=="table"||!this.target.hasAttribute("loaded")||!(!!this.view.key||["forms","tasks","users"].includes(this.view.elt.dataset.index))?null:{rows:Array.from(this.target.querySelectorAll("tr[lp-entity]"),e=>({key:e.dataset.key,hash:e.dataset.hash||"",fingerprint:e.dataset.fingerprint||""}))}}_parseRefreshRow(t){if(!t)return null;const e=document.createElement("template");return e.innerHTML=t.trim(),e.content.querySelector("tr[lp-entity]")}refreshDelta(t){const e=new Map(Array.from(this.target.querySelectorAll("tr[lp-entity]"),r=>[r.dataset.key,r]));for(const r of t.remove||[])e.get(r)?.remove(),e.delete(r);const a=[];for(const r of t.upsert||[]){const s=this._parseRefreshRow(r.html);if(!s||s.dataset.key!==r.key)throw new Error("Invalid table refresh row");const n=e.get(r.key);n?n.replaceWith(s):a.push(s),e.set(r.key,s)}const o=Array.isArray(t.order)?t.order:[];for(const r of o){const s=e.get(r);if(!s)throw new Error("Table refresh order references a missing row");this.target.append(s)}a.length&&this.view.addFlash(...a);let i=this.target.querySelector("tr[data-role='empty']");if(!o.length&&!i&&t.empty){const r=document.createElement("template");r.innerHTML=t.empty.trim(),i=r.content.querySelector("tr[data-role='empty']"),i&&this.target.append(i)}this.setEmptyRowVisibility(),this.sortingWidget?.refreshRows?.()}refresh(t){if(!t?.html)return;const e=[...t.html.querySelectorAll("tr[lp-entity]")],a=new Set(e.map(i=>i.dataset.key).filter(Boolean)),o=[];for(const i of e){const r=i.dataset.key;if(!r)continue;const s=this.target.querySelector(`tr[data-key="${r}"]`);s?s.replaceWith(i):o.push(i)}if(o.length){const i=this.target.querySelector("tr[lp-entity]");i?i.before(...o):this.target.append(...o),this.view.addFlash(...o)}this.prefetched||this.target.querySelectorAll("tr[lp-entity]").forEach(i=>{a.has(i.dataset.key)||i.remove()}),this.setEmptyRowVisibility(),this.sortingWidget?.refreshRows?.()}async prereconcile(){const t=this.target.hasAttribute("loaded");if(!this.loaded||t)return;const e=await this.component.loadWidget("TableSorting");e&&await e.init(),this._finishLoading=!0}postreconcile(){const t=this.target;let e=!1;const a=this.sortingWidget?.initialized===!0;this._created.length>0&&(t.prepend(...this._created),this.view.addFlash(...this._created),this._created=[],e=!0,this.view.mobile&&t.scrollIntoView({behavior:"auto",block:"start"})),this._updated.length>0&&(t.append(...this._updated),this._updated=[],e=!0),this._finishLoading&&(this._finishLoading=!1,this.target.setAttribute("loaded",""),this.setEmptyRowVisibility(),t.dataset.visible=!0,this.loading=!1),e&&(this.setEmptyRowVisibility(),a&&this.sortingWidget.refreshRows())}}export{h as IndexTable};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseTable } from './baseTable.js?v=b43106f0';
+import './foundation.js?v=b43106f0';
+import './upstreamUnavailable.js?v=b43106f0';
+import './connectivity.js?v=b43106f0';
+import './styles.js?v=b43106f0';
+import './icons.js?v=b43106f0';
+import './primitives.js?v=b43106f0';
+import './table.js?v=b43106f0';
+import './baseElement.js?v=b43106f0';
+import './checkbox.js?v=b43106f0';
+import './input.js?v=b43106f0';
+import './formatting.js?v=b43106f0';
+import './link.js?v=b43106f0';
+import './facets.js?v=b43106f0';
+import './remote.js?v=b43106f0';
+import './queryLifecycle.js?v=b43106f0';
+import './combobox.js?v=b43106f0';
+import './results.js?v=b43106f0';
+import './storage.js?v=b43106f0';
+import './submitter.js?v=b43106f0';
+import './loader.js?v=b43106f0';
+
+/**
+ * @testable infrastructure
+ */
+class IndexTable extends BaseTable {
+	constructor(attributes) {
+		super(attributes);
+		this.refreshScope = "collection";
+		this.loading = false;
+		this.loaded = !this.prefetched || this.target.hasAttribute("loaded");
+		this._empty = false;
+		this._updated = [];
+		this._created = [];
+	}
+
+	async updated(response) {
+		this._updated = response.html?.querySelectorAll("tr[lp-entity]") || [];
+		const append = response.html?.querySelector("tr[lp-load]");
+		this.loaded = !append;
+		return append;
+	}
+
+	async created(response) {
+		this._created = response.html.querySelectorAll("tr");
+	}
+
+	get selector() {
+		return this.component.elt.querySelector(
+			"th[data-column='selector'] button",
+		);
+	}
+
+	setEmptyRowVisibility() {
+		const emptyRow = this.target.querySelector("tr[data-role='empty']");
+		const notEmpty = this.target.querySelector("tr[lp-entity]");
+		if (emptyRow) {
+			if (!this.view.mobile) {
+				emptyRow.dataset.visible = notEmpty ? "false" : "true";
+			} else {
+				emptyRow.style.display = notEmpty ? "none" : "block";
+			}
+		}
+		if (!notEmpty) {
+			this.loaded = true;
+			this.target.setAttribute("loaded", "");
+		}
+	}
+
+	get prefetched() {
+		return this.target.hasAttribute("lp-prefetch");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @pairs indexes:fingerprint-gate reconnect-refresh:manifest
+	 */
+	refreshDescriptor() {
+		if (
+			this.component.name !== "table" ||
+			!this.target.hasAttribute("loaded")
+		) {
+			return null;
+		}
+		const supported =
+			Boolean(this.view.key) ||
+			["forms", "tasks", "users"].includes(this.view.elt.dataset.index);
+		if (!supported) return null;
+
+		return {
+			rows: Array.from(
+				this.target.querySelectorAll("tr[lp-entity]"),
+				(row) => ({
+					key: row.dataset.key,
+					hash: row.dataset.hash || "",
+					fingerprint: row.dataset.fingerprint || "",
+				}),
+			),
+		};
+	}
+
+	_parseRefreshRow(html) {
+		if (!html) return null;
+		const template = document.createElement("template");
+		template.innerHTML = html.trim();
+		return template.content.querySelector("tr[lp-entity]");
+	}
+
+	/**
+	 * @testable infrastructure
+	 * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
+	 */
+	refreshDelta(delta) {
+		const existing = new Map(
+			Array.from(this.target.querySelectorAll("tr[lp-entity]"), (row) => [
+				row.dataset.key,
+				row,
+			]),
+		);
+		for (const key of delta.remove || []) {
+			existing.get(key)?.remove();
+			existing.delete(key);
+		}
+
+		const added = [];
+		for (const update of delta.upsert || []) {
+			const row = this._parseRefreshRow(update.html);
+			if (!row || row.dataset.key !== update.key) {
+				throw new Error("Invalid table refresh row");
+			}
+			const current = existing.get(update.key);
+			if (current) current.replaceWith(row);
+			else added.push(row);
+			existing.set(update.key, row);
+		}
+
+		const order = Array.isArray(delta.order) ? delta.order : [];
+		for (const key of order) {
+			const row = existing.get(key);
+			if (!row) throw new Error("Table refresh order references a missing row");
+			this.target.append(row);
+		}
+		if (added.length) this.view.addFlash(...added);
+
+		let empty = this.target.querySelector("tr[data-role='empty']");
+		if (!order.length && !empty && delta.empty) {
+			const template = document.createElement("template");
+			template.innerHTML = delta.empty.trim();
+			empty = template.content.querySelector("tr[data-role='empty']");
+			if (empty) this.target.append(empty);
+		}
+
+		this.setEmptyRowVisibility();
+		this.sortingWidget?.refreshRows?.();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
+	 * @matrix form-index : delete-target destination-refresh sorting
+	 */
+	refresh(response) {
+		if (!response?.html) return;
+		const newRows = [...response.html.querySelectorAll("tr[lp-entity]")];
+		const newKeys = new Set(
+			newRows.map((row) => row.dataset.key).filter(Boolean),
+		);
+		const prepend = [];
+
+		for (const newRow of newRows) {
+			const key = newRow.dataset.key;
+			if (!key) continue;
+
+			const existing = this.target.querySelector(`tr[data-key="${key}"]`);
+			if (existing) existing.replaceWith(newRow);
+			else prepend.push(newRow);
+		}
+
+		if (prepend.length) {
+			const anchor = this.target.querySelector("tr[lp-entity]");
+			if (anchor) anchor.before(...prepend);
+			else this.target.append(...prepend);
+			this.view.addFlash(...prepend);
+		}
+
+		if (!this.prefetched) {
+			this.target.querySelectorAll("tr[lp-entity]").forEach((row) => {
+				if (!newKeys.has(row.dataset.key)) row.remove();
+			});
+		}
+
+		this.setEmptyRowVisibility();
+		this.sortingWidget?.refreshRows?.();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
+	 * @matrix form-index : created-row sorting
+	 */
+	async prereconcile() {
+		const loaded = this.target.hasAttribute("loaded");
+		if (!this.loaded || loaded) return;
+
+		const sorting = await this.component.loadWidget("TableSorting");
+		if (sorting) await sorting.init();
+		this._finishLoading = true;
+	}
+
+	postreconcile() {
+		const target = this.target;
+		let rowsChanged = false;
+		const sortingWasInitialized = this.sortingWidget?.initialized === true;
+
+		if (this._created.length > 0) {
+			target.prepend(...this._created);
+			this.view.addFlash(...this._created);
+			this._created = [];
+			rowsChanged = true;
+
+			if (this.view.mobile) {
+				target.scrollIntoView({ behavior: "auto", block: "start" });
+			}
+		}
+
+		if (this._updated.length > 0) {
+			target.append(...this._updated);
+			this._updated = [];
+			rowsChanged = true;
+		}
+
+		if (this._finishLoading) {
+			this._finishLoading = false;
+			this.target.setAttribute("loaded", "");
+			this.setEmptyRowVisibility();
+			target.dataset.visible = true;
+			this.loading = false;
+		}
+
+		if (rowsChanged) {
+			this.setEmptyRowVisibility();
+			if (sortingWasInitialized) this.sortingWidget.refreshRows();
+		}
+	}
+}
+
+export { IndexTable };

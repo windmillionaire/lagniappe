@@ -1,2 +1,31 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="5b6d2d63-c439-428d-8662-20898f3e94c8",e._sentryDebugIdIdentifier="sentry-dbid-5b6d2d63-c439-428d-8662-20898f3e94c8");}catch(e){}}();import{F as i}from"./formWidget.js?v=bf429679";import"./controller.js?v=bf429679";import"./primitives.js?v=bf429679";import"./styles.js?v=bf429679";import"./icons.js?v=bf429679";import"./foundation.js?v=bf429679";import"./upstreamUnavailable.js?v=bf429679";import"./connectivity.js?v=bf429679";import"./loader.js?v=bf429679";import"./modal.js?v=bf429679";import"./representation.js?v=bf429679";class s extends i{constructor(t){super(t),this.messages={submit:"Save Restrictions",submitting:"Saving Restrictions",submitted:"Restrictions Saved"}}}export{s as PagePermissions};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormWidget } from './formWidget.js?v=b43106f0';
+import './controller.js?v=b43106f0';
+import './primitives.js?v=b43106f0';
+import './styles.js?v=b43106f0';
+import './icons.js?v=b43106f0';
+import './foundation.js?v=b43106f0';
+import './upstreamUnavailable.js?v=b43106f0';
+import './connectivity.js?v=b43106f0';
+import './loader.js?v=b43106f0';
+import './modal.js?v=b43106f0';
+import './representation.js?v=b43106f0';
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
+ * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restrictions_save_drafts_and_show_each_source
+ * @matrix pages : permission-gates permissions-panel access-restrictions explicit-submit group-restricted owner-restricted source-summary
+ */
+class PagePermissions extends FormWidget {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Save Restrictions",
+			submitting: "Saving Restrictions",
+			submitted: "Restrictions Saved",
+		};
+	}
+}
+
+export { PagePermissions };

@@ -3,6 +3,10 @@
 import re
 from pathlib import Path
 
+import pytest
+from bs4 import BeautifulSoup
+from jinja2 import Environment, StrictUndefined, nodes
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TAG_WITH_ENTITY = re.compile(r"<(?:(?!>).)*\blp-entity\b(?:(?!>).)*>", re.DOTALL)
@@ -18,33 +22,124 @@ def test_server_rendered_lp_entities_declare_fingerprints():
                 line = path.read_text()[: match.start()].count("\n") + 1
                 missing.append(f"{relative}:{line}")
 
-    assert missing == [], "lp-entity tags missing data-fingerprint: " + ", ".join(missing)
+    assert missing == [], "lp-entity tags missing data-fingerprint: " + ", ".join(
+        missing
+    )
+
+
+def _edited_marker_routes(source):
+    """Read declared url_for destinations, ignoring Jinja layout and comments."""
+    routes = []
+    for call in Environment().parse(source).find_all(nodes.Call):
+        target = call.node
+        if not (
+            isinstance(target, nodes.Getattr)
+            and target.attr == "edited_marker"
+            and isinstance(target.node, nodes.Name)
+            and target.node.name == "controls"
+        ):
+            continue
+        arguments = call.args + [kw.value for kw in call.kwargs if kw.key == "route"]
+        assert len(arguments) == 1, "edited_marker requires one focused route"
+        route = arguments[0]
+        assert isinstance(route, nodes.Call) and isinstance(route.node, nodes.Name)
+        assert route.node.name == "url_for", (
+            "edited_marker must use a route destination"
+        )
+        assert route.args and isinstance(route.args[0], nodes.Const)
+        # AST nodes compare by content, not quote style, whitespace, or line number.
+        routes.append((route.args[0].value, {kw.key: kw.value for kw in route.kwargs}))
+    return routes
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}",
+        '{{ controls.edited_marker(\n route=url_for("tasks.get", key=t.urlsafe_key)\n) }}',
+        "{# controls.edited_marker() #}{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}",
+    ],
+)
+def test_edited_marker_route_scan_accepts_equivalent_jinja(source):
+    assert _edited_marker_routes(source) == [
+        (
+            "tasks.get",
+            {"key": nodes.Getattr(nodes.Name("t", "load"), "urlsafe_key", "load")},
+        )
+    ]
+
+
+def test_edited_marker_route_scan_rejects_missing_route():
+    with pytest.raises(AssertionError, match="requires one focused route"):
+        _edited_marker_routes("{{ controls.edited_marker() }}")
 
 
 def test_edited_form_markers_cover_update_forms_with_focused_routes():
     templates = REPO_ROOT / "lagniappe" / "web" / "templates"
-    calls = []
-    for path in templates.rglob("*.html"):
-        for line in path.read_text().splitlines():
-            if "controls.edited_marker(" not in line:
-                continue
-            argument = line.split("controls.edited_marker(", 1)[1].rsplit(")", 1)[0]
-            calls.append((path.relative_to(templates).as_posix(), argument.strip()))
+    required = {
+        "users/tools.html": [
+            "url_for('users.public_permissions')",
+            "url_for('users.group_permissions', key=group.urlsafe_key)",
+        ],
+        "projects/model_tasks.html": [
+            "url_for('projects.model_info', key=project_key, task_key=task_key)"
+        ],
+        "projects/info.html": ["url_for('projects.info', key=project.urlsafe_key)"],
+        "pages/tasks.html": [
+            "url_for('tasks.get', key=t.urlsafe_key)",
+            "url_for('tasks.settings', key=t.urlsafe_key)",
+        ],
+        "pages/document.html": [
+            "url_for('pages.document_settings', key=page.urlsafe_key)"
+        ],
+        "pages/info.html": [
+            "url_for('pages.permissions', key=page.urlsafe_key)",
+            "url_for('pages.user_settings', key=page.urlsafe_key)",
+            "url_for('pages.info', key=page.urlsafe_key)",
+        ],
+        "files/info.html": ["url_for('files.info', key=file.urlsafe_key)"],
+        "categories/tools.html": [
+            "url_for('categories.info', key=category.urlsafe_key)"
+        ],
+    }
+    actual = {
+        path.relative_to(templates).as_posix(): _edited_marker_routes(
+            path.read_text(encoding="utf-8")
+        )
+        for path in templates.rglob("*.html")
+    }
+    for path, expressions in required.items():
+        for expression in expressions:
+            expected = _edited_marker_routes(
+                "{{ controls.edited_marker(" + expression + ") }}"
+            )[0]
+            assert expected in actual[path], (
+                f"{path}: missing edited marker for {expression}"
+            )
 
-    assert len(calls) == 12
-    assert all(argument for _, argument in calls)
-    task_calls = [argument for path, argument in calls if path == "pages/tasks.html"]
-    assert task_calls == [
-        "url_for('tasks.get', key=t.urlsafe_key)",
-        "url_for('tasks.settings', key=t.urlsafe_key)",
+
+# @template controls.html::edited_marker
+def test_edited_marker_renders_focused_route_and_reset_control():
+    source = (REPO_ROOT / "lagniappe/web/templates/controls.html").read_text(
+        encoding="utf-8"
+    )
+    environment = Environment(autoescape=True, undefined=StrictUndefined)
+    tree = environment.parse(source)
+    # Render the real macro; unrelated macros need application-only filters.
+    tree.body = [
+        node
+        for node in tree.body
+        if isinstance(node, nodes.Macro) and node.name == "edited_marker"
     ]
-    assert (
-        "categories/tools.html",
-        "url_for('categories.info', key=category.urlsafe_key)",
-    ) in calls
+    module = environment.from_string(tree).make_module({"styles": {"message": ""}})
+    route = "/l/tasks/settings?key=task-1&mode=review"
+    markup = BeautifulSoup(module.edited_marker(route), "html.parser")
 
-    controls = (templates / "controls.html").read_text()
-    assert "{% macro edited_marker(route) %}" in controls
-    assert 'data-edited-route="{{ route }}"' in controls
-    assert 'data-role="edited-reset"' in controls
-    assert "edited-reload" not in controls
+    marker = markup.select_one("[lp-edited-marker]")
+    assert marker is not None
+    assert marker["data-edited-route"] == route
+    assert marker["data-visible"] == "false"
+    assert marker["aria-live"] == "polite"
+    reset = marker.select_one('[data-role="edited-reset"]')
+    assert reset is not None and reset["type"] == "button"
+    assert not markup.select('[data-role="edited-reload"]')
