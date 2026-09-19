@@ -91,7 +91,7 @@ export class Task extends ViewComponent {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_completion_replaces_closed_row_in_one_transition
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_completion_replaces_closed_row_in_one_transition
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_reopening_discards_inactive_history_until_next_click
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_waits_for_acceptance_and_moves_closed_task
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_closes_task

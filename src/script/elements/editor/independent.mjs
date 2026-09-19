@@ -58,7 +58,7 @@ export class IndependentDocument {
 	 * content as loaded state.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_failed_load_stays_inert_and_retries
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_failed_load_stays_inert_and_retries
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
 	 * @matrix editor html-field : authoritative-content error-reporting initial-load retry
 	 */
@@ -203,9 +203,9 @@ export class IndependentDocument {
 	 * one latest follow-up value.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_failed_save_stays_dirty_and_retries
-	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order
-	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_saves_intentional_clear
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_failed_save_stays_dirty_and_retries
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_saves_intentional_clear
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
 	 * @matrix editor html-field : concurrent-edit error-reporting intentional-clear keepalive retry serialized-save server-acknowledgement
 	 */
@@ -358,7 +358,7 @@ export class IndependentDocument {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.py::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_editor_teardown_releases_toolbar_before_editor_view
 	 * @matrix editor html-field : listener-teardown builder-save
 	 */
 	destroy() {

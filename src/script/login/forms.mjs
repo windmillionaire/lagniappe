@@ -8,7 +8,7 @@ import {
 
 /**
  * @testable true
- * @tests tests_js/test_034_login_buttons.py::test_login_action_button_uses_fixed_icon_and_text_slots
+ * @tests tests_js/test_034_login_buttons.mjs::test_login_action_button_uses_fixed_icon_and_text_slots
  * @matrix login : loading-state submit-button
  */
 const setLoginActionButton = (button, text, icon = null) => {
@@ -231,7 +231,7 @@ class EmailCheckForm extends LoginForms {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
- * @tests tests_js/test_034_login_buttons.py::test_owner_setup_supports_password_only_mode
+ * @tests tests_js/test_034_login_buttons.mjs::test_owner_setup_supports_password_only_mode
  * @matrix login : auth-errors disabled-provider owner-bootstrap password-validation verify-email
  */
 class OwnerSetupForm extends LoginForms {

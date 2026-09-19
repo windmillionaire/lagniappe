@@ -7,7 +7,7 @@ import ShellView from "./base/shell.mjs";
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
  * @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
- * @tests tests_js/test_038_startup_specializations.py::test_manual_dropdown_loads_only_in_mobile_mode
+ * @tests tests_js/test_038_startup_specializations.mjs::test_manual_dropdown_loads_only_in_mobile_mode
  * @matrix manual : popstate responsive-navigation section-navigation
  * @pair startup:mobile-only-dropdown
  */

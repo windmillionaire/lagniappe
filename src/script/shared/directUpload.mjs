@@ -23,7 +23,7 @@ const directUploadRoute = (route) => {
 
 /**
  * @testable true
- * @tests tests_js/test_014_direct_upload_retry.py::test_builder_direct_upload_failure_preserves_owner_page
+ * @tests tests_js/test_014_direct_upload_retry.mjs::test_builder_direct_upload_failure_preserves_owner_page
  * @matrix direct-upload forms : retryable-action persistent-error
  */
 const createDirectUploadSession = async ({
@@ -157,7 +157,7 @@ const directUploadChunk = ({ file, sessionUrl, offset, end }) =>
 
 /**
  * @testable true
- * @tests tests_js/test_014_direct_upload_retry.py::test_direct_upload_resumes_after_network_reset
+ * @tests tests_js/test_014_direct_upload_retry.mjs::test_direct_upload_resumes_after_network_reset
  * @matrix direct-upload : resumable-range retry
  */
 const uploadDirectFile = async ({

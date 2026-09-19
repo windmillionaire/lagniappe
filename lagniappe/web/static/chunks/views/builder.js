@@ -1,22 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="41d61f4f-2e7c-424f-a32d-6c6a36ad3d40",e._sentryDebugIdIdentifier="sentry-dbid-41d61f4f-2e7c-424f-a32d-6c6a36ad3d40");}catch(e){}}();import"../search.js?v=bf429679";import"../entityMenu.js?v=bf429679";import"../directUpload.js?v=bf429679";import"../foundation.js?v=bf429679";import"../connectivity.js?v=bf429679";import"../modal.js?v=bf429679";import{F as q}from"../builder.js?v=bf429679";import"../styles.js?v=bf429679";import"../remote.js?v=bf429679";import"../queryLifecycle.js?v=bf429679";import"../combobox.js?v=bf429679";import"../primitives.js?v=bf429679";import"../icons.js?v=bf429679";import"../results.js?v=bf429679";import"../storage.js?v=bf429679";import"../formatting.js?v=bf429679";import"../upstreamUnavailable.js?v=bf429679";import"../dropdown.js?v=bf429679";import"../polling.js?v=bf429679";import"../controller.js?v=bf429679";import"../loader.js?v=bf429679";export{q as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=bdc1ce7d';
-import '../entityMenu.js?v=bdc1ce7d';
-import '../directUpload.js?v=bdc1ce7d';
-import '../foundation.js?v=bdc1ce7d';
-import '../connectivity.js?v=bdc1ce7d';
-import '../modal.js?v=bdc1ce7d';
-export { F as default } from '../builder.js?v=bdc1ce7d';
-import '../styles.js?v=bdc1ce7d';
-import '../remote.js?v=bdc1ce7d';
-import '../queryLifecycle.js?v=bdc1ce7d';
-import '../combobox.js?v=bdc1ce7d';
-import '../primitives.js?v=bdc1ce7d';
-import '../icons.js?v=bdc1ce7d';
-import '../results.js?v=bdc1ce7d';
-import '../storage.js?v=bdc1ce7d';
-import '../formatting.js?v=bdc1ce7d';
-import '../upstreamUnavailable.js?v=bdc1ce7d';
-import '../dropdown.js?v=bdc1ce7d';
-import '../polling.js?v=bdc1ce7d';
-import '../controller.js?v=bdc1ce7d';
-import '../loader.js?v=bdc1ce7d';

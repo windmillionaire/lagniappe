@@ -64,8 +64,8 @@ class PDFRangeTransport extends pdfjs.PDFDataRangeTransport {
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_pdf_preview_loading_state_paints_before_document_render
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas
- * @tests tests_js/test_025_pdf_preview.py::test_pdf_preview_loading_does_not_block_widget_reconciliation
- * @tests tests_js/test_025_pdf_preview.py::test_pdf_preview_revisit_does_not_await_pending_rasterization
+ * @tests tests_js/test_025_pdf_preview.mjs::test_pdf_preview_loading_does_not_block_widget_reconciliation
+ * @tests tests_js/test_025_pdf_preview.mjs::test_pdf_preview_revisit_does_not_await_pending_rasterization
  * @matrix file : loading-state pdf-preview pdf-toolbar revisit view-transition
  */
 export class PDFPreview {

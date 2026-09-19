@@ -20,7 +20,7 @@ export class ComponentsPanel {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-	 * @tests tests_js/test_032_todo_element_frontend.py::test_todo_builder_registration_is_task_only
+	 * @tests tests_js/test_032_todo_element_frontend.mjs::test_todo_builder_registration_is_task_only
 	 * @matrix forms : components page-form task-form
 	 */
 	init() {

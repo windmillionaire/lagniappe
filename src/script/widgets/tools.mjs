@@ -7,7 +7,7 @@ const AI_DROPZONE_TEXT =
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
- * @tests tests_js/test_043_ai_email_frontend.py::test_ai_email_address_selection_and_copy_controls
+ * @tests tests_js/test_043_ai_email_frontend.mjs::test_ai_email_address_selection_and_copy_controls
  * @matrix ai-report : absent-markup ask clipboard-fallback create email-address-selection explain-button instructions multi-file status-reset tool-switcher upload-form
  */
 export class CreateToolReport extends BaseUpload {

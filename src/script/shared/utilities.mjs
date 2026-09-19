@@ -60,7 +60,7 @@ export const showBriefly = (element, content, duration = 1500) => {
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_debounce_cancel_prevents_delayed_callback
+ * @tests tests_js/test_020_shared_utilities.mjs::test_debounce_cancel_prevents_delayed_callback
  * @pair async-query:debounce-teardown
  */
 export const debounce = (func, wait) => {
@@ -86,7 +86,7 @@ export const debounce = (func, wait) => {
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_wait_for_attribute_resolves_and_cleans_up_observers
+ * @tests tests_js/test_020_shared_utilities.mjs::test_wait_for_attribute_resolves_and_cleans_up_observers
  * @matrix frontend-utilities : cleanup mutation-observer
  */
 export function waitForAttribute(element, attributeName, timeout = 10000) {
@@ -149,7 +149,7 @@ function _sortObject(obj) {
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_are_equal_normalizes_object_keys_but_preserves_array_order
+ * @tests tests_js/test_020_shared_utilities.mjs::test_are_equal_normalizes_object_keys_but_preserves_array_order
  * @matrix frontend-utilities : array-order deep-equality
  */
 export const areEqual = (a, b) => {

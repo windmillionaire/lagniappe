@@ -2,7 +2,7 @@
  * Compare field representations without importing form controllers or UI.
  *
  * @testable true
- * @tests tests_js/test_036c_form_migrations.py::test_incompatible_local_values_require_review
+ * @tests tests_js/test_036c_form_migrations.mjs::test_incompatible_local_values_require_review
  * @matrix form-migration : stale-input representation-aware
  */
 export const compatibleField = (before, after) => {
@@ -35,7 +35,7 @@ export const compatibleField = (before, after) => {
 };
 /**
  * @testable true
- * @tests tests_js/test_036c_form_migrations.py::test_incompatible_local_values_require_review
+ * @tests tests_js/test_036c_form_migrations.mjs::test_incompatible_local_values_require_review
  * @matrix form-migration : stale-input representation-aware
  */
 export const incompatibleSchema = (before, after) =>

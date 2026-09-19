@@ -180,6 +180,7 @@ Supported tags are:
 - `@testable true|false|infrastructure`
 - `@tests <pytest nodeid or glob>`
 - `@source <source path>::<qualified symbol>` on a test
+- `@node-program <repository-relative .mjs path>` on a test that executes a separate Node program
 - `@scaffolding <helper path>::<symbol>`
 - `@covered-by <source path>::<symbol>`
 - `@reason <why direct testing is inappropriate>`
@@ -247,6 +248,13 @@ test's unrelated cells do not expand the graph further.
 
 Unknown or nearly misspelled traceability tags are diagnosed. `@suggestion` is
 not a supported tag; use `@todo` when a missing behavior should remain visible.
+
+Use `@node-program` for a retained Python/Node boundary test. It adds the
+program and the standard Node execution dependencies to that test's evidence
+and changed-file selection without creating source ownership or behavior cells.
+The path must name an existing `.mjs` file within the repository; repeat the
+tag for multiple programs. See [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md)
+for the migration recipe.
 
 ## Focus modes
 

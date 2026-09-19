@@ -72,7 +72,7 @@ export default class ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
 	 * @pair startup:performance-marks
 	 */
 	async init() {
@@ -237,7 +237,7 @@ export default class ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_lazy_search_replays_the_latest_live_input_after_loading
+	 * @tests tests_js/test_029_core_startup.mjs::test_lazy_search_replays_the_latest_live_input_after_loading
 	 * @matrix startup : first-interaction single-flight
 	 * @pair search:navbar-results
 	 */
@@ -265,7 +265,7 @@ export default class ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
 	 * @pair startup:performance-marks
 	 */
 	publish() {
@@ -343,7 +343,7 @@ export default class ShellView {
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
 	 * @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
-	 * @tests tests_js/test_038_startup_specializations.py::test_command_copy_falls_back_when_clipboard_is_unavailable
+	 * @tests tests_js/test_038_startup_specializations.mjs::test_command_copy_falls_back_when_clipboard_is_unavailable
 	 * @matrix manual admin : clipboard-fallback command-copy
 	 */
 	async copyCommand(button) {
@@ -400,7 +400,7 @@ export default class ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
 	 * @pair forms:submit-interception
 	 */
 	_handleSubmit(event) {
@@ -429,7 +429,7 @@ export default class ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
 	 * @pair startup:single-flight
 	 */
 	runColdAction(owner, load, activate, busyOwner = owner) {
@@ -461,7 +461,7 @@ export default class ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
 	 * @pair startup:destroy-safety
 	 */
 	destroy() {

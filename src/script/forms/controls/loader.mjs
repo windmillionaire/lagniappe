@@ -8,7 +8,7 @@ const CONTROLS = {
  * Register ownership before awaiting initialization so teardown also covers
  * partially initialized controls and detached replacements.
  * @testable true
- * @tests tests_js/test_048_form_controls.py::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
+ * @tests tests_js/test_048_form_controls.mjs::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
  * @matrix forms : initialization teardown readonly
  */
 export async function initFormControls(form) {

@@ -12,7 +12,7 @@ const selectionRange = (editor) => {
 
 /**
  * @testable true
- * @tests tests_js/test_041_editor_decorations.py::test_selection_highlight_decorations_and_range_mapping
+ * @tests tests_js/test_041_editor_decorations.mjs::test_selection_highlight_decorations_and_range_mapping
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
  * @matrix ai editor : replace-selection selected-text
  */

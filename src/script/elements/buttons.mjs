@@ -71,7 +71,7 @@ const button = (attributes) => {
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_active_action_buttons_preserve_full_width_icon_slots
+ * @tests tests_js/test_018_style_pipeline.mjs::test_active_action_buttons_preserve_full_width_icon_slots
  * @matrix ui-action : fixed-layout loading-state
  */
 const active = (attributes) => {

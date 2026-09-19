@@ -11,13 +11,13 @@ import { loadRevisionPreview } from "./preview.mjs";
  * forms discovered by EditWatcher.
  *
  * @testable true
- * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_compares_and_resets_each_form_independently
- * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_coalesces_overlapping_revision_probes
- * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_separates_schema_and_renderer_value_changes
- * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_reconciles_independent_field_selections
- * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
+ * @tests tests_js/test_024_edit_watcher.mjs::test_edit_watcher_compares_and_resets_each_form_independently
+ * @tests tests_js/test_024_edit_watcher.mjs::test_edit_watcher_coalesces_overlapping_revision_probes
+ * @tests tests_js/test_028_form_state_split.mjs::test_edit_watcher_separates_schema_and_renderer_value_changes
+ * @tests tests_js/test_028_form_state_split.mjs::test_edit_watcher_reconciles_independent_field_selections
+ * @tests tests_js/test_028_form_state_split.mjs::test_owned_deferred_completion_replaces_clean_active_form
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
- * @tests tests_js/test_036c_form_migrations.py::test_projected_matching_values_do_not_discard_incompatible_drafts
+ * @tests tests_js/test_036c_form_migrations.mjs::test_projected_matching_values_do_not_discard_incompatible_drafts
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_offline_submission_survives_schema_migration_until_review
  * @matrix edited-entity-notice : active-state clean-state coalescing comparison dirty-state focused-state latest-schema local-values mixed-submission overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability saved-default schema-only submission-choice targeted-reset transition whole-form-selection
  * @matrix forms : latest-schema mixed-submission per-field-selection saved-default submission-choice

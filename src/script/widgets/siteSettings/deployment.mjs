@@ -198,7 +198,7 @@ export class SiteDeployment extends SiteSetting {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_deployment_caps_workers_only_for_f2_and_b2
+	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_deployment_caps_workers_only_for_f2_and_b2
 	 * @matrix admin : deployment-settings memory-pressure scaling-controls
 	 */
 	_syncWorkerLimit() {

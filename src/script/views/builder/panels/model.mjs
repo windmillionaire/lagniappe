@@ -183,7 +183,7 @@ const _model = (schema) => {
 
 /**
  * @testable true
- * @tests tests_js/test_019_form_sync_frontend.py::test_builder_model_defaults_are_presentation_only
+ * @tests tests_js/test_019_form_sync_frontend.mjs::test_builder_model_defaults_are_presentation_only
  * @matrix form-schema forms : builder immutable-schema presentation-defaults
  */
 const _presentation = (schema) => {

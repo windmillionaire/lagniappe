@@ -114,7 +114,7 @@ export class FormSettings {
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
 	 * @matrix forms : access-restrictions group-restricted owner-restricted
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_restriction_save_submits_snapshot_and_releases_failed_submitter
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_restriction_save_submits_snapshot_and_releases_failed_submitter
 	 * @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
 	 * @matrix forms : access-restrictions explicit-submit retryable-action single-flight
 	 */
@@ -162,7 +162,7 @@ export class FormSettings {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_generation_failure_stays_visible_and_releases_submitter
 	 * @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
 	 * @matrix forms : draft-history
 	 * @pair forms:stale-response

@@ -8,7 +8,7 @@ import { loadView } from "./viewRegistry.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_navigation_fetch_abort_is_not_reported_as_application_error
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_navigation_fetch_abort_is_not_reported_as_application_error
  * @matrix startup : error-reporting navigation transient-network
  */
 async function onError(event) {
@@ -39,7 +39,7 @@ window.__CONNECTIVITY_READY__ = Promise.resolve();
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_cross_document_transition_publishes_settled_readiness
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_cross_document_transition_publishes_settled_readiness
  * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
  * @pairs startup:settled-boundary view-transition:navigation
  */
@@ -126,12 +126,12 @@ let _ping = null;
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
- * @tests tests_js/test_017_main_lifecycle.py::test_ping_uses_server_owned_cache_policy
- * @tests tests_js/test_017_main_lifecycle.py::test_ping_clears_only_the_settled_pending_promise
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_uses_server_owned_cache_policy
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_clears_only_the_settled_pending_promise
  * @matrix offline : cache-policy pending-ownership server-health settled-cleanup
  * @pair offline:indicator
  */
-async function pingServer() {
+export async function pingServer() {
 	if (_ping) return _ping;
 
 	_ping = (async () => {
@@ -266,9 +266,9 @@ function queueSync({
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
- * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
- * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
- * @tests tests_js/test_017_main_lifecycle.py::test_startup_publishes_worker_state_before_loading_view_with_pending_ping
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_rapid_sync_requests_coalesce_and_retain_forced_transition
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_startup_publishes_worker_state_before_loading_view_with_pending_ping
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_delete_file_removes_attached_task_badge
  * @matrix connectivity service-worker : state-publication startup
  * @matrix offline : browser-state coalescing indicator rapid-transitions reconnect server-health transitions view-reset visible-blur
@@ -314,12 +314,12 @@ async function syncViewOnce({
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
- * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
- * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_rapid_sync_requests_coalesce_and_retain_forced_transition
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
  * @matrix offline : browser-state server-health settled-boundary transitions
  * @pairs connectivity:error-recovery offline:error-recovery
  */
-async function syncView(options = {}) {
+export async function syncView(options = {}) {
 	queueSync(options);
 	if (_sync) return _sync;
 
@@ -349,7 +349,7 @@ async function syncView(options = {}) {
  * only callers that need the background cycle's completion await the result.
  *
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
  * @matrix connectivity offline : browser-state settled-boundary transitions
  */
 function browserConnectivityChanged(browser) {
@@ -359,10 +359,10 @@ function browserConnectivityChanged(browser) {
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_suspend_current_view_deregisters_without_health_check
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_suspend_current_view_deregisters_without_health_check
  * @matrix offline sync : deregistration pagehide visibility
  */
-function suspendCurrentView({
+export function suspendCurrentView({
 	blurred = false,
 	blurredAt = blurred ? Date.now() : null,
 } = {}) {
@@ -421,10 +421,10 @@ function startErrorHandling() {
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_service_worker_registration_starts_immediately
- * @tests tests_js/test_017_main_lifecycle.py::test_controller_replacement_receives_current_versioned_connectivity_state
- * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
- * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_service_worker_registration_starts_immediately
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_controller_replacement_receives_current_versioned_connectivity_state
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_upstream_unavailable_worker_message_shows_retryable_banner
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_public_page_skips_authenticated_lifecycle
  * @matrix connectivity service-worker : controller-replacement state-publication version
  * @matrix request-errors service-worker : upstream-unavailable validation
  * @pairs service-worker:registration startup:interaction-ready
@@ -451,8 +451,8 @@ function startServiceWorker() {
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
- * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_public_page_skips_authenticated_lifecycle
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
  * @matrix polling : blur catch-up focus visibility
  * @matrix startup : analytics deferred-lifecycle public-boundary
  */
@@ -491,7 +491,7 @@ async function startAuthenticatedLifecycle() {
 /**
  * @testable infrastructure
  */
-function initialize() {
+export function initialize() {
 	if (window.__INITIALIZED__) return;
 	window.__INITIALIZED__ = true;
 	setTestMode();

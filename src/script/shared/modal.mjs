@@ -6,7 +6,7 @@ import { withTransition } from "./transitions.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.py::test_modal_owns_exact_node_and_rejects_late_attachment
+ * @tests tests_js/test_046_async_query_lifecycle.mjs::test_modal_owns_exact_node_and_rejects_late_attachment
  * @matrix modal : exact-owner late-publication listener-teardown reuse
  */
 export class Modal {
@@ -294,7 +294,7 @@ export class HelpModal extends Modal {
 
 /**
  * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.py::test_modal_owns_exact_node_and_rejects_late_attachment
+ * @tests tests_js/test_046_async_query_lifecycle.mjs::test_modal_owns_exact_node_and_rejects_late_attachment
  * @matrix modal : listener-teardown reuse
  */
 export class OfflineModal extends Modal {

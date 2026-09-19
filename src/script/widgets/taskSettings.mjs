@@ -28,7 +28,7 @@ export class BaseTaskSettings extends FormWidget {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
 	 * @matrix tasks : attach-form create model-task-link
 	 * @matrix tasks : retained-draft manual-form-choice
 	 */
@@ -85,7 +85,7 @@ export class BaseTaskSettings extends FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_settings_awaits_action_controls_and_cleans_up
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_settings_awaits_action_controls_and_cleans_up
 	 * @matrix tasks : action-control-lifecycle teardown
 	 */
 	async _initActions() {

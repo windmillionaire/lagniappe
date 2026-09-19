@@ -12,14 +12,14 @@ import { primitives } from "../primitives.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_exposes_initial_positioning_readiness
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_initial_position_ignores_superseded_transition_geometry
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_aria_and_keyboard_state_follow_the_open_panel
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_pointer_and_dismissal_events_preserve_trigger_focus
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_copies_only_supported_dataset_configuration
- * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_stops_after_destroy
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_exposes_initial_positioning_readiness
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_initial_position_ignores_superseded_transition_geometry
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_aria_and_keyboard_state_follow_the_open_panel
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_pointer_and_dismissal_events_preserve_trigger_focus
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_copies_only_supported_dataset_configuration
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_positioning_stops_after_destroy
  * @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
  * @matrix combobox : aria dataset-configuration dismissal empty-results keyboard pointer positioning positioning-readiness readiness teardown transition-race
  * @pair editor:history-positioning

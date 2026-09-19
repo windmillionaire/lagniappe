@@ -79,6 +79,106 @@ def test_native_helper_changes_focus_and_invalidate_evidence(
     assert traceability.changed_tests_for_paths(tests, [dependency], {}) == [case]
 
 
+@pytest.fixture
+def python_node_program(tmp_path, monkeypatch, native_inventory):
+    program = tmp_path / "testing/utility/js/interop.mjs"
+    helper = program.parent / "fixtures/value.mjs"
+    helper.parent.mkdir(parents=True)
+    program.write_text('import "./fixtures/value.mjs";\n')
+    helper.write_text("export const value = 1;\n")
+    (tmp_path / ".nvmrc").write_text("26.8.2\n")
+    (tmp_path / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
+    bridge = tmp_path / "testing/tests_js/test_bridge.py"
+    bridge.write_text(
+        "# @node-program testing/utility/js/interop.mjs\n"
+        "def test_bridge(): pass\n\n"
+        "def test_unrelated(): pass\n"
+    )
+    monkeypatch.setattr(
+        native_js,
+        "inventory",
+        lambda path: {
+            "cases": [],
+            "imports": ["./fixtures/value.mjs"] if path == program else [],
+        },
+    )
+    return traceability.discover_tests(tmp_path, ["testing/tests_js/test_bridge.py"])
+
+
+@pytest.mark.parametrize(
+    "dependency",
+    [
+        "testing/utility/js/interop.mjs",
+        "testing/utility/js/fixtures/value.mjs",
+        ".nvmrc",
+        "package-lock.json",
+    ],
+)
+def test_python_node_program_changes_focus_and_invalidate_its_evidence(
+    tmp_path, python_node_program, dependency
+):
+    tests = python_node_program
+    case = tests["tests_js/test_bridge.py::test_bridge"]
+    unrelated = tests["tests_js/test_bridge.py::test_unrelated"]
+    assert case.metadata.node_programs == ["testing/utility/js/interop.mjs"]
+    assert case.metadata.sources == []
+    assert traceability.feature_dimension_pairs(case.metadata) == set()
+    assert not traceability.traceability_metadata_issues([], tests.values())
+    dependencies = {
+        test.nodeid: set(test._execution_dependencies) for test in tests.values()
+    }
+    for test in tests.values():
+        test.execution_current = True
+        test._execution_snapshots = [traceability.behavior_path_fingerprints(tmp_path)]
+    traceability.apply_test_dependency_fingerprints(tests, dependencies, tmp_path)
+    assert case.execution_current and unrelated.execution_current
+
+    path = tmp_path / dependency
+    if path.suffix == ".mjs":
+        path.write_text("export const value = 2;\n")
+    elif path.name == ".nvmrc":
+        path.write_text("26.9.0\n")
+    else:
+        path.write_text('{"lockfileVersion": 4}\n')
+    traceability.apply_test_dependency_fingerprints(tests, dependencies, tmp_path)
+
+    assert not case.execution_current
+    assert unrelated.execution_current
+    assert traceability.changed_tests_for_paths(tests, [dependency], {}) == [case]
+
+
+def test_deleted_node_program_remains_a_dependency_and_reports_an_error(
+    tmp_path, python_node_program
+):
+    program = "testing/utility/js/interop.mjs"
+    (tmp_path / program).unlink()
+    tests = traceability.discover_tests(tmp_path, ["testing/tests_js/test_bridge.py"])
+    case = tests["tests_js/test_bridge.py::test_bridge"]
+
+    assert traceability.changed_tests_for_paths(tests, [program], {}) == [case]
+    issues = traceability.traceability_metadata_issues([], tests.values())
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "error"
+    assert issues[0]["message"] == f"@node-program file does not exist: {program}"
+
+
+@pytest.mark.parametrize(
+    "program",
+    ["", "/absolute/program.mjs", "../program.mjs", "testing/utility/program.js"],
+)
+def test_node_program_rejects_invalid_declarations(tmp_path, native_inventory, program):
+    bridge = tmp_path / "testing/tests_js/test_bridge.py"
+    bridge.write_text(f"# @node-program {program}\ndef test_bridge(): pass\n")
+    tests = traceability.discover_tests(tmp_path, ["testing/tests_js/test_bridge.py"])
+    case = next(iter(tests.values()))
+
+    assert not case._execution_dependencies
+    issues = traceability.traceability_metadata_issues([], tests.values())
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "error"
+    assert "@node-program" in issues[0]["message"]
+
+
 def test_native_evidence_prunes_removed_case(tmp_path, native_inventory):
     _, rows = native_inventory
     nodeid = "tests_js/test_example.mjs::test_example"

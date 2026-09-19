@@ -30,7 +30,7 @@ export class UserSettings extends FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @tests tests_js/test_044_agent_api_settings.mjs::test_agent_api_key_controls_keep_secret_ephemeral
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
 	 * @matrix agent-api : copy-control expiry revoke rotate shown-once status
 	 */
@@ -101,7 +101,7 @@ export class UserSettings extends FormWidget {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
-	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_confirmation_uses_app_modal
+	 * @tests tests_js/test_044_agent_api_settings.mjs::test_agent_api_key_confirmation_uses_app_modal
 	 * @matrix agent-api user-settings : confirmation-modal revoke rotate
 	 */
 	async _confirmApiKeyAction(section, trigger, options) {
@@ -488,7 +488,7 @@ export class UserSettings extends FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_044_agent_api_settings.py::test_agent_api_key_controls_keep_secret_ephemeral
+	 * @tests tests_js/test_044_agent_api_settings.mjs::test_agent_api_key_controls_keep_secret_ephemeral
 	 * @matrix agent-api user-settings : poll-reconcile status
 	 */
 	postreconcile() {

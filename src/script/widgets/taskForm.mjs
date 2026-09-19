@@ -421,7 +421,7 @@ export class TaskForm extends FormWidget {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_history_fill_converts_selected_fields_and_reports_invalid_values
 	 * @matrix tasks : history-fill latest-submission incompatible-value stale-response
 	 */

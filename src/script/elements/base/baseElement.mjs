@@ -6,7 +6,7 @@ const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 
 /**
  * @testable infrastructure
- * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+ * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
  * @covered-by src/script/forms/renderer.mjs::FormRenderer.render
  * @covered-by src/script/widgets/base/formWidget.mjs::FormWidget._click
  */
@@ -151,7 +151,7 @@ export class BaseElement {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_history_fill_waits_without_overwriting_new_input
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_history_fill_waits_without_overwriting_new_input
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
 	 * @matrix tasks : history-fill stale-response element-matrix
 	 */
@@ -217,7 +217,7 @@ export class BaseElement {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
 	 * @pair forms:direct-fields
 	 */
 	create() {

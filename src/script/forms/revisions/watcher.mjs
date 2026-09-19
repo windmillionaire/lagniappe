@@ -6,8 +6,8 @@ import { EditReconciler } from "./reconciler.mjs";
  * lp-edited-marker descendants.
  *
  * @testable true
- * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_compares_and_resets_each_form_independently
- * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
+ * @tests tests_js/test_024_edit_watcher.mjs::test_edit_watcher_compares_and_resets_each_form_independently
+ * @tests tests_js/test_028_form_state_split.mjs::test_owned_deferred_completion_replaces_clean_active_form
  * @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
  * @matrix edited-entity-notice : acknowledgement acknowledgement-no-probe active-state batching entity-ancestor owned-deferred-completion per-form subscription-lifecycle visibility
@@ -134,7 +134,7 @@ export class EditWatcher {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
+	 * @tests tests_js/test_028_form_state_split.mjs::test_owned_deferred_completion_replaces_clean_active_form
 	 * @matrix deferred-jobs edited-entity-notice : owned-deferred-completion
 	 */
 	_ownedDeferredCompletion(marker, widget) {
@@ -223,7 +223,7 @@ export class EditWatcher {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_restores_active_autofill_without_form_sync
+	 * @tests tests_js/test_028_form_state_split.mjs::test_edit_watcher_restores_active_autofill_without_form_sync
 	 * @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 	 * @matrix deferred-jobs edited-entity-notice : active-operation form-lock reload
 	 */

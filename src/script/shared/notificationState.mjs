@@ -9,7 +9,7 @@ let invalidStateReported = false;
  * one DOM commit.
  *
  * @testable true
- * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @tests tests_js/test_036_notification_state.mjs::test_notification_state_updates_badge_and_reports_cache_miss
  * @matrix notifications : accessible-state badge
  */
 export const renderNotificationBadge = (count) => {
@@ -68,7 +68,7 @@ const _normalized = (raw) => {
  * Publish compact notification state before the lazy menu module is loaded.
  *
  * @testable true
- * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @tests tests_js/test_036_notification_state.mjs::test_notification_state_updates_badge_and_reports_cache_miss
  * @matrix notifications : badge cold-seed redis-projection
  */
 export const applyNotificationState = (raw) => {
@@ -100,7 +100,7 @@ export const applyNotificationState = (raw) => {
 
 /**
  * @testable true
- * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @tests tests_js/test_036_notification_state.mjs::test_notification_state_updates_badge_and_reports_cache_miss
  * @pair notifications:response-header
  */
 export const applyNotificationStateHeader = (headers) => {

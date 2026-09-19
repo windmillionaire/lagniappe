@@ -162,7 +162,7 @@ const remoteTransactionFlashes = (transaction, userColor, author) => {
 
 /**
  * @testable true
- * @tests tests_js/test_041_editor_decorations.py::test_remote_change_flash_decorations_map_and_expire
+ * @tests tests_js/test_041_editor_decorations.mjs::test_remote_change_flash_decorations_map_and_expire
  * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
  * @pairs editor:remote-highlight sync:document
  */

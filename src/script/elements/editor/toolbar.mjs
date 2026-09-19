@@ -320,7 +320,7 @@ export class Toolbar {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.py::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_editor_teardown_releases_toolbar_before_editor_view
 	 * @matrix editor html-field : listener-teardown builder-save
 	 */
 	destroy() {

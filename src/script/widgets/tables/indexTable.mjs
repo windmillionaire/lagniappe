@@ -54,7 +54,7 @@ export class IndexTable extends BaseTable {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
 	 * @pairs indexes:fingerprint-gate reconnect-refresh:manifest
 	 */
 	refreshDescriptor() {
@@ -138,7 +138,7 @@ export class IndexTable extends BaseTable {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
 	 * @matrix form-index : delete-target destination-refresh sorting
 	 */
 	refresh(response) {
@@ -177,7 +177,7 @@ export class IndexTable extends BaseTable {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
 	 * @matrix form-index : created-row sorting
 	 */
 	async prereconcile() {

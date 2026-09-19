@@ -5,16 +5,16 @@ import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_024_edit_watcher.py::test_form_revision_snapshot_is_canonical_and_memory_only
+ * @tests tests_js/test_024_edit_watcher.mjs::test_form_revision_snapshot_is_canonical_and_memory_only
  * @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state
- * @tests tests_js/test_048_form_controls.py::test_form_shell_waits_for_html_and_visibility_does_not_rebuild
- * @tests tests_js/test_048_form_controls.py::test_form_replacements_serialize_and_adopt_only_latest_controls
- * @tests tests_js/test_048_form_controls.py::test_form_discard_and_failure_leave_live_controls_intact
- * @tests tests_js/test_048_form_controls.py::test_explicit_revision_reset_can_replace_dirty_form
+ * @tests tests_js/test_048_form_controls.mjs::test_form_shell_waits_for_html_and_visibility_does_not_rebuild
+ * @tests tests_js/test_048_form_controls.mjs::test_form_replacements_serialize_and_adopt_only_latest_controls
+ * @tests tests_js/test_048_form_controls.mjs::test_form_discard_and_failure_leave_live_controls_intact
+ * @tests tests_js/test_048_form_controls.mjs::test_explicit_revision_reset_can_replace_dirty_form
  * @matrix forms user-groups : initialization conditional-response single-reconciliation rebuild-serialization
  * @matrix forms : teardown reset unsaved-preservation
  * @matrix user-groups : background-update unsaved-preservation reset
- * @tests tests_js/test_048_form_controls.py::test_queued_commit_waits_for_newer_replacement
+ * @tests tests_js/test_048_form_controls.mjs::test_queued_commit_waits_for_newer_replacement
  */
 export class FormWidget {
 	constructor(attributes) {
@@ -166,7 +166,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_local_revision_uses_latest_schema_and_merges_submission_values
+	 * @tests tests_js/test_028_form_state_split.mjs::test_local_revision_uses_latest_schema_and_merges_submission_values
 	 * @matrix edited-entity-notice form-schema forms : latest-schema local-values no-schema-version-choice remote-added-values
 	 */
 	buildLocalRevision(response, state = this.captureFormState()) {
@@ -268,7 +268,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_form_submit_is_guarded_only_by_durable_autofill_lock
+	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_guarded_only_by_durable_autofill_lock
 	 * @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
 	 */
 	async prepareSubmit(options) {
@@ -289,7 +289,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_offline_queue_does_not_block_initial_form_render
+	 * @tests tests_js/test_029_core_startup.mjs::test_offline_queue_does_not_block_initial_form_render
 	 * @pair forms:queue-independent-initial-render
 	 */
 	async init() {
@@ -399,7 +399,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_active_deferred_form_waits_for_root_operation_scan
+	 * @tests tests_js/test_028_form_state_split.mjs::test_active_deferred_form_waits_for_root_operation_scan
 	 * @matrix deferred-jobs : form-lock reload
 	 */
 	async _initForm({ replace = true } = {}) {
@@ -444,7 +444,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
 	 * @matrix forms : clear direct-fields
 	 */
 	_click(e) {
@@ -485,7 +485,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_migration_notice_survives_form_replacement_and_discard
+	 * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
 	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
 	 * @matrix form-migration : informational-notice
 	 */
@@ -637,7 +637,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_form_response_metadata_stays_with_renderer_widget
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_form_response_metadata_stays_with_renderer_widget
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_adding_form_from_task_settings_preserves_widget_identity
 	 * @matrix forms : schema-ownership sibling-widgets
 	 * @matrix tasks : attach-form merged-submission widget-identity

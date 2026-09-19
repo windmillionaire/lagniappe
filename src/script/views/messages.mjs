@@ -8,7 +8,7 @@ const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
 /**
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_messages_view_refreshes_read_races_and_uses_delete_modal
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_messages_view_refreshes_read_races_and_uses_delete_modal
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear

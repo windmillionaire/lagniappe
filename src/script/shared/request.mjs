@@ -21,7 +21,7 @@ let _tokenRefresh = null;
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_non_csrf_bad_request_is_not_retried
+ * @tests tests_js/test_009_request_csrf.mjs::test_non_csrf_bad_request_is_not_retried
  * @matrix csrf request-errors : retry-classification
  */
 const csrfFailed = (response) =>
@@ -37,10 +37,10 @@ const _getToken = () => document.getElementById("token")?.value;
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_request_exposes_service_worker_updated_marker
- * @tests tests_js/test_009_request_csrf.py::test_request_exposes_client_cache_invalidation_marker
- * @tests tests_js/test_009_request_csrf.py::test_request_dispatches_entity_fingerprint_acknowledgement
- * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_exposes_service_worker_updated_marker
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_exposes_client_cache_invalidation_marker
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_dispatches_entity_fingerprint_acknowledgement
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_supports_conditional_post_not_modified
  * @matrix cache : conditional-response dom-refresh etag invalidation reload
  * @matrix deferred-jobs : conditional-response etag
  * @matrix edited-entity-notice : acknowledgement multiple-entities response-headers
@@ -139,9 +139,9 @@ const _friendlyError = (message, { body = null } = {}) => {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_plain_text_upstream_error_stays_in_request_error_path
- * @tests tests_js/test_009_request_csrf.py::test_request_can_return_html_error_without_replacing_page
- * @tests tests_js/test_009_request_csrf.py::test_application_marked_html_error_keeps_existing_behavior
+ * @tests tests_js/test_009_request_csrf.mjs::test_plain_text_upstream_error_stays_in_request_error_path
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_can_return_html_error_without_replacing_page
+ * @tests tests_js/test_009_request_csrf.mjs::test_application_marked_html_error_keeps_existing_behavior
  * @matrix edited-entity-notice : non-invasive-probe reload-fallback
  * @matrix request-errors : ajax-upload non-invasive-probe proxy-text-error reload-fallback
  * @matrix request-errors : application-error-marker dom-replacement
@@ -235,7 +235,7 @@ const _refreshToken = async () => {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_concurrent_stale_writes_share_server_controlled_token_refresh
+ * @tests tests_js/test_009_request_csrf.mjs::test_concurrent_stale_writes_share_server_controlled_token_refresh
  * @matrix csrf : concurrent-refresh stale-token
  */
 const refreshToken = async () => {
@@ -305,9 +305,9 @@ const putRequest = async (url, body, options = {}) => {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
- * @tests tests_js/test_009_request_csrf.py::test_request_preserves_structured_validation_error
- * @tests tests_js/test_009_request_csrf.py::test_request_preserves_plain_validation_error
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_supports_conditional_post_not_modified
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_preserves_structured_validation_error
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_preserves_plain_validation_error
  * @matrix deferred-jobs request : post-headers
  * @matrix csrf : stale-token
  * @matrix polling : diagnostics structured-validation

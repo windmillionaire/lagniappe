@@ -47,7 +47,7 @@ const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
 
 /**
  * @testable true
- * @tests tests_js/test_014_direct_upload_retry.py::test_directory_drop_is_rejected_before_file_processing
+ * @tests tests_js/test_014_direct_upload_retry.mjs::test_directory_drop_is_rejected_before_file_processing
  * @matrix upload : directory-rejection drag-drop
  */
 async function containsDroppedDirectory(dataTransfer) {
@@ -360,8 +360,8 @@ export class BaseUpload {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_014_direct_upload_retry.py::test_single_file_keeps_compatibility_multipart_fallback
-	 * @tests tests_js/test_014_direct_upload_retry.py::test_large_multi_file_retry_preserves_completed_direct_uploads
+	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_single_file_keeps_compatibility_multipart_fallback
+	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_large_multi_file_retry_preserves_completed_direct_uploads
 	 * @matrix direct-upload : aggregate-limit compatibility multipart-fallback partial-resume single-file
 	 */
 	async prepareSubmit({ route = null } = {}) {

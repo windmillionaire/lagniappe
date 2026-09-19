@@ -1,6 +1,6 @@
 /**
  * @testable true
- * @tests tests_js/test_031_form_element_loader.py::test_unknown_form_element_reports_schema_type
+ * @tests tests_js/test_031_form_element_loader.mjs::test_unknown_form_element_reports_schema_type
  * @pair forms:invalid-schema
  */
 export async function getFormElement(renderer, schema, submission) {

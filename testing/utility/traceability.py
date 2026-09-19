@@ -136,6 +136,7 @@ class Metadata:
     dimensions: list[str] = field(default_factory=list)
     pairs: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
+    node_programs: list[str] = field(default_factory=list)
     todos: list[str] = field(default_factory=list)
     reason: str | None = None
     covered_by: list[str] = field(default_factory=list)
@@ -156,6 +157,7 @@ class Metadata:
             or self.dimensions
             or self.pairs
             or self.sources
+            or self.node_programs
             or self.todos
             or self.reason
             or self.covered_by
@@ -517,6 +519,7 @@ def parse_metadata(text: str) -> Metadata:
         "pairs",
         "source",
         "sources",
+        "node-program",
         "todo",
         "todos",
         "reason",
@@ -604,6 +607,8 @@ def parse_metadata(text: str) -> Metadata:
                 add_unique(metadata.dimensions, [dimension])
         elif tag in {"source", "sources"}:
             add_unique(metadata.sources, split_values(value, preserve_brackets=True))
+        elif tag == "node-program":
+            add_unique(metadata.node_programs, split_values(value))
         elif tag in {"todo", "todos"}:
             if value:
                 add_unique(metadata.todos, [value])
@@ -631,6 +636,7 @@ def parse_metadata(text: str) -> Metadata:
             "pairs",
             "source",
             "sources",
+            "node-program",
             "template",
             "templates",
             "style",
@@ -1222,19 +1228,47 @@ def test_files_in_roots(repo_root: Path, roots: Iterable[object]) -> list[Path]:
     return sorted(files)
 
 
+def declared_node_program_dependencies(metadata: Metadata, repo_root: Path) -> set[str]:
+    """Track file-backed Node programs without claiming application coverage."""
+    repo_root = repo_root.resolve()
+    dependencies: set[str] = set()
+    for value in metadata.node_programs:
+        relative = Path(value)
+        path = repo_root / relative
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.suffix != ".mjs"
+            or not path.resolve().is_relative_to(repo_root)
+        ):
+            metadata.issues.append(
+                f"@node-program must name a repository-relative .mjs file: {value}"
+            )
+            continue
+        dependencies.add(relative.as_posix())
+        if not path.is_file():
+            metadata.issues.append(f"@node-program file does not exist: {value}")
+            continue
+        dependencies.update(native_js.execution_dependencies(path, repo_root))
+    return dependencies
+
+
 def discover_tests(repo_root: Path, roots: Iterable[object] = ()) -> dict[str, TestCase]:
     """Discover test functions statically without importing application modules."""
     tests: dict[str, TestCase] = {}
     paths = test_files_in_roots(repo_root, roots)
     native_js.inventories(path for path in paths if path.suffix == ".mjs")
     for path in paths:
-        dependencies = sorted(native_js.execution_dependencies(path, repo_root)) if path.suffix == ".mjs" else []
+        dependencies = native_js.execution_dependencies(path, repo_root) if path.suffix == ".mjs" else set()
         test_path = _canonical_test_path(repo_root, path)
         for qualname, info in collect_file_test_symbol_info(path).items():
             nodeid = f"{test_path}::{qualname}"
             tests[nodeid] = TestCase(
                 nodeid=nodeid,
-                _execution_dependencies=dependencies,
+                _execution_dependencies=sorted(
+                    dependencies
+                    | declared_node_program_dependencies(info.metadata, repo_root)
+                ),
                 runnable=not info.unfinished,
                 unfinished=info.unfinished,
                 metadata=info.metadata,

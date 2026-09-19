@@ -21,7 +21,7 @@ export class PublicPermissions extends FormWidget {
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
- * @tests tests_js/test_044_user_widget_frontend.py::test_group_permissions_tracks_rename_draft_after_target_rebuild
+ * @tests tests_js/test_044_user_widget_frontend.mjs::test_group_permissions_tracks_rename_draft_after_target_rebuild
  * @matrix user-groups : entity-permissions general-permissions permission-update rename reset-rebinding
  */
 export class GroupPermissions extends FormWidget {

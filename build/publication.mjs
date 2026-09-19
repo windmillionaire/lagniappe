@@ -128,7 +128,7 @@ const filesUnder = (root, relativeRoot) => {
  * Hash the complete portable source surface used by frontend publication.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_records_recursive_artifacts_and_source_identity
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_records_recursive_artifacts_and_source_identity
  * @pair frontend-build:source-integrity
  */
 const frontendSourceIdentity = (root = process.cwd()) => {
@@ -173,7 +173,7 @@ const outputArtifactPath = (outputOptions, fileName) => {
  * Collect every emitted Rollup output across the sequential bundle cohort.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_records_recursive_artifacts_and_source_identity
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_records_recursive_artifacts_and_source_identity
  * @matrix frontend-build : artifact-inventory nested-chunks
  */
 const recordBuildArtifacts = ({
@@ -234,8 +234,8 @@ const artifactRecord = (root, pathValue) => {
  * Commit build metadata only after Rollup and every external build hook pass.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_records_recursive_artifacts_and_source_identity
- * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_rejects_missing_outputs_and_source_drift
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_records_recursive_artifacts_and_source_identity
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_rejects_missing_outputs_and_source_drift
  * @matrix frontend-build : artifact-integrity completion-marker safe-failure source-integrity
  */
 const publishFrontendBuild = ({

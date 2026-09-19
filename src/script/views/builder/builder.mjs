@@ -24,7 +24,7 @@ import { ModelElement, ModelPanel } from "./panels/model.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.py::test_builder_destroys_owned_search_modal_and_panels_during_startup
+ * @tests tests_js/test_046_async_query_lifecycle.mjs::test_builder_destroys_owned_search_modal_and_panels_during_startup
  * @matrix forms : builder-lifecycle late-publication listener-teardown
  */
 class FormBuilder {
@@ -130,9 +130,9 @@ class FormBuilder {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
-	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
-	 * @tests tests_js/test_036c_form_migrations.py::test_builder_resumes_migration_polling_and_clears_completed_status
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_builder_owns_independent_editor_lifecycle_flushes
+	 * @tests tests_js/test_036c_form_migrations.mjs::test_builder_resumes_migration_polling_and_clears_completed_status
 	 * @matrix editor html-field : teardown
 	 * @matrix forms offline : builder-lifecycle
 	 * @matrix form-migration : progress recovery
@@ -407,7 +407,7 @@ class FormBuilder {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.py::test_builder_save_restores_unsubmitted_condition_buffer
+	 * @tests tests_js/test_036b_builder_draft.mjs::test_builder_save_restores_unsubmitted_condition_buffer
 	 * @matrix forms : draft-history stale-acknowledgement focus-recovery
 	 */
 	restoreDraft({ preserveFocus = false } = {}) {
@@ -762,7 +762,7 @@ class FormBuilder {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_table_creation_defaults_columns_for_unsaved_preview
 	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
 	 */
 	createElement(schema) {

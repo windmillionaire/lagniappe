@@ -129,7 +129,7 @@ export class FormRenderer {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.py::test_renderer_visibility_requires_canonical_condition_lists
+	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_renderer_visibility_requires_canonical_condition_lists
 	 * @matrix form-schema forms : canonical-list legacy-object-rejected visibility
 	 */
 	async _initVisibilityTriggers() {

@@ -51,8 +51,8 @@ async function checkUserStatus(email, form) {
  * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
  * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
  * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
- * @tests tests_js/test_009_request_csrf.py::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
- * @tests tests_js/test_009_request_csrf.py::test_login_verification_email_reuses_refreshed_csrf
+ * @tests tests_js/test_009_request_csrf.mjs::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
+ * @tests tests_js/test_009_request_csrf.mjs::test_login_verification_email_reuses_refreshed_csrf
  * @matrix login : csrf-refresh delivery-failure email-password hosted-e2e identity-platform owner-bootstrap recovery redirect remember-preference safe-error token-verification verify-email
  */
 async function handleIdentityUser(user, form) {

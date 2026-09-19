@@ -6,7 +6,7 @@ const REPORT_FILTERS = ["active", "executed", "answers"];
 
 /**
  * @testable true
- * @tests tests_js/test_047_home_report_filters.py::test_report_categories_and_saved_filter_selection
+ * @tests tests_js/test_047_home_report_filters.mjs::test_report_categories_and_saved_filter_selection
  * @matrix ai-report : filter-categories
  */
 function reportCategory(report) {
@@ -189,7 +189,7 @@ export class ToolReportList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-	 * @tests tests_js/test_047_home_report_filters.py::test_report_filters_count_hidden_categories_and_empty_selections
+	 * @tests tests_js/test_047_home_report_filters.mjs::test_report_filters_count_hidden_categories_and_empty_selections
 	 * @matrix ai-report : filter-create filter-persistence
 	 */
 	created(response) {
@@ -219,7 +219,7 @@ export class ToolReportList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_report_filters_persist_and_follow_live_status
-	 * @tests tests_js/test_047_home_report_filters.py::test_report_filters_count_hidden_categories_and_empty_selections
+	 * @tests tests_js/test_047_home_report_filters.mjs::test_report_filters_count_hidden_categories_and_empty_selections
 	 * @matrix ai-report : filter-categories filter-counts filter-empty
 	 */
 	_renderFilters() {
@@ -354,7 +354,7 @@ export class ToolReportList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
-	 * @tests tests_js/test_047_home_report_filters.py::test_bulk_delete_recovers_from_partial_and_network_failures
+	 * @tests tests_js/test_047_home_report_filters.mjs::test_bulk_delete_recovers_from_partial_and_network_failures
 	 * @matrix ai-report : bulk-delete delete-failure delete-snapshot loading-indicator
 	 */
 	async _deleteExecuted(keys, route, modal) {

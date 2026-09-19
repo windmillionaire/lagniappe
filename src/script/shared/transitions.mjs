@@ -186,10 +186,10 @@ const executeTransition = async (entries) => {
 
 /**
  * @testable true
- * @tests tests_js/test_011_view_transitions_frontend.py::test_nested_transition_joins_active_transition_without_error_report
- * @tests tests_js/test_011_view_transitions_frontend.py::test_transition_resolves_after_update_without_waiting_for_animation
- * @tests tests_js/test_011_view_transitions_frontend.py::test_same_turn_commits_share_one_transition_and_run_once
- * @tests tests_js/test_011_view_transitions_frontend.py::test_ready_rejection_does_not_replay_commit
+ * @tests tests_js/test_011_view_transitions_frontend.mjs::test_nested_transition_joins_active_transition_without_error_report
+ * @tests tests_js/test_011_view_transitions_frontend.mjs::test_transition_resolves_after_update_without_waiting_for_animation
+ * @tests tests_js/test_011_view_transitions_frontend.mjs::test_same_turn_commits_share_one_transition_and_run_once
+ * @tests tests_js/test_011_view_transitions_frontend.mjs::test_ready_rejection_does_not_replay_commit
  * @matrix view-transition : animation-lifecycle coalescing error-reporting exact-once nested-callback queueing ready-rejection update-completion
  */
 export const withTransition = (callback, { label = "unlabeled" } = {}) => {

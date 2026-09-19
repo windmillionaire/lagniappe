@@ -6,8 +6,8 @@ import { request } from "../../shared/request.mjs";
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_builder_observes_migration_completion_without_leaving
- * @tests tests_js/test_036c_form_migrations.py::test_migration_status_uses_notification_and_keeps_save_disabled
- * @tests tests_js/test_036c_form_migrations.py::test_builder_resumes_migration_polling_and_clears_completed_status
+ * @tests tests_js/test_036c_form_migrations.mjs::test_migration_status_uses_notification_and_keeps_save_disabled
+ * @tests tests_js/test_036c_form_migrations.mjs::test_builder_resumes_migration_polling_and_clears_completed_status
  * @matrix form-migration : saved-job progress reload recovery
  */
 export class FormChangeStatus {

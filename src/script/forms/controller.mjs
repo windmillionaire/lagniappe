@@ -7,7 +7,7 @@ import { FormRenderer } from "./renderer.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_048_form_controls.py::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
+ * @tests tests_js/test_048_form_controls.mjs::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
  * @matrix forms : initialization teardown readonly
  */
 export class FormController {
@@ -208,7 +208,7 @@ export class FormController {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_024_edit_watcher.py::test_base_form_tracks_unsaved_state_without_sync
+	 * @tests tests_js/test_024_edit_watcher.mjs::test_base_form_tracks_unsaved_state_without_sync
 	 * @matrix forms unsaved-state : change input non-sync reset
 	 */
 	_initUnsavedState() {
@@ -259,7 +259,7 @@ export class FormController {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_024_edit_watcher.py::test_base_form_tracks_unsaved_state_without_sync
+	 * @tests tests_js/test_024_edit_watcher.mjs::test_base_form_tracks_unsaved_state_without_sync
 	 * @matrix forms unsaved-state : success
 	 */
 	success() {

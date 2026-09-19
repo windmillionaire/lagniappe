@@ -3,7 +3,7 @@
  * depend on storage availability.
  *
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_safe_storage_adapters_handle_browser_failures_and_json
+ * @tests tests_js/test_020_shared_utilities.mjs::test_safe_storage_adapters_handle_browser_failures_and_json
  * @matrix browser-storage : availability json
  */
 class StorageAdapter {
@@ -78,7 +78,7 @@ export const sessionStore = new StorageAdapter("sessionStorage");
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_safe_storage_adapters_handle_browser_failures_and_json
+ * @tests tests_js/test_020_shared_utilities.mjs::test_safe_storage_adapters_handle_browser_failures_and_json
  * @matrix browser-storage : recent-search-cleanup
  */
 export const clearRecentSearchResults = () => {

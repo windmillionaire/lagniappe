@@ -14,7 +14,7 @@ export class HtmlElement extends BaseElement {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_037_html_element_frontend.py::test_html_element_reports_request_failure_without_masking_original
+	 * @tests tests_js/test_037_html_element_frontend.mjs::test_html_element_reports_request_failure_without_masking_original
 	 * @pair form-html:error-reporting
 	 */
 	async _getHtml() {

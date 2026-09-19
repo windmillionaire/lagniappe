@@ -7,8 +7,8 @@ import { RemoteQueryCombobox } from "./remote.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_starts_location_sync_on_init
- * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_waits_for_session_sync_before_search
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_location_combobox_starts_location_sync_on_init
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_location_combobox_waits_for_session_sync_before_search
  * @matrix location : initialization on-demand request-ordering session-update
  */
 export class LocationBox extends RemoteQueryCombobox {

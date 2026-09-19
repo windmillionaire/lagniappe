@@ -82,7 +82,7 @@ function _sameOrigin(url) {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_upstream_diagnostics_are_bounded_private_and_deduplicated
+ * @tests tests_js/test_009_request_csrf.mjs::test_upstream_diagnostics_are_bounded_private_and_deduplicated
  * @matrix error-tracking request-errors : privacy route-class upstream-unavailable
  */
 export function upstreamRouteClass(url) {
@@ -100,8 +100,8 @@ export function upstreamRouteClass(url) {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
- * @tests tests_js/test_009_request_csrf.py::test_application_marked_html_error_keeps_existing_behavior
+ * @tests tests_js/test_009_request_csrf.mjs::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
+ * @tests tests_js/test_009_request_csrf.mjs::test_application_marked_html_error_keeps_existing_behavior
  * @matrix request-errors : application-error-marker classification upstream-unavailable
  */
 export function isUpstreamUnavailableResponse(response, url) {
@@ -119,9 +119,9 @@ export function isUpstreamUnavailableResponse(response, url) {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
- * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
- * @tests tests_js/test_009_request_csrf.py::test_mutation_upstream_failure_is_uncertain_and_never_replayed
+ * @tests tests_js/test_009_request_csrf.mjs::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
+ * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @tests tests_js/test_009_request_csrf.mjs::test_mutation_upstream_failure_is_uncertain_and_never_replayed
  * @matrix request-errors : classification dom-preservation explicit-retry mutation no-replay outcome-uncertain upstream-unavailable
  */
 export async function handleUpstreamResponse(
@@ -221,7 +221,7 @@ function _releaseMetadata() {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_upstream_diagnostics_are_bounded_private_and_deduplicated
+ * @tests tests_js/test_009_request_csrf.mjs::test_upstream_diagnostics_are_bounded_private_and_deduplicated
  * @matrix error-tracking request-errors : privacy response-metadata upstream-unavailable
  */
 export function upstreamUnavailableDetails(
@@ -263,7 +263,7 @@ export function upstreamUnavailableDetails(
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_upstream_diagnostics_are_bounded_private_and_deduplicated
+ * @tests tests_js/test_009_request_csrf.mjs::test_upstream_diagnostics_are_bounded_private_and_deduplicated
  * @matrix error-tracking request-errors : cooldown fingerprint privacy upstream-unavailable warning
  */
 export function reportUpstreamUnavailable(details) {
@@ -349,7 +349,7 @@ function _renderBanner(details) {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
  * @matrix request-errors : banner dom-preservation retry upstream-unavailable
  */
 export function showUpstreamUnavailable(details, retry = null) {
@@ -361,7 +361,7 @@ export function showUpstreamUnavailable(details, retry = null) {
  * Clear only at a fresh application-response boundary.
  *
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
  * @matrix request-errors : banner fresh-response upstream-unavailable
  */
 export function noteFreshApplicationResponse() {
@@ -376,7 +376,7 @@ export function noteFreshApplicationResponse() {
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_upstream_unavailable_worker_message_shows_retryable_banner
  * @matrix browser-protocol request-errors service-worker : banner client-message upstream-unavailable
  */
 export function receiveUpstreamUnavailable(details, retry = null) {
@@ -394,7 +394,7 @@ export function receiveUpstreamUnavailable(details, retry = null) {
 
 /**
  * @testable true
- * @tests tests_js/test_017_main_lifecycle.py::test_upstream_unavailable_worker_message_shows_retryable_banner
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_upstream_unavailable_worker_message_shows_retryable_banner
  * @matrix browser-protocol request-errors service-worker : banner client-message retry upstream-unavailable validation
  */
 export function receiveUpstreamUnavailableMessage(message) {
@@ -410,8 +410,8 @@ export function receiveUpstreamUnavailableMessage(message) {
 
 /**
  * @testable true
- * @tests tests_js/test_009_request_csrf.py::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
- * @tests tests_js/test_009_request_csrf.py::test_mutation_upstream_failure_is_uncertain_and_never_replayed
+ * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
+ * @tests tests_js/test_009_request_csrf.mjs::test_mutation_upstream_failure_is_uncertain_and_never_replayed
  * @matrix request-errors : banner explicit-retry no-replay upstream-unavailable
  */
 export function installUpstreamUnavailableBanner() {

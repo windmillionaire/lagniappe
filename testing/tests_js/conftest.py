@@ -2,14 +2,12 @@
 
 from pathlib import Path
 import shutil
-import subprocess
 
 import pytest
 
 from testing.utility.native_js_pytest import collect_file, prepare_registries
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 SUITE_ROOT = Path(__file__).resolve().parent
 
 
@@ -35,26 +33,3 @@ def node_binary():
     if node is None:
         pytest.skip("node is required for JavaScript behavior tests")
     return node
-
-
-@pytest.fixture
-def run_node(node_binary):
-    """Run an inline Node program from the repository root."""
-
-    def run(script: str, *, module: bool = False, timeout: int = 30):
-        command = [node_binary]
-        if module:
-            command.append("--input-type=module")
-        command.extend(["-e", script])
-        result = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        assert result.returncode == 0, result.stderr + result.stdout
-        return result
-
-    return run

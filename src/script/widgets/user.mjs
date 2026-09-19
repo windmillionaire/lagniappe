@@ -9,7 +9,7 @@ import { FormWidget } from "./base/formWidget.mjs";
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
- * @tests tests_js/test_044_user_widget_frontend.py::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
+ * @tests tests_js/test_044_user_widget_frontend.mjs::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
  * @matrix users : create-form create-form-reset focus-preservation group-selector multiple submitted-form-data visibility-isolation
  * @pair users:page-form-preserved
  */

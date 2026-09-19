@@ -99,7 +99,7 @@ export default class Core extends ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
 	 * @matrix startup : deferred-services interaction-ready
 	 */
 	async init() {
@@ -160,7 +160,7 @@ export default class Core extends ShellView {
 	 * Subscribe the root view to its durable entity or collection revision.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @tests tests_js/test_029_core_startup.mjs::test_core_polling_subscription_lifecycle
 	 * @covered-by src/script/views/base/services.mjs::ensurePollingCoordinator
 	 * @matrix polling : channel entity refresh
 	 */
@@ -254,7 +254,7 @@ export default class Core extends ShellView {
 	 * handled by the next iteration.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
 	 * @matrix reconnect-refresh : committed-delete destination-invalidation mounted-collection
 	 * @pair polling:reentrancy
 	 */
@@ -348,8 +348,8 @@ export default class Core extends ShellView {
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
-	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
-	 * @tests tests_js/test_029_core_startup.py::test_core_sync_distinguishes_visible_blur_from_hard_suspension
+	 * @tests tests_js/test_028_form_state_split.mjs::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+	 * @tests tests_js/test_029_core_startup.mjs::test_core_sync_distinguishes_visible_blur_from_hard_suspension
 	 * @matrix offline : background-replay dirty-form-preservation
 	 * @matrix polling : blur catch-up nonblocking visibility
 	 * @pair sync:deregistration
@@ -419,7 +419,7 @@ export default class Core extends ShellView {
 	 * itself polls mounted updated forms as each replay succeeds.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+	 * @tests tests_js/test_028_form_state_split.mjs::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
 	 * @pairs offline:background-replay polling:nonblocking
 	 */
 	scheduleOfflineReplay() {
@@ -442,7 +442,7 @@ export default class Core extends ShellView {
 	 * active visible widget may own recurring form, document, or ingress work.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @tests tests_js/test_029_core_startup.mjs::test_core_polling_subscription_lifecycle
 	 * @matrix polling : active-widget subscription-lifecycle visibility
 	 */
 	async reconcilePollingSubscriptions() {
@@ -464,7 +464,7 @@ export default class Core extends ShellView {
 	 * request at most one follow-up pass if ownership changes while a pass runs.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @tests tests_js/test_029_core_startup.mjs::test_core_polling_subscription_lifecycle
 	 * @matrix polling : nonblocking subscription-lifecycle
 	 * @matrix startup : nonblocking single-flight
 	 */
@@ -511,7 +511,7 @@ export default class Core extends ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
 	 * @matrix reconnect-refresh : batching fallback manifest
 	 */
 	_collectRefreshTargets(components) {
@@ -520,7 +520,7 @@ export default class Core extends ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
 	 * @matrix reconnect-refresh : cache-invalidation delta-apply legacy-fallback
 	 */
 	async _refreshCollectionComponents(components, options = {}) {

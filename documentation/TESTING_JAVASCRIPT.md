@@ -222,6 +222,24 @@ cases participate in template-contract reporting; arbitrary helper-generated
 selectors are not inferred. Only tag a template when its real skeleton is part
 of the test contract, not merely because a hand-written HTML fixture resembles it.
 
+For a retained Python case that executes a separate Node program, declare that
+program immediately above the test:
+
+```python
+# @node-program testing/utility/js/document_append_interop.mjs
+def test_server_append_round_trips_through_yjs_and_editor_schema(node_binary):
+    ...
+```
+
+Use a repository-relative `.mjs` file path; repeat the tag for multiple programs.
+The program and its imported test helpers, shared Node test utilities, package
+manifests, Node pin, and registry inputs become execution dependencies of that
+Python case. A change makes its previous evidence stale and selects it for the
+changed-files check. Missing or invalid program paths are metadata errors.
+Keep application coverage in the existing `@source`/`@matrix` tags;
+`@node-program` declares execution inputs only. Merely storing a program path
+in a Python constant does not establish this dependency.
+
 ### Pilot assertion equivalence
 
 | Original replay case | Native proof |
@@ -241,7 +259,7 @@ participate in the round-trip case.
 
 ### Service workers
 
-Keep the specialized boundary from `test_008_service_worker.py`: execute the
+Keep the specialized boundary in `test_008_service_worker.mjs`: execute the
 rendered worker script in a context supplying self, caches, and worker events.
 Move test bodies and reusable sandbox code into `.mjs`, use the same named
 Node cases and pytest collector, and retain the existing production template
@@ -278,65 +296,11 @@ when its assertion checklist is preserved, native cases pass, references point
 to the new cases, evidence is current, and the old executable Python strings
 are removed. Do not add production behavior changes merely to reduce retesting.
 
-## Remaining migration inventory
+## Completed migration inventory
 
-The groups below are a starting order, not permission to batch unrelated files.
-Migrate one file at a time and re-check the source for its actual dependencies.
-The native pilot and native harness are complete; the Python runner tests remain
-Python because they exercise the cross-language integration itself.
-
-| Stage | Files | Main boundary |
-| --- | --- | --- |
-| 1 | `test_010b_document_append_interop.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_020_shared_utilities.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_021_browser_protocol.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_023_entity_name_formatting.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_026_location_urls.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_033_identity_platform.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_036c_form_migrations.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 1 | `test_048_markdown_paste.py` | Pure/native modules; narrowly mock package or protocol boundaries as needed |
-| 2 | `test_011_view_transitions_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_015_error_tracking_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_016_combobox_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_025_pdf_preview.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_027_table_element_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_031_form_element_loader.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_032_todo_element_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_033_editor_menu_items.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_034_login_buttons.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_036_form_builder_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_036b_builder_draft.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_037_html_element_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_039_file_processing_reconciliation.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_041_editor_decorations.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_042_messaging_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_043_ai_email_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_044_agent_api_settings.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_044_user_widget_frontend.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_047_home_report_filters.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_047_public_sharing.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 2 | `test_048_form_controls.py` | DOM and explicit dependency mocks; some editor/file APIs need dedicated fixtures |
-| 3 | `test_009_request_csrf.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_010_sync_manager_frontend.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_012_entity_layout_frontend.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_014_direct_upload_retry.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_015_core_submit_frontend.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_017_main_lifecycle.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_019_form_sync_frontend.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_022_refresh_frontend.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_023_deferred_operations.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_024_edit_watcher.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_029_core_startup.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_032_task_settings_lifecycle.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_034_polling_coordinator.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_035_ingress_polling.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_036_notification_state.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_038_startup_specializations.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_040_home_polling.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 3 | `test_046_async_query_lifecycle.py` | DOM, fetch/request boundary, deterministic time; storage where exercised |
-| 4 | `test_018_style_pipeline.py` | Real generator/Rollup contracts; move programs to files without removing build coverage |
-| 4 | `test_022_build_chunk_versioning.py` | Real generator/Rollup contracts; move programs to files without removing build coverage |
-| 4 | `test_032_build_configuration.py` | Real generator/Rollup contracts; move programs to files without removing build coverage |
-| 5 | `test_008_service_worker.py` | IndexedDB/private-helper adaptation; service worker retains its own sandbox |
-| 5 | `test_028_form_state_split.py` | IndexedDB/private-helper adaptation; service worker retains its own sandbox |
-| 5 | `test_045_browser_persistence.py` | IndexedDB/private-helper adaptation; service worker retains its own sandbox |
+All executable JavaScript behavior cases in `testing/tests_js/` are native
+`.mjs` modules. The remaining Python modules are intentional: the native-runner
+bridge test, the Yjs server/Node interop orchestrator with an explicit
+`@node-program`, and Python-only source/template contracts. The shared
+`node_binary` fixture remains for genuine cross-language orchestration; the
+obsolete inline `run_node` fixture has been removed.

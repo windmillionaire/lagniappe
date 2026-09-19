@@ -39,7 +39,7 @@ const MESSAGES = {
 
 /**
  * @testable true
- * @tests tests_js/test_036c_form_migrations.py::test_delete_element_commits_panel_and_model_changes_in_one_transition
+ * @tests tests_js/test_036c_form_migrations.mjs::test_delete_element_commits_panel_and_model_changes_in_one_transition
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_checkbox_replacement_explains_and_preserves_boolean_choices
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_replacement_choices_and_explanations_match_component_types

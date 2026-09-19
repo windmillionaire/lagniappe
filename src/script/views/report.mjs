@@ -39,7 +39,7 @@ export default class Report extends Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_038_startup_specializations.py::test_report_loads_base_form_only_for_present_forms_and_in_parallel
+	 * @tests tests_js/test_038_startup_specializations.mjs::test_report_loads_base_form_only_for_present_forms_and_in_parallel
 	 * @matrix ai-report : concurrent-form-init lazy-form-runtime
 	 */
 	ensureReportForms() {

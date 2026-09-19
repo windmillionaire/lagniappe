@@ -5,7 +5,7 @@ import { mergeAttributes, Node } from "@tiptap/core";
  * conversion decision.
  *
  * @testable true
- * @tests tests_js/test_048_markdown_paste.py::test_markdown_source_schema_is_distinct_from_code_blocks
+ * @tests tests_js/test_048_markdown_paste.mjs::test_markdown_source_schema_is_distinct_from_code_blocks
  * @tests tests_e2e/004_projects/test_004d_document.py::test_keeping_pasted_markdown_preserves_source_block
  * @matrix editor markdown : paste source-block
  */

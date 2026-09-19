@@ -51,7 +51,7 @@ const onMainWarning = (warning, warn) => {
  * Mode-specific transforms stay ordered in the calling configuration.
  *
  * @testable true
- * @tests tests_js/test_032_build_configuration.py::test_rollup_modes_preserve_bundle_and_publication_contracts
+ * @tests tests_js/test_032_build_configuration.mjs::test_rollup_modes_preserve_bundle_and_publication_contracts
  * @matrix frontend-build : artifact-inventory chunking view-registry warnings build-modes
  */
 export const createRollupConfig = ({

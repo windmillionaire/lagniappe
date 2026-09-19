@@ -39,7 +39,7 @@ export const ensureOfflineQueue = (view) =>
 
 /**
  * @testable true
- * @tests tests_js/test_022_refresh_frontend.py::test_page_task_subscription_survives_list_loading_before_polling_service
+ * @tests tests_js/test_022_refresh_frontend.mjs::test_page_task_subscription_survives_list_loading_before_polling_service
  * @matrix polling startup : subscription-lifecycle deferred-services
  */
 export const ensurePollingCoordinator = (view) =>

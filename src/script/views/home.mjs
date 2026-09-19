@@ -15,7 +15,7 @@ const HOME_CHANNELS = Object.freeze({
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
- * @tests tests_js/test_040_home_polling.py::test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner
+ * @tests tests_js/test_040_home_polling.mjs::test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner
  * @matrix home polling : foreground lazy-widget mounted-scope targeted-refresh
  * @pair home:mobile
  */
