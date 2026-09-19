@@ -27,7 +27,6 @@ from .get import datastore_key
 from .core import DATA, KINDS
 from .filter import Query
 from .migration_steps.base import (
-    MIGRATION_CHUNK_SIZE,
     MAX_RECORDED_ERRORS,
     MAX_RECORDED_REPAIRS,
     MigrationChange,
