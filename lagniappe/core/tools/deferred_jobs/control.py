@@ -16,6 +16,10 @@ from .errors import (
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_execution_control_renews_and_observes_lost_claim
+# @tests tests_unit/test_023h_deferred_job_control.py::test_local_stop_state_prevents_activity_reads
+# @tests tests_unit/test_023h_deferred_job_control.py::test_local_stop_during_activity_read_is_observed
+# @tests tests_unit/test_023h_deferred_job_control.py::test_claim_loss_stops_checks_and_prevents_heartbeat_renewal
+# @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
 # @matrix deferred-jobs : cancellation deadline heartbeat progress provider-boundary tool-boundary
 class DeferredExecutionControl:
     """Lease, deadline, cancellation, and coarse progress for one attempt."""
@@ -52,12 +56,23 @@ class DeferredExecutionControl:
         return bool(self.provider_retry_callback and self.provider_retry_callback())
 
     def ensure_active(self):
+        """Check local stop conditions and fresh durable ownership, without renewal."""
+        self._check_local_state()
+        if not self._active_check():
+            self._lost = True
+            raise DeferredJobClaimLostError("Deferred job was cancelled or superseded.")
+        # A database read can overlap the deadline or a heartbeat failure.
+        self._check_local_state()
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/deferred_jobs/control.py::DeferredExecutionControl
+    # @reason local stop conditions are checked through ensure_active
+    def _check_local_state(self):
         if self._background_error is not None:
             raise DeferredJobInfrastructureError(
                 "Deferred job heartbeat failed."
             ) from self._background_error
-        if self._lost or not self._active_check():
-            self._lost = True
+        if self._lost:
             raise DeferredJobClaimLostError("Deferred job was cancelled or superseded.")
         if _utc() >= self.deadline_at:
             raise DeferredJobDeadlineError(
@@ -106,6 +121,7 @@ class DeferredExecutionControl:
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_execution_control_renews_and_observes_lost_claim
+# @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
 # @matrix deferred-jobs : blocking-provider heartbeat lease-loss
 class _DeferredLeaseGuard:
     """Renew a claim while a blocking provider request owns the worker."""

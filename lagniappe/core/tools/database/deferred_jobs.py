@@ -542,6 +542,23 @@ def claim_deferred_job(identifier, lease_token, lease_expires, now):
 
 
 # @testable true
+# @tests tests_unit/test_023h_deferred_job_control.py::test_claim_checks_observe_durable_ownership_without_writes
+# @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
+# @matrix deferred-jobs : cancellation lease read-path heartbeat
+def owns_deferred_job_claim(identifier, lease_token):
+    """Read current token ownership without extending or modifying the lease.
+
+    Terminal delivery can still own a token until cleanup releases it. Mutations
+    must continue to fence ownership inside their own transaction.
+    """
+    key = _deferred_job_key(identifier)
+    if key is None:
+        return False
+    entity = DATA.datastore.get(key)
+    return entity is not None and entity.get("lease_token") == lease_token
+
+
+# @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_claim_and_checkpoint_are_compare_and_set
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_status_transactions_do_not_write_actor
 # @matrix deferred-jobs : checkpoint compare-and-set lease revision transaction user-write-isolation

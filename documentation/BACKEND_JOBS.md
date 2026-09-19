@@ -77,6 +77,17 @@ deadline. Report planning also has a ten-minute total lifetime from job creation
 including queue waits; each attempt uses the earlier deadline. Execution control is checked between provider rounds and
 tool calls and immediately before apply.
 
+While awaiting a provider, cancellation checks run about once per second and
+read the durable lease token without writing the job. Local deadline, known
+claim loss, and heartbeat failure checks run before and after that read.
+During an attempt, the initial execution heartbeat and the 60-second background
+heartbeat extend the lease; progress and checkpoint writes retain their existing
+purposes.
+Cancellation therefore remains observable at the next one-second provider check
+(plus database latency), independently of renewal. Each execution boundary still
+reads ownership afresh, and publication/checkpoint transactions retain their
+authoritative token checks. No cached ownership hint authorizes a mutation.
+
 Site generation of corrective plans requires AI.CREATE, including retries and
 proposal revisions. The report adapter rechecks that entitlement before provider
 preparation and publication. External corrective proposals and their approved
