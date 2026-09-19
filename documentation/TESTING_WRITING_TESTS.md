@@ -11,6 +11,7 @@ Commands and suite setup live in [TESTING.md](TESTING.md).
 Use these questions before adding a test and when reviewing an existing one.
 They adapt [Software Engineering at Google, chapter 12](https://abseil.io/resources/swe-book/html/ch12.html).
 
+- Does the test protect a meaningful behavior or policy worth maintaining?
 - Does the test name a behavior and the outcome that matters?
 - Does it exercise a stable entry point with the owned logic intact?
 - Does it check results, with a reason for any interaction requirements?
@@ -36,11 +37,24 @@ example when the matching behavior needs verification. Preserve deliberate
 security allowlists and scope restrictions. Incidental source spelling or an
 unexplained repository-wide count usually needs a more precise contract.
 
-Keep good tests unchanged. Before deleting or combining cases, identify the
-surviving assertions and scenarios, or establish that the old contract is no
-longer supported. Matching tags or executed lines do not prove redundancy.
-Preserve meaningful distinctions in setup, such as absent data versus an
-explicitly empty value, and allowed versus denied access.
+Keep good tests unchanged. Remove a test when it provides no meaningful
+behavioral or policy protection; explain why no replacement is needed. When
+deleting or combining useful coverage, identify the surviving assertions and
+scenarios, or establish that the contract is no longer supported. Matching tags
+or executed lines do not prove redundancy. Preserve meaningful distinctions
+such as absent versus empty data and allowed versus denied access.
+
+Incidental source spelling, entire warning sentences, and internal call
+sequences need an explicit contract to justify exact assertions. Protocol
+fields, command arguments, security allowlists, and essential diagnostic
+information can require precision. Do not turn a low-value check into a more
+elaborate test without first establishing what useful failure it detects.
+
+When a test exposes a possible product or tooling bug, record the scenario,
+expected and actual behavior, evidence, and uncertainty in the task's review
+record. Do not change expectations, weaken assertions, or remove meaningful
+coverage to fit suspected faulty behavior. Defer the dependent change when the
+contract is unclear; keep unrelated improvement work moving.
 
 Control time and other nondeterministic inputs at their boundary. Read the
 contract before choosing exact expectations: two input paths may intentionally

@@ -5,7 +5,7 @@ Field/link/select/radio submissions are in ``test_003b_submission_links_and_sele
 
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -93,9 +93,13 @@ def test_resolve_location_query_retries_after_simplify():
     """Second search uses simplified query when first returns empty."""
     with patch.object(
         loc, "search_places", side_effect=[[], [{"id": "p1", "name": "Hit"}]]
-    ):
+    ) as search_places:
         result = loc.resolve_location_query("123 Main St Suite 4")
     assert result == {"id": "p1", "name": "Hit"}
+    assert search_places.call_args_list == [
+        call("123 Main St Suite 4"),
+        call("123 Main St"),
+    ]
 
 
 # @pair location:first-hit
@@ -104,9 +108,10 @@ def test_resolve_location_query_first_hit_wins():
         loc,
         "search_places",
         return_value=[{"id": "p1", "name": "First"}],
-    ):
+    ) as search_places:
         result = loc.resolve_location_query("Some Cafe")
     assert result == {"id": "p1", "name": "First"}
+    search_places.assert_called_once_with("Some Cafe")
 
 
 # @matrix location : api-cache oauth
@@ -457,7 +462,9 @@ def test_location_same_id_updates_address2_without_refetch():
 def test_location_place_detail_failure_falls_back_to_submitted_text():
     field = _location_field()
 
-    with patch.object(loc, "get_place_details", return_value=None):
+    with patch.object(
+        loc, "get_place_details", return_value=None
+    ) as get_place_details:
         field.validate_submission(
             {
                 "id": "unverified-place",
@@ -472,23 +479,38 @@ def test_location_place_detail_failure_falls_back_to_submitted_text():
         "address2": "Suite 4",
     }
     assert "id" not in field.value
-    assert field.warnings
+    get_place_details.assert_called_once_with("unverified-place")
+    assert field.warnings == [
+        "Place details were unavailable; stored the submitted location as text."
+    ]
 
 
 # @matrix location : fallback warnings
 @pytest.mark.unit
 def test_location_validate_ai_fallback():
     field = _location_field()
-    with patch.object(loc, "resolve_location_query", return_value=None):
+    with patch.object(
+        loc, "resolve_location_query", return_value=None
+    ) as resolve_location_query:
         field.validate_ai("Nowhereville XYZ 99999")
-    assert field.value["address"] == "Nowhereville XYZ 99999"
-    assert field.warnings
+    assert field.value == {
+        "address": "Nowhereville XYZ 99999",
+        "name": "Nowhereville XYZ 99999",
+    }
+    resolve_location_query.assert_called_once_with("Nowhereville XYZ 99999")
+    assert field.warnings == [
+        "No place found for 'Nowhereville XYZ 99999'; stored as address text."
+    ]
 
 
 # @matrix location : fallback import
 @pytest.mark.unit
 def test_location_validate_import_fallback():
     field = _location_field()
-    with patch.object(loc, "resolve_location_query", return_value=None):
+    with patch.object(
+        loc, "resolve_location_query", return_value=None
+    ) as resolve_location_query:
         field.validate_import("No match here")
-    assert field.value["address"] == "No match here"
+    assert field.value == {"address": "No match here", "name": "No match here"}
+    resolve_location_query.assert_called_once_with("No match here")
+    assert field.errors == []
