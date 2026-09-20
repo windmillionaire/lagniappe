@@ -36,10 +36,9 @@ def test_standard_csv():
     # Check column structure
     columns = result["columns"]
     column_labels = [c["label"] for c in columns.values()]
-    assert "id" in column_labels
-    assert "first_name" in column_labels
-    assert "email" in column_labels
-    assert "salary" in column_labels
+    assert column_labels == [
+        "id", "first_name", "last_name", "email", "department", "hire_date", "salary"
+    ]
 
 
 # @pair ingress-csv:delimiter
@@ -72,6 +71,16 @@ def test_empty_rows_skipped():
     # Should have 4 valid data rows (rows with at least one value)
     assert result["row_count"] == 4
     assert result["column_count"] == 4
+    columns = result["columns"]
+    assert [
+        {columns[key]["label"]: value for key, value in row.items()}
+        for row in result["rows"]
+    ] == [
+        {"id": "1", "name": "First", "value": "100", "notes": "Some notes"},
+        {"id": "2", "name": "Second", "value": "200", "notes": ""},
+        {"id": "3", "name": "Third", "value": "", "notes": "Missing value"},
+        {"id": "4", "name": "Fourth", "value": "400", "notes": "Last row"},
+    ]
 
 
 # @pair ingress-csv:validation
@@ -99,14 +108,18 @@ def test_rows_keyed_by_column_id():
 
     result = process_csv(text)
 
-    # Each row should be a dict with column IDs as keys
-    first_row = result["rows"][0]
-    assert isinstance(first_row, dict)
-
-    # Keys should match column IDs
-    column_ids = set(result["columns"].keys())
-    row_keys = set(first_row.keys())
-    assert row_keys == column_ids
+    columns = result["columns"]
+    assert all(key == column["id"] for key, column in columns.items())
+    assert len(result["rows"]) == 10
+    for row in result["rows"]:
+        assert set(row) == set(columns)
+    assert {
+        columns[key]["label"]: value for key, value in result["rows"][0].items()
+    } == {
+        "id": "1", "first_name": "Alice", "last_name": "Johnson",
+        "email": "alice.johnson@example.com", "department": "Engineering",
+        "hire_date": "2021-03-15", "salary": "85000",
+    }
 
 
 # --- Column Type Inference Tests ---
@@ -225,6 +238,11 @@ def test_multi_categorical_detection():
     tags_col = next(c for c in result["columns"].values() if c["label"] == "tags")
     assert tags_col["type"] == "multi_categorical"
     assert tags_col["icon"] == "select"
+    departments_col = next(
+        c for c in result["columns"].values() if c["label"] == "departments"
+    )
+    assert departments_col["type"] == "multi_categorical"
+    assert departments_col["icon"] == "select"
 
 
 # @matrix ingress-csv : number type-inference

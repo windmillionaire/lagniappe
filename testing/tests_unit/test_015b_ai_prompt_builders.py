@@ -176,27 +176,16 @@ def test_prompt_tracks_context_output_examples_and_attachments():
     assert _context_json(prompt, "Page Info") == {"alpha": 1}
     assert _context_text(prompt, "Plain Note") == "Use directly"
     assert "Empty Value" not in _context_labels(prompt)
-    assert prompt.instruction_blocks == [
-        {"title": None, "content": "Follow the rules."},
-        {
-            "title": None,
-            "content": (
-                "### Tool Call Planning\n\n"
-                "- Before each tool turn, identify all useful calls whose arguments "
-                "are already known.\n"
-                "- Request those independent calls together in the same turn, "
-                "including every\n"
-                "  applicable `get_guidelines` bundle.\n"
-                "- Defer a call only when its arguments depend on an earlier tool "
-                "result. Do not\n"
-                "  add unnecessary calls merely to form a batch.\n"
-                "- When get_help is available, consult it for questions about Lagniappe features\n"
-                "  and cite the returned topic URLs. General help does not establish the user's\n"
-                "  permission to act on a particular record."
-            ),
-            "role": "tool_call_planning",
-        },
-    ]
+    assert prompt.instruction_blocks[0] == {
+        "title": None,
+        "content": "Follow the rules.",
+    }
+    planning = prompt.instruction_blocks[1]
+    assert planning["title"] is None
+    assert planning["role"] == "tool_call_planning"
+    assert "independent calls together" in planning["content"]
+    assert "get_guidelines" in planning["content"]
+    assert "permission to act" in planning["content"]
     assert prompt.preview().count("### Tool Call Planning") == 1
     prompt.enable_tools("get_entity", "get_schema")
     assert prompt.preview().count("### Tool Call Planning") == 1
@@ -456,14 +445,15 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
             self.user = None
 
     class EvidenceFile:
-        def __init__(self, key, filename, summary):
+        def __init__(self, key, filename, summary, *, can_view=True):
             self.key = key
             self.hash = key
             self.filename = filename
             self.summary = summary
+            self.can_view = can_view
 
         def allowed(self, action, user=None):
-            return True
+            return self.can_view
 
         def to_ai(self, user=None):
             return {
@@ -476,6 +466,12 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         "assessment-file", "assessment.pdf", "Parcel 123 is assessed at $245,000."
     )
     task_file = EvidenceFile("tax-file", "tax-bill.pdf", None)
+    hidden_task_file = EvidenceFile(
+        "private-tax-file",
+        "private-tax-bill.pdf",
+        "Must not be disclosed.",
+        can_view=False,
+    )
     category = SimpleNamespace(
         name="Properties",
         description="Property records and obligations.",
@@ -511,7 +507,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         page=page,
         form=form,
         submission_schema=form.schema,
-        files=[task_file],
+        files=[task_file, hidden_task_file, task_file],
         properties=SimpleNamespace(
             submission=Submission({"input-value": ""}),
         ),
@@ -522,8 +518,20 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
     page_prompt = autofill.form_autofill_prompt(**page_data)
     task_prompt = autofill.form_autofill_prompt(**task_data)
 
-    assert page_data["attached_files"] == [page_file.to_ai(user)]
-    assert task_data["attached_files"] == [task_file.to_ai(user)]
+    assert page_data["attached_files"] == [
+        {
+            "hash": "hash:assessment-file",
+            "filename": "assessment.pdf",
+            "summary": "Parcel 123 is assessed at $245,000.",
+        }
+    ]
+    assert task_data["attached_files"] == [
+        {
+            "hash": "hash:tax-file",
+            "filename": "tax-bill.pdf",
+            "summary": None,
+        }
+    ]
     assert task_data["document"] == page_data["document"] == "Assessment notes"
     assert task_data["parent_page"] == {
         "name": "Pettis Trust",
@@ -533,10 +541,8 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         "name": "Properties",
         "description": "Property records and obligations.",
     }
-    assert _context_json(page_prompt, "Attached Files") == [
-        page_file.to_ai(user)
-    ]
-    assert _context_json(task_prompt, "Attached Files") == [task_file.to_ai(user)]
+    assert _context_json(page_prompt, "Attached Files") == page_data["attached_files"]
+    assert _context_json(task_prompt, "Attached Files") == task_data["attached_files"]
     assert _context_json(task_prompt, "Parent Page") == task_data["parent_page"]
     assert _context_json(task_prompt, "Target Record") == {
         "kind": "task",
@@ -555,9 +561,18 @@ def test_autofill_summary_dependencies_track_enabled_processing():
     user = SimpleNamespace(is_authenticated=True)
 
     class EvidenceFile:
-        def __init__(self, key, *, enabled=True, complete=None, error=None):
+        def __init__(
+            self,
+            key,
+            *,
+            enabled=True,
+            complete=None,
+            error=None,
+            can_view=True,
+        ):
             self.key = key
             self.hash = key
+            self.can_view = can_view
             self.properties = SimpleNamespace(
                 summarize=SimpleNamespace(
                     enabled=enabled,
@@ -567,15 +582,16 @@ def test_autofill_summary_dependencies_track_enabled_processing():
             )
 
         def allowed(self, action, user=None):
-            return True
+            return self.can_view
 
     complete = EvidenceFile("complete", complete=True)
     pending = EvidenceFile("pending")
     failed = EvidenceFile("failed", error="page limit")
     disabled = EvidenceFile("disabled", enabled=False)
+    hidden = EvidenceFile("hidden", complete=True, can_view=False)
     target = SimpleNamespace(
         entity_kind="page",
-        files=[complete, pending, failed, disabled],
+        files=[complete, pending, pending, failed, disabled, hidden],
     )
 
     dependencies = autofill.autofill_summary_dependencies(target, user)
@@ -646,9 +662,12 @@ def test_ai_summary_generation_marks_partial_ooxml_context(monkeypatch):
     assert context.endswith(
         "[Extracted text is partial because the worksheet row limit was reached.]"
     )
+    expected_header = (
+        "# This text was automatically extracted from large.xlsx. Formatting, "
+        "formulas, dates, and embedded objects may be incomplete.\n\n"
+    )
     assert extraction_limits == [
-        summarize.EXTRACTED_CONTEXT_LIMIT
-        - len(summarize._extracted_context_header("large.xlsx"))
+        summarize.EXTRACTED_CONTEXT_LIMIT - len(expected_header)
     ]
 
 

@@ -455,6 +455,25 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
         is FetchReason.AI_FILTER_RESULT_SERIALIZATION
     )
 
+    with_inactive = ai_query.query_workspace_filter(
+        project,
+        [{"field": "name", "comparator": "substring", "values": ["task"]}],
+        user,
+        limit=10,
+        sort="name_asc",
+        include_inactive=True,
+    )
+
+    assert with_inactive["matched"] == 3
+    assert with_inactive["returned"] == 3
+    assert with_inactive["truncated"] is False
+    assert [item["name"] for item in with_inactive["results"]] == [
+        "Inactive",
+        "Older",
+        "Visible",
+    ]
+    assert hidden.to_ai_users == []
+
 
 # @matrix ai-filter : legacy-record bounded-error output
 @pytest.mark.unit
@@ -493,22 +512,30 @@ def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
 ):
     user = object()
     project, _model, _form, _hidden_form = _workspace_filter_fixture()
+    wrong_kind = _Entity("task", "wrong-kind", "Wrong Kind")
     monkeypatch.setattr(
         workspace_filter.Entities,
         "fetch_one",
-        lambda *_args, **_kwargs: project,
+        lambda identifier, **_kwargs: {
+            project.hash: project,
+            wrong_kind.hash: wrong_kind,
+        }.get(identifier),
     )
     monkeypatch.setattr(
         workspace_filter,
         "describe_filter_fields",
         lambda parent, current_user: {"parent": parent.hash, "user": current_user},
     )
+    query_calls = []
+
+    def query_workspace_filter(parent, conditions, current_user, **options):
+        query_calls.append((parent, conditions, current_user, options))
+        return {"results": []}
+
     monkeypatch.setattr(
         workspace_filter,
         "query_workspace_filter",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            exceptions.ValidationError("bad condition")
-        ),
+        query_workspace_filter,
     )
 
     schema_result = workspace_filter.execute_get_filter_schema(
@@ -520,12 +547,46 @@ def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
         "user": user,
     }
     assert workspace_filter.execute_query_workspace_filter(
+        {
+            "id": project.hash,
+            "conditions": [
+                {"field": "name", "comparator": "substring", "values": ["tax"]}
+            ],
+            "limit": 7,
+            "sort": "name_asc",
+            "include_inactive": True,
+        },
+        user,
+    ) == {"results": []}
+    assert query_calls == [
+        (
+            project,
+            [{"field": "name", "comparator": "substring", "values": ["tax"]}],
+            user,
+            {"limit": 7, "sort": "name_asc", "include_inactive": True},
+        )
+    ]
+
+    monkeypatch.setattr(
+        workspace_filter,
+        "query_workspace_filter",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            exceptions.ValidationError("bad condition")
+        ),
+    )
+    assert workspace_filter.execute_query_workspace_filter(
         {"id": project.hash, "conditions": []},
         user,
     ) == {"error": "bad condition"}
     assert workspace_filter.execute_get_filter_schema({}, user) == {
         "error": "id is required"
     }
+    assert workspace_filter.execute_get_filter_schema(
+        {"id": "missing"}, user
+    ) == {"error": "Project or category not found"}
+    assert workspace_filter.execute_get_filter_schema(
+        {"id": wrong_kind.hash}, user
+    ) == {"error": "Project or category not found"}
 
     project._allowed = False
     denied_result = workspace_filter.execute_get_filter_schema(

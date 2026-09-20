@@ -88,6 +88,11 @@ write. Cache refresh is post-commit. Infrastructure failures put the import in
 resumable `failed` state; row validation errors are ordinary results and do not
 stop the run.
 
+Unexpected row-planning exceptions also stop at that failure boundary, including
+failures after task or history allocation. No part of that row is committed and
+its cursor is unchanged; restart retries the same row. Only `ValidationError`
+is converted to an ordinary rejected-row result by the planner.
+
 Malformed checklist input raises a validation error and rejects the entire
 row, including its otherwise valid fields. A raised row-validation error
 discards all staged entities (and their pending history effects), records an

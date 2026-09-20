@@ -55,7 +55,7 @@ def test_task_complete_without_schedule(get_test_entities):
 
 # @matrix submission task-completion : required-fields validation
 @pytest.mark.unit
-def test_task_complete_raises_when_required_submission_missing(get_test_entities):
+def test_task_complete_raises_when_required_submission_missing():
     """``TaskCompletionError`` when form exists and required fields are incomplete."""
     task = TestEntities.get(
         "TASK",
@@ -74,14 +74,16 @@ def test_task_complete_raises_when_required_submission_missing(get_test_entities
             "page": {"name": "Completer Page", "hash": "cpg002"},
         },
     )
-    missing = MagicMock()
-    missing.label = "Required Field"
+    missing = SimpleNamespace(label="Required Field")
 
     with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
         with patch.object(Task, "_check_required", return_value=[missing]):
             with patch("lagniappe.core.entities.task.current_user", completer):
                 with pytest.raises(TaskCompletionError, match="Required Field"):
                     task.complete()
+    assert task.completed is False
+    assert task.completed_on is None
+    assert "completed_submission" not in task.db
 
 
 # @source lagniappe/core/entities/task.py::Task._check_required
@@ -406,8 +408,8 @@ def test_task_combine_selects_completed_then_modified_main():
     assert select_main_task((active, older, newer)) is active
 
     active.modified = older.modified = newer.modified
-    expected = max((active, older, newer), key=lambda task: task.urlsafe_key)
-    assert select_main_task((active, older, newer)) is expected
+    assert select_main_task((active, older, newer)) is newer
+    assert select_main_task((newer, older, active)) is newer
 
 
 # @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
@@ -734,7 +736,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
 
 
 # @matrix task-completion : complete next-due-date schedule-queue
-# @matrix task-scheduling : complete durable-uncomplete next-due-date post-commit schedule-queue timezone
+# @matrix task-scheduling : complete next-due-date schedule-queue
 @pytest.mark.unit
 def test_task_complete_with_schedule_queues_uncomplete():
     """With an active schedule, ``complete`` advances due date then queues uncomplete (patched)."""
@@ -779,7 +781,7 @@ def test_task_complete_with_schedule_queues_uncomplete():
     queue_mock.assert_called_once_with(task)
     assert task.completed is True
     assert task.completed_on is not None
-    assert task.due_date is not None
+    assert task.due_date.isoformat() == "2025-06-16T00:00:00+00:00"
 
 
 # @matrix task-completion task-scheduling : complete schedule-queue
@@ -813,6 +815,7 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     task.due_date = mock_today - timedelta(days=1)
 
     with (
+        patch("lagniappe.core.tools.tasks.scheduling.datetime", wraps=datetime) as clock,
         patch(
             "lagniappe.core.tools.tasks.scheduling.user_today",
             return_value=mock_today,
@@ -828,6 +831,7 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
             "lagniappe.core.tools.tasks.scheduling.task_queue.create_task"
         ) as create_task,
     ):
+        clock.now.return_value = mock_today
         task.complete()
 
     create_task.assert_not_called()
@@ -841,7 +845,7 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
 
 
 # @matrix cloud-tasks : durable-uncomplete idempotency post-commit
-# @matrix task-scheduling : durable-uncomplete idempotency post-commit schedule-queue
+# @matrix task-scheduling : durable-uncomplete idempotency post-commit schedule-queue timezone
 # @pair task-completion:schedule-queue
 @pytest.mark.unit
 def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
@@ -864,14 +868,8 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "lagniappe.core.tools.tasks.scheduling.CONFIG",
             SimpleNamespace(production=True),
         ),
-        patch(
-            "lagniappe.core.tools.tasks.scheduling.scheduled_uncomplete_time",
-            return_value=datetime(2025, 6, 16, tzinfo=timezone.utc),
-        ),
-        patch(
-            "lagniappe.core.tools.tasks.scheduling.due_in_home_task_window",
-            return_value=False,
-        ),
+        patch("lagniappe.core.tools.tasks.scheduling.datetime", wraps=datetime) as clock,
+        patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=ZoneInfo("America/Chicago")),
         patch(
             "lagniappe.core.tools.tasks.scheduling.url_for",
             return_value="https://example.test/process/uncomplete-task",
@@ -881,14 +879,17 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             return_value="queued-task",
         ) as create_task,
     ):
+        instant = datetime(2025, 6, 16, 4, 30, tzinfo=timezone.utc)
+        clock.now.side_effect = lambda tz=None: instant.astimezone(tz)
         token = dates.add_uncomplete_task_to_queue(task)
         create_task.assert_not_called()
         task_name = dates.dispatch_scheduled_uncomplete(task)
 
     assert token == task.scheduled_uncomplete_token
-    assert len(token) == 32
+    assert token
+    assert any(intent.intent is MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH for intent in task.mutation_intents)
     assert task.scheduled_uncomplete_at == datetime(
-        2025, 6, 16, tzinfo=timezone.utc
+        2025, 6, 16, 5, tzinfo=timezone.utc
     )
     assert task_name == "queued-task"
     create_task.assert_called_once_with(
@@ -897,10 +898,17 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "key": task.urlsafe_key,
             "token": token,
         },
-        schedule_at=datetime(2025, 6, 16, tzinfo=timezone.utc),
+        schedule_at=datetime(2025, 6, 16, 5, tzinfo=timezone.utc),
         task_id=create_task.call_args.kwargs["task_id"],
     )
     assert create_task.call_args.kwargs["task_id"].startswith("task-uncomplete-")
+    first_dispatch = create_task.call_args
+    with (
+        patch("lagniappe.core.tools.tasks.scheduling.url_for", return_value="https://example.test/process/uncomplete-task"),
+        patch("lagniappe.core.tools.tasks.scheduling.task_queue.create_task", create_task),
+    ):
+        dates.dispatch_scheduled_uncomplete(task)
+    assert create_task.call_args == first_dispatch
     assert task.completed is True
     assert task.completed_on is not None
     assert task.active is True

@@ -7,6 +7,7 @@
 					"name": "Task With Description",
 					"hash": "task001",
 					"description": "This is a plain text description.",
+					"expected_description": "This is a plain text description.",
 					"page": { "name": "Parent Page", "hash": "page001" }
 				}
 			],
@@ -16,6 +17,7 @@
 					"name": "Task With HTML Description",
 					"hash": "task002",
 					"description": "<p>Description with <strong>HTML</strong> tags</p>",
+					"expected_description": "Description with  HTML  tags",
 					"page": { "name": "Parent Page", "hash": "page002" }
 				}
 			],

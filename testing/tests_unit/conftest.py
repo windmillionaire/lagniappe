@@ -562,6 +562,7 @@ def test_condition_definition():
     from unittest.mock import patch
     from zoneinfo import ZoneInfo
     from lagniappe.core.entities.condition import Condition
+    from datetime import datetime
 
     DEFAULT_USER_TZ = ZoneInfo("America/Chicago")
 
@@ -573,10 +574,15 @@ def test_condition_definition():
         # Build entity_map from provided map or empty
         entity_map = entity_map or {}
 
-        with patch(
-            "lagniappe.core.tools.dates.user_timezone", return_value=DEFAULT_USER_TZ
+        fields = entity.test_spec["fields"]
+        assert fields, "condition fixture must contain field cases"
+        with (
+            patch("lagniappe.core.tools.dates.user_timezone", return_value=DEFAULT_USER_TZ),
+            patch("lagniappe.core.tools.dates.datetime", wraps=datetime) as clock,
         ):
-            for field_case in entity.test_spec.get("fields", []):
+            # Date-only property inputs preserve the current local time.
+            clock.now.return_value = datetime(2025, 6, 15, 12, 30, tzinfo=DEFAULT_USER_TZ)
+            for field_case in fields:
                 condition = Condition()
                 condition.entity = entity
                 # Set entity_map before field/set_value to avoid database calls
@@ -620,47 +626,15 @@ def test_condition_definition():
                     f"expected {expected_is_entity_valued!r}"
                 )
 
-                # For timestamps, the value is dynamic - just check structure matches
-                if expected.get("type") == "timestamp":
-                    # Check that description prefix matches (entity, field, type, comparator)
-                    assert actual_desc[:4] == expected_desc[:4], (
-                        f"{field_id} ({comparator}): description prefix = {actual_desc[:4]!r}, "
-                        f"expected {expected_desc[:4]!r}"
-                    )
-                    # Verify value is numeric (or list of numerics for BETWEEN)
-                    if len(actual_desc) > 4:
-                        val = actual_desc[4]
-                        if isinstance(val, list):
-                            assert all(isinstance(v, (int, float)) for v in val), (
-                                f"{field_id} ({comparator}): BETWEEN values should be numeric"
-                            )
-                        else:
-                            assert isinstance(val, (int, float)), (
-                                f"{field_id} ({comparator}): timestamp value should be numeric, "
-                                f"got {type(val).__name__}"
-                            )
-                    if isinstance(definition.value, list):
-                        assert all(
-                            isinstance(v, (int, float)) for v in definition.value
-                        ), (
-                            f"{field_id} ({comparator}): definition timestamp "
-                            "values should be numeric"
-                        )
-                    else:
-                        assert isinstance(definition.value, (int, float)), (
-                            f"{field_id} ({comparator}): definition timestamp "
-                            f"value should be numeric, got {type(definition.value).__name__}"
-                        )
-                else:
-                    expected_value = expected_desc[4] if len(expected_desc) > 4 else None
-                    assert definition.value == expected_value, (
-                        f"{field_id} ({comparator}): value = {definition.value!r}, "
-                        f"expected {expected_value!r}"
-                    )
-                    assert actual_desc == expected_desc, (
-                        f"{field_id} ({comparator}): description = {actual_desc!r}, "
-                        f"expected {expected_desc!r}"
-                    )
+                expected_value = expected_desc[4] if len(expected_desc) > 4 else None
+                assert definition.value == expected_value, (
+                    f"{field_id} ({comparator}): value = {definition.value!r}, "
+                    f"expected {expected_value!r}"
+                )
+                assert actual_desc == expected_desc, (
+                    f"{field_id} ({comparator}): description = {actual_desc!r}, "
+                    f"expected {expected_desc!r}"
+                )
 
                 # Check details
                 details = condition.details

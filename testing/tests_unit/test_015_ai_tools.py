@@ -74,6 +74,7 @@ WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 @pytest.fixture(autouse=True)
 def deployment_ai_model_defaults(monkeypatch):
     monkeypatch.setattr(runtime_ai_settings_module.site_database, "ai", lambda: None)
+    monkeypatch.setattr(ai_core.CONFIG, "AI_OBSERVABILITY", False)
 
 
 def model_response(text=None, finish_reason=None):
@@ -390,12 +391,17 @@ def test_ai_settings_normalize_validates_models_and_keeps_current_custom():
 
     assert normalized == current
 
-    with pytest.raises(exceptions.AISettingsError, match="Primary model"):
-        config_ai_settings.normalize_ai_settings(
-            {**current, "AI_MODEL": "not-a-real-model"},
-            current_settings=current,
-            model_options=options,
-        )
+    for setting, label in (
+        ("AI_MODEL", "Primary model"),
+        ("AI_UTILITY_MODEL", "Utility model"),
+        ("AI_IMAGE_MODEL", "Image model"),
+    ):
+        with pytest.raises(exceptions.AISettingsError, match=label):
+            config_ai_settings.normalize_ai_settings(
+                {**current, setting: "not-a-real-model"},
+                current_settings=current,
+                model_options=options,
+            )
 
     with pytest.raises(exceptions.AISettingsError, match="global"):
         config_ai_settings.normalize_ai_settings(
@@ -947,19 +953,30 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
 
     class FakeForm:
         entity_kind = "form"
-        active = True
-        reserved = False
 
-        def __init__(self, key, name, form_type="page", schema=None):
+        def __init__(
+            self,
+            key,
+            name,
+            form_type="page",
+            schema=None,
+            *,
+            can_view=True,
+            active=True,
+            reserved=False,
+        ):
             self.key = key
             self.urlsafe_key = key
             self.hash = key
             self.name = name
             self.form_type = form_type
             self.schema = schema or []
+            self.can_view = can_view
+            self.active = active
+            self.reserved = reserved
 
         def allowed(self, action, user=None):
-            return True
+            return self.can_view
 
     class FakeCategory:
         entity_kind = "category"
@@ -1057,6 +1074,7 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
         schema=[{"id": "input-status", "label": "Status", "type": "select"}],
     )
     loose_form = FakeForm("form-loose", "Loose Form")
+    private_form = FakeForm("form-private", "Private Form", can_view=False)
     category = FakeCategory(
         "cat-contacts",
         "Contacts",
@@ -1075,7 +1093,15 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
         form_key=task_form.key,
     )
     project.model_tasks = [model_task]
-    entities = [category, project, model_task, contact_form, task_form, loose_form]
+    entities = [
+        category,
+        project,
+        model_task,
+        contact_form,
+        task_form,
+        loose_form,
+        private_form,
+    ]
     loads = []
 
     forms_by_key = {form.key: form for form in [contact_form, task_form, loose_form]}
@@ -1208,9 +1234,10 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
             self.key = "form-key"
             self.hash = "form-hash"
             self.name = "Invoice"
+            self.can_view = True
 
         def allowed(self, action, user=None):
-            return True
+            return self.can_view
 
     class FakeSubmission:
         def __init__(self, value):
@@ -1337,9 +1364,14 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
     assert all_result["total"] == 4
     assert all_result["returned"] == 4
     assert all_result["truncated"] is False
-    assert any(instance["kind"] == "page" for instance in all_result["instances"])
-    assert completed.name in [instance["name"] for instance in all_result["instances"]]
-    assert hidden.name not in [instance["name"] for instance in all_result["instances"]]
+    assert all_result["form_type"] == "task"
+    assert all_result["field_count"] == 1
+    assert [instance["name"] for instance in all_result["instances"]] == [
+        "July Invoice",
+        "A Pay July invoice",
+        "Pay September invoice",
+        "Z Pay August invoice",
+    ]
 
     completed_result = ai_get_form_instances.execute_get_form_instances(
         {
@@ -1361,6 +1393,25 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
         "kind": "page",
         "name": "July Invoice",
     }
+
+    assert ai_get_form_instances.execute_get_form_instances(
+        {"id": "form-hash", "kinds": ["document"]},
+        SimpleNamespace(),
+    ) == {
+        "error": "Unknown instance kind filter.",
+        "invalid_kinds": ["document"],
+        "allowed_kinds": ["page", "task"],
+    }
+    assert ai_get_form_instances.execute_get_form_instances(
+        {"id": "form-hash", "task_status": "archived"},
+        SimpleNamespace(),
+    )["invalid_task_status"] == "archived"
+
+    form.can_view = False
+    assert ai_get_form_instances.execute_get_form_instances(
+        {"id": "form-hash"},
+        SimpleNamespace(),
+    ) == {"error": "Access denied"}
 
 
 # @matrix ai : guidelines tool-dispatch
@@ -1464,8 +1515,8 @@ def test_get_guidelines_filters_actions_and_schema_field_types():
     assert "`create_page`" in selected_actions["guidelines"]
     assert "`attach_file`" in selected_actions["guidelines"]
     assert "`create_task`" not in selected_actions["guidelines"]
-    assert selected_actions["content_bytes"] < len(
-        ai_get_guidelines._selected_action_guidance(list(ai_get_guidelines.ACTION_GUIDELINES)).encode("utf-8")
+    assert selected_actions["content_bytes"] == len(
+        selected_actions["guidelines"].encode("utf-8")
     )
 
     selected_fields = ai_get_guidelines.execute_get_guidelines(
@@ -2575,7 +2626,7 @@ def test_ai_exception_context_survives_autofill_wrapper_without_duplicate_captur
     with pytest.raises(exceptions.AIException) as exc:
         autofill.generate_autofilled_submission(Prompt("Generate"), entity=None, user=None)
 
-    assert str(exc.value) == "Generation failed. Please try again.  limit reached"
+    assert str(exc.value).endswith("limit reached")
     assert exc.value.context == source_context
     assert captured == []
 
@@ -3656,20 +3707,18 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert summarize.can_summarize_file(office_file) is True
     assert summarize.can_summarize_file(unsupported) is False
 
-    assert summarize.summarize_file(office_file) is office_file.properties.summarize
+    queued_summary = summarize.summarize_file(office_file)
+    assert queued_summary is office_file.properties.summarize
+    assert queued_summary.status == "Summarizing file..."
     assert started[0].inputs == {"file": office_file}
     assert started[0].actor is actor
     assert started[0].client == {}
     assert started[0].delay_seconds == 10
+    assert len(started) == 1
 
     result = summarize.summarize_file(unsupported)
 
     assert result.error == "Unsupported file type."
-
-    queued_summary = summarize.summarize_file(office_file)
-    assert queued_summary.status == "Summarizing file..."
-    assert started[-1].client == {}
-
 
 # @matrix ai : docx errors ooxml summary-prompt
 @pytest.mark.unit

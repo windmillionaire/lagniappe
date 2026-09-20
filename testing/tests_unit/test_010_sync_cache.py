@@ -103,11 +103,14 @@ def test_document_transactions_are_key_isolated_and_expiring(monkeypatch):
 
     assert first["fingerprint"] == "first"
     assert second["fingerprint"] == "second"
-    assert len(set(redis.watched)) == 2
-    assert all(
-        expires == documents.DOCUMENT_TTL_SECONDS
-        for expires in redis.expirations.values()
-    )
+    first_key = documents.Sync.DOCUMENTS.key("page-one:document")
+    second_key = documents.Sync.DOCUMENTS.key("page-two:document")
+    assert json.loads(redis.values[first_key])["revision"] == 1
+    assert json.loads(redis.values[second_key])["revision"] == 2
+    assert redis.expirations == {
+        first_key: documents.DOCUMENT_TTL_SECONDS,
+        second_key: documents.DOCUMENT_TTL_SECONDS,
+    }
 
 
 def _without_presence(monkeypatch):
@@ -385,7 +388,7 @@ def test_presence_uses_expiring_client_hash_fields(monkeypatch):
         documents.cache,
         "hmget",
         lambda key, fields: [
-            documents._presence_payload("client-1", user).encode("utf-8")
+            json.dumps({**user, "client_id": "client-1"}).encode("utf-8")
         ],
     )
 
@@ -402,7 +405,10 @@ def test_presence_uses_expiring_client_hash_fields(monkeypatch):
         "client-1",
     ) in pipeline.commands
     assert users == [{**user, "client_id": "client-1"}]
-    assert len(digest) == 64
+    assert ("sadd", documents.Sync.PRESENCE.key("page:document"), "client-1") in pipeline.commands
+    stored_user = next(command[3] for command in pipeline.commands if command[0] == "hset")
+    assert json.loads(stored_user) == {**user, "client_id": "client-1"}
+    assert documents._register_presence("page:document", "client-1", user)[1] == digest
 
 
 @pytest.fixture
@@ -533,6 +539,42 @@ def test_revisioned_document_poll_returns_snapshot_then_deltas(document_state):
     assert "authors" not in mixed_authors
 
 
+# @matrix polling sync : author-attribution delta document revision snapshot
+@pytest.mark.unit
+@pytest.mark.parametrize("old_revision", [1, 99])
+def test_document_generation_change_returns_all_retained_deltas(document_state, old_revision):
+    old_generation = document_state["generation"]
+    document_state.clear()
+    document_state.update(documents._new_state({"ydoc": "new-base"}))
+    for revision in (0, 1):
+        documents.apply_document_update(
+            "page:document", seed={}, generation=document_state["generation"],
+            revision=revision, update=f"delta-{revision + 1}",
+            author={"hash": "author", "name": "Author"},
+        )
+
+    recovered = documents.poll_document(
+        "page:document", seed={}, client_id="returning-client", user={},
+        generation=old_generation, revision=old_revision,
+    )
+
+    assert recovered["generation"] != old_generation
+    assert recovered["mode"] == "snapshot"
+    assert recovered["ydoc"] == "new-base"
+    assert recovered["revision"] == 2
+    assert recovered["updates"] == [
+        {"revision": 1, "update": "delta-1", "user_hash": "author"},
+        {"revision": 2, "update": "delta-2", "user_hash": "author"},
+    ]
+    assert recovered["authors"] == {"author": {"hash": "author", "name": "Author"}}
+    current = documents.poll_document(
+        "page:document", seed={}, client_id="returning-client", user={},
+        generation=recovered["generation"], revision=recovered["revision"],
+    )
+    assert current["mode"] == "delta"
+    assert current["updates"] == []
+
+
 # @matrix polling sync : compaction concurrency document revision
 @pytest.mark.unit
 def test_revisioned_document_update_preserves_stale_branch_delta(document_state):
@@ -608,5 +650,8 @@ def test_revisioned_presence_close_removes_client(monkeypatch):
         ["page:document", "page:document", "project:document"],
     )
 
-    assert sum(command[0] == "srem" for command in pipeline.commands) == 2
-    assert pipeline.commands[-1][0] == "hdel"
+    assert pipeline.commands == [
+        ("srem", documents.Sync.PRESENCE.key("page:document"), "client-1"),
+        ("srem", documents.Sync.PRESENCE.key("project:document"), "client-1"),
+        ("hdel", documents.Sync.CLIENTS.value, "client-1"),
+    ]

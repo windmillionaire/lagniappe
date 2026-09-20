@@ -373,6 +373,16 @@ def test_checkpoint_persists_before_publishing_and_guards_assets(monkeypatch):
     assert [event[0] for event in events] == ["assets", "commit", "publish"]
     assert events[1][1] == {"advance_parent": True, "expected_state": {"assets": "old"}}
 
+    events.clear()
+
+    def reject_checkpoint(*args, **kwargs):
+        raise exceptions.MutationConflict("concurrent checkpoint")
+
+    monkeypatch.setattr(document_updates.Entities, "save_document_checkpoint", reject_checkpoint)
+    with pytest.raises(exceptions.MutationConflict, match="concurrent checkpoint"):
+        document_updates.save_checkpoint(page, html="loser", ydoc="loser")
+    assert events == [("assets", {"html": "loser", "ydoc": "loser"})]
+
 
 # @matrix mutations sync : document checkpoint cas conflict
 def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
@@ -433,7 +443,7 @@ def test_skipped_document_append_needs_no_receipt_on_retry(monkeypatch):
     ) == recovery.ACTION_APPLIED
 
 
-# @matrix ai-report editor : document append retry conflict
+# @matrix ai-report editor : document append retry
 @pytest.mark.parametrize("existing", [False, True])
 def test_report_append_retry_preserves_content(monkeypatch, existing):
     _patch_fake_keys(monkeypatch)
@@ -524,8 +534,38 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
     assert len(histories) == int(existing)
     if existing:
         assert histories["saved-version"].name.startswith("Before report append")
+        assert histories["saved-version"].get_asset("document").html() == "<p>Keep</p>"
     actions._append_page_document(action, report, user, {}, {"action_record": prepared, "batch": batch})
     assert page.properties.document.ydoc == snapshot
-    saved_html = page.properties.document.html
-    changed, _ = crdt.append_fragment(snapshot, "<p>Other edit</p>", "other")
-    save(page, html=saved_html + "<p>Other edit</p>", ydoc=changed)
+
+    # A receipt records the applied operation, not an immutable document version.
+    appended_html = page.properties.document.html
+    monkeypatch.setattr(Document, "save", lambda *_args, **_kwargs: pytest.fail("Retry must not write"))
+    for edit in ("edit-appended-text", "clear-document"):
+        edited = crdt.load_document(snapshot)
+        if edit == "edit-appended-text":
+            children = edited["default"].children
+            text = children[len(children) - 1].children[0]
+            text.insert(len(text), " (edited)")
+            edited_html = appended_html.replace("<p>Added</p>", "<p>Added (edited)</p>")
+        else:
+            del edited["default"].children[:]
+            edited_html = ""
+        edited_snapshot = crdt.encode_document(edited)
+        assert crdt.document_structure(edited_snapshot) != crdt.document_structure(snapshot)
+        save(page, html=edited_html, ydoc=edited_snapshot)
+        saved_assets = copy.deepcopy(page.assets)
+        recovering = copy.deepcopy(prepared)
+        recovering.pop("document_after")  # Report checkpoint was lost after append.
+
+        assert actions.inspect_document_append(recovering, user) == "applied"
+        assert recovering["document_after"] == metadata["document_after"]
+        _, pending, recovered_metadata = actions._append_page_document(
+            action, report, user, {}, {"action_record": recovering, "batch": batch}
+        )
+        assert pending == []
+        assert recovered_metadata == metadata
+        assert page.properties.document.ydoc == edited_snapshot
+        assert page.properties.document.html == edited_html
+        assert page.assets == saved_assets
+        assert len(histories) == int(existing)

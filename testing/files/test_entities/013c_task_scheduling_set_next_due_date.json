@@ -8,7 +8,7 @@
 					"hash": "rec_next001",
 					"page": { "name": "Parent Page", "hash": "page001" },
 					"schedule": { "unit": "day", "interval": 1 },
-					"expected": { "delta": { "days": 1 } }
+					"expected": { "expected_date": "2025-06-16" }
 				}
 			],
 			[
@@ -18,7 +18,7 @@
 					"hash": "rec_next002",
 					"page": { "name": "Parent Page", "hash": "page002" },
 					"schedule": { "unit": "day", "interval": 3 },
-					"expected": { "delta": { "days": 3 } }
+					"expected": { "expected_date": "2025-06-18" }
 				}
 			],
 			[
@@ -28,7 +28,7 @@
 					"hash": "rec_next003",
 					"page": { "name": "Parent Page", "hash": "page003" },
 					"schedule": { "unit": "week", "interval": 1 },
-					"expected": { "delta": { "weeks": 1 } }
+					"expected": { "expected_date": "2025-06-22" }
 				}
 			],
 			[
@@ -38,7 +38,7 @@
 					"hash": "rec_next004",
 					"page": { "name": "Parent Page", "hash": "page004" },
 					"schedule": { "unit": "week", "interval": 2 },
-					"expected": { "delta": { "weeks": 2 } }
+					"expected": { "expected_date": "2025-06-29" }
 				}
 			],
 			[
@@ -48,7 +48,7 @@
 					"hash": "rec_next005",
 					"page": { "name": "Parent Page", "hash": "page005" },
 					"schedule": { "unit": "month", "interval": 1 },
-					"expected": { "delta": { "months": 1 } }
+					"expected": { "expected_date": "2025-07-15" }
 				}
 			],
 			[
@@ -58,7 +58,7 @@
 					"hash": "rec_next006",
 					"page": { "name": "Parent Page", "hash": "page006" },
 					"schedule": { "unit": "month", "interval": 3 },
-					"expected": { "delta": { "months": 3 } }
+					"expected": { "expected_date": "2025-09-15" }
 				}
 			],
 			[
@@ -68,7 +68,7 @@
 					"hash": "rec_next007",
 					"page": { "name": "Parent Page", "hash": "page007" },
 					"schedule": { "unit": "year", "interval": 1 },
-					"expected": { "delta": { "years": 1 } }
+					"expected": { "expected_date": "2026-06-15" }
 				}
 			]
 		]
@@ -269,13 +269,13 @@
 			[
 				"TASK",
 				{
-					"name": "With postponed_from earlier - uses earlier date",
+					"name": "Four-day recurrence retains pre-postponement cadence",
 					"hash": "per_next007",
 					"page": { "name": "Parent Page", "hash": "page007" },
-					"schedule": { "unit": "day", "interval": 1 },
+					"schedule": { "unit": "day", "interval": 4 },
 					"days_ago": 0,
 					"postponed_from_days_ago": 5,
-					"expected": { "days_from_today": 1 }
+					"expected": { "days_from_today": 3 }
 				}
 			]
 		]

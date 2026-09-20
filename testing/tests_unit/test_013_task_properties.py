@@ -22,20 +22,21 @@ def test_task_description(get_test_entities):
 
     Description has:
     - Setter strips HTML tags via utility.strip_tags
-    - filter_value is lowercase
+    - filter_value preserves the plain text
     - sort_value is boolean (True if has description)
     - cache_key is "desc"
     - ai_key is "task_description" for TASK
     """
-    for task in get_test_entities():
+    tasks = get_test_entities()
+    assert tasks
+    for task in tasks:
         raw_value = task.test_spec.get("description")
 
         if raw_value:
             task.description = raw_value
 
             # Value should have HTML stripped (if any)
-            assert task.description == task.properties.description.value
-            assert "<" not in (task.description or "")  # No HTML tags
+            assert task.description == task.test_spec["expected_description"]
 
             # FilterMixin
             assert task.to_filter_index()["description"] == task.description
@@ -70,26 +71,30 @@ def test_task_due_date(get_test_entities):
     - to_filter_index includes due_date as timestamp
     - to_ai includes Due Date as formatted string
     """
-    from datetime import timezone
     from unittest.mock import patch
     from zoneinfo import ZoneInfo
 
     user_tz = ZoneInfo("America/Chicago")
 
-    with patch("lagniappe.core.tools.dates.user_timezone", return_value=user_tz):
-        for task in get_test_entities():
+    tasks = get_test_entities()
+    assert tasks
+    with (
+        patch("lagniappe.core.tools.dates.user_timezone", return_value=user_tz),
+        patch("lagniappe.core.tools.dates.datetime", wraps=datetime) as clock,
+    ):
+        clock.now.return_value = datetime(2025, 6, 15, 14, 30, tzinfo=user_tz)
+        for task in tasks:
             raw_value = task.test_spec.get("due_date")
 
             if raw_value:
                 task.due_date = raw_value
 
                 # value should be stored in UTC
-                assert task.due_date is not None
-                assert task.due_date.tzinfo == timezone.utc
+                assert task.due_date.isoformat() == "2025-06-15T19:30:00+00:00"
 
                 # column_value should be in user timezone
                 column_val = task.column("due_date").column_value
-                assert column_val.tzinfo == user_tz
+                assert column_val.isoformat() == "2025-06-15T14:30:00-05:00"
 
                 # to_filter_index includes due_date as timestamp
                 filter_index = task.to_filter_index()
@@ -97,7 +102,7 @@ def test_task_due_date(get_test_entities):
 
                 # to_ai includes Due Date as formatted string
                 ai_data = task.to_ai()
-                assert isinstance(ai_data["Due Date"], str)
+                assert ai_data["Due Date"] == "2025-06-15"
 
             else:
                 # No due date - not included in filter index or ai
@@ -114,7 +119,9 @@ def test_task_completed(get_test_entities):
     Completed stores boolean task status; filter and column surfaces expose the
     same boolean value.
     """
-    for task in get_test_entities():
+    tasks = get_test_entities()
+    assert tasks
+    for task in tasks:
         is_completed = task.test_spec.get("completed", False)
 
         if is_completed:
@@ -291,7 +298,7 @@ def test_task_has_status_filter_value(get_schema):
 
 # @matrix signature submission task : asset-lifecycle db-value
 @pytest.mark.unit
-def test_task_signature_form_submission_saves_asset_id(get_schema):
+def test_task_signature_form_submission_saves_asset_id():
     """Submitting a signature file saves it as a task asset and stores the field id."""
     form = TestEntities.get("FORM", {"name": "Signature Form", "hash": "frm013sig"})
     form.schema = [
@@ -601,7 +608,7 @@ def test_task_model_and_page_details_attach_from_key_map():
 
 # @matrix task : inheritance model-form
 @pytest.mark.unit
-def test_task_model_tracking_inherits_model_form(monkeypatch):
+def test_task_model_tracking_inherits_model_form():
     """Tasks inherit loaded model forms without lazy-loading missing relations."""
     model_form = TestEntities.get(
         "FORM", {"name": "Invoice", "hash": "model-form-inherit"}
@@ -923,6 +930,8 @@ def test_task_postpone_preserves_original_due_date_once():
         side_effect=[first_postponed, second_postponed],
     ):
         task.postpone(first_due)
+        assert task.postponed_from == first_due
+        assert task.due_date == first_postponed
         task.postpone(first_postponed)
 
     assert task.postponed_from == first_due

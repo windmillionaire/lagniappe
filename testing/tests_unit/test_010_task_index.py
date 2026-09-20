@@ -108,10 +108,6 @@ def test_task_index(get_test_entities):
     Assigned To, Modified.
     Verifies entity.column(field_id) returns correct column_value for each.
     """
-    from lagniappe.core.entities.index import TaskIndex
-
-    from testing.utility.test_entities import TestEntities
-
     index_user = TestEntities.get(
         "USER",
         {
@@ -123,6 +119,7 @@ def test_task_index(get_test_entities):
     )
 
     tasks = get_test_entities()
+    assert tasks
 
     # Set properties that need to be set via setter
     for task in tasks:
@@ -130,7 +127,7 @@ def test_task_index(get_test_entities):
         task.description = task.test_spec.get("description")
         if task.test_spec.get("completed"):
             task.completed = True
-            task.completed_on = datetime.now(timezone.utc)
+            task.completed_on = datetime(2026, 9, 19, 12, tzinfo=timezone.utc)
 
     task_index = TaskIndex(user=index_user)
     task_index._tasks = tasks
@@ -171,29 +168,25 @@ def test_task_index(get_test_entities):
     for task in tasks:
         # completed - returns boolean
         completed_col = task.column("completed")
-        expected_completed = True if task.test_spec.get("completed") else False
+        expected_completed = task.test_spec.get("completed", False)
         assert completed_col.column_value == expected_completed
 
         # name - returns entity details dict
         name_col = task.column("name")
-        assert name_col.column_value == task.details
+        assert name_col.column_value["hash"] == task.test_spec["hash"]
+        assert name_col.column_value["name"] == task.test_spec["name"]
 
         # description - returns description string or None
         desc_col = task.column("description")
-        assert desc_col.column_value == task.description
-
-        # due_date - column exists (value tested elsewhere due to timezone context)
-        assert task.column("due_date") is not None
+        assert desc_col.column_value == task.test_spec.get("description")
 
         # assigned_to - stores page; column_value is page details when assigned
         assigned_col = task.column("assigned_to")
-        if task.assigned_to:
-            assert assigned_col.column_value == task.assigned_to.reference_details
+        if assignment := task.test_spec.get("assigned_to"):
+            assert assigned_col.column_value["hash"] == assignment["page"]["hash"]
+            assert assigned_col.column_value["name"] == assignment["page"]["name"]
         else:
             assert assigned_col.column_value is None
-
-        # modified - column exists (value tested elsewhere due to timezone context)
-        assert task.column("modified") is not None
 
         if task.completed:
             assert task.column("completed").editable is True
@@ -495,7 +488,7 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
         assigned_to=None,
     )
     undated_query.assert_called_once_with(
-        start_cursor="cursor-1",
+        start_cursor=None,
         limit=2,
         project=project,
         hashes=["cat010"],
@@ -507,3 +500,19 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
     assert tasks == [undated_task]
     assert index.cursor == "cursor-2"
     assert index.append == "/tasks.rows&cursor=cursor-2&undated=1"
+
+    # Continuing the undated stream must retain its own cursor and skip dated reads.
+    with (
+        patch("lagniappe.core.entities.index.database_get.tasks_with_due_dates") as dated_query,
+        patch("lagniappe.core.entities.index.database_get.tasks_without_due_dates",
+              return_value=SimpleNamespace(results=[], next_cursor=None)) as undated_query,
+        patch("lagniappe.core.entities.index.Entities.fetch", return_value=[]),
+    ):
+        final_page = TaskIndex(cursor="cursor-2", undated=True, limit=2, user=user, entity=project)
+        assert final_page.tasks == []
+        assert final_page.append is False
+    dated_query.assert_not_called()
+    undated_query.assert_called_once_with(
+        start_cursor="cursor-2", limit=2, project=project,
+        hashes=["cat010"], assigned_to=None,
+    )

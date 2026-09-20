@@ -54,52 +54,27 @@ def test_group_permissions(get_permissions_test_data):
     Entity-level cases that lived under ``test_009c`` (users without groups) are
     covered here for groups—the same ``create_permissions`` / pruning rules apply.
     """
-    with (
-        patch("lagniappe.core.mixins.permissions.Entities.fetch") as mock_load,
-        patch(
-            "lagniappe.core.mixins.permissions.cache.get_details_by_hash"
-        ) as mock_cache,
-    ):
+    with patch("lagniappe.core.mixins.permissions.Entities.fetch") as mock_load:
         groups, resources = get_permissions_test_data()
-
+        assert groups and resources
         resource_entities = {r.hash: r for r, _ in resources if hasattr(r, "hash")}
 
         for group in groups:
-            form_data = group.test_spec.get("form_data", {})
-            user = CONFIG.TEST_CURRENT_USER
-
+            form_data = group.test_spec["form_data"]
             mock_load.return_value = [
                 e for e in resource_entities.values() if e.hash in form_data
             ]
-
-            def _details(hashes):
-                if not hashes:
-                    return {}
-                out = {}
-                for h in hashes:
-                    if h in resource_entities:
-                        out[h] = {"requires": resource_entities[h].required}
-                    else:
-                        out[h] = {"requires": []}
-                return out
-
-            mock_cache.side_effect = _details
-
             expected = group.test_spec["expected"]
 
-            group.properties.permissions.create(form_data, user=user)
+            group.properties.permissions.create(form_data, user=CONFIG.TEST_CURRENT_USER)
 
-            # Check expected permission keys and values
-            for key, value in expected.get("permissions", {}).items():
-                assert group.permissions.get(key) == value, (
-                    f"{group.name}: {key} = {group.permissions.get(key)}, expected {value}"
-                )
-
-            # Check expected RESTRICTED entries
-            for hash in expected.get("restricted", []):
-                assert group.permissions.get(hash) == "RESTRICTED", (
-                    f"{group.name}: {hash} should be RESTRICTED, got {group.permissions.get(hash)}"
-                )
+            expected_permissions = {
+                **expected["permissions"],
+                **{key: "RESTRICTED" for key in expected.get("restricted", [])},
+            }
+            assert group.permissions == expected_permissions
+            assert json.loads(group.db.get("permissions", "{}")) == expected_permissions
+            assert group.db["views"] == expected["views"]
 
 
 # @matrix permissions public-groups : active permissions public
@@ -110,52 +85,20 @@ def test_public_permissions(get_permissions_test_data):
     - Active group: sets public: TRUE
     - Inactive group: sets public: FALSE
     """
-    with (
-        patch("lagniappe.core.mixins.permissions.Entities.fetch") as mock_load,
-        patch(
-            "lagniappe.core.mixins.permissions.cache.get_details_by_hash"
-        ) as mock_cache,
-    ):
-        groups, resources = get_permissions_test_data()
-
-        resource_entities = {r.hash: r for r, _ in resources if hasattr(r, "hash")}
-
+    with patch("lagniappe.core.mixins.permissions.Entities.fetch", return_value=[]):
+        groups, _ = get_permissions_test_data()
+        assert groups
         for group in groups:
-            form_data = group.test_spec.get("form_data", {})
-            user = CONFIG.TEST_CURRENT_USER
-
-            mock_load.return_value = [
-                e for e in resource_entities.values() if e.hash in form_data
-            ]
-
-            def _details_pub(hashes):
-                if not hashes:
-                    return {}
-                out = {}
-                for h in hashes:
-                    if h in resource_entities:
-                        out[h] = {"requires": resource_entities[h].required}
-                    else:
-                        out[h] = {"requires": []}
-                return out
-
-            mock_cache.side_effect = _details_pub
-
             expected = group.test_spec["expected"]
-
-            group.properties.permissions.create(form_data, user=user)
-
-            # Check public key specifically
-            assert group.permissions.get("public") == expected["public"], (
-                f"{group.name}: public = {group.permissions.get('public')}, "
-                f"expected {expected['public']}"
+            group.properties.permissions.create(
+                group.test_spec["form_data"], user=CONFIG.TEST_CURRENT_USER
             )
-
-            # Check expected permission keys and values
-            for key, value in expected.get("permissions", {}).items():
-                assert group.permissions.get(key) == value, (
-                    f"{group.name}: {key} = {group.permissions.get(key)}, expected {value}"
-                )
+            expected_permissions = {
+                **expected["permissions"], "forms": "VIEW", "public": expected["public"]
+            }
+            assert group.permissions == expected_permissions
+            assert json.loads(group.db.get("permissions", "{}")) == expected_permissions
+            assert group.db["views"] == ["models"]
 
 
 # @matrix permissions public-groups user-groups : default-denial form-data permission-form
@@ -355,9 +298,9 @@ def test_save_permissions_refreshes_member_users_with_current_group():
     assert public_user.invalidate_cache is True
 
 
-# @matrix permissions user-groups : owner-only unauthenticated
+# @matrix permissions user-groups : admin unauthenticated
 @pytest.mark.unit
-def test_group_permissions_owner_only_and_unauthenticated_defaults():
+def test_group_permissions_require_admin_and_handle_anonymous():
     anonymous = SimpleNamespace(is_authenticated=False, is_owner=False)
     non_owner = SimpleNamespace(is_authenticated=True, is_owner=False)
 
@@ -377,6 +320,13 @@ def test_group_permissions_owner_only_and_unauthenticated_defaults():
 
     with pytest.raises(PermissionError, match="only site owner"):
         public.properties.permissions.create(user=non_owner)
+
+    admin = SimpleNamespace(is_authenticated=True, is_owner=False, is_admin=True)
+    with patch("lagniappe.core.mixins.permissions.Entities.fetch", return_value=[]):
+        group.properties.permissions.create({"models": "VIEW"}, user=admin)
+        public.properties.permissions.create({"public": "TRUE"}, user=admin)
+    assert group.permissions == {"models": "VIEW"}
+    assert public.permissions == {"forms": "VIEW", "public": "TRUE"}
 
 
 # @matrix public-groups : create enabled get permissions

@@ -32,10 +32,10 @@ class GroupPermissions(GroupPermissionsMixin, Permissions):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
-    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_owner_only_and_unauthenticated_defaults
+    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_require_admin_and_handle_anonymous
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
     # @matrix permissions user-groups : default-denial form-data restricted unauthenticated views
-    # @pair user-groups:owner-only
+    # @pair user-groups:admin
     def create(self, form_data=None, user=None):
         user = current_context_user(user)
         if not user or not user.is_authenticated:
@@ -93,10 +93,10 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_public_permissions
     # @tests tests_unit/test_009e_user_groups.py::test_public_permissions_default_forms_view_is_stored
-    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_owner_only_and_unauthenticated_defaults
+    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_require_admin_and_handle_anonymous
     # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
     # @matrix permissions public-groups user-groups : active default-forms-view explicit-none permissions public storage unauthenticated
-    # @pairs permissions:owner-only public-groups:default-forms-view
+    # @pairs permissions:admin public-groups:default-forms-view
     def create(self, form_data=None, user=None):
         user = current_context_user(user)
         if not user or not user.is_authenticated:

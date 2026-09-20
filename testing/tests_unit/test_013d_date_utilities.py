@@ -1,6 +1,6 @@
 """Unit tests for complex date utility functions in core/tools/tasks/scheduling.py."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -36,10 +36,10 @@ def test_calculate_next_scheduled_due_date():
 
     assert dates.calculate_next_scheduled_due_date(
         dst_due, {"mode": "daily"}
-    ) == datetime(2025, 3, 9, 9, 30, 45, 123456, tzinfo=tz)
+    ).isoformat() == "2025-03-09T09:30:45.123456-07:00"
     assert dates.calculate_next_scheduled_due_date(
         dst_due, {"mode": "weekly", "days": [5]}
-    ) == datetime(2025, 3, 15, 9, 30, 45, 123456, tzinfo=tz)
+    ).isoformat() == "2025-03-15T09:30:45.123456-07:00"
 
     day_31_due = datetime(2025, 1, 31, 9, 30, 45, 123456, tzinfo=tz)
     assert dates.calculate_next_scheduled_due_date(
@@ -252,28 +252,18 @@ def test_calculate_postponed_due_date():
     mock_now = datetime(2025, 6, 18, 10, 0, 0, tzinfo=tz)
 
     with patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz):
-        with patch("lagniappe.core.tools.tasks.scheduling.datetime") as mock_datetime:
+        with patch("lagniappe.core.tools.tasks.scheduling.datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = mock_now
-            # Mock strptime/timedelta/etc if needed, but dates.py uses them from the original datetime module
-            # Let's ensure mock_datetime has the same attributes as the real datetime class
-            from datetime import datetime as real_datetime
-
-            mock_datetime.side_effect = real_datetime
-            mock_datetime.strptime = real_datetime.strptime
-            mock_datetime.combine = real_datetime.combine
-            mock_datetime.min = real_datetime.min
-            mock_datetime.max = real_datetime.max
-
             # Tomorrow: Thursday June 19
             assert dates.calculate_postponed_due_date(
                 "tomorrow"
-            ) == mock_now + dates.timedelta(days=1)
+            ) == mock_now + timedelta(days=1)
 
             # Weekend: Saturday June 21
             # weekday() 0=Mon, 2=Wed. 5-2=3 days to Saturday.
             assert dates.calculate_postponed_due_date(
                 "weekend"
-            ) == mock_now + dates.timedelta(days=3)
+            ) == mock_now + timedelta(days=3)
 
             # Remaining days this week: Thursday June 19 through Sunday June 22
             for weekday, offset in {
@@ -284,7 +274,7 @@ def test_calculate_postponed_due_date():
             }.items():
                 assert dates.calculate_postponed_due_date(
                     f"this-week-{weekday}"
-                ) == mock_now + dates.timedelta(days=offset)
+                ) == mock_now + timedelta(days=offset)
 
             # Today and elapsed weekdays are not valid postponement targets.
             assert dates.calculate_postponed_due_date("this-week-wednesday") is None
@@ -294,7 +284,7 @@ def test_calculate_postponed_due_date():
             # 7-2=5 days to Monday.
             assert dates.calculate_postponed_due_date(
                 "next-week"
-            ) == mock_now + dates.timedelta(days=5)
+            ) == mock_now + timedelta(days=5)
 
             # Explicit next-week weekdays: Monday June 23 through Friday June 27
             for weekday, offset in {
@@ -306,7 +296,7 @@ def test_calculate_postponed_due_date():
             }.items():
                 assert dates.calculate_postponed_due_date(
                     f"next-week-{weekday}"
-                ) == mock_now + dates.timedelta(days=5 + offset)
+                ) == mock_now + timedelta(days=5 + offset)
 
 
 # @matrix template-formatting : blank-value date input-value string-passthrough

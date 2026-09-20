@@ -164,6 +164,8 @@ def test_ooxml_happy_paths_preserve_docx_and_xlsx_order():
     assert docx_result == OOXMLExtractionResult("Alpha\tBeta\nLeft\tRight")
     assert xlsx_result == OOXMLExtractionResult("Name\tTeam\nAlice\t2")
     assert extract_ooxml_text(docx, mimetype=DOCX_MIMETYPE) == docx_result.text
+    assert extract_ooxml(docx, filename="notes.txt") is None
+    assert extract_ooxml_text(docx, filename="notes.txt") is None
 
 
 # @matrix files : ooxml partial-result
@@ -181,6 +183,14 @@ def test_ooxml_output_budget_returns_typed_partial_result():
     assert partial_result.text == "12345"
     assert partial_result.truncated is True
     assert partial_result.truncation_reason == OOXMLTruncationReason.OUTPUT
+
+    for invalid_limit in (0, True, "5", ooxml.OOXML_POLICY.output_characters + 1):
+        with pytest.raises(ValueError, match="max_characters must be between"):
+            extract_ooxml(
+                exact,
+                filename="exact.docx",
+                max_characters=invalid_limit,
+            )
 
 
 # @matrix files : ooxml output-budget partial-result

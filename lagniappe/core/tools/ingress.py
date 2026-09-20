@@ -464,7 +464,9 @@ class IngressMutationPlanner:
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
     # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
+    # @tests tests_unit/test_006d_ingress_service.py::test_history_failure_after_task_allocation_does_not_commit_partial_row
     # @matrix ingress : row-results row-task task-import validation-errors
+    # @matrix ingress : cursor-resume failure restart
     def plan(self, row):
         values = {
             self.columns[column_id]["label"]: value
@@ -505,11 +507,8 @@ class IngressMutationPlanner:
             result.pop("entity", None)
             result.pop("history", None)
             result.setdefault("errors", []).append(str(error))
-        except Exception as error:
-            exceptions.capture(error, result)
-            result.setdefault("errors", []).append(
-                "Entity Creation Error: " + str(error)
-            )
+        # Unexpected failures must reach the service's resumable failure boundary,
+        # rather than returning a partially staged row as a successful plan.
 
         entities = []
         seen = set()

@@ -157,6 +157,8 @@ def test_page_allowed_uses_stored_requirements_without_loading_categories():
     )
 
     assert page.allowed(Action.EDIT, user=viewer) is False
+    viewer.permissions = {"shallow-permission-page": "EDIT"}
+    assert page.allowed(Action.EDIT, user=viewer) is True
     assert page.properties.model.is_set is False
     assert page.properties.categories.is_set is False
 
@@ -201,9 +203,8 @@ def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
     keys = [t_show.key, t_hide.key]
 
     def _allowed(self, action, user=None):
-        if self.key == t_hide.key:
-            return False
-        return True
+        assert action is Action.VIEW
+        return self.key != t_hide.key
 
     monkeypatch.setattr(Task, "allowed", _allowed)
 
@@ -214,7 +215,7 @@ def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
         ),
         patch(
             "lagniappe.core.entities.page.Entities.fetch",
-            return_value=[t_hide, t_show],
+            return_value=[t_hide, page, t_show],
         ) as fetch,
     ):
         page._tasks = None

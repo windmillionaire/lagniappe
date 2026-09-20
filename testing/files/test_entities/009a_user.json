@@ -29,6 +29,7 @@
 					"name": "User last login",
 					"hash": "user003",
 					"timezone": "America/Chicago",
+					"expected_column": "2024-06-15T14:30:00-05:00",
 					"page": { "name": "User Page", "hash": "page003" }
 				}
 			],
@@ -38,6 +39,7 @@
 					"name": "User last login UTC",
 					"hash": "user004",
 					"timezone": "UTC",
+					"expected_column": "2024-06-15T19:30:00+00:00",
 					"page": { "name": "User Page", "hash": "page004" }
 				}
 			]
@@ -75,18 +77,6 @@
 					"name": "Owner user test",
 					"hash": "user007",
 					"page": { "name": "User Page", "hash": "page007" }
-				}
-			]
-		]
-	},
-	"test_user_is_admin": {
-		"entities": [
-			[
-				"USER",
-				{
-					"name": "Admin user test",
-					"hash": "user008",
-					"page": { "name": "User Page", "hash": "page008" }
 				}
 			]
 		]

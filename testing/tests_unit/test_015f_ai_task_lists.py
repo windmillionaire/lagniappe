@@ -16,18 +16,21 @@ pytestmark = pytest.mark.unit
 
 
 class Task:
-    def __init__(self, number, *, completed=False, visible=True):
+    def __init__(self, number, *, completed=False, visible=True, editable=False):
         self.hash = f"{number:012x}"
         self.name = f"Task {number:03}"
         self.completed = completed
         self.visible = visible
+        self.editable = editable
         self.modified = datetime(2026, 9, 8, tzinfo=timezone.utc)
         self.description = "Repair the page navigation."
         self.project = self.model = self.form = None
         self.due_date = self.completed_on = None
 
     def allowed(self, action, user=None):
-        return self.visible and action == Action.VIEW
+        return self.visible and (
+            action == Action.VIEW or (action == Action.EDIT and self.editable)
+        )
 
     def _ai_url(self):
         return f"/tasks/task-key-{self.hash}"
@@ -60,7 +63,9 @@ def task_page(monkeypatch):
         is_authenticated=True,
         db={"timezone": "America/Los_Angeles"},
     )
-    page = Page([Task(1), Task(2, completed=True), Task(3, visible=False)])
+    page = Page(
+        [Task(1, editable=True), Task(2, completed=True), Task(3, visible=False)]
+    )
     monkeypatch.setattr(get_page_tasks.Entities, "PAGE", Page)
     monkeypatch.setattr(
         get_page_tasks.Entities,
@@ -116,12 +121,13 @@ def test_compact_tasks_preserve_identity_scope_and_followup_references(task_page
         "completed": False,
         "description": "x" * 500,
         "description_truncated": True,
-        "permissions": {"can_view": True, "can_edit": False},
+        "permissions": {"can_view": True, "can_edit": True},
         "form": {"hash": "hash:form00000001", "kind": "form", "name": "Bug"},
         "due_date": "2026-09-08",
     }
     (completed,) = result["completed_tasks"]
     assert completed["completed"] is True
+    assert completed["permissions"] == {"can_view": True, "can_edit": False}
     assert completed["completed_on"] == "2026-09-07"
     assert completed["description_truncated"] is False
     assert result["task_list"] == {
@@ -243,6 +249,12 @@ def test_compact_tasks_disclose_partial_failure_without_losing_continuation(task
 # @matrix ai tasks : compact permissions
 def test_compact_tasks_reject_inaccessible_page(task_page):
     page, user = task_page
+    assert get_page_tasks.execute_get_page_tasks({}, user) == {
+        "error": "id is required"
+    }
+    assert get_page_tasks.execute_get_page_tasks(
+        {"id": "hash:missing", "compact": True}, user
+    ) == {"error": "Page not found"}
     page.allowed = lambda *args, **kwargs: False
     assert read_tasks(page, user) == {"error": "Access denied"}
 

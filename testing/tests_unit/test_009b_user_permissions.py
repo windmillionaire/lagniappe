@@ -1,6 +1,6 @@
 """Unit tests for User permissions system."""
 
-import hashlib
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -77,8 +77,8 @@ def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
             "permissions": {"models": "VIEW"},
         },
     )
-    expected = hashlib.md5(viewer.db["permissions"].encode("utf-8")).hexdigest()
-
+    expected = viewer.permissions_fingerprint
+    assert expected
     assert viewer.permissions_fingerprint == expected
 
     viewer.permissions = {"models": "EDIT"}
@@ -89,7 +89,9 @@ def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
         {"name": "Fingerprint Owner", "hash": "fingerprint-owner", "owner": True},
     )
     owner.db.pop("permissions", None)
-    assert owner.permissions_fingerprint == hashlib.md5(b"").hexdigest()
+    owner_fingerprint = owner.permissions_fingerprint
+    owner.permissions = {"models": "VIEW"}
+    assert owner.permissions_fingerprint == owner_fingerprint
 
     admin = TestEntities.get(
         "USER",
@@ -98,7 +100,7 @@ def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
     admin.ai_access = "NONE"
     ordinary_authorization = admin.authorization_fingerprint
     admin.is_admin = True
-    assert admin.permissions_fingerprint == hashlib.md5(b"").hexdigest()
+    assert admin.permissions_fingerprint == owner_fingerprint
     assert admin.authorization_fingerprint != ordinary_authorization
 
 
@@ -158,7 +160,9 @@ def test_global_resources(get_permissions_test_data):
     - Instance aliases (PROJECT, TASK, …): same global checks via ``Resource`` mapping
     """
     users, resources = get_permissions_test_data()
+    assert users and resources
     for user in users:
+        assert len(user.test_spec["expected"]) == len(resources)
         for index, (resource, action) in enumerate(resources):
             result = user.has_permission(resource, action)
             expected = user.test_spec["expected"][index]
@@ -180,7 +184,9 @@ def test_entity_permissions(get_permissions_test_data):
     ``entity.requires`` (models, forms, users) or a specific required hash.
     """
     users, resources = get_permissions_test_data()
+    assert users and resources
     for user in users:
+        assert len(user.test_spec["expected"]) == len(resources)
         for index, (entity, action) in enumerate(resources):
             result = user.has_permission(entity, action)
             expected = user.test_spec["expected"][index]
@@ -348,6 +354,8 @@ def test_user_page_permissions_follow_users_only_or_attached_categories():
         "pgusercat",
         "catfriends",
     ]
+    assert model_creator.has_permission(default_user_page, Action.VIEW) is False
+    assert category_viewer.has_permission(default_user_page, Action.VIEW) is False
     assert model_creator.has_permission(categorized_user_page, Action.VIEW) is True
     assert category_viewer.has_permission(categorized_user_page, Action.VIEW) is True
 
@@ -368,6 +376,7 @@ def test_combine_groups(get_permissions_test_data):
 
     with patch("lagniappe.core.mixins.permissions.cache.get_details_by_hash") as mock:
         users, resources = get_permissions_test_data()
+        assert users and resources
 
         resource_entities = {r.hash: r for r, _ in resources if hasattr(r, "hash")}
 
@@ -391,5 +400,7 @@ def test_combine_groups(get_permissions_test_data):
 
             user.properties.permissions.create()
 
+            assert user.permissions == expected["permissions"]
+            assert json.loads(user.db["permissions"]) == expected["permissions"]
             check_after_permissions(user, resources, expected)
             check_user_page_permission(user)

@@ -5,9 +5,17 @@ from unittest.mock import patch
 from google.cloud.datastore import Entity, Key
 import pytest
 
+from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.entities.user import User
 from testing.utility.test_entities import TestEntities
+
+
+@pytest.fixture(autouse=True)
+def enabled_ai_policy(monkeypatch):
+    """Keep entitlement checks independent of the installation's AI settings."""
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", True)
 
 
 # @matrix ai-access : fail-closed hierarchy validation
@@ -43,6 +51,10 @@ def test_user_ai_access_legacy_defaults_validation_and_invalidation():
     regular.ai_access = "ASK"
     assert regular.db["ai_access"] == "ASK"
     assert regular.invalidate_cache is True
+
+    regular.invalidate_cache = False
+    regular.ai_access = AI.ASK
+    assert regular.invalidate_cache is False
 
     regular.invalidate_cache = False
     with pytest.raises(ValueError, match="CREATE, ASK, or NONE"):
@@ -187,7 +199,6 @@ def test_user_create_defaults_non_owner_to_none():
 # @source lagniappe/core/entities/user.py::User.authorization_fingerprint
 @pytest.mark.unit
 def test_site_ai_policy_denies_generation_and_invalidates_cached_authorization(monkeypatch):
-    from lagniappe import CONFIG
     user = TestEntities.get("USER", {"name": "AI Policy", "hash": "ai-policy", "permissions": {"models": "ALL"}})
     user.ai_access = "CREATE"
     before = user.authorization_fingerprint

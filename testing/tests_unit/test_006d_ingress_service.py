@@ -1,8 +1,10 @@
 """Durable ingress transitions, cursor commits, and progress contracts."""
 
 import json
+from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -154,12 +156,18 @@ def test_testing_batch_commits_ordered_results_and_finishes(monkeypatch):
     second = service.run_batch(limit=1)
     assert second.state == "completed"
     assert second.processed == 2
+    expected_results = [
+        {"row": json.dumps({"name": "A"}), "idempotency_key": "row:0"},
+        {"row": json.dumps({"name": "B"}), "idempotency_key": "row:1"},
+    ]
+    assert entity.results == expected_results
     assert service.stage == IngressStage.COMPLETED
     assert service.progress().to_dict()["actions"] == ["delete_imported"]
 
     duplicate = service.run_batch(limit=1)
     assert duplicate.state == "completed"
     assert duplicate.results == ()
+    assert entity.results == expected_results
 
 
 # @matrix ingress : cursor-resume failure restart
@@ -188,10 +196,67 @@ def test_failed_batch_restarts_from_committed_cursor(monkeypatch):
         service.run_batch(limit=1)
     assert service.run_status == "failed"
     assert service.cursor == 1
+    assert entity.results == [{"row": "A"}]
+    assert "failed" in service.execution["error"].lower()
+    assert "storage down" not in service.execution["error"]
 
     service.restart()
     assert service.run_status == "queued"
     assert service.cursor == 1
+    assert entity.results == [{"row": "A"}]
+    assert "error" not in service.execution
+
+
+# @matrix ingress : cursor-resume failure restart row-task
+def test_history_failure_after_task_allocation_does_not_commit_partial_row(monkeypatch):
+    entity = _ingress(stage="IMPORTING", highest="VERIFY_IMPORT", rows=[{"name": "Target"}])
+    entity.get_process("execution")["status"] = "queued"
+    entity.properties.choose_type.entity_type = "task"
+    entity.properties.verify_import.index_from = "name"
+    entity.properties.assign_columns.section["name"] = "task_name"
+    entity.form = TestEntities.get("FORM", {"name": "Import form"})
+    entity.form.form_type = "task"
+    entity.form.schema = []
+    page = TestEntities.get("PAGE", {"name": "Target"})
+    allocated = []
+
+    def allocate(planner, data):
+        task = TestEntities.get("TASK", {"name": "Imported"}, page=page)
+        task.form = data["form"]
+        allocated.append(task)
+        return task
+
+    planner_type = ingress_tools.IngressMutationPlanner
+    monkeypatch.setattr(planner_type, "_new_task", allocate)
+    monkeypatch.setattr(planner_type, "Entities", SimpleNamespace(PAGE=lambda _key: page))
+    monkeypatch.setattr(ingress_tools.files, "find_page", lambda *_args, **_kwargs: {
+        "id": page.key, "warnings": [], "errors": [],
+    })
+    history = planner_type._set_history
+    monkeypatch.setattr(planner_type, "_set_history", Mock(side_effect=RuntimeError("history unavailable")))
+    monkeypatch.setattr(ingress_tools.exceptions, "capture", lambda *_args, **_kwargs: None)
+    service = ingress_tools.IngressService(entity)
+    commit = Mock(wraps=service._commit_row)
+    monkeypatch.setattr(service, "_commit_row", commit)
+
+    with pytest.raises(RuntimeError, match="history unavailable"):
+        service.run_batch(limit=1)
+    assert len(allocated) == 1  # The failure happened after a Task was staged.
+    commit.assert_not_called()
+    assert service.run_status == "failed"
+    assert service.cursor == 0
+    assert entity.results == []
+    assert "history unavailable" not in service.execution["error"]
+
+    monkeypatch.setattr(planner_type, "_set_history", history)
+    service.restart()
+    result = service.run_batch(limit=1)
+    assert result.state == "completed"
+    assert result.processed == 1
+    assert len(entity.results) == 1
+    assert entity.results[0]["entity"] == allocated[1].details
+    assert not entity.results[0].get("errors")
+    commit.assert_called_once()
 
 
 # @matrix ingress : deterministic-key idempotency row-task
@@ -264,21 +329,28 @@ class FakeMutation:
 
 class FakeTransaction:
     def __init__(self, entity):
-        self.entity = entity
+        self.entity = deepcopy(entity)
         self.saved = []
         self.mutations = []
+        self.fail_commit = False
 
     def __enter__(self):
+        self.saved = []
+        self.mutations = []
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, exc_type, *_args):
+        if exc_type is None:
+            if self.fail_commit:
+                raise RuntimeError("commit unavailable")
+            for entity in self.saved:
+                if entity.get("type") == "ingress":
+                    self.entity = deepcopy(entity)
         return False
 
     def put(self, entity):
         self.saved.append(entity)
         self.mutations.append(FakeMutation(entity))
-        if entity.get("type") == "ingress":
-            self.entity = entity
 
 
 class FakeDatastore:
@@ -290,7 +362,7 @@ class FakeDatastore:
 
     def get(self, _key, transaction=None):
         assert transaction is self.transaction_instance
-        return self.transaction_instance.entity
+        return deepcopy(self.transaction_instance.entity)
 
 
 def _database(monkeypatch, execution):
@@ -318,7 +390,7 @@ def _database(monkeypatch, execution):
 # @matrix ingress : cursor duplicate-delivery
 def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
-    entity, _datastore = _database(
+    entity, datastore = _database(
         monkeypatch,
         {"status": "queued", "cursor": 0},
     )
@@ -336,12 +408,14 @@ def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
     assert rejected["committed"] is False
     assert rejected["reason"] == "cursor"
     assert rejected["execution"]["cursor"] == 1
+    assert datastore.transaction_instance.saved == []
+    assert json.loads(datastore.transaction_instance.entity["execution"])["cursor"] == 1
 
 
 # @pair ingress:stop
 def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
-    entity, _datastore = _database(
+    entity, datastore = _database(
         monkeypatch,
         {
             "status": "running",
@@ -354,6 +428,9 @@ def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch)
     assert stopped["execution"]["status"] == "stopped"
     assert "lease_token" not in stopped["execution"]
     assert "lease_expires" not in stopped["execution"]
+    assert json.loads(datastore.transaction_instance.entity["execution"]) == {
+        "status": "stopped", "cursor": 0
+    }
 
     candidate = SimpleNamespace(key="ingress", db=dict(entity))
     committed = database_ingress.commit_ingress_row(
@@ -362,6 +439,7 @@ def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch)
     assert committed["committed"] is False
     assert committed["reason"] == "state"
     assert committed["execution"]["cursor"] == 0
+    assert datastore.transaction_instance.saved == []
 
 
 # @matrix ingress : compare-and-set cursor durable-commit property-mask
@@ -381,6 +459,8 @@ def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypat
     )
     assert rejected["committed"] is False
     assert rejected["reason"] == "cursor"
+    assert datastore.transaction_instance.saved == []
+    assert json.loads(datastore.transaction_instance.entity["execution"])["cursor"] == 2
 
     committed = database_ingress.commit_ingress_row(
         "ingress",
@@ -395,12 +475,22 @@ def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypat
     assert mutation.upsert is None
     assert mutation.update is dependent.db
     assert mutation.property_mask.paths == ["modified"]
+    stored = deepcopy(datastore.transaction_instance.entity)
+    assert json.loads(stored["execution"])["cursor"] == 3
+    assert stored["modified"] == now
+
+    datastore.transaction_instance.fail_commit = True
+    with pytest.raises(RuntimeError, match="commit unavailable"):
+        database_ingress.commit_ingress_row(
+            "ingress", 3, candidate, ((candidate, None),), now
+        )
+    assert datastore.transaction_instance.entity == stored
 
 
 # @matrix ingress : compare-and-set cursor failure status stop
 def test_ingress_status_update_is_cursor_checked(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
-    _entity, _datastore = _database(
+    _entity, datastore = _database(
         monkeypatch,
         {"status": "queued", "cursor": 1},
     )
@@ -413,6 +503,7 @@ def test_ingress_status_update_is_cursor_checked(monkeypatch):
     )
     assert stale["updated"] is False
     assert stale["reason"] == "cursor"
+    assert datastore.transaction_instance.saved == []
 
     updated = database_ingress.update_ingress_status(
         "ingress",
@@ -425,3 +516,6 @@ def test_ingress_status_update_is_cursor_checked(monkeypatch):
     assert updated["execution"]["status"] == "failed"
     assert updated["execution"]["cursor"] == 1
     assert updated["execution"]["error"] == "failed"
+    assert json.loads(datastore.transaction_instance.entity["execution"]) == {
+        "status": "failed", "cursor": 1, "error": "failed"
+    }

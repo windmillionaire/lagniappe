@@ -42,7 +42,7 @@ def merge_documents(*snapshots):
 
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry conflict
+# @matrix ai-report editor : document append retry
 def document_structure(snapshot):
     # @testable false
     # @covered-by lagniappe/core/tools/document_crdt.py::document_structure

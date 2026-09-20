@@ -214,6 +214,7 @@ def _register_presence(sync_id, client_id, user):
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
+# @tests tests_unit/test_010_sync_cache.py::test_document_generation_change_returns_all_retained_deltas
 # @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
 # @matrix polling sync : author-attribution delta document presence revision snapshot
@@ -239,10 +240,12 @@ def poll_document(
     requires_snapshot = (
         not generation_matches or known_revision < int(state["base_revision"])
     )
+    # A snapshot starts at this generation's base, not the previous client's cursor.
+    delta_start = int(state["base_revision"]) if requires_snapshot else known_revision
     updates = [
         update
         for update in state.get("updates", [])
-        if int(update.get("revision") or 0) > known_revision
+        if int(update.get("revision") or 0) > delta_start
     ]
     payload = {
         "generation": state["generation"],

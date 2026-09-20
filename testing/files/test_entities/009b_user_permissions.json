@@ -215,6 +215,7 @@
 						}
 					],
 					"expected": {
+						"permissions": {"models": "EDIT", "puser1": "EDIT"},
 						"before": [false, false, false, false, false, false],
 						"after": [true, true, true, false, true, true]
 					}
@@ -240,6 +241,7 @@
 						}
 					],
 					"expected": {
+						"permissions": {"cat001": "DELETE", "puser2": "EDIT"},
 						"before": [false, false, false, false, false, false],
 						"after": [false, false, true, true, true, true]
 					}
@@ -260,6 +262,7 @@
 						}
 					],
 					"expected": {
+						"permissions": {"cat001": "VIEW", "puser3": "EDIT"},
 						"before": [false, false, false, false, true, true],
 						"after": [false, false, true, false, true, false]
 					}
@@ -280,6 +283,7 @@
 						}
 					],
 					"expected": {
+						"permissions": {"cat001": "RESTRICTED", "page001": "VIEW", "puser4": "EDIT"},
 						"before": [true, false, true, false, true, false],
 						"after": [false, false, false, false, true, false]
 					}
@@ -300,6 +304,7 @@
 						}
 					],
 					"expected": {
+						"permissions": {"models": "VIEW", "puser5": "EDIT"},
 						"before": [false, false, true, false, true, false],
 						"after": [true, false, true, false, true, false]
 					}

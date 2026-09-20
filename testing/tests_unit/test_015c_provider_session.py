@@ -153,6 +153,8 @@ def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch, serv
     finally:
         session.close()
     assert len(calls) == 3
+    assert retries == [True, True]
+    assert all(call["model"] == "fake" for call in calls)
     assert all(call["contents"] is contents for call in calls)
     assert all(call["config"].http_options.retry_options.attempts == 1 for call in calls)
     assert all(call["config"].http_options.timeout == 10000 for call in calls)

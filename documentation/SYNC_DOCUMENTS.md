@@ -46,7 +46,9 @@ continue to use optimistic transactions and fresh durable reads where required.
 `POST /l/sync` appends Yjs deltas under a Redis optimistic transaction. Every
 delta receives a monotonic revision. Polling returns:
 
-- a full snapshot when generation differs or the cursor predates compaction;
+- a full snapshot plus every retained delta after its base revision when
+  generation differs or the cursor predates compaction (an old generation's
+  numeric cursor must not filter the replacement generation's deltas);
 - only newer deltas otherwise; and
 - a presence list only when its digest changed.
 
@@ -115,6 +117,13 @@ operation receipt, including the expected post-append content signature, so a
 retry after a Report checkpoint failure does not append twice. AI/MCP document
 actions remain append-only. Inline edits, replacement and deletion belong in the
 editor; corrective plans do not automatically remove previously appended content.
+
+An applied receipt is final evidence that its operation committed, even if a user
+later edits or deletes the appended content. Its signature describes the historical
+post-append state, not a requirement that the current document still match. Recovery
+reconciles the Report checkpoint from that receipt without flagging later content
+edits as drift, appending again, restoring deleted text, or making another document
+version. Existing fresh-access checks still apply.
 
 After an append commits, the server publishes a new revision/generation with the
 merged snapshot. Connected/offline clients merge it using the existing sync

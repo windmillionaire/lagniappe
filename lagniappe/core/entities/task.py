@@ -69,7 +69,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         return value
 
     # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
     # @matrix task-scheduling : durable-uncomplete post-commit
     def _defer_scheduled_uncomplete(self, schedule_at):
         self.db["scheduled_uncomplete_token"] = uuid4().hex
@@ -279,6 +279,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
     # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_and_retries
     # @matrix task-completion : assignee complete completed-by no-schedule
@@ -314,7 +315,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_repeats_when_completed
     # @matrix task-scheduling : complete next-due-date recurring schedule-queue
-    # @pair task-completion:next-due-date
+    # @pairs task-completion:next-due-date task-completion:schedule-queue
     def _complete_active_schedule(self, *, history_key=None):
         self.properties.schedule.set_next_due_date()
         if history_key is None:

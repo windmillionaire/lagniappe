@@ -167,9 +167,9 @@ class FilterCache:
                 return
             cursor = index.next_cursor
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason project task cache loading needs real database/filter-cache behavior
+    # @testable true
+    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters
+    # @matrix cache filters project task : all-tasks completed restrictions source-query
     def _load_project_tasks(self):
         """Load every task for a project filter cache.
 
@@ -192,14 +192,10 @@ class FilterCache:
         self._to_cache.update(self._entity_map(tasks))
 
     # @testable true
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_uses_shared_cache_key_without_user_restrictions
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_category_pages_without_restrictions
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
-    # @matrix cache filters project task : all-tasks completed restrictions source-query
-    # @matrix filters : entity-condition model-task run-results string-condition shared-key
+    # @matrix filters : entity-condition model-task run-results string-condition
     def cache(self):
         """Build or incrementally refresh the filter cache."""
         # filter_cache.delete(self.cache_key)

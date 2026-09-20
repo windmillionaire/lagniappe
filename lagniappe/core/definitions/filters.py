@@ -207,6 +207,9 @@ class FilterDefinition:
     def __str__(self):
         return f"{self.entity_hash} {self.field} {self.field_type.value} {self.comparator.value} {self.value} {self.is_entity_valued}"
 
+    # @testable true
+    # @tests tests_unit/test_012b_form_conditions.py::test_zero_number_condition_survives_saved_filter_serialization
+    # @matrix filters : condition-definition number round-trip zero
     @property
     def description(self):
         """Serializable list representation for storage."""
@@ -219,7 +222,7 @@ class FilterDefinition:
                 self.value,
                 self.is_entity_valued,
             ]
-        elif self.value:
+        elif self.value is not None:
             return [
                 self.entity_hash,
                 self.field,

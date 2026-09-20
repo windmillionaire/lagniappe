@@ -45,6 +45,8 @@ class ScheduleType(ProcessProperty):
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
     # @pair task-scheduling:ai-generation
+    # @tests tests_unit/test_013a_task_scheduling.py::test_generated_schedule_prompt_survives_reload_and_avoids_regeneration
+    # @matrix task-scheduling : periodic scheduled prompt-reuse
     def create(self):
         if not self.prompt:
             return
@@ -59,9 +61,10 @@ class ScheduleType(ProcessProperty):
             return
 
         result["description"] = result.pop("text")
-        result["user_prompt"] = self._user_prompt
+        result["user-prompt"] = self._user_prompt
 
         self.section.update(result)
+        self.section.pop("user_prompt", None)  # Retire the old spelling on regeneration.
         self.complete = True
 
 
@@ -204,7 +207,8 @@ class Schedule(Property):
 
     Get:
         schedule: The active schedule ProcessProperty (Recurring, Periodic, or Scheduled).
-        skipped (int): Number of overdue occurrences since last completion.
+        skipped (int): Additional missed occurrences after the due-date baseline,
+            excluding the original outstanding occurrence and today.
         error (str | None): Error from the active schedule.
     """
 
@@ -270,6 +274,8 @@ class Schedule(Property):
     # @testable true
     # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_recurring
     # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
+    # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today
+    # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_preserves_earliest_due_date_baseline
     # @matrix task-scheduling : periodic recurring scheduled skipped
     @property
     def skipped(self):
