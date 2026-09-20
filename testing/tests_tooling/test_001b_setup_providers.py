@@ -278,14 +278,14 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
     )
     deliveries = []
 
-    def test_delivery(config, recipient):
+    def send_candidate(config, recipient):
         assert saves == []
         deliveries.append((config.copy(), recipient))
         if len(deliveries) == 1:
             raise ProviderTransientError("The Gmail connection was interrupted.")
         return True
 
-    monkeypatch.setattr(auth_email, "test_smtp_delivery", test_delivery)
+    monkeypatch.setattr(auth_email, "test_smtp_delivery", send_candidate)
     monkeypatch.setattr(
         auth_email,
         "_configure_dmarc_for_sender",
@@ -713,11 +713,23 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     from installer import auth_email
 
     saves = []
+    previous = {
+        "provider": "smtp",
+        "service": "Legacy SMTP",
+        "host": "smtp.legacy.test",
+        "port": 587,
+        "security": "starttls",
+        "username": "legacy-user",
+        "password": "legacy-password",
+        "senderEmail": "legacy@example.test",
+        "senderName": "Legacy Sender",
+    }
     settings = types.SimpleNamespace(
         APP={
             "ADMIN_EMAIL": "owner@example.test",
             "APP_NAME": "Demo",
             "CUSTOM_DOMAIN": "app.example.test",
+            "AUTH_EMAIL_CONFIG": previous.copy(),
         },
         save=lambda: saves.append(True),
     )
@@ -736,34 +748,34 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     )
     monkeypatch.setattr(auth_email, "FORMATTER", formatter)
     deliveries = []
-    monkeypatch.setattr(
-        auth_email,
-        "test_smtp_delivery",
-        lambda config, recipient: deliveries.append(
-            (config.copy(), recipient)
-        )
-        or True,
-    )
+
+    def send_candidate(config, recipient):
+        assert settings.APP["AUTH_EMAIL_CONFIG"] == previous
+        assert saves == []
+        deliveries.append((config.copy(), recipient))
+        if len(deliveries) == 1:
+            raise ProviderError("SMTP provider rejected the candidate")
+        return True
+
+    monkeypatch.setattr(auth_email, "test_smtp_delivery", send_candidate)
     dmarc_domains = []
     monkeypatch.setattr(
         auth_email,
         "_configure_dmarc_for_sender",
         lambda sender: dmarc_domains.append(sender) or True,
     )
-    answers = iter(
-        [
-            "n",
-            "Resend",
-            "smtp.resend.test",
-            "465",
-            "ssl",
-            "resend",
-            "provider-key",
-            "noreply@example.test",
-            "Demo",
-            "owner@example.test",
-        ]
-    )
+    candidate_answers = [
+        "Resend",
+        "smtp.resend.test",
+        "465",
+        "ssl",
+        "resend",
+        "provider-key",
+        "noreply@example.test",
+        "Demo",
+        "owner@example.test",
+    ]
+    answers = iter(["n", *candidate_answers, "", *candidate_answers])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     assert auth_email._setup_provider_auth_email()
@@ -779,7 +791,8 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
         "senderName": "Demo",
     }
     assert deliveries == [
-        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test")
+        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test"),
+        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test"),
     ]
     assert dmarc_domains == ["noreply@example.test"]
     assert saves == [True]

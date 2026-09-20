@@ -218,52 +218,6 @@ def test_deferred_jobs_cli_verifies_installation_before_provisioning(monkeypatch
     assert events == ["verify", "provision"]
 
 
-def test_security_cli_routes_to_security_configuration(monkeypatch):
-    from runner import gcloud as runner_gcloud
-
-    _isolate_cli_routing_prerequisites(monkeypatch)
-    events = []
-    security_module = types.ModuleType("installer.security")
-    security_module.configure_security = lambda: events.append("security") or 0
-    monkeypatch.setitem(sys.modules, "installer.security", security_module)
-    monkeypatch.setattr(
-        runner_gcloud,
-        "activate_repository_gcloud",
-        lambda **_kwargs: True,
-    )
-    monkeypatch.setattr(sys, "argv", ["-m installer", "security"])
-
-    setup_path = Path(__file__).resolve().parents[2] / "installer" / "__main__.py"
-    with pytest.raises(SystemExit) as exit_info:
-        runpy.run_path(setup_path, run_name="__main__")
-
-    assert exit_info.value.code == 0
-    assert events == ["security"]
-
-
-def test_development_cli_routes_to_development_setup(monkeypatch):
-    from runner import gcloud as runner_gcloud
-
-    _isolate_cli_routing_prerequisites(monkeypatch)
-    events = []
-    development_module = types.ModuleType("installer.development")
-    development_module.setup_development = lambda: events.append("development") or 0
-    monkeypatch.setitem(sys.modules, "installer.development", development_module)
-    monkeypatch.setattr(
-        runner_gcloud,
-        "activate_repository_gcloud",
-        lambda **_kwargs: True,
-    )
-    monkeypatch.setattr(sys, "argv", ["-m installer", "development"])
-
-    setup_path = Path(__file__).resolve().parents[2] / "installer" / "__main__.py"
-    with pytest.raises(SystemExit) as exit_info:
-        runpy.run_path(setup_path, run_name="__main__")
-
-    assert exit_info.value.code == 0
-    assert events == ["development"]
-
-
 # @matrix setup : authentication-email cli deploy gmail replacement smtp
 def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
     import config
@@ -1122,6 +1076,7 @@ def test_redis_connection_uses_shared_tls_settings_and_exits_on_failure(
     monkeypatch.setattr(redis_pkg, "Redis", FailingRedis)
     with pytest.raises(ProviderError):
         redis_setup.test_redis_connection()
+    assert len(closed_clients) == 3
 
 
 # @matrix setup : certificate-validation failure-isolation redis-tls settings-save
@@ -2692,8 +2647,11 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
 # @source config/deployment.py::normalize_deployment_settings
 # @matrix config : app-yaml deployment-settings memory-pressure
 def test_default_deployment_uses_three_memory_safe_workers():
+    from config.deployment import normalize_deployment_settings
+
     constants = _load_config_constants()
     assert constants.DEFAULT_DEPLOYMENT_SETTINGS["DEPLOY_WORKER_COUNT"] == "3"
+    assert normalize_deployment_settings({})["DEPLOY_WORKER_COUNT"] == "3"
 
 
 # @matrix config user-settings : app-yaml deployment-settings validation

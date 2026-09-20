@@ -1,5 +1,6 @@
 """Tooling tests for setup validation and configuration helpers."""
 
+import copy
 import json
 from pathlib import Path
 import shutil
@@ -1325,6 +1326,9 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     from config import constants
     from installer import create_config
 
+    original_handlers = copy.deepcopy(constants.APP_HANDLERS)
+    original_index = copy.deepcopy(constants.INDEX_YAML)
+
     (tmp_path / "package.json").write_text(json.dumps({"version": "1.0.0"}))
     config.SETTINGS.NODE = config.File.PACKAGE_JSON.load()
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
@@ -1379,9 +1383,19 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
         "svc@my-project-1.iam.gserviceaccount.com"
     )
     assert app_yaml["inbound_services"] == ["warmup"]
-    assert app_yaml["handlers"] == constants.APP_HANDLERS
+    assert app_yaml["handlers"] == original_handlers
     assert dev_config["gcloud_config"]["PROJECT"] == "my-project-1"
     assert dev_config["gcloud_config"]["ACCOUNT"] == "admin@example.com"
+
+    assert config.SETTINGS.INDEX == original_index
+    config.SETTINGS.DEPLOY["handlers"][0]["http_headers"]["Cache-Control"] = (
+        "changed after generation"
+    )
+    config.SETTINGS.INDEX["indexes"][0]["properties"][0]["name"] = (
+        "changed after generation"
+    )
+    assert constants.APP_HANDLERS == original_handlers
+    assert constants.INDEX_YAML == original_index
 
 
 # @pair setup:config-files

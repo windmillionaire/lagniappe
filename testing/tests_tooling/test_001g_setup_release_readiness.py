@@ -125,6 +125,15 @@ def test_redacted_install_summary_is_allowlisted():
         "GIBBERISH": "bucket-source-secret",
         "SECRET_KEY": "flask-secret",
         "SENTRY_DSN": "https://sentry-secret@example.test/1",
+        "IDENTITY_PLATFORM_CONFIG": {
+            "projectId": "demo-project",
+            "apiKey": "identity-api-secret",
+        },
+        "AUTH_EMAIL_CONFIG": {
+            "provider": "smtp",
+            "password": "smtp-password-secret",
+        },
+        "CLOUDFLARE_API_TOKEN": "cloudflare-token-secret",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@demo-project.iam.gserviceaccount.com"
         ),
@@ -174,6 +183,9 @@ def test_redacted_install_summary_is_allowlisted():
         "redis-secret",
         "flask-secret",
         "sentry-secret",
+        "identity-api-secret",
+        "smtp-password-secret",
+        "cloudflare-token-secret",
     ):
         assert secret not in text
 
@@ -197,6 +209,10 @@ def test_expected_resource_summary_is_allowlisted():
         "REDIS_PASSWORD": "redis-secret",
         "GIBBERISH": "bucket-source-secret",
         "SECRET_KEY": "flask-secret",
+        "IDENTITY_PLATFORM_CONFIG": {
+            "projectId": "demo-project",
+            "apiKey": "identity-api-secret",
+        },
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@demo-project.iam.gserviceaccount.com"
         ),
@@ -216,12 +232,14 @@ def test_expected_resource_summary_is_allowlisted():
     assert "Internal caller service account: runtime@demo-project" in text
     assert "Task queue: lagniappe-tasks" in text
     assert "OCR processor: projects/demo/locations/us/processors/123" in text
+    assert "Identity Platform project: demo-project" in text
     assert "App Engine runtime: python314" in text
     assert "History bucket:" in text
     for secret in (
         "bucket-source-secret",
         "redis-secret",
         "flask-secret",
+        "identity-api-secret",
     ):
         assert secret not in text
 
@@ -447,6 +465,44 @@ def test_doctor_reads_adc_identity_without_changing_it():
     }
     assert events and "userinfo.email" in events[0][1]
 
+    user_credentials = types.SimpleNamespace(
+        token=None,
+        quota_project_id="demo-project",
+    )
+    refresh_request = object()
+
+    def refresh(request):
+        assert request is refresh_request
+        user_credentials.token = "adc-access-token"
+
+    user_credentials.refresh = refresh
+    token_requests = []
+
+    def token_lookup(url, *, params, timeout):
+        token_requests.append((url, params, timeout))
+        return types.SimpleNamespace(
+            status_code=200,
+            json=lambda: {"email": "user@example.test"},
+        )
+
+    assert doctor._read_adc_identity(
+        auth_default=lambda scopes: (user_credentials, "demo-project"),
+        request_factory=lambda: refresh_request,
+        token_lookup=token_lookup,
+    ) == {
+        "state": "success",
+        "principal": "user@example.test",
+        "project": "demo-project",
+        "quota_project": "demo-project",
+    }
+    assert token_requests == [
+        (
+            "https://oauth2.googleapis.com/tokeninfo",
+            {"access_token": "adc-access-token"},
+            5,
+        )
+    ]
+
 
 # @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
@@ -539,9 +595,10 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
 # @matrix setup : explicit-mutation repair validation
 def test_repair_runs_reconciliation_then_validation(monkeypatch):
     events = []
+    install_result = {"value": 0}
     monkeypatch.setattr(
         "installer.install.install",
-        lambda: events.append("reconcile") or 0,
+        lambda: events.append("reconcile") or install_result["value"],
     )
     monkeypatch.setattr(
         verify,
@@ -551,6 +608,12 @@ def test_repair_runs_reconciliation_then_validation(monkeypatch):
 
     assert verify.repair_installation() == 0
     assert events == ["reconcile", "validate"]
+
+    for unsuccessful_result in (False, None, 7):
+        events.clear()
+        install_result["value"] = unsuccessful_result
+        assert verify.repair_installation() == unsuccessful_result
+        assert events == ["reconcile"]
 
 
 def test_doctor_cli_bypasses_mutating_setup_operation(monkeypatch):

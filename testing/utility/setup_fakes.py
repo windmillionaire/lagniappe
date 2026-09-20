@@ -28,7 +28,7 @@ class FakeSession:
     def _next_response(self):
         if self.responses:
             return self.responses.pop(0)
-        return FakeResponse()
+        raise AssertionError("Unexpected provider request: no fake response remains")
 
     def get(self, url, **kwargs):
         self.calls.append({"method": "GET", "url": url, **kwargs})
