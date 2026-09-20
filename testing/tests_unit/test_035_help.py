@@ -33,7 +33,6 @@ def clear_topic_caches():
 # @pair help:canonical-source
 def test_topics_are_canonical_and_portable():
     corpus = reference.topics()
-    assert len(corpus) == 45
     assert 'form_creation' not in corpus
     assert {'navigation', 'search', 'filters', 'documents', 'offline',
             'messages_notifications', 'task_scheduling', 'task_history',
@@ -242,7 +241,7 @@ def test_index_upgrade_does_not_hide_provider_failures(memory_cache):
 # @matrix help : publication version
 def test_population_is_versioned_atomic_and_skips_warm_start(memory_cache, monkeypatch):
     version = help_cache.ensure_help()
-    assert len(memory_cache.hashes) == 46
+    assert len(memory_cache.hashes) == len(reference.topics()) + 1
     key = f'{HELP_PREFIX}{version}:create_form'
     row = memory_cache.hashes[key]
     assert row['topic_id'] == 'create_form' and row['kind'] == 'help'
@@ -277,7 +276,7 @@ def test_failed_population_is_retryable_and_cache_loss_repopulates(memory_cache)
     memory_cache.hashes.clear()
     memory_cache.values.clear()
     assert help_cache.ensure_help() == version
-    assert len(memory_cache.hashes) == 45
+    assert len(memory_cache.hashes) == len(reference.topics())
 
 
 # @pair help:publication

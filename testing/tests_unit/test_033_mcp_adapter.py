@@ -1711,11 +1711,11 @@ def test_failed_concurrent_startup_cancels_sibling_requests() -> None:
     assert fake.cancelled == {"me", "tools"}
 
 
+# @pair mcp-adapter:product-contract
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 @pytest.mark.parametrize(
     ("status", "code"), [(401, "unauthorized"), (403, "forbidden")]
 )
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 def test_published_tools_still_honor_next_request_revocation_or_permission_loss(
     status: int,
     code: str,
@@ -2780,11 +2780,6 @@ def test_create_start_schema_recovery_preserves_selection_and_created_plan(failu
 
 
 # @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-
-
-# @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/schema.py::validate_value
 @pytest.mark.parametrize("bound, limit, value", [("maximum", 50, 100), ("minimum", 1, 0), ("maxLength", 2, "private"), ("maxItems", 1, ["private", "value"])])
 def test_validation_errors_expose_only_safe_bounds(bound, limit, value):
@@ -3035,12 +3030,8 @@ def test_context_enrichment_remains_cancellable():
 
 
 # @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-
-
-# @pair mcp-adapter:product-contract
 # @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow(monkeypatch):
+def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow():
     async def exercise():
         from lagniappe_mcp.limits import MCP_INSTRUCTIONS
 

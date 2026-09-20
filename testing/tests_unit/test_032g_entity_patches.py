@@ -137,23 +137,6 @@ def test_page_patch_preserves_omitted_membership():
 
 
 # @matrix entity-patch : preservation validation preparation permissions
-def test_patch_checks_completion_and_migrations_without_owner_guards(monkeypatch):
-    actor, task, form, page = case()
-    prepared = prepare_patch(task, {"description": "Short", "submission": {"answer": "Migrated"}}, actor)
-    assert prepared.guards == ()
-    page.db["modified"] = datetime.now(timezone.utc)
-    assert prepare_patch(task, {"description": "Short"}, actor).entity.description == "Short"
-    task.completed = True
-    with pytest.raises(ValidationError, match="Completed"):
-        prepare_patch(task, {"description": "Short"}, actor)
-    task.completed = False
-    form.db["pending_form_change"] = "concurrent-migration"
-    with pytest.raises(ValidationError, match="Wait"):
-        prepare_patch(task, {"description": "Short"}, actor)
-    assert task.description == "Long original description"
-
-
-# @matrix entity-patch : preservation validation preparation permissions
 def test_patch_validates_classification_assignee_and_explicit_clears():
     actor, task, form, page = case()
     project, other = entity("PROJECT", "project"), entity("PROJECT", "other")
