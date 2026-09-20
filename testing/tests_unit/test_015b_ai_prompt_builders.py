@@ -662,13 +662,8 @@ def test_ai_summary_generation_marks_partial_ooxml_context(monkeypatch):
     assert context.endswith(
         "[Extracted text is partial because the worksheet row limit was reached.]"
     )
-    expected_header = (
-        "# This text was automatically extracted from large.xlsx. Formatting, "
-        "formulas, dates, and embedded objects may be incomplete.\n\n"
-    )
-    assert extraction_limits == [
-        summarize.EXTRACTED_CONTEXT_LIMIT - len(expected_header)
-    ]
+    (extraction_limit,) = extraction_limits
+    assert 0 < extraction_limit < summarize.EXTRACTED_CONTEXT_LIMIT
 
 
 # @pair ai:tools

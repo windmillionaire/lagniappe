@@ -59,6 +59,7 @@ def _ordinary_restriction_allows(recipient, restrictions):
 # @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @matrix messaging : owner-opt-in permission self-exclusion
+# @matrix task-assignment : owner-opt-in permission self-assignment
 # @pair task-assignment:permission
 def recipient_allowed(actor, recipient, *, channel):
     """Validate a recipient at the final mutation boundary."""

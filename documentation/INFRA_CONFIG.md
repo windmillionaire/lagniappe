@@ -187,9 +187,15 @@ not automatic public metadata.
 
 ## Error reporting and agent access
 
-Backend and browser Sentry destinations are separate settings. Both paths
-remove request payloads and identity context, allowlist structural request
-metadata, redact recognized credentials, and bound nested context. Error
+Backend `SENTRY_DSN` and browser `SENTRY_JS_DSN` destinations are independent
+settings. At runtime, a missing, null, or blank browser DSN disables browser
+reporting; it never falls back to the backend destination. Explicit browser DSNs
+are whitespace-trimmed, and the backend setting is left unchanged. Setup still
+supplies both destinations when monitoring is configured, including an explicitly
+shared destination for an operator's own project.
+
+Both paths remove request payloads and identity context, allowlist structural
+request metadata, redact recognized credentials, and bound nested context. Error
 messages and stack traces remain diagnostic content.
 
 Backend tracing and profiling use the optional `SENTRY_TRACES_SAMPLE_RATE` and

@@ -595,7 +595,7 @@ def test_skip_proposal_actions_marks_dependencies():
     ]
 
 
-# @matrix ai-report : dependencies grouped-display proposal restore skip
+# @matrix ai-report : dependencies exact-indexes grouped-display proposal restore skip
 @pytest.mark.unit
 def test_toggle_proposal_action_skip_restores_dependencies():
     proposal = {
@@ -624,6 +624,22 @@ def test_toggle_proposal_action_skip_restores_dependencies():
         True,
         True,
         True,
+        None,
+    ]
+
+    selection.toggle_proposal_action_indexes(proposal, 1, [0, 1])
+    exact = selection.toggle_proposal_action_indexes(
+        proposal,
+        0,
+        [0, 1],
+        include_dependencies=False,
+    )
+
+    assert exact == {"changed": [1, 2], "skipped": [1, 2]}
+    assert [action.get("skip") for action in proposal["actions"]] == [
+        True,
+        True,
+        None,
         None,
     ]
 

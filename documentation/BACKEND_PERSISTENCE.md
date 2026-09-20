@@ -170,6 +170,13 @@ attempt, and that deletion must name the exact attempt-unique path and generatio
 Temporary upload sources are instead deleted after their File/Report checkpoint,
 using a generation precondition and idempotent already-absent handling.
 
+The immediate-copy path in `copy_direct_upload_file` also supplies
+the captured source generation as a deletion precondition. An absent source or
+generation mismatch leaves the successful copy intact; cleanup never retries
+without the precondition. Other storage failures propagate with the copied
+destination still recorded on the upload. Report/autofill finalization opts out
+of immediate cleanup and retains its post-checkpoint cleanup/retry protocol.
+
 ## Data migrations
 
 `database/migrations.py` executes the registered migration catalog through the

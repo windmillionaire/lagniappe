@@ -26,12 +26,26 @@ def test_notification_email_preference_defaults_and_eligibility():
     assert user.notification_email_mode == "NONE"
     assert user.db["notification_email_opt_out_epoch"] == 1
     assert not email_policy.eligible_user(user)
+    user.notification_email_mode = "NONE"
+    assert user.db["notification_email_opt_out_epoch"] == 1
+    user.notification_email_mode = "DAILY"
+    user.notification_email_mode = "NONE"
+    assert user.db["notification_email_opt_out_epoch"] == 2
 
     public = user_row("public", now, public=True, mode="DAILY")
     never_logged_in = user_row("new", now, logged_in=False, mode="DAILY")
+    inactive = user_row("inactive", now, mode="DAILY")
+    inactive.active = False
+    addressless = user_row("addressless", now, mode="DAILY")
+    addressless.email = ""
     assert public.notification_email_mode == "NONE"
     assert not email_policy.eligible_user(public)
     assert not email_policy.eligible_user(never_logged_in)
+    assert not email_policy.eligible_user(inactive)
+    assert not email_policy.eligible_user(addressless)
+
+    with pytest.raises(ValueError, match="Public users"):
+        public.notification_email_mode = "IMMEDIATE"
 
     with pytest.raises(ValueError, match="NONE, IMMEDIATE, or DAILY"):
         user.notification_email_mode = "weekly"

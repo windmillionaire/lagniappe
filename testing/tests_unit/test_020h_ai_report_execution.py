@@ -583,7 +583,7 @@ def test_completed_task_retry_preserves_reused_completion(monkeypatch):
             },
         },
     )
-    stored, _saves = _recovery_store(monkeypatch, page, task)
+    _recovery_store(monkeypatch, page, task)
     original_execute = ReportActionAdapter.apply
     calls = []
     failed = {"value": False}
@@ -612,12 +612,6 @@ def test_completed_task_retry_preserves_reused_completion(monkeypatch):
         "finish_project",
         "finish_project",
     ]
-
-    def delete(*entities):
-        for entity in entities:
-            stored.pop(entity.urlsafe_key, None)
-
-    monkeypatch.setattr(report_runner.Entities, "delete", delete)
 
 
 # @matrix ai-report : completed-task-history grouping result

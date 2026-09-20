@@ -74,6 +74,21 @@ def test_hosted_e2e_cookie_is_signed_scoped_and_expiring():
             version="another-version",
             source="a" * 40,
         )
+    with pytest.raises(HostedE2EAuthenticationError, match="another deployment"):
+        load_hosted_e2e_cookie(
+            secret,
+            value,
+            version="e2e-version",
+            source="b" * 40,
+        )
+    with pytest.raises(HostedE2EAuthenticationError, match="invalid or expired"):
+        load_hosted_e2e_cookie(
+            secret,
+            value,
+            version="e2e-version",
+            source="a" * 40,
+            max_age=-1,
+        )
     with pytest.raises(HostedE2EAuthenticationError, match="invalid or expired"):
         load_hosted_e2e_cookie(
             secret,

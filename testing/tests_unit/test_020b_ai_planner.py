@@ -93,8 +93,16 @@ def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, fee
 # @matrix ai-report : validation file-placement
 def test_file_usage_requires_exact_coverage_and_files_only_filing():
     usage = [{"file": "hash:receipt12345", "usage": "evidence"}]
-    assert planner.validate_file_usage(usage, ["hash:receipt12345"]) == usage
-    for invalid in (None, [], usage * 2, [{"file": "unknown", "usage": "evidence"}]):
+    validated = planner.validate_file_usage(usage, ["hash:receipt12345"])
+    assert validated == usage
+    assert validated is not usage
+    for invalid in (
+        None,
+        [],
+        usage * 2,
+        [{"file": "unknown", "usage": "evidence"}],
+        [{"file": "hash:receipt12345", "usage": "archive"}],
+    ):
         with pytest.raises(exceptions.AIException):
             planner.validate_file_usage(invalid, ["hash:receipt12345"])
     with pytest.raises(exceptions.AIException, match="must be organized"):
@@ -102,6 +110,7 @@ def test_file_usage_requires_exact_coverage_and_files_only_filing():
             usage, ["hash:receipt12345"], require_organization=True
         )
     usage[0]["usage"] = "organize"
+    assert validated == [{"file": "hash:receipt12345", "usage": "evidence"}]
     with pytest.raises(exceptions.AIException, match="Answer-only"):
         planner.validate_file_usage(usage, ["hash:receipt12345"], read_only=True)
 

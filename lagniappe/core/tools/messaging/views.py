@@ -133,7 +133,7 @@ def get_conversation(user, conversation_identifier):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : chronological-display history-page
+# @matrix messaging : chronological-display history-page participant-privacy
 def conversation_history(
     user,
     conversation_identifier,

@@ -265,6 +265,65 @@ def test_config_honors_ai_observability_setting(monkeypatch):
     assert module.CONFIG.REDIS_CA_CERT == "config/files/redis_ca.pem"
 
 
+# @source lagniappe/__init__.py::Config
+# @pair config:error-reporting
+@pytest.mark.parametrize(
+    "browser_settings, expected",
+    [
+        pytest.param({}, "", id="missing"),
+        pytest.param({"SENTRY_JS_DSN": None}, "", id="null"),
+        pytest.param({"SENTRY_JS_DSN": ""}, "", id="empty"),
+        pytest.param({"SENTRY_JS_DSN": " \t "}, "", id="whitespace"),
+        pytest.param(
+            {"SENTRY_JS_DSN": "https://browser.example.test/2"},
+            "https://browser.example.test/2",
+            id="separate-destination",
+        ),
+        pytest.param(
+            {"SENTRY_JS_DSN": " https://browser.example.test/2 "},
+            "https://browser.example.test/2",
+            id="padded-destination",
+        ),
+        pytest.param(
+            {"SENTRY_JS_DSN": "https://backend.example.test/1"},
+            "https://backend.example.test/1",
+            id="explicitly-shared-destination",
+        ),
+    ],
+)
+def test_config_keeps_sentry_browser_destination_independent(
+    monkeypatch, browser_settings, expected
+):
+    import lagniappe
+
+    app_settings = {
+        "CONFIG_KIND": "lagniappe-settings",
+        "CONFIG_SCHEMA_VERSION": 3,
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
+        "GOOGLE_CLOUD_PROJECT": "project-1",
+        "APP_ENGINE_LOCATION": "us-central",
+        "RESOURCE_REGION": "us-central1",
+        "GIBBERISH": "bucket-seed",
+        "VERSION": "1.0",
+        "CAPTURE_ERRORS": True,
+        "SENTRY_DSN": "https://backend.example.test/1",
+        **browser_settings,
+    }
+    original_settings = copy.deepcopy(app_settings)
+    monkeypatch.setattr(
+        lagniappe, "SETTINGS", types.SimpleNamespace(app_config=app_settings)
+    )
+    monkeypatch.setenv("FLASK_ENV", "production")
+
+    config = lagniappe.Config()
+
+    assert config.SENTRY_JS_DSN == expected
+    assert config.SENTRY_DSN == "https://backend.example.test/1"
+    assert config.capture_errors is True
+    assert app_settings == original_settings
+
+
 # @pairs config:error-reporting error-reporting:sampling
 def test_config_normalizes_and_validates_sentry_sample_rates(monkeypatch):
     app_settings = {
@@ -510,6 +569,16 @@ def test_google_access_token_refreshes_adc_when_stale(monkeypatch):
     with pytest.raises(RuntimeError, match="scopes and IAM") as failure:
         config.google_access_token()
     assert isinstance(failure.value.__cause__, PermissionError)
+
+    class EmptyCredentials:
+        token = None
+
+        def before_request(self, request, method, url, headers):
+            return None
+
+    config._google_credentials = EmptyCredentials()
+    with pytest.raises(RuntimeError, match="did not provide an access token"):
+        config.google_access_token()
 
 
 # @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix

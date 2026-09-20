@@ -712,5 +712,8 @@ def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):
     assert saved == [(report, actor)]
     if changes:
         actor.access = lambda _required: False
-        with pytest.raises(Exception, match="Creating proposals requires"):
+        with pytest.raises(
+            report_adapters.exceptions.ValidationError,
+            match="Creating proposals requires",
+        ):
             adapter.apply(context)

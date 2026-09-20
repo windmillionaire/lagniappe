@@ -54,9 +54,10 @@ class DeferredJobRecovery:
 
     # @testable true
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_redispatches_one_cas_claimed_stale_job
+    # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_terminalizes_one_cas_claimed_expired_job
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_resumes_stale_terminal_delivery_after_grace
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
-    # @matrix deferred-jobs : compare-and-set deterministic-task-id grace orphaned-input reconciliation redispatch terminal-delivery
+    # @matrix deferred-jobs : compare-and-set deterministic-task-id grace maximum-age orphaned-input reconciliation redispatch terminal-delivery
     # @pair notifications:terminal-delivery
     def reconcile(self, *, now=None, limit=250):
         """Redispatch stranded work and bound the age of every operation."""

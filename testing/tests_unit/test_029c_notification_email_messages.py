@@ -20,7 +20,7 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix notification-email : latest-only message quiet-window read-suppression
+# @matrix notification-email : clear-suppression hide-suppression latest-only message quiet-window read-suppression reply-suppression
 def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     store = MemoryDatastore()
@@ -125,3 +125,34 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     ) == {"state": "sent"}
     assert "later message" in sent[1][0][2]
     assert sent[0][1]["message_id"] != sent[1][1]["message_id"]
+
+    def clear_conversation(message, sequence):
+        conversation["cleared_through"] = {recipient_id: sequence}
+
+    def hide_message(message, _sequence):
+        message["hidden_for"] = [recipient.key]
+
+    def reply_to_conversation(message, _sequence):
+        conversation["last_sender"] = recipient.key
+
+    for offset, (label, suppress) in enumerate(
+        (
+            ("cleared", clear_conversation),
+            ("hidden", hide_message),
+            ("recipient replied", reply_to_conversation),
+        ),
+        start=5,
+    ):
+        created = fourth_time + timedelta(minutes=10 * (offset - 3))
+        message = incoming(offset, created, label)
+        candidate = email_capture.record_message(message, conversation, recipient)
+        suppress(message, offset)
+        store.put(conversation)
+        store.put(message)
+
+        assert email_delivery.deliver(
+            candidate.key.to_legacy_urlsafe().decode(),
+            now=created + timedelta(minutes=5),
+        ) == {"state": "suppressed"}
+
+    assert len(sent) == 2

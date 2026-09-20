@@ -256,7 +256,7 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     assert report_url in html_body
 
 
-# @matrix notification-email : digest full-roundup future-only-switch item-cap timezone
+# @matrix notification-email : digest full-roundup future-only-switch item-cap opt-out-suppression timezone
 def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     now = datetime(2026, 8, 15, 14, tzinfo=timezone.utc)
     store = MemoryDatastore()
@@ -345,3 +345,26 @@ def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     assert "First event" in sent[0][2]
     assert "Second event" in sent[0][2]
     assert "1 more item is available" in sent[0][2]
+
+    opt_out_now = now + timedelta(days=1)
+    opt_out_event = email_capture.record_notification_event(
+        recipient,
+        store.key(KINDS.activity.value, "opt-out", parent=recipient.key),
+        body="Must not be sent",
+        now=opt_out_now,
+    )
+    opt_out_batch_key = Key.from_legacy_urlsafe(tasks[-1]["payload"]["delivery_key"])
+    opt_out_batch = store.get(opt_out_batch_key)
+    recipient.notification_email_mode = "NONE"
+    monkeypatch.setattr(
+        email_database,
+        "digest_events",
+        lambda _batch: [store.get(opt_out_event.key)],
+    )
+
+    assert email_delivery.deliver(
+        opt_out_batch.key.to_legacy_urlsafe().decode(),
+        now=opt_out_batch["due_at"],
+    ) == {"state": "suppressed"}
+    assert store.get(opt_out_event.key)["state"] == "suppressed"
+    assert len(sent) == 1

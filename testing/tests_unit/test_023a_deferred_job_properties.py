@@ -765,6 +765,69 @@ def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
     assert recent["dispatch_state"] == "pending"
 
 
+# @source lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
+# @matrix deferred-jobs : compare-and-set lease maximum-age reconciliation
+@pytest.mark.parametrize("status", ["queued", "running", "retry_wait"])
+@pytest.mark.parametrize("age_seconds", [10799, 10800, 10801])
+def test_recovery_maximum_age_expires_live_work_at_the_boundary(
+    monkeypatch, status, age_seconds
+):
+    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    entity = {
+        "status": status,
+        "status_revision": 4,
+        "dispatch_state": "claimed",
+        "created": now - timedelta(seconds=age_seconds),
+        "modified": now,
+        "lease_token": "active-worker",
+        "lease_expires": now + timedelta(minutes=5),
+        "next_attempt_at": now + timedelta(minutes=5),
+    }
+    original = dict(entity)
+    datastore = FakeDatastore(entity)
+    monkeypatch.setattr(
+        deferred_database, "DATA", SimpleNamespace(datastore=datastore)
+    )
+    monkeypatch.setattr(deferred_database, "_deferred_job_key", lambda _value: "job")
+    updates = {
+        "status": "failed",
+        "dispatch_state": "delivery_pending",
+        "lease_token": None,
+        "lease_expires": None,
+        "next_attempt_at": None,
+    }
+
+    result = deferred_database.claim_deferred_job_recovery(
+        "job", 4, now, grace_seconds=120, max_age_seconds=10800,
+        stale_updates=updates,
+    )
+
+    if age_seconds < 10800:
+        assert result["claimed"] is False
+        assert result["reason"] == "not-due"
+        assert entity == original
+        assert datastore.transaction_instance.saved == []
+    else:
+        assert result["claimed"] is True
+        assert result["action"] == "failed"
+        assert result["reason"] == "maximum-age"
+        assert entity == {
+            "status": "failed",
+            "status_revision": 5,
+            "dispatch_state": "delivery_pending",
+            "created": original["created"],
+            "modified": now,
+        }
+        assert entity in datastore.transaction_instance.saved
+
+        replay = deferred_database.claim_deferred_job_recovery(
+            "job", 4, now, grace_seconds=120, max_age_seconds=10800,
+            stale_updates=updates,
+        )
+        assert replay["claimed"] is False
+        assert entity["status_revision"] == 5
+
+
 # @matrix deferred-jobs : cancellation compare-and-set lease terminal-race tombstone
 def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
     now = datetime(2026, 7, 19, tzinfo=timezone.utc)

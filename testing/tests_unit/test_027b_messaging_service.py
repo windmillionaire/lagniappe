@@ -23,7 +23,7 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @matrix messaging : body-validation chronological-display clear-horizon compose-eligibility conversation-page deterministic-key history-page idempotency new-after-clear per-copy-delete read-race reply-permission unread-count
+# @matrix messaging : body-validation chronological-display clear-horizon compose-eligibility conversation-page deterministic-key history-page idempotency new-after-clear participant-privacy per-copy-delete read-race reply-permission unread-count
 # @matrix notifications : aggregate-count revision
 def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkeypatch):
     store = MemoryDatastore()
@@ -201,6 +201,10 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
     assert listed["conversations"][0]["peer"]["replyable"] is True
     assert listed["cursor"] == "next-page"
     assert [item["body"] for item in history["messages"]] == ["fourth"]
+
+    stranger = managed_user("stranger", "Mallory")
+    with pytest.raises(PermissionError, match="unavailable"):
+        message_views.conversation_history(stranger, restored.key)
 
     with pytest.raises(ValidationError):
         message_values.normalize_body("   ")

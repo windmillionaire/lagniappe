@@ -230,7 +230,7 @@ def create_direct_upload_session(
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_bad_token
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
-# @matrix storage : direct-upload token validation
+# @matrix storage : direct-upload expiry token validation
 def load_direct_upload_token(token, max_age=DIRECT_UPLOAD_TOKEN_MAX_AGE):
     """Load and validate a direct-upload token payload."""
     try:
@@ -335,7 +335,7 @@ def direct_upload_file(record, *, consumer=None):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_copy_direct_upload_file_copies_and_deletes_temp_object
-# @matrix storage : direct-upload final-copy
+# @matrix storage : direct-upload final-copy generation-conditional-cleanup idempotency
 def copy_direct_upload_file(
     upload,
     path,
@@ -381,7 +381,11 @@ def copy_direct_upload_file(
         )
         copied.patch(**patch_options)
     if delete_source:
-        upload.blob.delete()
+        try:
+            upload.blob.delete(if_generation_match=source_generation)
+        except (google_exceptions.NotFound, google_exceptions.PreconditionFailed):
+            # An absent source needs no cleanup; a replacement is not ours to delete.
+            pass
     return copied
 
 
