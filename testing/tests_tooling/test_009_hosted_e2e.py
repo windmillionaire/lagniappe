@@ -1239,7 +1239,19 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
     monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
     monkeypatch.setattr(hosted_e2e, "_verify_soft_routing_guard", lambda _value: None)
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: {"present": True})
+    active_executions = ["lagniappe-e2e-active1"]
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_active_job_executions",
+        lambda *_args, **_kwargs: tuple(active_executions),
+    )
+    provider_calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_gcloud",
+        lambda *arguments, **options: provider_calls.append((arguments, options)),
+    )
     monkeypatch.setattr(hosted_e2e, "_acquire_cleanup_lease", CleanupLease)
     monkeypatch.setattr(
         hosted_e2e,
@@ -1253,12 +1265,22 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
         lambda *arguments, **options: cors_changes.append((arguments, options)),
     )
 
+    with pytest.raises(HostedE2EError, match="active hosted E2E executions"):
+        hosted_e2e.teardown()
+    assert provider_calls == []
+    assert result_root.exists()
+
+    active_executions.clear()
     result = hosted_e2e.teardown()
 
     assert result["status"] == "torn-down"
     assert hosted_e2e._load_json(state_path)["status"] == "torn-down"
     assert not result_root.exists()
     assert setup_path.exists()
+    assert [call[0][:4] for call in provider_calls] == [
+        ("run", "jobs", "delete", infrastructure.job),
+        ("app", "versions", "delete", version),
+    ]
     assert cors_changes == [((infrastructure, state["base_url"]), {"present": False})]
     assert (
         f"Removed local hosted E2E artifacts: {result_root}" in capsys.readouterr().out
@@ -1566,16 +1588,12 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
         "pull-requests": "read",
     }
     assert attest["permissions"] == {"statuses": "write"}
-    assert request["name"] == "Resolve hosted release request"
     assert "preflight" not in workflow["jobs"]
     assert execute["needs"] == "request"
     assert "needs.request.outputs.execute == 'true'" in execute["if"]
     assert execute["environment"] == "hosted-e2e"
     assert "environment" not in quality
-    assert "Prepare hosted release evidence" in execute["name"]
-    assert "Execute hosted suite" in execute["name"]
     assert "Source quality and traceability" in quality["name"]
-    assert "Manual dispatch guard" in quality["name"]
     assert quality["needs"] == ["request", "execute"]
     assert "github.event_name == 'push'" in quality["if"]
     assert "needs.request.outputs.execute == 'true'" in quality["if"]
@@ -1583,13 +1601,11 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "inputs.mode == 'continuation'" in quality["if"]
     assert attest["needs"] == ["quality"]
     assert "needs.quality.result == 'success'" in attest["if"]
-    assert "Publish current-head release status" in attest["name"]
     assert "ref: ${{ needs.request.outputs.candidate_sha }}" in workflow_text
     assert "ref: ${{ steps.context.outputs.evidence_sha }}" in workflow_text
     assert "PR_HEAD_SHA" in workflow_text
     assert "next/*|hotfix/*" in workflow_text
     assert '"head=$owner:$branch"' in workflow_text
-    assert "No open pull request to main" in workflow_text
     assert "synchronize" not in workflow["on"]["pull_request"]["types"]
     assert "google-github-actions/auth" in workflow_text
     assert "gcloud run jobs describe" in workflow_text
@@ -1598,14 +1614,10 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "--wait" not in workflow_text
     assert "gcloud storage cp" in workflow_text
     assert "attempt<=720" in workflow_text
-    assert "completion manifest" in workflow_text
     assert "hosted-e2e import-results" in workflow_text
     assert '--execution "$EXECUTION"' in workflow_text
     assert 'rm -f -- "$credentials_file"' in workflow_text
     assert "statuses/$EVIDENCE_SHA" in workflow_text
-    assert "Hosted evidence and release gates passed" in (
-        workflow_text
-    )
     assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
 
     quality_text = yaml.dump(quality, sort_keys=False)

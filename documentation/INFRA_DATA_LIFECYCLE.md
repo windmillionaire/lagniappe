@@ -183,6 +183,9 @@ only the same project/manual backup.
 
 Failure leaves the application in maintenance with the safety clone and asset
 versions available for diagnosis. Restore does not automatically roll back.
+If clearing Redis fails, restore does not regenerate task deliveries or resume
+traffic or the queue. Retrying the same restore resumes at cache clearing;
+completed import and validation steps are not repeated.
 The Admin **Backups & Archives** tab is informational; restore and delete remain
 exact-confirmation operator commands.
 

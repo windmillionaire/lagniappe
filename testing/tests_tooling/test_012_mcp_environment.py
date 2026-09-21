@@ -25,11 +25,13 @@ UV_SCRIPT = b"#!/bin/sh\nprintf '%s\\n' 'uv 0.12.9'\n"
 class _ArchiveResponse(io.BytesIO):
     status = 200
 
-    def __init__(self, payload, url):
+    def __init__(self, payload, url, *, content_length=None):
         super().__init__(payload)
         self._url = url
         self.headers = {
-            "Content-Length": str(len(payload)),
+            "Content-Length": str(
+                len(payload) if content_length is None else content_length
+            ),
             "Content-Encoding": "identity",
         }
 
@@ -38,9 +40,10 @@ class _ArchiveResponse(io.BytesIO):
 
 
 class _ArchiveOpener:
-    def __init__(self, payload, *, final_url=None):
+    def __init__(self, payload, *, final_url=None, content_length=None):
         self.payload = payload
         self.final_url = final_url
+        self.content_length = content_length
         self.requests = []
 
     def open(self, request, *, timeout):
@@ -48,6 +51,7 @@ class _ArchiveOpener:
         return _ArchiveResponse(
             self.payload,
             self.final_url or request.full_url,
+            content_length=self.content_length,
         )
 
 
@@ -108,6 +112,30 @@ def _uv_runner(command, **_kwargs):
     return subprocess.CompletedProcess(command, 0, stdout=version, stderr="")
 
 
+def _bootstrap_path_lookup_lines(tree):
+    shutil_names = {
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name == "shutil"
+    }
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in shutil_names
+            and node.attr == "which"
+        ) or (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "shutil"
+            and any(alias.name == "which" for alias in node.names)
+        )
+    ]
+
+
 def test_uv_bootstrap_is_standard_library_only():
     path = REPOSITORY_ROOT / "runner/uv_bootstrap.py"
     source = path.read_text(encoding="utf-8")
@@ -120,7 +148,24 @@ def test_uv_bootstrap_is_standard_library_only():
             imported_roots.add(node.module.split(".", 1)[0])
 
     assert imported_roots <= sys.stdlib_module_names | {"__future__"}
-    assert "shutil.which" not in source
+    assert _bootstrap_path_lookup_lines(tree) == []
+
+
+@pytest.mark.parametrize(
+    "source, prohibited",
+    [
+        ("import shutil\nshutil.which('uv')", True),
+        ("import shutil as files\nfiles.which('uv')", True),
+        ("from shutil import which as find_tool\nfind_tool('uv')", True),
+        ("import shutil\nshutil.copyfile('source', 'target')", False),
+        ("record.which\nexample = 'shutil.which(uv)'", False),
+    ],
+    ids=["module", "module-alias", "function-alias", "other-shutil", "unrelated"],
+)
+def test_uv_bootstrap_path_guard_recognizes_imports_not_unrelated_attributes(
+    source, prohibited
+):
+    assert bool(_bootstrap_path_lookup_lines(ast.parse(source))) is prohibited
 
 
 # @matrix mcp-package setup : bootstrap manifest managed-path platform-pin url-policy version-pin
@@ -572,7 +617,7 @@ def test_uv_bootstrap_preserves_existing_copy_on_download_or_replace_failure(
         expected = "size does not match"
     elif failure == "oversized":
         download = payload + b"x"
-        expected = "size does not match"
+        expected = "exceeded the manifest size ceiling"
     else:
 
         def fail_replace(_source, _destination):
@@ -588,7 +633,10 @@ def test_uv_bootstrap_preserves_existing_copy_on_download_or_replace_failure(
             system="Linux",
             architecture="x86_64",
             libc="gnu",
-            opener=_ArchiveOpener(download),
+            opener=_ArchiveOpener(
+                download,
+                content_length=len(payload) if failure in {"truncated", "oversized"} else None,
+            ),
             run=destination_looks_stale,
             replace=replacement,
         )
@@ -743,6 +791,11 @@ def test_mcp_environment_uses_managed_uv_lock_and_isolated_python(
         "UV_MANAGED_PYTHON": "1",
         "UV_PYTHON": "/tmp/untrusted-python",
         "UV_PYTHON_DOWNLOADS": "automatic",
+        "PYTHONHOME": "/tmp/untrusted-home",
+        "PYTHONPATH": "/tmp/untrusted-imports",
+        "PYTEST_ADDOPTS": "--collect-only",
+        "PYTEST_PLUGINS": "untrusted_plugin",
+        "VIRTUAL_ENV": "/tmp/untrusted-environment",
     }
     for name, value in hostile_uv.items():
         monkeypatch.setenv(name, value)
@@ -779,8 +832,13 @@ def test_mcp_environment_uses_managed_uv_lock_and_isolated_python(
     assert {
         name for name in sync_options["env"] if name.startswith("UV_")
     } == {"UV_CACHE_DIR", "UV_NO_BUILD", "UV_PROJECT_ENVIRONMENT"}
-    assert "VIRTUAL_ENV" not in sync_options["env"]
-    assert "PYTHONPATH" not in sync_options["env"]
+    assert not {
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "PYTEST_ADDOPTS",
+        "PYTEST_PLUGINS",
+        "VIRTUAL_ENV",
+    } & sync_options["env"].keys()
     assert events[1][0][:2] == [str(python), "-I"]
 
 

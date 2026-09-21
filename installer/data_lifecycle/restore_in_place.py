@@ -467,7 +467,7 @@ def _completion_record(context, plan, checkpoint):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_is_confirmed_resumable_and_has_no_rollback
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
-# @matrix data-lifecycle : confirmation dry-run in-place-merge legacy-journal-rejection progress queue-purge-audit remote-journal restore resume
+# @matrix data-lifecycle : cache-invalidation confirmation dry-run in-place-merge legacy-journal-rejection progress queue-purge-audit remote-journal restore resume
 def restore_backup(
     backup_id,
     *,
@@ -660,6 +660,9 @@ def restore_backup(
             owner_email=plan["owner_email"],
         )
         checkpoint.update("target-validated", target_validated=True, validation=result)
+    if not checkpoint.payload.get("cache_invalidated"):
+        context.invalidate_cache()
+        checkpoint.update("cache-invalidated", cache_invalidated=True)
     if not checkpoint.payload.get("scheduled_tasks_reconciled"):
         result = reconcile_scheduled_uncomplete_tasks(context, plan)
         checkpoint.update(
@@ -667,9 +670,6 @@ def restore_backup(
             scheduled_tasks_reconciled=True,
             scheduled_task_result=result,
         )
-    if not checkpoint.payload.get("cache_invalidated"):
-        context.invalidate_cache()
-        checkpoint.update("cache-invalidated", cache_invalidated=True)
     if not checkpoint.payload.get("traffic_restored"):
         context.set_traffic(plan["original_traffic"], split_by=plan["traffic_split_by"])
         checkpoint.update("traffic-restored", traffic_restored=True)

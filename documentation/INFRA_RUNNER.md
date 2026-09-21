@@ -193,6 +193,15 @@ the lockfile, and resolves the matching official `node:<version>-bookworm-slim`
 image digest for hosted E2E. The installer reads the same `.nvmrc` floor.
 An unavailable or invalid image stops this declaration update before files
 are changed. No Docker installation or image-layer download is required.
+The declaration update stages all changed files and recovery copies beside
+their destinations before publication, preserving existing file permissions.
+A caught publication error or Ctrl+C restores the previous files and removes
+any newly created pin. If restoration fails, the command reports the affected
+paths and retains recovery copies for manual repair; resolve that partial state
+before retrying. Cleanup failures leave the aligned files in place and report
+the staging directories that need removal. This is exception recovery, not a
+crash-atomic transaction across files. It does not undo the already-installed
+Node runtime or other completed dependency updates.
 At release freeze, `run.py release-check` validates the staged `.nvmrc`, both
 npm engine declarations, and the hosted image's matching version and digest
 pin. It checks recorded versions without making network requests or requiring
