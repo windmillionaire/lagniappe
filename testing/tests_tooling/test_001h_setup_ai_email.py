@@ -92,9 +92,18 @@ def test_resend_setup_client_uses_full_key_for_provider_administration():
         "re_full", request=request, retry_sleep=lambda _delay: None
     )
     assert client.list_domains() == []
+    client.create_receiving_domain("inbound.example.com")
 
     assert calls[0][2]["headers"]["Authorization"] == "Bearer re_full"
     assert calls[0][2]["timeout"] == 15
+    assert calls[1][0:2] == (
+        "POST",
+        "https://api.resend.com/domains",
+    )
+    assert calls[1][2]["json"] == {
+        "name": "inbound.example.com",
+        "capabilities": {"sending": "disabled", "receiving": "enabled"},
+    }
 
 
 # @matrix ai-email setup : domain idempotence receiving-only resend resend-domain setup
@@ -159,14 +168,15 @@ def test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy(monkeypatc
     events = []
 
     class Client:
+        def __init__(self, webhooks):
+            self.webhooks = webhooks
+
         def list_webhooks(self):
-            return [
-                {
-                    "id": "webhook-1",
-                    "endpoint": "https://app.example.com/webhooks/resend/ai-email",
-                    "status": "enabled",
-                }
-            ]
+            return self.webhooks
+
+        def create_webhook(self, endpoint):
+            events.append(("create", endpoint))
+            return {"id": "webhook-new"}
 
         def update_webhook(self, webhook_id, *, endpoint, status):
             events.append(("update", webhook_id, endpoint, status))
@@ -182,7 +192,16 @@ def test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy(monkeypatc
             }
 
     result = ai_email.reconcile_webhook(
-        Client(), "https://app.example.com/webhooks/resend/ai-email"
+        Client(
+            [
+                {
+                    "id": "webhook-1",
+                    "endpoint": "https://app.example.com/webhooks/resend/ai-email",
+                    "status": "enabled",
+                }
+            ]
+        ),
+        "https://app.example.com/webhooks/resend/ai-email",
     )
 
     assert result["id"] == "webhook-1"
@@ -193,6 +212,22 @@ def test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy(monkeypatc
             "https://app.example.com/webhooks/resend/ai-email",
             "disabled",
         )
+    ]
+
+    events.clear()
+    result = ai_email.reconcile_webhook(
+        Client([]), "https://app.example.com/webhooks/resend/ai-email"
+    )
+
+    assert result["id"] == "webhook-new"
+    assert events == [
+        ("create", "https://app.example.com/webhooks/resend/ai-email"),
+        (
+            "update",
+            "webhook-new",
+            "https://app.example.com/webhooks/resend/ai-email",
+            "disabled",
+        ),
     ]
 
 
@@ -481,6 +516,9 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     assert saved["resend"]["sendingApiKey"] == "re_send"
     assert saved["resend"]["senderEmail"] == "noreply@example.com"
     output = capsys.readouterr().out
+    assert "re_full" not in output
+    assert "re_send" not in output
+    assert "whsec_dGVzdC1zZWNyZXQ=" not in output
     assert "Next step: deploy and activate AI email submissions." in output
     assert "no synthetic email or health probe is run" in output
     assert (

@@ -10,6 +10,8 @@ Start with `documentation/TESTING_TRACEABILITY_TOOL.md` for the annotation contr
 For general test-writing conventions, use `documentation/TESTING_WRITING_TESTS.md`.
 When starting from an existing test, use the test-writing checklist and the
 traceability tool's `--test` reverse report to find its declared source owners.
+That filter is limited to configured `test_roots`; for excluded tooling
+meta-tests, inspect owners directly or use a deliberately scoped configuration.
 
 ## Goal
 

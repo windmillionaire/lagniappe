@@ -10,6 +10,8 @@ Read [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) and
 reshaping a test. An example is `testing/tests_js/test_045_offline_queue.mjs`.
 Harness contracts are exercised in `test_000_native_harness.mjs` and
 `test_000_native_runner.py`; the latter intentionally tests the Python bridge.
+`test_002_traceability_interop.py` likewise exercises the real Python-to-Node
+inventory boundary. Python-only traceability policies remain in tooling.
 
 ## Commands and case declarations
 

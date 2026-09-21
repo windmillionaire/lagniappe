@@ -97,7 +97,17 @@ def _policy(name="projects/demo-project/alertPolicies/memory", **values):
 # @matrix monitoring setup : instance-class threshold
 @pytest.mark.parametrize(
     ("instance_class", "envelope_mib"),
-    sorted(monitoring.INSTANCE_CLASS_MEMORY_MIB.items()),
+    (
+        ("F1", 384),
+        ("F2", 768),
+        ("F4", 1536),
+        ("F4_1G", 3072),
+        ("B1", 384),
+        ("B2", 768),
+        ("B4", 1536),
+        ("B4_1G", 3072),
+        ("B8", 3072),
+    ),
 )
 def test_memory_threshold_is_derived_from_each_supported_instance_class(
     instance_class,
@@ -353,3 +363,4 @@ def test_inspection_reports_missing_and_drifted_managed_policy(monkeypatch):
         "details": {"policy": "current"},
         "error": None,
     }
+    assert {call[0] for call in session.calls} == {"GET"}

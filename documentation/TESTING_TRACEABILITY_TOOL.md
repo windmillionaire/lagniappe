@@ -360,6 +360,15 @@ as `tests_unit/test_example.py`. MCP service tests live there too, even though
 the runner executes them in the service's isolated dependency environment.
 Absolute paths, traversal and the retired `repo:` client-test roots are rejected.
 
+`--test TARGET` filters tests already discovered within the configured
+`test_roots`; naming a file explicitly does not expand those roots. The default
+configuration includes the behavior suites and selected tooling owners, not
+every tooling meta-test. `--test matched no discovered tests` can therefore mean
+that an existing test is outside report scope, not that pytest cannot run it.
+Review such tests directly, or use `--config` with a deliberately scoped
+configuration when a reverse report is needed. Do not broaden the repository's
+default roots merely to make a one-off review command match.
+
 Suite placement remains independent of traceability:
 
 - backend logic: `testing/tests_unit/`

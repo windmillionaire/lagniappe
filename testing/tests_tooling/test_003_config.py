@@ -190,11 +190,11 @@ def test_google_location_aliases_keep_app_engine_and_regional_resources_distinct
 def test_dependency_upgrade_tracks_all_requirement_files():
     from runner import upgrade
 
-    assert [path.name for path in upgrade.REQUIREMENTS_PATHS] == [
+    assert [path.as_posix() for path in upgrade.REQUIREMENTS_PATHS] == [
         "requirements-installer.txt",
         "requirements.txt",
         "requirements-dev.txt",
-        "font-requirements.txt",
+        "build/font-requirements.txt",
     ]
 
 

@@ -424,19 +424,48 @@ def test_visible_subprocess_output_pauses_progress(monkeypatch):
 
     events = []
     progress = types.SimpleNamespace(
-        stop=lambda: events.append("paused"),
-        start=lambda: events.append("resumed"),
+        running=True,
+        console=None,
+        stop=lambda: setattr(progress, "running", False),
+        start=lambda: setattr(progress, "running", True),
     )
+
+    class DiagnosticStream(io.StringIO):
+        def write(self, text):
+            if "provider unavailable" in text:
+                assert not progress.running
+            return super().write(text)
+
+    stream = DiagnosticStream()
+    progress.stream = stream
+    monkeypatch.setattr(sys, "stdout", stream)
     command = ["provider", "argument with spaces"]
 
     def run(args, **kwargs):
         assert args == command
         assert kwargs["capture_output"] is False
-        assert events[-1] == "paused"
+        assert not progress.running
         events.append("provider output")
         return subprocess.CompletedProcess(args, 0)
 
     monkeypatch.setattr(process.subprocess, "run", run)
     monkeypatch.setattr(ui, "ACTIVE_PROGRESS", [progress])
     assert process.run_command(command, capture_output=False).returncode == 0
-    assert events == ["paused", "provider output", "resumed"]
+    assert events == ["provider output"]
+    assert progress.running
+
+    events.clear()
+
+    def fail(args, **kwargs):
+        assert args == command
+        assert kwargs["capture_output"] is False
+        assert not progress.running
+        events.append("provider failure")
+        raise subprocess.CalledProcessError(2, args, stderr="provider unavailable")
+
+    monkeypatch.setattr(process.subprocess, "run", fail)
+    with pytest.raises(RuntimeError, match="Command failed"):
+        process.run_command(command, capture_output=False)
+    assert events == ["provider failure"]
+    assert "provider unavailable" in stream.getvalue()
+    assert progress.running

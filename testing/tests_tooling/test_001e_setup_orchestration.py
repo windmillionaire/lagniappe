@@ -1441,7 +1441,11 @@ def test_settings_save_characterizes_each_local_write_failure(
 
     monkeypatch.setattr(config.File, "save", save)
     monkeypatch.setattr(config.File, "exists", lambda file_ref: True)
-    monkeypatch.setattr(config, "write_generation_manifest", lambda: None)
+    monkeypatch.setattr(
+        config,
+        "write_generation_manifest",
+        lambda: pytest.fail("a partial generated set must not be committed"),
+    )
 
     settings = object.__new__(config.Settings)
     settings.DEPLOY = {"runtime": "python314"}
@@ -1498,6 +1502,7 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     with SetupProcessLock(lock_path):
         with pytest.raises(SetupError, match="already running"):
             SetupProcessLock(lock_path).acquire()
+    assert not lock_path.exists()
 
     with pytest.raises(SetupError, match="interrupted"):
         with setup_operation(
@@ -1516,7 +1521,12 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
             raise KeyboardInterrupt
 
     journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert not lock_path.exists()
+    assert journal["schema"] == 1
+    assert journal["mode"] == "install"
     assert journal["status"] == "interrupted"
+    assert journal["error_category"] == "interrupted"
+    assert journal["resume_command"].endswith("setup.sh jobs")
     assert journal["last_step"] == "enable API"
     assert journal["mutations"] == [
         {
