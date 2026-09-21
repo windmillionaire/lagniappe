@@ -1,4 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f03bfb6f-f001-42d0-99b5-4d3367cc6665",e._sentryDebugIdIdentifier="sentry-dbid-f03bfb6f-f001-42d0-99b5-4d3367cc6665");}catch(e){}}();import"../connectivity.js?v=b4bfb915";import{S as o,m as t,a as f}from"../foundation.js?v=b4bfb915";import"../upstreamUnavailable.js?v=b4bfb915";export{o as default,t as markPerformance,f as whenIdle};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../connectivity.js?v=b1aeef6f';
-export { S as default, m as markPerformance, a as whenIdle } from '../foundation.js?v=b1aeef6f';
-import '../upstreamUnavailable.js?v=b1aeef6f';

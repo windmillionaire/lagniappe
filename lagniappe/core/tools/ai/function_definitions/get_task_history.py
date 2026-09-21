@@ -19,7 +19,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
     description=(
         "Load completion history for a task, including the name and description "
         "saved for each completion, completion dates, submission values, and "
-        "attached file metadata. Use this for Ask "
+        "attached file metadata. Use this for "
         "questions about past task occurrences, recency, frequency, averages, "
         "or evidence files, such as last doctor appointments or gaps between "
         "oil changes. Use file hash tokens from the result with get_file when the "

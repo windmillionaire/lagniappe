@@ -1,1 +1,1 @@
-"""Organize report input preparation and submission completion."""
+"""Report upload preparation."""

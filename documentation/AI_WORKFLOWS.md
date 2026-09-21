@@ -29,6 +29,15 @@ exact action schemas and their guidance with
 nonempty selection. The shared validator checks the complete proposal and can
 return errors to the same conversation twice for correction.
 
+Initial and revision prompts share the same assembly. The base prompt covers
+answers, evidence, permissions, and how to retrieve relevant guidance. Upload
+classification is included only when uploads exist; detailed file organization
+is retrieved with `get_guidelines(task="filing")` when the request needs it.
+That bundle also covers reorganizing existing workspace files without uploads.
+Those existing files do not belong in `file_usage` and do not require new upload
+summary actions. Selected action guidance retains the general proposal rules
+for work that has no files.
+
 `AI.ASK` permits answers and evidence files. `AI.CREATE` additionally permits
 proposals, constrained by live workspace permissions. Available actions do not
 depend on whether files were uploaded. Jobs recheck entitlement before publishing

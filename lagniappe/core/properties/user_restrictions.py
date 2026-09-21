@@ -143,10 +143,12 @@ class Restrictions(Property):
         return self._state_value("category_edit")
 
     # @testable true
+    # @tests tests_unit/test_020b_ai_planner.py::test_action_catalog_uses_create_update_delete_permissions
     # @matrix ai-report : action-capabilities permissions
     # @pair permissions:own-page
     @property
     def ai_action_capabilities(self):
+        """Live create/update/delete hints for action discovery, never target authorization."""
         return self._ai_action_capabilities()
 
     # @testable true
@@ -331,6 +333,9 @@ class Restrictions(Property):
             return ["models"]
         return self._sorted_hashes(self._value_details, "page", "category")
 
+    # @testable false
+    # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.ai_action_capabilities
+    # @reason resource-level hints are exercised through action discovery and session tests
     def _ai_action_capabilities(self):
         self._ensure_loaded()
         self._ensure_permission_details()
@@ -338,19 +343,17 @@ class Restrictions(Property):
         can_edit_models = self.entity.has_permission(Resource.MODELS, Action.EDIT)
         can_create_forms = self.entity.has_permission(Resource.FORMS, Action.CREATE)
         can_create_pages = self._has_access(self.category_edit_restrictions)
-        can_edit_categories = can_edit_models or self._has_access(
-            self.category_edit_restrictions
-        )
         can_edit_pages = (
-            can_edit_models
-            or can_edit_categories
+            can_create_pages
             or self.entity.has_permission(self.entity.page, Action.EDIT)
             or self._has_permission_kind(self._permission_details, "page", Action.EDIT)
         )
         can_edit_projects = can_edit_models or self._has_permission_kind(
             self._permission_details, "project", Action.EDIT
         )
-        can_edit_tasks = can_edit_models or self._has_permission_kind(
+        # Tasks inherit Page editing; exact restrictions and assignment are checked
+        # on each target, not inferred from these discovery hints.
+        can_edit_tasks = can_edit_pages or self._has_permission_kind(
             self._permission_details, "task", Action.EDIT
         )
         can_delete_models = self.entity.has_permission(Resource.MODELS, Action.DELETE)
@@ -364,25 +367,10 @@ class Restrictions(Property):
             "can_create_categories": can_create_models,
             "can_create_projects": can_create_models,
             "can_create_pages": can_create_pages,
-            "can_append_page_documents": can_edit_pages,
             "can_create_model_tasks": can_create_models or can_edit_projects,
-            "can_attach_files_to_pages": can_edit_pages or can_create_pages,
-            "can_attach_files_to_tasks": can_edit_tasks or can_edit_pages,
-            "can_move_pages": can_edit_pages and can_edit_categories,
-            "can_move_tasks": can_edit_tasks and can_edit_pages,
-            "can_move_files": can_edit_pages or can_edit_tasks,
-            "can_rename_entities": any(
-                (
-                    can_edit_models,
-                    can_edit_forms,
-                    can_edit_categories,
-                    can_edit_pages,
-                    can_edit_projects,
-                    can_edit_tasks,
-                )
-            ),
-            "can_update_form_schemas": can_edit_forms,
-            "can_update_submissions": can_edit_pages or can_edit_tasks,
+            "can_update_pages": can_edit_pages,
+            "can_update_tasks": can_edit_tasks,
+            "can_update_forms": can_edit_forms,
             "can_delete_pages": (
                 can_delete_categories
                 or self._has_permission_kind(
@@ -391,7 +379,6 @@ class Restrictions(Property):
                     Action.DELETE,
                 )
             ),
-            "can_summarize_report_files": True,
         }
 
     def _ensure_permission_details(self):

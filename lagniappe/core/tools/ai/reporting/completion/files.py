@@ -93,7 +93,7 @@ def summarize_report_input_files(
     service_tier=None,
     ensure_active=None,
 ):
-    """Generate missing summaries for report files before Organize planning."""
+    """Generate missing summaries for uploaded files before report planning."""
     summarized = []
     for file in report.input_files:
         attempted_summary = False

@@ -9,6 +9,7 @@ from lagniappe.core.tools.ai.guidelines import (
     FORM_AUTOFILL_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
     FILE_ORGANIZATION_GUIDELINES,
+    REPORT_PROPOSAL_GUIDELINES,
     PROJECT_COMPLEXITY_GUIDELINES,
     PROJECT_GENERATION_GUIDELINES,
     REPORT_TASK_SCHEDULING_GUIDELINES,
@@ -79,13 +80,13 @@ ACTION_GUIDELINES = {
     "create_project": "Create a project before its model tasks and use it for a durable area of goal-directed work.",
     "create_model_task": "Create a model task after its Project and optional task Form; model tasks describe reusable work types.",
     "create_page": "Choose the stable subject, compare plausible existing Pages, use an executable Category/Form reference, and include grounded final submission values when the workflow requires them.",
-    "create_task": "Use an editable Page or earlier page action, a stable work name, and task Forms only. For one source-dated completed occurrence, use one create_task with completed=true and completed_on from the source; supply the exact task reference to reuse an existing Task, plus the required name and page/page_action. Do not invent a second completion for today. To check off existing work now while preserving its details, use complete_task. Only when evidence contains multiple occurrences, create the latest dated completion first, then another create_task with task_action pointing to that earlier action and the older completed_on date. Both actions supply name and page/page_action; the older occurrence leaves the latest completion intact.",
+    "create_task": "Use an editable Page or earlier page action, a stable work name, and task Forms only. For one source-dated completed occurrence, use one create_task with completed=true and completed_on from the source; supply the exact task reference to reuse an existing Task, plus the required name and page/page_action. Future-dated work must remain open. Do not invent a second completion for today. To check off existing work now while preserving its details, use complete_task. Only when evidence contains multiple occurrences, create the latest dated completion first, then another create_task with task_action pointing to that earlier action and the older completed_on date. Both actions supply name and page/page_action; the older occurrence leaves the latest completion intact.",
     "update_form_schema": "Preview exact-ID schema operations, explain destructive changes, and place the update before actions that use it. The user reviews the plan.",
     "attach_file": "Attach the exact report file ref to data.entity (an editable existing Page, Task or task history) or data.entity_action (an earlier create_page/create_task action). This links the file; it does not convert it into document text. Use the completed occurrence as the target for its evidence.",
     "move_task": "Use exact editable source and destination references; propose only requested moves.",
     "move_file": "Use an exact file and editable source/destination; preserve evidence attachments required by the plan.",
     "suggest_page_deletion": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
-    "summarize_file": "Use each exact report file ref once with a grounded full-file summary, two distinct broad retrieval terms, and normally search=true.",
+    "summarize_file": "Summarize only uploads classified as organize, once per exact report file ref, with a grounded full-file summary, two distinct broad retrieval terms, and normally search=true. Evidence-only uploads and existing workspace files do not require summary actions.",
     "skip": "Use only when an artifact truly should not be saved or the user explicitly excluded it.",
     "needs_review": "Use when a real human judgment remains; do not use it to avoid documented schema or reference work.",
 }
@@ -93,7 +94,7 @@ ACTION_GUIDELINES = {
 
 GUIDELINE_BUNDLES = {
     "filing": {
-        "description": "Plan file organization from evidence and workspace context.",
+        "description": "Organize uploaded or existing workspace files from evidence and context.",
         "instructions": (
             "Settle targets and structure, then author all final form submissions "
             "and updates in the same proposal. Use the current action contract. "
@@ -102,7 +103,6 @@ GUIDELINE_BUNDLES = {
         "sections": (
             LAGNIAPPE_WORKSPACE_CONCEPTS,
             FILE_ORGANIZATION_GUIDELINES,
-            SUMMARY_GENERATION_GUIDELINES,
         ),
     },
     "category": {
@@ -150,7 +150,7 @@ GUIDELINE_BUNDLES = {
     },
     "report_actions": {
         "description": "Detailed report action and output contract.",
-        "sections": (),
+        "sections": (REPORT_PROPOSAL_GUIDELINES,),
     },
 }
 
@@ -204,7 +204,8 @@ GET_GUIDELINES = types.FunctionDeclaration(
     name="get_guidelines",
     description=(
         "Return detailed prompt guidelines for one report-planning subtask. Use this "
-        "tool with task=filing when the caller needs file organization guidance. "
+        "tool with task=filing when organizing uploaded or existing workspace files; "
+        "evidence-only questions do not need filing guidance. "
         "Use the other tasks for detailed rules about "
         "generated structure, form schemas, form submissions, page documents, file "
         "summaries, or action data. Request one bundle per call. Independent bundles "
@@ -331,6 +332,9 @@ def _guidelines_result(args, *, external):
 
     if task == "report_actions" and "create_task" in actions:
         sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
+
+    if task == "report_actions" and "summarize_file" in actions:
+        sections.append(SUMMARY_GENERATION_GUIDELINES)
 
     guidelines = "\n\n".join(section.strip() for section in sections)
     ai_debug(

@@ -554,7 +554,7 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
             },
         }
     )
-    with pytest.raises(exceptions.AIException, match="must target report input"):
+    with pytest.raises(exceptions.AIException, match="must target uploads classified as organize"):
         proposal_validation.validate_proposal(
             unexpected,
             required_file_refs=required,

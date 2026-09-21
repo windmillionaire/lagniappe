@@ -169,9 +169,17 @@ natural read into several dependent calls: each extra Gemini round sends another
 provider request and replays prior tool output. Tool count alone is not the useful
 measure; observe rounds, cumulative tokens, latency and provider errors.
 
-`get_guidelines(task="filing")` shares complete-proposal guidance across
-built-in Gemini and external clients. The current contract selects the allowed
-actions and file responsibilities. Native jobs prepare summaries/retrieval terms
+`get_guidelines(task="report_actions", actions=[...])` shares general proposal
+rules and the selected action schemas across built-in Gemini and external
+clients. `get_guidelines(task="filing")` supplies specialized organization rules
+only when filing uploads or reorganizing existing workspace files. Evidence-only
+questions do not need it. The initial report prompt never embeds the full filing
+bundle; upload classification instructions appear only when input files exist.
+Without uploads, native prompts and external contracts explicitly require
+`file_usage=[]`, even when the request concerns existing workspace files.
+
+The current contract selects the allowed actions and file responsibilities.
+Native jobs prepare summaries/retrieval terms
 before generation; external clients author `summarize_file` actions when their
 contract allows them. Both author final form values and requested task/document
 updates themselves. Native validation feeds precise errors back into the same
@@ -184,6 +192,13 @@ conditional requirements without changing Gemini's provider-compatible schema.
 The external `form_autofill` bundle permits grounded corrections and emits only
 selected field updates; built-in Autofill retains its blank-only completion
 policy and preserves non-empty partial values.
+
+Summary-writing policy comes with the selected `summarize_file` action or the
+`file_summary` bundle, not with general filing guidance. The native planner
+reuses server-prepared summaries. General proposal completeness, target reuse,
+and final-value requirements belong to `report_actions`, so requests without
+files receive them without loading filing policy. Answer-only provider access
+omits the planner's mutation and filing instructions.
 
 `get_category_pages` returns at most ten Pages per call. Its response separates
 the caller's `requested_limit`, the enforced `effective_limit`, and
@@ -250,3 +265,12 @@ requires a nonempty selection and returns exact selected schemas as well as
 rules. No router or full action-schema union is included in the initial prompt.
 The output's file_usage classifies each upload as evidence or organize; only
 the latter creates filing obligations. See [AI_WORKFLOWS.md](AI_WORKFLOWS.md).
+
+The model-facing permission context contains `allowed_actions` and action rules,
+without a second capability map. The action catalog derives its choices from
+internal create/update/delete hints; attachments, document appends, moves,
+renames, and submission changes use the ordinary edit permission model. These
+hints are computed on demand and are not stored in the Flask session. They do
+not grant access to an individual record: discovery, proposal preparation, and
+execution check the exact targets, including both sides of a move. Page editing
+also supplies the Task editing hint, matching Task permission inheritance.

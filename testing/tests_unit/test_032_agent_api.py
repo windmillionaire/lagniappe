@@ -1069,6 +1069,10 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert contract["personal_page"]["hash"] == "hash:personalpage"
     assert contract["submission_format"]["body"] == {"contract_version": external_api.CONTRACT_VERSION, "proposal": {}, "file_usage": []}
     assert contract["file_usage_schema"]["items"]["properties"]["usage"]["enum"] == ["evidence", "organize"]
+    rules = "\n".join(contract["workflow_rules"])
+    assert "exactly one {file, usage} entry per uploaded file" in rules
+    assert "Every organize file needs an attachment" in rules
+    assert "file_usage=[]" not in rules
     for item in contract["guidance_requirements"]["conditional"]:
         arguments = dict(item["request"])
         if arguments["task"] == "report_actions":
@@ -1123,6 +1127,12 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
     assert set(selected["proposal_schema"]["$defs"]) == {"create_task"}
     assert summary["proposal_schema"] is None
     assert summary["schema_scope"] == "summary"
+    rules = "\n".join(summary["workflow_rules"])
+    assert "Supply file_usage=[]" in rules
+    assert "Files discovered in the workspace are not uploads" in rules
+    assert "organizing uploaded or existing workspace files" in rules
+    assert "Every organize file needs" not in rules
+    assert "exactly one {file, usage} entry per uploaded file" not in rules
     compact = external_api.plan_contract(report, actor, actions=["create_task"], view="schema", **kwargs)
     assert compact["proposal_schema"] == selected["proposal_schema"]
     assert compact["submission_format"] == full["submission_format"]
@@ -1141,6 +1151,11 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
     assert external_api.plan_contract(report, actor, actions=[], view="schema", **kwargs)["proposal_schema"] == answer_schema
     filing = next(rule for rule in answer["guidance_requirements"]["conditional"] if rule["request"]["task"] == "filing")
     assert filing["when"] == {"file_usage_any": ["organize"]}
+    assert any(
+        rule["request"] == {"task": "filing"}
+        and "move_file" in rule["when"].get("actions_any", [])
+        for rule in answer["guidance_requirements"]["conditional"]
+    )
     assert "required_before_analysis" not in answer["guidance_requirements"]
     assert (
         selected["payload_sizes"]["contract_without_payload_sizes_bytes"]

@@ -78,7 +78,7 @@ def validate_proposal(
     prepare_schema_changes=False,
     require_response=False,
 ):
-    """Validate the JSON action proposal returned by the organize prompt."""
+    """Validate the JSON proposal returned by native or external report planning."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
     raw_proposal = proposal
     submitted_required_file_refs = list(required_file_refs or ())
@@ -212,7 +212,7 @@ def validate_proposal(
         ]
         if missing_file_refs:
             raise exceptions.AIException(
-                "Organize proposal must attach every report input file to a page "
+                "The proposal must attach every upload classified as organize to a page "
                 "or task. Missing report_file_ref values: "
                 f"{', '.join(str(file_ref) for file_ref in missing_file_refs)}"
             )
@@ -233,7 +233,7 @@ def validate_proposal(
             required_file_ref_set = set(required_file_refs)
             if any(file_ref not in required_file_ref_set for file_ref in summary_counts):
                 raise exceptions.AIException(
-                    "Organize summarize_file actions must target report input files."
+                    "summarize_file actions must target uploads classified as organize."
                 )
 
             missing_summary_refs = []
@@ -250,14 +250,14 @@ def validate_proposal(
                     duplicate_summary_refs.append(submitted_file_ref)
             if missing_summary_refs:
                 raise exceptions.AIException(
-                    "Organize proposal must summarize every report input file. "
+                    "The proposal must summarize every upload classified as organize. "
                     "Missing report_file_ref values: "
                     f"{', '.join(str(file_ref) for file_ref in missing_summary_refs)}"
                 )
             if duplicate_summary_refs:
                 raise exceptions.AIException(
-                    "Organize proposal must include exactly one summary per report "
-                    "input file. Duplicate report_file_ref values: "
+                    "The proposal must include exactly one summary per upload "
+                    "classified as organize. Duplicate report_file_ref values: "
                     f"{', '.join(str(file_ref) for file_ref in duplicate_summary_refs)}"
                 )
 

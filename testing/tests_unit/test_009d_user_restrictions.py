@@ -282,6 +282,9 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
             assert restrictions.unrestricted_pages(
                 TestEntities.get("CATEGORY", {"name": "Cat", "hash": "cat001"})
             ) == ["page001"]
+            capabilities = restrictions.ai_action_capabilities
+            assert capabilities["can_update_pages"] is True
+            assert capabilities["can_update_tasks"] is True
 
         blob = session["restrictions"]
         assert blob["version"] == restrictions._session_version
@@ -297,6 +300,7 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         assert "can_use_ai_tools" not in blob
         assert "can_assign" not in blob
         assert "can_create_pages" not in blob
+        assert not set(capabilities) & blob.keys()
         assert details.call_count == 1
 
         _reset_restrictions(user)

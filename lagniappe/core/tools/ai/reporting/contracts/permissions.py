@@ -21,17 +21,14 @@ def allowed_report_actions(user):
         allowed.add("create_model_task")
     if capabilities["can_create_pages"]:
         allowed.add("create_page")
-    if capabilities["can_append_page_documents"]:
+    if capabilities["can_update_pages"]:
         allowed.add("append_page_document")
-    if capabilities["can_attach_files_to_pages"]:
+    if capabilities["can_update_pages"] or capabilities["can_update_tasks"]:
         allowed.add("attach_file")
-    if capabilities["can_attach_files_to_tasks"]:
-        allowed.add("attach_file")
-    if capabilities["can_move_tasks"]:
-        allowed.add("move_task")
-    if capabilities["can_move_files"]:
         allowed.add("move_file")
-    if capabilities["can_update_form_schemas"]:
+    if capabilities["can_update_tasks"] and capabilities["can_update_pages"]:
+        allowed.add("move_task")
+    if capabilities["can_update_forms"]:
         allowed.add("update_form_schema")
     if capabilities["can_delete_pages"]:
         allowed.add("suggest_page_deletion")
@@ -45,66 +42,9 @@ def allowed_report_actions(user):
 def report_action_permission_context(user, allowed_actions=None):
     allowed = tuple(allowed_report_actions(user) if allowed_actions is None else allowed_actions)
     allowed_set = set(allowed)
-    user_capabilities = user.properties.restrictions.ai_action_capabilities
-    capabilities = {
-        "can_create_forms": (
-            user_capabilities["can_create_forms"] and "create_form" in allowed_set
-        ),
-        "can_create_categories": (
-            user_capabilities["can_create_categories"]
-            and "create_category" in allowed_set
-        ),
-        "can_create_projects": (
-            user_capabilities["can_create_projects"] and "create_project" in allowed_set
-        ),
-        "can_create_pages": (
-            user_capabilities["can_create_pages"] and "create_page" in allowed_set
-        ),
-        "can_create_model_tasks": (
-            user_capabilities["can_create_model_tasks"]
-            and "create_model_task" in allowed_set
-        ),
-        "can_attach_files_to_pages": (
-            user_capabilities["can_attach_files_to_pages"]
-            and "attach_file" in allowed_set
-        ),
-        "can_append_page_documents": (
-            user_capabilities["can_append_page_documents"] and "append_page_document" in allowed_set
-        ),
-        "can_add_forms_to_pages": (
-            user_capabilities["can_attach_files_to_pages"]
-            and "update_page" in allowed_set
-        ),
-        "can_attach_files_to_tasks": (
-            user_capabilities["can_attach_files_to_tasks"]
-            and "attach_file" in allowed_set
-        ),
-        "can_move_pages": (
-            user_capabilities["can_move_pages"]
-            and "update_page" in allowed_set
-        ),
-        "can_move_tasks": (
-            user_capabilities["can_move_tasks"] and "move_task" in allowed_set
-        ),
-        "can_move_files": (
-            user_capabilities["can_move_files"] and "move_file" in allowed_set
-        ),
-        "can_rename_entities": (
-            user_capabilities["can_rename_entities"] and bool({"update_page", "update_task", "update_project", "update_model_task"} & allowed_set)
-        ),
-        "can_update_form_schemas": (
-            user_capabilities["can_update_form_schemas"]
-            and "update_form_schema" in allowed_set
-        ),
-        "can_update_submissions": (
-            user_capabilities["can_update_submissions"]
-            and bool({"update_page", "update_task"} & allowed_set)
-        ),
-        "can_delete_pages": (
-            user_capabilities["can_delete_pages"] and "suggest_page_deletion" in allowed_set
-        ),
-    }
-    rules = ["Only return action types listed in allowed_actions.", "Cohesive updates require exact editable targets. Use data.entity and data.changes. Omitted fields remain unchanged; form reassignment requires complete target submission. Existing-form submission patches preserve unmentioned answer IDs. Completed tasks cannot be restructured. Model-task form changes affect future tasks only. Project model_tasks ordering includes every model exactly once. Use $action_id for earlier creations. Documents support append only; inline replacement or deletion requires the editor."]
+    rules = ["Only return action types listed in allowed_actions."]
+    if {"update_page", "update_task", "update_project", "update_model_task"} & allowed_set:
+        rules.append("Cohesive updates require exact editable targets. Use data.entity and data.changes. Omitted fields remain unchanged; form reassignment requires complete target submission. Existing-form submission patches preserve unmentioned answer IDs. Completed tasks cannot be restructured. Model-task form changes affect future tasks only. Project model_tasks ordering includes every model exactly once. Use $action_id for earlier creations. Documents support append only; inline replacement or deletion requires the editor.")
     if "create_page" in allowed_set:
         rules.append("Creating pages requires an editable category.")
     if "create_model_task" in allowed_set:
@@ -127,9 +67,10 @@ def report_action_permission_context(user, allowed_actions=None):
         rules.append("Page deletion is manual cleanup rendered after report execution.")
     rules.append(
         "If the useful action is not allowed, use needs_review or answer without actions."
+        if "needs_review" in allowed_set
+        else "If the useful action is not allowed, explain the limitation and answer without actions."
     )
     return {
         "allowed_actions": list(allowed),
-        "capabilities": capabilities,
         "rules": rules,
     }
