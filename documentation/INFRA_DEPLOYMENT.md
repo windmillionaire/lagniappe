@@ -22,6 +22,12 @@ When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are
 enabled.
 
+When MCP is enabled, `run.py deploy` prepares its cloud resources after the
+frontend build and before the App Engine confirmation prompt. It announces
+preparation before making provider calls and reports completion afterward.
+Slow provider lookups and retries can delay that prompt for several minutes;
+the MCP commands run non-interactively with captured output.
+
 `installer/deploy.py` owns the interactive deployment workflow and calls the
 same runner helper in publish-only mode. It uses the
 generated assets already present in the checkout and does not run npm or change

@@ -490,6 +490,8 @@ def prepare_deployment(settings=None, *, announce_progress=True):
     deployer = settings.get("DEPLOYER_EMAIL") or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
     if not deployer:
         raise SetupError("MCP requires the saved installer/deployer identity.")
+    if announce_progress:
+        print(ui.activity("Preparing MCP service before App Engine deployment"), flush=True)
     reconcile_resources(target, deployer)
     service = _service(target)
     saved_resource = settings.get("MCP_RESOURCE")
@@ -516,6 +518,8 @@ def prepare_deployment(settings=None, *, announce_progress=True):
     reconcile_access(target, ["run", "services"], SERVICE,
                      [(iam.principal_member(deployer), ["roles/run.admin"])],
                      flags=[f"--region={target.region}"])
+    if announce_progress:
+        print(ui.success("MCP preparation complete"), flush=True)
     return target
 
 
