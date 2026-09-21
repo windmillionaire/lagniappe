@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from lagniappe.core.definitions import Action, MutationEffectType, MutationOperation
+from lagniappe.core.definitions import (
+    Action,
+    Fetch,
+    MutationEffectType,
+    MutationOperation,
+)
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities import entity as entity_module
 from lagniappe.core.mutations.delete import DeleteCollector
@@ -18,8 +23,8 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-def _user(name, key, *, owner=False, permissions=None):
-    return TestEntities.get(
+def _user(name, key, *, owner=False, admin=False, permissions=None):
+    user = TestEntities.get(
         "USER",
         {
             "name": name,
@@ -28,6 +33,9 @@ def _user(name, key, *, owner=False, permissions=None):
             "permissions": permissions or {},
         },
     )
+    if admin:
+        user.is_admin = True
+    return user
 
 
 def _note(parent, author, *, visibility="private", scope="home", body="Note"):
@@ -45,7 +53,7 @@ def _note(parent, author, *, visibility="private", scope="home", body="Note"):
     return note
 
 
-# @matrix notes : body create parent photo scope visibility
+# @matrix notes : author body create defaults parent photo scope visibility
 def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
     author = _user("Author", "note-create-author")
     photo = SimpleNamespace(filename="note.jpg")
@@ -83,6 +91,15 @@ def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
     assert note.properties.user.key == author.key
     assert note.photo == {"filename": "note.jpg", "name": "photo", "type": "image"}
 
+    defaulted = Entities.NOTE.create({"user": author})
+    assert defaulted.properties.parent.key == author.key
+    assert defaulted.properties.user.key == author.key
+    assert defaulted.visibility == "private"
+    assert defaulted.scope == "home"
+
+    with pytest.raises(ValueError, match="parent and author"):
+        Entities.NOTE.create({"parent": author})
+
 
 # @matrix notes : persistence scope validation visibility
 def test_note_visibility_and_scope_validate_values():
@@ -108,6 +125,7 @@ def test_note_permissions_follow_visibility_scope_and_authorship():
     author = _user("Author", "note-permission-author")
     viewer = _user("Viewer", "note-permission-viewer")
     owner = _user("Owner", "note-permission-owner", owner=True)
+    admin = _user("Admin", "note-permission-admin", admin=True)
     anonymous = SimpleNamespace(is_authenticated=False, is_owner=False)
 
     private_home = _note(author, author)
@@ -115,6 +133,7 @@ def test_note_permissions_follow_visibility_scope_and_authorship():
     assert private_home.allowed(Action.DELETE, author) is True
     assert private_home.allowed(Action.VIEW, owner) is True
     assert private_home.allowed(Action.DELETE, owner) is True
+    assert private_home.allowed(Action.DELETE, admin) is True
     assert private_home.allowed(Action.VIEW, viewer) is False
     assert private_home.allowed(Action.VIEW, anonymous) is False
 
@@ -187,8 +206,15 @@ class _ActivityFilter:
         return self
 
 
-# @matrix activity : ancestor query type-order
-def test_activity_query_filters_requested_types(monkeypatch):
+# @matrix activity : ancestor query multi-type type-order
+@pytest.mark.parametrize(
+    ("types", "expected_filter"),
+    [
+        ("notification", ("eq", "type", "notification")),
+        (("note", "notification"), ("contains", "type", ["note", "notification"])),
+    ],
+)
+def test_activity_query_filters_requested_types(monkeypatch, types, expected_filter):
     query = _ActivityQuery([_RawActivity("notification", type="notification")])
     activity_filter = _ActivityFilter()
     monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
@@ -199,12 +225,12 @@ def test_activity_query_filters_requested_types(monkeypatch):
         lambda kind: query if kind == database_get.KINDS.activity else None,
     )
 
-    results = database_get.activity(object(), types="notification")
+    results = database_get.activity(object(), types=types)
 
     assert [item.key for item in results] == ["notification"]
     assert query.ancestor_key == "parent-key"
     assert query.ordering == "-created"
-    assert activity_filter.calls == [("eq", "type", "notification")]
+    assert activity_filter.calls == [expected_filter]
 
 
 # @matrix notifications : bounded-page cursor ordinary-discriminator
@@ -291,8 +317,20 @@ def test_home_notes_return_only_visible_notes(monkeypatch):
         created=now - timedelta(minutes=2),
     )
     rows = [public, own_private, hidden_private]
+    queries = []
+    filters = []
 
-    monkeypatch.setattr(database_get, "Query", lambda _kind: _ActivityQuery(rows))
+    def query(_kind):
+        queries.append(_ActivityQuery(rows))
+        return queries[-1]
+
+    def activity_filter():
+        filters.append(_ActivityFilter())
+        return filters[-1]
+
+    monkeypatch.setattr(database_get, "Query", query)
+    monkeypatch.setattr(database_get, "Filter", activity_filter)
+    monkeypatch.setattr(database_get, "datastore_key", lambda user: user.key)
 
     viewer = SimpleNamespace(key="viewer", is_owner=False)
     assert [item.key for item in database_get.home_notes(viewer)] == [
@@ -306,6 +344,32 @@ def test_home_notes_return_only_visible_notes(monkeypatch):
         "own-private",
         "hidden-private",
     ]
+    assert [query.ordering for query in queries] == ["-created", "-created"]
+    assert [activity_filter.calls for activity_filter in filters] == [
+        [("eq", "type", "note"), ("eq", "scope", "home")],
+        [("eq", "type", "note"), ("eq", "scope", "home")],
+    ]
+
+
+# @matrix mutations notes : save owner-invalidation
+def test_note_save_touches_parent_and_author():
+    author = _user("Author", "note-save-author")
+    page = TestEntities.get("PAGE", {"name": "Save Notes", "hash": "save-notes"})
+    note = _note(page, author, visibility="everyone", scope="page")
+
+    plan = plan_mutation(MutationOperation.SAVE, note, registry=Entities)
+
+    writes = {
+        effect.entity.key: effect
+        for effect in plan.effects
+        if effect.effect is MutationEffectType.UPSERT
+    }
+    assert set(writes) == {note.key, page.key, author.key}
+    assert writes[note.key].property_mask is None
+    assert writes[page.key].property_updates == ("modified",)
+    assert writes[author.key].property_updates == ("modified",)
+    assert writes[page.key].reasons == ("note-list-owner",)
+    assert writes[author.key].reasons == ("note-list-owner",)
 
 
 # @matrix mutations notes : delete owner-invalidation page-cascade user-cascade
@@ -323,13 +387,13 @@ def test_note_delete_repairs_owners_and_parent_cascades(monkeypatch):
     monkeypatch.setattr(database_get, "page_notes", lambda _page: [note])
     monkeypatch.setattr(database_get, "page_files", lambda _page: [])
     monkeypatch.setattr(database_get, "page_tasks_with_history", lambda _page: [])
-    monkeypatch.setattr(
-        Entities,
-        "fetch",
-        lambda *entities, **_kwargs: [
-            entity for entity in entities if hasattr(entity, "db")
-        ],
-    )
+    fetch_requests = []
+
+    def fetch_entities(*entities, request):
+        fetch_requests.append((entities, request))
+        return [entity for entity in entities if hasattr(entity, "db")]
+
+    monkeypatch.setattr(Entities, "fetch", fetch_entities)
 
     page_plan = plan_mutation(MutationOperation.DELETE, page, registry=Entities)
     deleted = {
@@ -338,6 +402,8 @@ def test_note_delete_repairs_owners_and_parent_cascades(monkeypatch):
         if effect.effect is MutationEffectType.DELETE
     }
     assert {page.key, note.key}.issubset(deleted)
+    assert fetch_requests[0] == ((note,), Fetch.direct())
+    assert all(request == Fetch.direct() for _entities, request in fetch_requests)
 
     home_note = _note(author, author, body="Delete with author")
     monkeypatch.setattr(database_get, "notes_by_user", lambda _user: [home_note])
@@ -345,3 +411,4 @@ def test_note_delete_repairs_owners_and_parent_cascades(monkeypatch):
     collector.user_notes(author)
     assert home_note in collector.to_delete
     assert any(survivor.entity is author for survivor in collector.survivors)
+    assert fetch_requests[-1] == ((home_note,), Fetch.direct())

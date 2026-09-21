@@ -8,12 +8,12 @@ import {
 	SignInForm,
 	setLoginActionButton,
 	VerifyEmailForm,
-} from "./login/forms";
-import { IdentityPlatformClient } from "./login/identity";
+} from "./login/forms.mjs";
+import { IdentityPlatformClient } from "./login/identity.mjs";
 import { initializeLogoutForms } from "./shared/logout.mjs";
 import { request } from "./shared/request.mjs";
+import { withTransition } from "./shared/transitions.mjs";
 import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.mjs";
-import { withTransition } from "./shared/utilities.mjs";
 
 initializeLogoutForms();
 installUpstreamUnavailableBanner();

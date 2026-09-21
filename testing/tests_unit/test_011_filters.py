@@ -14,7 +14,6 @@ Fixtures in ``011_filters.json`` use ``related_hashes`` so each test can populat
 reading ``Filter.conditions``.
 """
 
-import hashlib
 import json
 import re
 from datetime import datetime, timezone
@@ -41,12 +40,10 @@ def _prepare_saved_filter(filter_entity, entity_map):
     """Match production: ``related`` supplies hashes for ``Filter.conditions``."""
     hashes = filter_entity.test_spec.get("related_hashes", [])
     filter_entity.properties.related.value = [entity_map[h] for h in hashes]
-    filter_entity._conditions = None
     definitions = [
         FilterDefinition.load(d) for d in filter_entity.test_spec["definitions_input"]
     ]
     filter_entity.definitions = definitions
-    filter_entity._conditions = None
 
 
 # @matrix filters : condition-definition validation
@@ -84,18 +81,18 @@ def test_filter_conditions_string(get_test_entities):
     filters = [e for e in entities if e.entity_kind == "filter"]
     entity_map = {e.hash: e for e in entities if e.entity_kind != "filter"}
 
+    assert filters
     for filter_entity in filters:
         _prepare_saved_filter(filter_entity, entity_map)
+        assert filter_entity.test_spec["expected_conditions"]
+        assert len(filter_entity.conditions) == len(filter_entity.test_spec["expected_conditions"])
 
         for i, expected in enumerate(filter_entity.test_spec["expected_conditions"]):
             cond = filter_entity.conditions[i]
 
-            assert cond.entity is not None
             assert cond.entity.hash == expected["entity_hash"]
             assert cond.entity is entity_map[expected["entity_hash"]]
 
-            assert cond.field is not None
-            assert hasattr(cond.field, "filter_key")
             assert cond.field.filter_key == expected["field"]
             assert cond.field is cond.entity.filters.fields[expected["field"]]
 
@@ -113,8 +110,11 @@ def test_filter_conditions_boolean(get_test_entities):
     filters = [e for e in entities if e.entity_kind == "filter"]
     entity_map = {e.hash: e for e in entities if e.entity_kind != "filter"}
 
+    assert filters
     for filter_entity in filters:
         _prepare_saved_filter(filter_entity, entity_map)
+        assert filter_entity.test_spec["expected_conditions"]
+        assert len(filter_entity.conditions) == len(filter_entity.test_spec["expected_conditions"])
 
         for i, expected in enumerate(filter_entity.test_spec["expected_conditions"]):
             cond = filter_entity.conditions[i]
@@ -136,8 +136,11 @@ def test_filter_conditions_entity_valued(get_test_entities):
     filters = [e for e in entities if e.entity_kind == "filter"]
     entity_map = {e.hash: e for e in entities if e.entity_kind != "filter"}
 
+    assert filters
     for filter_entity in filters:
         _prepare_saved_filter(filter_entity, entity_map)
+        assert filter_entity.test_spec["expected_conditions"]
+        assert len(filter_entity.conditions) == len(filter_entity.test_spec["expected_conditions"])
 
         for i, expected in enumerate(filter_entity.test_spec["expected_conditions"]):
             cond = filter_entity.conditions[i]
@@ -165,8 +168,11 @@ def test_filter_conditions_multiple_types(get_test_entities):
     filters = [e for e in entities if e.entity_kind == "filter"]
     entity_map = {e.hash: e for e in entities if e.entity_kind != "filter"}
 
+    assert filters
     for filter_entity in filters:
         _prepare_saved_filter(filter_entity, entity_map)
+        assert filter_entity.test_spec["expected_conditions"]
+        assert len(filter_entity.conditions) == len(filter_entity.test_spec["expected_conditions"])
 
         for i, expected in enumerate(filter_entity.test_spec["expected_conditions"]):
             cond = filter_entity.conditions[i]
@@ -267,13 +273,13 @@ def test_filter_fingerprint_uses_loaded_parent_fingerprint():
     filter_entity.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
     filter_entity.parent = parent
 
-    expected = hashlib.md5(
-        f"{super(FilterEntity, filter_entity).fingerprint}:{parent.fingerprint}".encode(
-            "utf-8"
-        )
-    ).hexdigest()
-
-    assert filter_entity.fingerprint == expected
+    before = filter_entity.fingerprint
+    assert filter_entity.fingerprint == before
+    parent.modified = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    parent_changed = filter_entity.fingerprint
+    assert parent_changed != before
+    filter_entity.modified = datetime(2026, 1, 3, tzinfo=timezone.utc)
+    assert filter_entity.fingerprint != parent_changed
 
 
 # @matrix filter permissions : related-entities saved-filters

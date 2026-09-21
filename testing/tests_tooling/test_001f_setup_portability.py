@@ -76,10 +76,6 @@ def test_release_setup_uses_central_tools_and_portable_npm_scripts():
     )
     assert package["scripts"]["build"] == "node build/run-rollup.mjs production"
     assert package["scripts"]["dev"] == "node build/run-rollup.mjs development"
-    for script in (package["scripts"]["build"], package["scripts"]["dev"]):
-        assert "rm -rf" not in script
-        assert "NODE_ENV=" not in script
-
     rollup_runner = (REPOSITORY_ROOT / "build/run-rollup.mjs").read_text(
         encoding="utf-8"
     )

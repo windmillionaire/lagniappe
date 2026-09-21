@@ -1,7 +1,7 @@
-import { BaseForm } from "../elements/base/baseForm";
-import { FormElement } from "../elements/form";
-import { sections } from "../elements/sections";
-import { captureError, request } from "../shared";
+import { sections } from "../elements/sections.mjs";
+import { FormController } from "../forms/controller.mjs";
+import { captureError, request } from "../shared/index.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable false
@@ -12,7 +12,7 @@ import { captureError, request } from "../shared";
 async function renderOriginalSubmission(response, key) {
 	const host = document.createElement("div");
 	host.dataset.kind = "task";
-	const form = new BaseForm({
+	const form = new FormController({
 		target: host,
 		key,
 		readonly: true,
@@ -48,7 +48,7 @@ async function renderOriginalSubmission(response, key) {
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
  * @matrix tasks : attached-form autofill complete empty-fields partial-submission permission-gates readonly submission
  */
-export class TaskForm extends FormElement {
+export class TaskForm extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {
@@ -421,7 +421,7 @@ export class TaskForm extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_history_fill_converts_selected_fields_and_reports_invalid_values
 	 * @matrix tasks : history-fill latest-submission incompatible-value stale-response
 	 */

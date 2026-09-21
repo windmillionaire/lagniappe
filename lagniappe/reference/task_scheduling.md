@@ -1,6 +1,5 @@
 ---
 title: Task Due Dates and Schedules
-manual_section: tasks
 related:
 - tasks
 - personal_task

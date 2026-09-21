@@ -58,7 +58,7 @@ def deferred_job_lock_descriptors(targets, scope=AUTOFILL_FORM_LOCK_SCOPE):
             database_deferred_jobs.release_deferred_job_lock(lock.key, lock.operation)
     if scope == AUTOFILL_FORM_LOCK_SCOPE:
         from types import SimpleNamespace
-        from ..form_changes import json_value, PENDING
+        from ..forms.contracts import json_value, PENDING
         form_keys = {target.db.get("form") for target in targets
                      if getattr(target, "entity_kind", None) in {"page", "task"}} - {None}
         forms = {form.key: form for form in Entities.fetch(*form_keys, request=Fetch.root())} if form_keys else {}

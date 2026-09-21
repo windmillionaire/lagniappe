@@ -15,7 +15,8 @@ from markupsafe import Markup
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, cache
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Search
 from lagniappe.core.tools.database.core import DATA
@@ -223,7 +224,7 @@ def test_report_deletion_preserves_created_work_and_uploaded_file():
         },
     })
     Entities.save(report)
-    ai.run_report(report, user)
+    report_runner.run_report(report, user)
     assert report.status == "complete", report.error
     actions = {action["id"]: action for action in report.result["actions"]}
     page = Entities.fetch_one(actions["page"]["entity"]["id"], request=Fetch.direct())

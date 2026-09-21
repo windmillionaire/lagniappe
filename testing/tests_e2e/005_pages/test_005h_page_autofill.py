@@ -134,7 +134,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
         )
 
         monkeypatch.setattr(
-            autofill_adapter.ai,
+            autofill_adapter.ai_autofill,
             "generate_autofilled_submission",
             lambda prompt, **kwargs: {FIELD_ID: EXPECTED_VALUE},
         )

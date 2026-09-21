@@ -14,6 +14,9 @@
 					"form_submission": { "input-dateab12": "2025-06-15" },
 					"expected": {
 						"input-dateab12": {
+							"value_utc": "2025-06-15T12:34:56.123456+00:00",
+							"column_value": "2025-06-15T07:34:56.123456-05:00",
+							"filter_value": 1749990896.123456,
 							"form_value": "2025-06-15",
 							"ai_value": "2025-06-15"
 						}
@@ -33,6 +36,9 @@
 					"ai_submission": { "input-dateab12": "2025-06-15" },
 					"expected": {
 						"input-dateab12": {
+							"value_utc": "2025-06-15T05:00:00+00:00",
+							"column_value": "2025-06-15T00:00:00-05:00",
+							"filter_value": 1749963600.0,
 							"form_value": "2025-06-15",
 							"ai_value": "2025-06-15"
 						}
@@ -52,6 +58,9 @@
 					"import_submission": { "input-dateab12": "06/15/2025" },
 					"expected": {
 						"input-dateab12": {
+							"value_utc": "2025-06-15T05:00:00+00:00",
+							"column_value": "2025-06-15T00:00:00-05:00",
+							"filter_value": 1749963600.0,
 							"form_value": "2025-06-15",
 							"ai_value": "2025-06-15"
 						}
@@ -71,6 +80,9 @@
 					"import_submission": { "input-dateab12": "June 15, 2025" },
 					"expected": {
 						"input-dateab12": {
+							"value_utc": "2025-06-15T05:00:00+00:00",
+							"column_value": "2025-06-15T00:00:00-05:00",
+							"filter_value": 1749963600.0,
 							"form_value": "2025-06-15",
 							"ai_value": "2025-06-15"
 						}
@@ -90,6 +102,9 @@
 					"import_submission": { "input-dateab12": "2025-06-15T14:30:00" },
 					"expected": {
 						"input-dateab12": {
+							"value_utc": "2025-06-15T19:30:00+00:00",
+							"column_value": "2025-06-15T14:30:00-05:00",
+							"filter_value": 1750015800.0,
 							"form_value": "2025-06-15",
 							"ai_value": "2025-06-15"
 						}
@@ -109,6 +124,9 @@
 					"form_submission": { "input-dateab12": "2025-12-31" },
 					"expected": {
 						"input-dateab12": {
+							"value_utc": "2025-12-31T13:34:56.123456+00:00",
+							"column_value": "2025-12-31T07:34:56.123456-06:00",
+							"filter_value": 1767188096.123456,
 							"form_value": "2025-12-31",
 							"ai_value": "2025-12-31"
 						}

@@ -5,6 +5,57 @@ from playwright.sync_api import expect
 
 from config import SETTINGS
 from testing.definitions import Users
+from testing.resources import SitePage
+
+
+@pytest.mark.e2e
+def test_manual_chapters_introduce_the_product_without_reference_embeds(get_user):
+    anonymous = get_user(Users.ANONYMOUS)
+    chapters = (
+        ('overview', 'Core Concepts'),
+        ('quickstart', 'Saving Work: Forms and Documents'),
+        ('forms', 'What Forms Are For'),
+        ('tasks', 'Tasks Live on Pages'),
+        ('permissions', 'Permission Layers'),
+        ('search', 'Filters and AI'),
+        ('collaboration', 'Shared Forms'),
+        ('personalization', 'Your Preferences'),
+        ('ai', 'What AI Can Do'),
+    )
+    for section, introduction in chapters:
+        anonymous.go(SitePage(url=f'/manual/{section}'))
+        content = anonymous.locate('[data-role="manual-content"]')
+        expect(content.get_by_role('heading', name=introduction, exact=True)).to_be_visible()
+        expect(content.locator('[data-role="manual-topic"], [data-role="help-body"]')).to_have_count(0)
+        expect(content.locator('a[href^="/help/"]')).to_have_count(0)
+
+
+# @template manual/content/quickstart.html::disclosure
+# @template manual/content/quickstart.html::guide_item
+@pytest.mark.e2e
+@pytest.mark.parametrize('mobile', [False, True], ids=['desktop', 'mobile'])
+def test_quickstart_orientation_disclosures(get_user, mobile):
+    anonymous = get_user(Users.ANONYMOUS)
+    anonymous.go(SitePage(url='/manual/quickstart'))
+    anonymous.mobile = mobile
+    content = anonymous.locate('[data-role="manual-content"]')
+    expect(content.get_by_text('Documents save themselves', exact=True)).to_be_visible()
+    expect(content.get_by_text('Forms wait for you', exact=True)).to_be_visible()
+    for title in (
+        'Common controls', 'Home', 'Pages', 'Tasks', 'Categories and index tables',
+        'Projects', 'Forms and the form builder', 'Files', 'Search, users, and Admin',
+    ):
+        disclosure = content.locator('details').filter(
+            has=anonymous.page.locator('summary').get_by_text(title, exact=True),
+        )
+        summary = disclosure.locator('summary')
+        expect(disclosure).not_to_have_attribute('open', '')
+        expect(disclosure.locator('p').first).not_to_be_visible()
+        summary.click()
+        expect(disclosure.locator('p').first).to_be_visible()
+        assert anonymous.page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+        summary.click()
+        expect(disclosure.locator('p').first).not_to_be_visible()
 
 
 @pytest.mark.e2e
@@ -38,12 +89,13 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
         "Activate the temporary account, run setup, verify the deployment, "
         "and return access."
     )
-    expect(owner.locator("ol")).not_to_be_visible()
+    expect(owner.locator("ol")).to_have_count(3)
+    expect(owner.locator("ol:visible")).to_have_count(0)
     expect(installer.locator("ol")).not_to_be_visible()
 
     owner.locator("summary").click()
     expect(owner).to_have_attribute("open", "")
-    expect(owner.locator("ol")).to_be_visible()
+    expect(owner.locator("ol:visible")).to_have_count(3)
     expect(installer.locator("ol")).not_to_be_visible()
     expect(owner).to_contain_text(
         "Apps / Additional Google services / Google Cloud Platform / "
@@ -94,7 +146,7 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
 
     owner.locator("summary").click()
     installer.locator("summary").click()
-    expect(owner.locator("ol")).not_to_be_visible()
+    expect(owner.locator("ol:visible")).to_have_count(0)
     expect(installer).to_have_attribute("open", "")
     expect(installer.locator("ol")).to_be_visible()
     expect(installer).to_contain_text("separate browser profile")

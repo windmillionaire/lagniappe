@@ -3,6 +3,7 @@
 from enum import Enum
 import uuid
 
+from google.api_core.exceptions import ServiceUnavailable
 from google.cloud.datastore import Entity, Key
 
 from lagniappe import CONFIG
@@ -255,12 +256,27 @@ def _save_guarded_mutations(writes, fingerprints, guards, *, deletes=()):
             transaction.delete(entity.key)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/utility.py::_save_guarded_mutations
-# @reason the same transaction preconditions protect ordinary writes and atomic job starts
+# @testable true
+# @tests tests_unit/test_018c_mutation_guards.py::test_*
+# @matrix mutations : concurrency batched-reads
 def check_mutation_guards(transaction, guards):
+    """Batch distinct reads while enforcing every expectation in input order."""
+    guards = tuple(guards)
+    keys = list(dict.fromkeys(key for key, _expected in guards))
+    current_rows = {}
+    # Datastore Lookup accepts at most 1,000 keys per request.
+    for offset in range(0, len(keys), 1000):
+        batch = keys[offset:offset + 1000]
+        missing = []
+        rows = DATA.datastore.get_multi(batch, missing=missing, transaction=transaction)
+        current_rows.update((row.key, row) for row in rows)
+        current_rows.update((row.key, None) for row in missing)
+        # The SDK retries deferred keys, but can exhaust its retry loop without
+        # resolving them. Only explicitly missing rows satisfy absence guards.
+        if any(key not in current_rows for key in batch):
+            raise ServiceUnavailable("Datastore did not resolve all mutation guards; retry.")
     for key, expected in guards:
-        current = DATA.datastore.get(key, transaction=transaction)
+        current = current_rows[key]
         conflict = (
             current is not None if expected is None else
             current is None or (

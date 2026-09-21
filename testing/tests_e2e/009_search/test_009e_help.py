@@ -1,4 +1,4 @@
-"""Shared help through real Redis, authenticated pages, manual and REST tools."""
+"""Shared help through real Redis, authenticated articles, modals and REST tools."""
 
 import json
 import re
@@ -14,7 +14,7 @@ from lagniappe.core.tools.cache import query
 from lagniappe.core.tools.cache.core import cache
 from lagniappe.core.tools.cache.help import ensure_help
 from lagniappe.core.tools.cache.keys import HELP_PREFIX, Keys, Search
-from lagniappe.reference import get_topic, topics
+from lagniappe.reference import get_topic
 from testing.definitions import Users
 from testing.elements import HeaderSearch
 from testing.resources import SitePage
@@ -49,9 +49,8 @@ def test_help_article_navigation_and_canonical_ids(get_user, browser_failures):
     expect(user.locate('.help-section')).not_to_have_count(0)
     article = _body(user.page.content(), 'create_form')
     modal = _get(user, '/reference/section/create_form')
-    manual = _get(user, '/manual/forms')
-    assert modal['status'] == manual['status'] == 200
-    assert _body(modal['text'], 'create_form') == article == _body(manual['text'], 'create_form')
+    assert modal['status'] == 200
+    assert _body(modal['text'], 'create_form') == article
     assert 'id="modal"' in modal['text']
     user.page.get_by_role('link', name='Close', exact=True).click()
     expect(user.page).to_have_url(SETTINGS.test_config['BASE_URL'].rstrip('/') + '/')
@@ -162,20 +161,6 @@ def test_redis_help_versions_permissions_pagination_and_record_exclusion():
     finally:
         cache.redis.delete(*keys, old)
         cache.redis.hdel(Keys.ENTITY_HASHES.value, *hashes)
-
-
-def test_every_topic_is_present_in_its_manual_chapter(get_user):
-    user = get_user(Users.OWNER)
-    user.go(SitePage(url='/manual/quickstart'))
-    chapters = {}
-    for section in {topic.manual_section for topic in topics().values()}:
-        response = _get(user, f'/manual/{section}')
-        assert response['status'] == 200
-        chapters[section] = BeautifulSoup(response['text'], 'html.parser')
-    for topic in topics().values():
-        nodes = chapters[topic.manual_section].select(f'[data-role="manual-topic"][id="{topic.id}"]')
-        assert len(nodes) == 1, topic.id
-        assert nodes[0].select_one('[data-role="help-body"]')
 
 
 def test_rest_help_lookup_is_plan_free_and_uses_canonical_sources(monkeypatch, get_user):

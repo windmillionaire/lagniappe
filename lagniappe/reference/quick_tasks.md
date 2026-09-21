@@ -1,6 +1,5 @@
 ---
 title: Quick Task Editing
-manual_section: tasks
 related:
 - tasks
 - form_settings

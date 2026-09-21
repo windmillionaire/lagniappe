@@ -1,6 +1,6 @@
-import { STYLES } from "styles";
-import { setIcon } from "../../shared/icons";
-import { Dropdown } from "../combobox/dropdown";
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { Dropdown } from "../combobox/dropdown.mjs";
 
 /**
  * @testable true

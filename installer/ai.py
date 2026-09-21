@@ -166,7 +166,7 @@ def configure_ai():
 
     from config import SETTINGS
     from installer.optional import configure_ai_features
-    from installer.utils import deploy_to_app_engine
+    from installer.deploy import deploy_to_app_engine
     from runner.context import setup_command
 
     f = FORMATTER.initialize()

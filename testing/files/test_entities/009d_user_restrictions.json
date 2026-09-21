@@ -12,9 +12,7 @@
 					"expected": {
 						"restrictions": ["forms", "models", "users"],
 						"search": false,
-						"can_assign": true,
 						"user_assign": false,
-						"can_create_pages": true,
 						"category_edit": false,
 						"task": false,
 						"page": ["models"],
@@ -38,9 +36,7 @@
 					"expected": {
 						"restrictions": ["forms", "models", "puser1", "users"],
 						"search": ["forms", "models", "puser1", "users"],
-						"can_assign": false,
 						"user_assign": [],
-						"can_create_pages": false,
 						"category_edit": [],
 						"task": ["models"],
 						"page": ["models"],
@@ -63,9 +59,7 @@
 					"expected": {
 						"restrictions": ["cat001", "page001", "puser2"],
 						"search": ["cat001", "page001", "puser2"],
-						"can_assign": false,
 						"user_assign": [],
-						"can_create_pages": false,
 						"category_edit": [],
 						"task": ["cat001", "page001", "puser2"],
 						"page": ["cat001", "page001", "puser2"],
@@ -88,9 +82,7 @@
 					"expected": {
 						"restrictions": ["cat001", "forms", "puser3"],
 						"search": ["cat001", "forms", "puser3"],
-						"can_assign": false,
 						"user_assign": [],
-						"can_create_pages": true,
 						"category_edit": ["cat001"],
 						"task": ["cat001", "puser3"],
 						"page": ["cat001", "forms", "puser3"],
@@ -112,9 +104,7 @@
 					"expected": {
 						"restrictions": ["puser4", "users"],
 						"search": ["puser4", "users"],
-						"can_assign": true,
 						"user_assign": false,
-						"can_create_pages": false,
 						"category_edit": [],
 						"task": ["puser4"],
 						"page": ["puser4", "users"],
@@ -136,9 +126,7 @@
 					"expected": {
 						"restrictions": ["grp001", "puser5"],
 						"search": ["grp001", "puser5"],
-						"can_assign": true,
 						"user_assign": ["grp001"],
-						"can_create_pages": false,
 						"category_edit": [],
 						"task": ["puser5"],
 						"page": ["grp001", "puser5"],
@@ -161,9 +149,7 @@
 					"expected": {
 						"restrictions": ["page001", "puser6"],
 						"search": ["page001", "puser6"],
-						"can_assign": false,
 						"user_assign": [],
-						"can_create_pages": false,
 						"category_edit": [],
 						"task": ["page001", "puser6"],
 						"page": ["page001", "puser6"],

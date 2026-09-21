@@ -2,6 +2,7 @@
 
 import json
 from importlib import import_module
+from unittest.mock import Mock
 
 import pytest
 
@@ -102,11 +103,14 @@ def test_document_transactions_are_key_isolated_and_expiring(monkeypatch):
 
     assert first["fingerprint"] == "first"
     assert second["fingerprint"] == "second"
-    assert len(set(redis.watched)) == 2
-    assert all(
-        expires == documents.DOCUMENT_TTL_SECONDS
-        for expires in redis.expirations.values()
-    )
+    first_key = documents.Sync.DOCUMENTS.key("page-one:document")
+    second_key = documents.Sync.DOCUMENTS.key("page-two:document")
+    assert json.loads(redis.values[first_key])["revision"] == 1
+    assert json.loads(redis.values[second_key])["revision"] == 2
+    assert redis.expirations == {
+        first_key: documents.DOCUMENT_TTL_SECONDS,
+        second_key: documents.DOCUMENT_TTL_SECONDS,
+    }
 
 
 def _without_presence(monkeypatch):
@@ -128,10 +132,11 @@ def test_existing_document_poll_refreshes_ttl_without_full_write(monkeypatch):
     redis.values[document_key] = json.dumps(state)
     monkeypatch.setattr(documents.cache, "_redis", redis)
     _without_presence(monkeypatch)
+    seed = Mock(side_effect=AssertionError("Warm polls must not load Storage."))
 
     payload = documents.poll_document(
         "page:document",
-        seed={"ydoc": "stale-seed"},
+        seed=seed,
         client_id="client-1",
         user={"hash": "user-1"},
     )
@@ -142,6 +147,7 @@ def test_existing_document_poll_refreshes_ttl_without_full_write(monkeypatch):
     assert redis.expirations[document_key] == documents.DOCUMENT_TTL_SECONDS
     assert redis.watched == []
     assert redis.sets == []
+    seed.assert_not_called()
 
 
 # @matrix polling : concurrency document read-path
@@ -224,16 +230,19 @@ def test_document_poll_initialization_conflict_keeps_winning_generation(monkeypa
     document_key = documents.Sync.DOCUMENTS.key("page:document")
     monkeypatch.setattr(documents.cache, "_redis", redis)
     _without_presence(monkeypatch)
+    seed = Mock(return_value={"ydoc": "losing-snapshot"})
 
     payload = documents.poll_document(
         "page:document",
-        seed={"ydoc": "losing-snapshot"},
+        seed=seed,
         client_id="client-1",
         user={"hash": "user-1"},
     )
 
     stored = documents._decode(redis.values[document_key])
     assert payload["generation"] == winning_state["generation"]
+    assert payload["ydoc"] == "winning-snapshot"
+    assert payload["fingerprint"] == "winning-fingerprint"
     assert payload["revision"] == 1
     assert payload["updates"] == winning_state["updates"]
     assert stored["generation"] == winning_state["generation"]
@@ -241,6 +250,103 @@ def test_document_poll_initialization_conflict_keeps_winning_generation(monkeypa
     assert redis.conflict_injected is True
     assert redis.watched == [document_key, document_key]
     assert redis.sets == [document_key]
+    seed.assert_called_once_with()
+
+
+# @matrix polling : document initialization read-path
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "durable_seed",
+    [
+        {"ydoc": "durable-snapshot", "fingerprint": "durable-fingerprint"},
+        {"markup": "<p>Legacy document</p>", "fingerprint": "legacy-fingerprint"},
+        {},
+    ],
+    ids=["ydoc", "legacy-html", "empty"],
+)
+def test_document_poll_lazy_seed_recovers_after_eviction(monkeypatch, durable_seed):
+    redis = _DocumentRedis()
+    document_key = documents.Sync.DOCUMENTS.key("page:document")
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+    seed = Mock(return_value=durable_seed)
+    request = dict(seed=seed, client_id="client-1", user={"hash": "user-1"})
+
+    initial = documents.poll_document("page:document", **request)
+    assert initial["mode"] == "snapshot"
+    assert initial["ydoc"] == durable_seed.get("ydoc")
+    assert initial["markup"] == durable_seed.get("markup")
+    seed.assert_called_once_with()
+
+    warm = documents.poll_document(
+        "page:document", **request,
+        generation=initial["generation"], revision=initial["revision"],
+        presence_digest=initial["presence_digest"],
+    )
+    assert warm["mode"] == "delta"
+    assert warm["updates"] == []
+    assert "ydoc" not in warm and "users" not in warm
+    seed.assert_called_once_with()
+
+    del redis.values[document_key]
+    recovered = documents.poll_document(
+        "page:document", **request, generation=initial["generation"], revision=99,
+    )
+    assert seed.call_count == 2
+    assert recovered["generation"] != initial["generation"]
+    assert recovered["revision"] == 0
+    assert recovered["mode"] == "snapshot"
+    assert recovered["ydoc"] == durable_seed.get("ydoc")
+    assert recovered["markup"] == durable_seed.get("markup")
+    assert recovered["fingerprint"] == durable_seed.get("fingerprint")
+
+
+# @matrix polling : concurrency document initialization
+@pytest.mark.unit
+def test_document_poll_preserves_generation_created_while_loading_seed(monkeypatch):
+    redis = _DocumentRedis()
+    document_key = documents.Sync.DOCUMENTS.key("page:document")
+    winning_state = documents._new_state({"ydoc": "winning-snapshot"})
+    winning_state.update(
+        revision=1,
+        updates=[{"revision": 1, "update": "concurrent-delta", "user_hash": None}],
+    )
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+
+    def load_seed():
+        assert redis.watched == []
+        redis.values[document_key] = json.dumps(winning_state)
+        return {"ydoc": "stale-snapshot"}
+
+    payload = documents.poll_document(
+        "page:document", seed=load_seed, client_id="client-1", user={},
+    )
+
+    assert payload["generation"] == winning_state["generation"]
+    assert payload["ydoc"] == "winning-snapshot"
+    assert payload["revision"] == 1
+    assert payload["updates"] == winning_state["updates"]
+    assert documents._decode(redis.values[document_key]) == winning_state
+
+
+# @matrix polling : document initialization
+@pytest.mark.unit
+def test_document_poll_seed_failure_leaves_cache_uninitialized(monkeypatch):
+    redis = _DocumentRedis()
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+    seed = Mock(side_effect=[RuntimeError("Storage unavailable"), {"ydoc": "saved"}])
+    request = dict(seed=seed, client_id="client-1", user={})
+
+    with pytest.raises(RuntimeError, match="Storage unavailable"):
+        documents.poll_document("page:document", **request)
+    assert redis.values == {}
+    assert redis.watched == []
+
+    recovered = documents.poll_document("page:document", **request)
+    assert recovered["ydoc"] == "saved"
+    assert recovered["mode"] == "snapshot"
 
 
 class _PresenceRegistrationPipeline:
@@ -282,7 +388,7 @@ def test_presence_uses_expiring_client_hash_fields(monkeypatch):
         documents.cache,
         "hmget",
         lambda key, fields: [
-            documents._presence_payload("client-1", user).encode("utf-8")
+            json.dumps({**user, "client_id": "client-1"}).encode("utf-8")
         ],
     )
 
@@ -299,7 +405,10 @@ def test_presence_uses_expiring_client_hash_fields(monkeypatch):
         "client-1",
     ) in pipeline.commands
     assert users == [{**user, "client_id": "client-1"}]
-    assert len(digest) == 64
+    assert ("sadd", documents.Sync.PRESENCE.key("page:document"), "client-1") in pipeline.commands
+    stored_user = next(command[3] for command in pipeline.commands if command[0] == "hset")
+    assert json.loads(stored_user) == {**user, "client_id": "client-1"}
+    assert documents._register_presence("page:document", "client-1", user)[1] == digest
 
 
 @pytest.fixture
@@ -430,6 +539,42 @@ def test_revisioned_document_poll_returns_snapshot_then_deltas(document_state):
     assert "authors" not in mixed_authors
 
 
+# @matrix polling sync : author-attribution delta document revision snapshot
+@pytest.mark.unit
+@pytest.mark.parametrize("old_revision", [1, 99])
+def test_document_generation_change_returns_all_retained_deltas(document_state, old_revision):
+    old_generation = document_state["generation"]
+    document_state.clear()
+    document_state.update(documents._new_state({"ydoc": "new-base"}))
+    for revision in (0, 1):
+        documents.apply_document_update(
+            "page:document", seed={}, generation=document_state["generation"],
+            revision=revision, update=f"delta-{revision + 1}",
+            author={"hash": "author", "name": "Author"},
+        )
+
+    recovered = documents.poll_document(
+        "page:document", seed={}, client_id="returning-client", user={},
+        generation=old_generation, revision=old_revision,
+    )
+
+    assert recovered["generation"] != old_generation
+    assert recovered["mode"] == "snapshot"
+    assert recovered["ydoc"] == "new-base"
+    assert recovered["revision"] == 2
+    assert recovered["updates"] == [
+        {"revision": 1, "update": "delta-1", "user_hash": "author"},
+        {"revision": 2, "update": "delta-2", "user_hash": "author"},
+    ]
+    assert recovered["authors"] == {"author": {"hash": "author", "name": "Author"}}
+    current = documents.poll_document(
+        "page:document", seed={}, client_id="returning-client", user={},
+        generation=recovered["generation"], revision=recovered["revision"],
+    )
+    assert current["mode"] == "delta"
+    assert current["updates"] == []
+
+
 # @matrix polling sync : compaction concurrency document revision
 @pytest.mark.unit
 def test_revisioned_document_update_preserves_stale_branch_delta(document_state):
@@ -505,5 +650,8 @@ def test_revisioned_presence_close_removes_client(monkeypatch):
         ["page:document", "page:document", "project:document"],
     )
 
-    assert sum(command[0] == "srem" for command in pipeline.commands) == 2
-    assert pipeline.commands[-1][0] == "hdel"
+    assert pipeline.commands == [
+        ("srem", documents.Sync.PRESENCE.key("page:document"), "client-1"),
+        ("srem", documents.Sync.PRESENCE.key("project:document"), "client-1"),
+        ("hdel", documents.Sync.CLIENTS.value, "client-1"),
+    ]

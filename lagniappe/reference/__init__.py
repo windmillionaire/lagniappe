@@ -1,4 +1,4 @@
-"""Canonical, portable help topics shared by the UI, manual, search and AI."""
+"""Canonical, portable reference topics shared by contextual help, search and AI."""
 
 from dataclasses import dataclass
 from functools import lru_cache
@@ -31,7 +31,6 @@ class Topic:
     summary: str
     text: str
     related: tuple[str, ...]
-    manual_section: str | None
 
     # @testable false
     # @covered-by lagniappe/reference/__init__.py::get_topic
@@ -87,11 +86,10 @@ def topics():
         if len(parts) != 3 or parts[0]:
             raise ValueError(f"Missing help metadata: {topic_id}")
         metadata = yaml.safe_load(parts[1])
-        if not isinstance(metadata, dict) or set(metadata) - {"title", "related", "manual_section"}:
+        if not isinstance(metadata, dict) or set(metadata) - {"title", "related"}:
             raise ValueError(f"Invalid help metadata: {topic_id}")
         title = metadata.get("title")
         related = metadata.get("related", [])
-        section = metadata.get("manual_section")
         body = parts[2].strip()
         if not isinstance(title, str) or not title.strip():
             raise ValueError(f"Missing help title: {topic_id}")
@@ -99,8 +97,6 @@ def topics():
             raise ValueError(f"Invalid related topics: {topic_id}")
         if len(set(related)) != len(related) or topic_id in related:
             raise ValueError(f"Duplicate or self-related help topic: {topic_id}")
-        if section is not None and section not in VALID_MANUAL_SECTIONS:
-            raise ValueError(f"Unknown manual section: {topic_id}")
         if not body or "{{" in body or "{%" in body:
             raise ValueError(f"Help must be static Markdown: {topic_id}")
         html = render_markdown(body)
@@ -109,7 +105,7 @@ def topics():
             raise ValueError(f"Help must start with a summary paragraph and use level-two headings: {topic_id}")
         loaded[topic_id] = Topic(
             topic_id, title.strip(), body, strip_tags(str(soup.contents[0])),
-            strip_tags(html), tuple(related), section,
+            strip_tags(html), tuple(related),
         )
     if not loaded:
         raise ValueError("No help topics were packaged.")
@@ -138,31 +134,25 @@ def get_topic(topic_id):
 
 
 # @testable true
-# @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_manual_links
+# @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_links
 # @pair help:rendering
 @lru_cache(maxsize=256)
-def topic_html(topic_id, *, embedded=False, manual=False):
-    """Render the same body with headings and links appropriate to its wrapper."""
+def topic_html(topic_id, *, embedded=False):
+    """Render the reference body with headings appropriate to its wrapper."""
     soup = BeautifulSoup(render_markdown(get_topic(topic_id).markdown), "html.parser")
     if embedded:
         for heading in soup.find_all(re.compile(r"h[2-5]")):
             heading.name = f"h{int(heading.name[1]) + 1}"
-    if manual:
-        for link in soup.find_all("a", href=True):
-            if link["href"].startswith("/help/"):
-                target = get_topic(link["href"].removeprefix("/help/"))
-                if target.manual_section:
-                    link["href"] = f"/manual/{target.manual_section}#{target.id}"
     return sanitize_html(str(soup))
 
 
 # @testable true
-# @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_manual_links
+# @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_links
 # @pair help:rendering
 @lru_cache(maxsize=256)
-def topic_sections(topic_id, *, embedded=False, manual=False):
+def topic_sections(topic_id, *, embedded=False):
     """Split the safe body into introduction and details for template wrappers."""
-    clean = BeautifulSoup(topic_html(topic_id, embedded=embedded, manual=manual), "html.parser")
+    clean = BeautifulSoup(topic_html(topic_id, embedded=embedded), "html.parser")
     nodes = list(clean.contents)
     heading_level = "h3" if embedded else "h2"
     has_sections = any(getattr(node, "name", None) == heading_level for node in nodes)

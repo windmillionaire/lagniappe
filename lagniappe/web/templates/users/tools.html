@@ -1,4 +1,5 @@
 {% import 'controls.html' as controls %}
+{% import 'users/permissions.html' as permissions %}
 
 {% macro create_user() %}
   <form lp-create
@@ -17,11 +18,12 @@
   </form>
 {% endmacro %}
 
-{% macro public_permissions(group) %}
+{% macro public_permissions(group, sections=None) %}
   <form data-widget="PublicPermissions"
         lp-entity
         lp-update
         lp-load
+        {% if sections is not none %}loaded{% endif %}
         data-key="{{ group.urlsafe_key }}"
         data-fingerprint="{{ group.fingerprint }}"
         data-route="{{ url_for('users.public_permissions') }}"
@@ -32,8 +34,13 @@
         data-nav="false"
         data-controls="true"
         class="{{ styles.form.tools }}">
+    {% if sections is not none %}
+      {{ permissions.sections(sections) }}
+    {% endif %}
     {{ controls.edited_marker(url_for('users.public_permissions')) }}
-    <button type="submit" class="{{ styles.button.submit }}"></button>
+    {% if sections is not none %}
+      <button type="submit" class="{{ styles.button.submit }}"></button>
+    {% endif %}
   </form>
 {% endmacro %}
 
@@ -52,11 +59,12 @@
   </form>
 {% endmacro %}
 
-{% macro group_permissions(group) %}
+{% macro group_permissions(group, sections=None) %}
   <form data-widget="GroupPermissions/{{ group.hash }}"
         lp-entity
         lp-update
         lp-load
+        {% if sections is not none %}loaded{% endif %}
         data-key="{{ group.urlsafe_key }}"
         data-fingerprint="{{ group.fingerprint }}"
         data-route="{{ url_for('users.group_permissions', key=group.urlsafe_key) }}"
@@ -68,8 +76,17 @@
         data-controls="true"
         data-help="permissions"
         class="{{ styles.form.tools }}">
+    {% if sections is not none %}
+      <label class="{{ styles.form.elementLabel }} flex-col">
+        <span>Group Name</span>
+        <input type="text" name="name" value="{{ group.name }}" class="{{ styles.input }}">
+      </label>
+      {{ permissions.sections(sections) }}
+    {% endif %}
     {{ controls.edited_marker(url_for('users.group_permissions', key=group.urlsafe_key)) }}
-    <button type="submit" class="{{ styles.button.submit }}"></button>
+    {% if sections is not none %}
+      <button type="submit" class="{{ styles.button.submit }}"></button>
+    {% endif %}
   </form>
 {% endmacro %}
 

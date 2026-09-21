@@ -7,7 +7,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.mixins import AIMixin
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.tools.form_definitions import original_completion
+from lagniappe.core.tools.forms.definitions import original_completion
 from ..submission_values import values_by_id
 
 DEFAULT_HISTORY_LIMIT = 10
@@ -19,7 +19,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
     description=(
         "Load completion history for a task, including the name and description "
         "saved for each completion, completion dates, submission values, and "
-        "attached file metadata. Use this for Ask "
+        "attached file metadata. Use this for "
         "questions about past task occurrences, recency, frequency, averages, "
         "or evidence files, such as last doctor appointments or gaps between "
         "oil changes. Use file hash tokens from the result with get_file when the "

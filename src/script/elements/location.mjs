@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { LocationBox } from "../elements/combobox";
-import { setIcon } from "../shared/icons";
-import { BaseElement } from "./base/baseElement";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { LocationBox } from "./combobox/index.mjs";
+import { primitives } from "./primitives.mjs";
 
 const MAPS_SEARCH = "https://www.google.com/maps/search/";
 
@@ -48,7 +48,7 @@ function displayText(location = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_026_location_urls.py::test_location_maps_url_uses_search_contract_and_place_id
+ * @tests tests_js/test_026_location_urls.mjs::test_location_maps_url_uses_search_contract_and_place_id
  * @matrix location : encoding maps-url place-id
  */
 function mapsUrl(location = {}) {

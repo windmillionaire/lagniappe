@@ -1,9 +1,9 @@
-import { CONFIG } from "../../../config/builder";
-import { SelectBox } from "../../../elements/combobox";
-import { primitives } from "../../../elements/primitives";
-import { generateElementId } from "../../../shared";
-import { fieldKind } from "../migrations";
-import { Condition } from "./base";
+import { SelectBox } from "../../../elements/combobox/index.mjs";
+import { primitives } from "../../../elements/primitives.mjs";
+import { generateElementId } from "../../../shared/utilities.mjs";
+import { CONFIG } from "../config.mjs";
+import { fieldKind } from "../migrations.mjs";
+import { Condition } from "./base.mjs";
 
 /**
  * @testable true
@@ -132,7 +132,7 @@ export default class Columns extends Condition {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @tests tests_js/test_036b_builder_draft.mjs::test_saved_controls_refresh_without_replacing_draft_inputs
 	 * @matrix forms : builder-save stable-identity
 	 */
 	refreshSavedState() {}

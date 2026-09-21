@@ -1,38 +1,74 @@
-{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, code, step, link, nav_buttons %}
 <div class="space-y-6">
   {% call card() %}
-    {{ manual_topic("user_settings") }}
+    <p class="text-base-medium">
+      After installation, most personalization happens from the Administrator
+      <strong>Admin</strong> page in <strong>Settings</strong>: site images,
+      deployment preferences, and
+      links out to the service-provider dashboards. A custom domain still uses
+      the setup script because it has to coordinate App Engine, DNS, and auth
+      settings.
+    </p>
   {% endcall %}
+  {{ heading("Your Preferences", icon="user", kind="user") }}
   {% call card() %}
-    {{ manual_topic("site_settings") }}
+    <p class="text-base-medium">
+      Open <strong>My Page / User Settings</strong> for your account preferences.
+      Managed users can turn notification email off, receive it after five
+      minutes, or choose a daily digest at 8:00 AM in their timezone. In-app
+      notifications remain available whichever email option you choose.
+    </p>
   {% endcall %}
+  {{ heading("Site Image", icon="personalization", kind="project") }}
   {% call card() %}
-    {{ manual_topic("site_image") }}
+    <p class="text-base-medium mb-3">
+      Uploading a site image generates favicons, Apple Touch icons, and PWA
+      manifest icons. Upload the image from the <strong>Admin</strong> page under
+      <strong>Settings</strong>, then <strong>Site Image</strong>. The app
+      stores a preview of the generated images right away, but the generated
+      static files still need to be restored into the deployed app.
+    </p>
+    {{ code("./setup.sh update") }}
   {% endcall %}
+  {{ heading("Deployment Settings") }}
   {% call card() %}
-    {{ manual_topic("site_deployment") }}
+    <p class="text-base-medium mb-3">
+      The <strong>Admin</strong> page also has a <strong>Settings</strong>,
+      <strong>Deployment</strong> section for the App Engine settings Lagniappe
+      writes into its deployment files. The default uses basic scaling, which
+      lets a quiet app idle down. If you would rather keep the app warm and
+      reduce cold starts, you can switch to automatic scaling and choose a
+      positive <strong>Min Idle</strong> warm-instance target, usually at a
+      higher cost. Automatic scaling with Min Idle set to zero can still idle down.
+    </p>
+    <p class="text-base-medium mb-3">
+      This section also controls instance class, worker count, and instance
+      counts, without hand-editing YAML for ordinary changes. Saving deployment
+      settings in the app does not redeploy immediately; it saves the choices
+      with the instance. To apply them to the local deployment files and deploy,
+      run:
+    </p>
+    {{ code("./setup.sh update") }}
+    {% call callout("warning", False) %}
+      Deployment settings affect cost and performance. Change one thing at a
+      time, deploy, then check App Engine logs, response times, and billing
+      before making another change.
+    {% endcall %}
   {% endcall %}
+  {{ heading("Sharing a Public Document") }}
   {% call card() %}
-    {{ manual_topic("site_ai_models") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("document_settings") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("site_public_pages") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("site_maintenance") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("site_configuration") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("site_service_providers") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("site_installation_access") }}
+    <p class="text-base-medium mb-3">
+      A page's <strong>Public Page</strong> settings can give its document a
+      shareable link for readers who are not signed in. Its private form
+      answers, tasks, notes, and uploads stay private. Choose the public title,
+      description, and any document preview image with that audience in mind.
+    </p>
+    <p class="text-base-medium">
+      Search discovery is a separate site setting: it lets eligible public
+      pages appear in the public directory and sitemap. Turning discovery off
+      keeps a published link available; make the page private to stop access
+      through that link. Individual pages can opt out of discovery too.
+    </p>
   {% endcall %}
   {{ heading("Custom Domain") }}
   {% call card() %}

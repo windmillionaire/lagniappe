@@ -1,5 +1,5 @@
-import { STYLES } from "styles";
-import { Dropdown } from "./combobox/dropdown";
+import { STYLES } from "../generated/styles.mjs";
+import { Dropdown } from "./combobox/dropdown.mjs";
 
 /**
  * Adapts template-defined entity actions to the shared Dropdown primitive.
@@ -8,7 +8,7 @@ import { Dropdown } from "./combobox/dropdown";
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page
  * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
- * @tests tests_js/test_016_combobox_frontend.py::test_entity_title_menu_anchors_to_the_title_bottom_left
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_entity_title_menu_anchors_to_the_title_bottom_left
  * @matrix entity-menu : builder-copy readiness state-linking title-menu title-positioning
  * @matrix pages tasks : title-menu
  */

@@ -20,7 +20,7 @@ from installer.errors import NPM_TIMEOUT, PIP_TIMEOUT, PLAYWRIGHT_TIMEOUT
 
 
 APP_ROOT = REPOSITORY_ROOT
-NODE_ENGINE_RANGE = "^22.18.0 || >=24.11.0"
+NODE_ENGINE_RANGE = f">={(APP_ROOT / '.nvmrc').read_text(encoding='utf-8').strip()}"
 _NODE_VERSION_PATTERN = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 _REQUIRED_INSTALLATION_FILES = (
     "APP_YAML",
@@ -80,9 +80,8 @@ def node_version_supported(version):
         return False
 
     parsed = tuple(int(part) for part in match.groups())
-    if parsed[0] == 22:
-        return parsed >= (22, 18, 0)
-    return parsed >= (24, 11, 0)
+    minimum = tuple(int(part) for part in NODE_ENGINE_RANGE.removeprefix(">=").split("."))
+    return parsed >= minimum
 
 
 # @testable false

@@ -615,6 +615,10 @@ def run_version_command(command_args: list[str]) -> int:
         print(f"BUILD_ID: {build_id}")
         return 0
 
+    version = args.version if args.version is not None else _current_version()
+    if not RELEASE_VERSION_PATTERN.fullmatch(version):
+        parser.error("version must use stable X.Y.Z form (for example, 1.2.3)")
+
     if args.action == "set":
         from config import File, SETTINGS
         from runner.deploy import update_package_lock_version
@@ -630,7 +634,6 @@ def run_version_command(command_args: list[str]) -> int:
         return 0
 
     if args.action == "note":
-        version = args.version or _current_version()
         path = _append_version_note(version, args.message)
         print(f"Added version note to {path}")
         return 0
@@ -906,6 +909,7 @@ def _migration_release_issues(
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_development_build
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_aligned_node_declarations
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
 # @matrix release : build-mode delivery-tree
@@ -998,6 +1002,35 @@ def release_readiness_issues(
             "package-lock.json root versions do not match package.json "
             f"version {version}."
         )
+
+    node_version = (_read_release_text(repo_root, ".nvmrc", issues) or "").strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", node_version):
+        issues.append(".nvmrc must pin a stable Node version in X.Y.Z form.")
+    else:
+        expected_engine = f">={node_version}"
+        for relative, metadata in (
+            ("package.json", package),
+            (
+                "package-lock.json root",
+                lock_root.get("", {}) if isinstance(lock_root, dict) else {},
+            ),
+        ):
+            engines = metadata.get("engines") if isinstance(metadata, dict) else None
+            if not isinstance(engines, dict) or engines.get("node") != expected_engine:
+                issues.append(
+                    f"{relative} Node engine must match .nvmrc: {expected_engine}."
+                )
+        docker_path = "runner/hosted_e2e_container/Dockerfile"
+        docker = _read_release_text(repo_root, docker_path, issues) or ""
+        stages = re.findall(r"^FROM (\S+) AS node-runtime$", docker, re.MULTILINE)
+        expected_image = (
+            rf"node:{re.escape(node_version)}-bookworm-slim@sha256:[0-9a-f]{{64}}"
+        )
+        if len(stages) != 1 or not re.fullmatch(expected_image, stages[0]):
+            issues.append(
+                f"{docker_path} must pin the node-runtime image to Node "
+                f"{node_version}-bookworm-slim with a SHA-256 digest."
+            )
 
     if version and build_metadata.get("version") != version:
         issues.append(

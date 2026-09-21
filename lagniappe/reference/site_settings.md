@@ -1,6 +1,5 @@
 ---
 title: Site Settings
-manual_section: personalization
 related:
 - site_maintenance
 - site_administrators

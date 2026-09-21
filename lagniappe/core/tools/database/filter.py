@@ -332,8 +332,8 @@ class Query:
         if r.next_cursor:
             # fetch next page
 
-        # Keys-only query for counting
-        count = Query(KINDS.instances).filter(f).keys_only().count()
+        # Server-side count
+        count = Query(KINDS.instances).filter(f).count()
 
         # Projection query (fetch only specific properties)
         results = Query(KINDS.users).project("email", "name").fetch_all()
@@ -400,7 +400,7 @@ class Query:
         """
         Fetch only entity keys (no properties).
 
-        Useful for counting or checking existence efficiently.
+        Useful when only entity identities are needed.
         """
         self._keys_only = True
         return self
@@ -488,20 +488,21 @@ class Query:
             return iter(())
         return q.fetch(start_cursor=self._cursor, limit=self._limit)
 
+    # @testable true
+    # @tests tests_unit/test_018_database_utility.py::test_query_count_uses_aggregation_without_fetching_entities
+    # @tests tests_unit/test_018_database_utility.py::test_denied_query_terminals_do_not_create_datastore_query
+    # @tests tests_e2e/002_home/test_002o_home_task_count.py::test_user_task_count_aggregates_owned_and_assigned_tasks_once
+    # @matrix database : count aggregation deduplication
+    # @matrix permissions : deny-all query-short-circuit terminal-results
     def count(self) -> int:
-        """
-        Count the number of matching entities.
-
-        Note: This fetches all keys, which can be expensive for large
-        result sets. For very large counts, consider using aggregation
-        queries (Datastore's COUNT aggregation) if available.
-        """
-        # Ensure keys_only for efficiency
+        """Count all matching entities in Datastore, ignoring pagination."""
         self._keys_only = True
         q = self._build_query()
         if q is None:
             return 0
-        return len(list(q.fetch()))
+        aggregation = DATA.datastore.aggregation_query(q).count(alias="total")
+        result = next(aggregation.fetch())
+        return int(result[0].value)
 
     def exists(self) -> bool:
         """Check if any matching entities exist."""

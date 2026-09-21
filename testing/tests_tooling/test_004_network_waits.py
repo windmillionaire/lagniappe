@@ -387,6 +387,14 @@ def test_poll_wait_matches_subscription_and_validates_result():
     ("payload", "message"),
     [
         (
+            {"version": 2, "results": []},
+            "invalid protocol version",
+        ),
+        (
+            {"version": 1, "results": {}},
+            "returned no result list",
+        ),
+        (
             {"version": 1, "results": []},
             "did not return subscription 'view:entity:file-key'",
         ),
@@ -529,8 +537,9 @@ def test_offline_sync_replay_waits_for_manager_and_exact_matching_response(
     expected = FakeResponse(
         url="http://test.local/l/sync",
         post_data=(
-            '{"sync_id":"project:document",'
-            '"updates":["offline edit","remote edit"]}'
+            '{"client_id":"client-1","updates":['
+            '{"sync_id":"unrelated:document","html":"other edit"},'
+            '{"sync_id":"project:document","html":"offline edit remote edit","save":true}]}'
         ),
     )
 
@@ -539,15 +548,20 @@ def test_offline_sync_replay_waits_for_manager_and_exact_matching_response(
         sync_id="project:document",
         request_payload_contains=("offline edit", "remote edit"),
     ) as responses:
-        page.respond(
-            FakeResponse(
-                url="http://test.local/l/sync",
-                post_data=(
-                    '{"sync_id":"unrelated:document",'
-                    '"updates":["offline edit","remote edit"]}'
-                ),
+        for unrelated_body in (
+            '{"updates":[{"sync_id":"unrelated:document","html":"offline edit remote edit"}]}',
+            '{"updates":[{"sync_id":"project:document-copy","html":"offline edit remote edit"}]}',
+            '{"updates":[{"sync_id":"unrelated:document","html":"project:document offline edit remote edit"}]}',
+            '{"updates":[{"sync_id":"project:document","html":"different edit"},'
+            '{"sync_id":"unrelated:document","html":"offline edit remote edit"}]}',
+            '{"sync_id":"project:document","updates":["offline edit","remote edit"]}',
+            '{"updates":{"sync_id":"project:document","html":"offline edit remote edit"}}',
+            '["project:document","offline edit","remote edit"]',
+            'project:document offline edit remote edit',
+        ):
+            page.respond(
+                FakeResponse(url="http://test.local/l/sync", post_data=unrelated_body)
             )
-        )
         page.respond(expected)
 
     assert responses == [expected]

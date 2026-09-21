@@ -1,5 +1,8 @@
-import { withTransition } from "../../shared";
-import { EmbeddedTableVisibility, ExpandedTableCell } from "../embeddedTable";
+import { withTransition } from "../../shared/transitions.mjs";
+import {
+	EmbeddedTableVisibility,
+	ExpandedTableCell,
+} from "../embeddedTable.mjs";
 
 /**
  * @testable true

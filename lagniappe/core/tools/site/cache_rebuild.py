@@ -29,7 +29,7 @@ class CacheRebuildResult:
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_rehydrates_entities_in_bounded_chunks
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_materializes_nested_relations_across_batch_boundaries
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_recalculates_restrictions_after_form_deletion
-# @matrix cache : batching current migration-gate nested-relations pending
+# @matrix cache : batching current migration-gate nested-relations pending validation
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_reports_bad_records_and_continues
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_does_not_hide_provider_failures
 # @matrix cache : failure-isolation actionable-links

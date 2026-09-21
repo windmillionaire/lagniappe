@@ -50,13 +50,17 @@ Used for entity documents (project documents, page documents). Manages real-time
 - **Saving**: On blur, the editor dispatches `sync-save`. `saveData` includes
   the merged delta, full `ydoc`, and rendered `html`; document HTML persistence
   happens through the `/l/sync` route when `html` is present.
-- **Offline/headless replay**: `loadHeadlessWidget(...)` can instantiate a
-  headless collaborative document so an offline record can merge and replay
-  even when the widget is not mounted on the current route.
+- **Offline/headless replay**: `headless.mjs` owns `loadHeadlessWidget(...)` and
+  its registry. It lazily imports the collaborative controller to construct a
+  detached document, allowing an offline record to merge and replay even when
+  the widget is not mounted on the current route. `SyncManager` retains
+  responsibility for initialization, remote/offline state, replay, and cleanup.
 
 **State encoding:** Yjs state vectors and updates are serialized as base64
 strings for transport. Shared helpers `base64ToUint8Array` and
-`uint8ArrayToBase64` handle conversion.
+`uint8ArrayToBase64` handle conversion. The collaborative controller imports
+these and `waitForAttribute` directly from `shared/utilities.mjs`; sync service
+acquisition remains lazy through the view.
 
 ### IndependentDocument (`independent.mjs`)
 
@@ -107,11 +111,18 @@ final flush ownership to `FormBuilder`. Collaborative documents leave
 visibility and final save behavior to the widget/component lifecycle plus
 `SyncManager`.
 
-## Editor Configuration (`editor.mjs`)
+## Editor Construction (`editor.mjs`)
 
 Two factory functions create TipTap `Editor` instances with shared extension configuration:
 
-**`collaborativeEditor(target, ydoc)`** -- includes `Collaboration` extension (Yjs), `FlashRemoteChanges`, disables built-in history (Yjs handles undo).
+Private `createFormattingExtensions()` and `createEditingExtensions()` helpers
+construct the common blocks. Each call creates fresh arrays and configured
+extensions. The factories retain StarterKit history settings and constructor
+options explicitly; collaborative setup inserts Collaboration and remote-change
+highlighting between the common blocks, then appends mentions. Its Yjs document
+and undo-origin set remain local to that editor instance.
+
+**`collaborativeEditor(target, ydoc, editable = true)`** -- includes `Collaboration` extension (Yjs), `FlashRemoteChanges`, disables built-in history (Yjs handles undo).
 
 **`independentEditor(target, content)`** -- enables built-in history, no
 collaboration extensions. Initial HTML is passed to the editor constructor so
@@ -229,6 +240,14 @@ is not migrated by public rendering.
 ## Toolbar (`toolbar.mjs`)
 
 The toolbar is shared between both document types. It creates tool buttons and dropdown menus, manages toolbar forms (color picker, image settings, link insertion), and tracks the active editor state.
+
+Feature configuration lives beside the toolbar in `elements/editor/config.mjs`:
+`TOOLBAR_TOOLS`, `TOOLBAR_MENUS`, `IMAGE_GROUPS`, `COLOR_MENU`, `FONT_MENU`, and
+`USER_COLORS`. This module contains only configuration data. Toolbar options
+remain lazy through the literal registries in `options/registry.mjs`.
+Editor commands, extensions, and the independent controller import shared
+helpers directly from their endpoint, request, error, query-lifecycle, utility,
+or modal owners.
 
 ### Initialization
 

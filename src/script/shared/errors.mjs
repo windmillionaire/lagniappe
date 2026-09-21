@@ -106,7 +106,7 @@ const getErrorText = (error) => {
  * transitions, and cross-document transitions. They should not be reported.
  *
  * @testable false
- * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @covered-by src/script/shared/transitions.mjs::withTransition
  * @reason transition-noise predicate is exercised through the transition wrapper
  */
 export const isSkippedViewTransitionError = (error) => {
@@ -454,13 +454,13 @@ const _filterNotificationBlockingSpans = (event) => {
  * configured DSN, then apply the shared privacy and noise filters.
  *
  * @testable true
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_drops_malformed_blocking_operation_warning
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_removes_invalid_trace_context_without_dropping_event
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_filters_notification_long_task_spans
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_redacts_browser_request_and_context_payloads
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_drops_malformed_breadcrumb_container
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_uses_installation_dsn_without_default_pii
- * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_does_not_initialize_without_dsn
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_drops_malformed_blocking_operation_warning
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_removes_invalid_trace_context_without_dropping_event
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_filters_notification_long_task_spans
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_redacts_browser_request_and_context_payloads
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_drops_malformed_breadcrumb_container
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_uses_installation_dsn_without_default_pii
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_does_not_initialize_without_dsn
  * @matrix error-tracking : blocking-operation configured-dsn disabled malformed-blocking-operation malformed-breadcrumbs notification-transaction payload-bounds privacy redaction request-context sentry-context trace-normalization
  */
 export const configureSentry = () => {
@@ -561,7 +561,7 @@ export const isTransientNetworkError = (error) => {
 
 /**
  * @testable true
- * @tests tests_js/test_015_error_tracking_frontend.py::test_capture_error_normalizes_sentry_context_values
+ * @tests tests_js/test_015_error_tracking_frontend.mjs::test_capture_error_normalizes_sentry_context_values
  * @matrix error-tracking : normalization sentry-context
  */
 export const captureError = (error, element, context) => {

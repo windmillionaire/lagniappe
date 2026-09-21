@@ -1,34 +1,134 @@
 {
 	"test_form_type": {
 		"entities": [
-			["FORM", { "name": "Page Form", "form_type": "page" }],
-			["FORM", { "name": "Task Form", "form_type": "task" }]
+			["FORM", {
+				"name": "Page Form",
+				"form_type": "page",
+				"expected": {
+					"value": "page",
+					"sort_value": {"Page": "page"},
+					"details_value": "page",
+					"column_value": "page",
+					"cache_value": "page"
+				}
+			}],
+			["FORM", {
+				"name": "Task Form",
+				"form_type": "task",
+				"expected": {
+					"value": "task",
+					"sort_value": {"Task": "task"},
+					"details_value": "task",
+					"column_value": "task",
+					"cache_value": "task"
+				}
+			}]
 		]
 	},
 	"test_form_schema": {
 		"entities": [
-			["FORM", { "name": "Basic Inputs Form", "schema": "basic_inputs" }],
-			["FORM", { "name": "Selection Types Form", "schema": "selection_types" }],
-			["FORM", { "name": "Complex Types Form", "schema": "complex_types" }]
+			["FORM", {
+				"name": "Basic Inputs Form",
+				"schema": "basic_inputs",
+				"expected_fields": {
+					"input-textab12": {"id": "input-textab12", "label": "Text Field"},
+					"input-datecd34": {"id": "input-datecd34", "label": "Date Field"},
+					"input-timeef56": {"id": "input-timeef56", "label": "Time Field"},
+					"input-numgh78": {"id": "input-numgh78", "label": "Number Field"},
+					"input-emlij90": {"id": "input-emlij90", "label": "Email Field"},
+					"input-telkl12": {"id": "input-telkl12", "label": "Phone Field"}
+				}
+			}],
+			["FORM", {
+				"name": "Selection Types Form",
+				"schema": "selection_types",
+				"expected_fields": {
+					"textarea-notesab": {"id": "textarea-notesab", "label": "Notes"},
+					"checkbox-activecd": {"id": "checkbox-activecd", "label": "Is Active"},
+					"radio-priorityef": {"id": "radio-priorityef", "label": "Priority"},
+					"select-statusgh": {"id": "select-statusgh", "label": "Status"},
+					"select-tagsij12": {"id": "select-tagsij12", "label": "Tags"}
+				}
+			}],
+			["FORM", {
+				"name": "Complex Types Form",
+				"schema": "complex_types",
+				"expected_fields": {
+					"table-contactsab": {"id": "table-contactsab", "label": "Contacts"},
+					"link-externalij": {"id": "link-externalij", "label": "Website"},
+					"link-internalkl": {"id": "link-internalkl", "label": "Related Page"},
+					"location-addrmn": {"id": "location-addrmn", "label": "Address"},
+					"signature-signop": {"id": "signature-signop", "label": "Signature"},
+					"html-instructqr": {"id": "html-instructqr", "label": "Instructions"},
+					"bookmark-refst12": {"id": "bookmark-refst12", "label": "Reference"}
+				}
+			}]
 		]
 	},
 	"test_form_table_fields": {
 		"entities": [
-			["FORM", { "name": "Has Table", "schema": "complex_types" }],
-			["FORM", { "name": "No Table", "schema": "basic_inputs" }]
+			["FORM", {
+				"name": "Has Table",
+				"schema": "complex_types",
+				"expected_table_fields": ["row-namecd12", "row-emailef34", "row-primarygh"]
+			}],
+			["FORM", {
+				"name": "No Table",
+				"schema": "basic_inputs",
+				"expected_table_fields": []
+			}]
 		]
 	},
 	"test_form_html_fields": {
 		"entities": [
-			["FORM", { "name": "Has HTML", "schema": "complex_types" }],
-			["FORM", { "name": "No HTML", "schema": "selection_types" }]
+			["FORM", {
+				"name": "Has HTML",
+				"schema": "complex_types",
+				"expected_html_fields": ["html-instructqr"]
+			}],
+			["FORM", {
+				"name": "No HTML",
+				"schema": "selection_types",
+				"expected_html_fields": []
+			}]
 		]
 	},
 	"test_form_filters": {
 		"entities": [
-			["FORM", { "name": "Basic Inputs Form", "schema": "basic_inputs" }],
-			["FORM", { "name": "Selection Types Form", "schema": "selection_types" }],
-			["FORM", { "name": "Complex Types Form", "schema": "complex_types" }]
+			["FORM", {
+				"name": "Basic Inputs Form",
+				"schema": "basic_inputs",
+				"expected_conditions": [
+					["input-textab12", "Text Field", "form", "text"],
+					["input-datecd34", "Date Field", "form", "date"],
+					["input-timeef56", "Time Field", "form", "time"],
+					["input-numgh78", "Number Field", "form", "number"],
+					["input-emlij90", "Email Field", "form", "email"],
+					["input-telkl12", "Phone Field", "form", "tel"]
+				]
+			}],
+			["FORM", {
+				"name": "Selection Types Form",
+				"schema": "selection_types",
+				"expected_conditions": [
+					["textarea-notesab", "Notes", "form", "textarea"],
+					["checkbox-activecd", "Is Active", "form", "checkbox"],
+					["radio-priorityef", "Priority", "form", "radio"],
+					["select-statusgh", "Status", "form", "select"],
+					["select-tagsij12", "Tags", "form", "select"]
+				]
+			}],
+			["FORM", {
+				"name": "Complex Types Form",
+				"schema": "complex_types",
+				"expected_conditions": [
+					["link-externalij", "Website", "form", "out"],
+					["link-internalkl", "Related Page", "form", "in"],
+					["location-addrmn", "Address", "form", "location"],
+					["signature-signop", "Signature", "form", "signature"],
+					["bookmark-refst12", "Reference", "form", "bookmark"]
+				]
+			}]
 		]
 	}
 }

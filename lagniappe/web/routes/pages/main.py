@@ -10,7 +10,7 @@ from lagniappe.core.definitions import (
     FileConsumerLimitError,
     enforce_file_consumer,
 )
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.auth.references import (
@@ -240,7 +240,7 @@ def _autofill_data(page, request, create=False):
             )
         except FileConsumerLimitError as error:
             abort(422, description=str(error))
-    return ai.autofill_prompt_data(
+    return ai_autofill.autofill_prompt_data(
         page,
         current_user,
         user_context=request.form.get("autofill-description"),
@@ -310,6 +310,8 @@ def _is_offline_replay(form):
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
+# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
+# @pair pages:submission-validation
 # @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.PAGE, Action.VIEW)
@@ -386,7 +388,7 @@ def update(key, **kwargs):
                 return responses.error(str(error))
         if role == "explain":
             try:
-                prompt = ai.form_autofill_prompt(**_autofill_data(page, request))
+                prompt = ai_autofill.form_autofill_prompt(**_autofill_data(page, request))
                 return responses.explain(prompt)
             finally:
                 direct_uploads.cleanup_direct_uploads(
@@ -522,7 +524,7 @@ def create(key, **kwargs):
         require_ai_access(AI.CREATE)
         if role == "explain":
             try:
-                prompt = ai.form_autofill_prompt(
+                prompt = ai_autofill.form_autofill_prompt(
                     **_autofill_data(page, request, create=True)
                 )
                 return responses.explain(prompt)

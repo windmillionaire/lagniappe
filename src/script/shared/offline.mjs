@@ -5,7 +5,7 @@ const MUTATION_STORE = "mutations";
 
 /**
  * @testable true
- * @tests tests_js/test_028_form_state_split.py::test_offline_database_upgrade_discards_legacy_activity_records
+ * @tests tests_js/test_028_form_state_split.mjs::test_offline_database_upgrade_discards_legacy_activity_records
  * @matrix offline : database-upgrade legacy-record-discard mutation-store
  */
 function openDB() {
@@ -41,9 +41,9 @@ function openDB() {
 
 /**
  * @testable true
- * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_operations_resolve_only_after_transaction_commit
- * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_abort_and_errors_reject_once_and_close_the_database
- * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_executor_failures_abort_and_preserve_the_original_error
+ * @tests tests_js/test_045_browser_persistence.mjs::test_indexeddb_operations_resolve_only_after_transaction_commit
+ * @tests tests_js/test_045_browser_persistence.mjs::test_indexeddb_abort_and_errors_reject_once_and_close_the_database
+ * @tests tests_js/test_045_browser_persistence.mjs::test_indexeddb_executor_failures_abort_and_preserve_the_original_error
  * @matrix offline sync : connection-lifecycle error-ownership executor-error multi-delete readonly-result transaction-abort transaction-commit
  */
 function withTransaction(storeNames, mode, executor) {

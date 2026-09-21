@@ -38,7 +38,7 @@ Form State Machine:
 """
 
 import base64
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 import importlib
 import json
@@ -61,7 +61,7 @@ from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Keys
 from lagniappe.core.tools.email import smtp as auth_email
 from lagniappe.core.tools.services import identity_platform
-from lagniappe.web import app
+from lagniappe.web import CSP, app
 
 from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements, Roles
@@ -919,6 +919,86 @@ def test_disabled_google_error_returns_to_method_chooser(get_user):
     expect(auth_method.locator(PASSWORD)).to_have_count(0)
 
 
+# @matrix login : auth-method owner-bootstrap google-oauth first-paint
+# @pair web-headers:security
+# @template users/login.html::google_signin
+@pytest.mark.parametrize("owner_setup", [False, True], ids=["ordinary", "owner"])
+def test_google_button_styles_apply_before_first_paint(get_user, monkeypatch, owner_setup):
+    """GIS's temporary button has its sizing before the iframe replaces it."""
+    _ensure_owner_initialized()
+    with _owner_waiting_for_first_login() if owner_setup else nullcontext():
+        with monkeypatch.context() as production:
+            production.setattr(CONFIG, "ENV", Environment.PRODUCTION)
+            production.setattr(CONFIG, "CAPTURE_ERRORS", False)
+            production.setattr(CONFIG, "GOOGLE_SIGNIN_ENABLED", True)
+            production.setattr(identity_platform, "google_provider_enabled", lambda: True)
+            client = app.test_client()
+            response = client.get("/users/login")
+            next_response = client.get("/users/login")
+
+        assert response.status_code == 200
+        html = response.get_data(as_text=True)
+        nonce = re.search(r'nonce="([^"]+)"', html).group(1)
+        next_nonce = re.search(
+            r'nonce="([^"]+)"', next_response.get_data(as_text=True)
+        ).group(1)
+        assert len(nonce) >= 32
+        assert nonce != next_nonce
+        policy = {
+            parts[0]: parts[1:]
+            for directive in response.headers["Content-Security-Policy"].split(";")
+            if (parts := directive.split())
+        }
+        for directive in ("style-src", "style-src-elem"):
+            assert f"'nonce-{nonce}'" in policy[directive]
+            assert "'unsafe-inline'" not in policy[directive]
+        assert not any(value.startswith("'nonce-") for value in policy["script-src"])
+
+        user = get_user(Users.ANONYMOUS)
+        # Serve the production template and headers; ordinary testing mode
+        # deliberately omits Google's SDK. Stub only the external SDK boundary,
+        # including its copying of script[nonce] onto the inline style element.
+        user.page.route(
+            "**/users/login",
+            lambda route: route.fulfill(
+                status=200, headers=dict(response.headers), body=html,
+            ),
+        )
+        user.page.route("https://accounts.google.com/gsi/client", lambda route: route.fulfill(
+            content_type="text/javascript",
+            body="""
+                const nonce = document.querySelector('script[nonce]')?.nonce;
+                function renderGoogleButton() {
+                    const host = [...document.querySelectorAll('.g_id_signin')]
+                        .find(element => element.getClientRects().length);
+                    if (!host) return requestAnimationFrame(renderGoogleButton);
+                    const style = document.createElement('style');
+                    if (nonce) style.nonce = nonce;
+                    style.textContent = `
+                        .g_id_signin [role=button] { width: 280px; height: 40px; }
+                        .g_id_signin svg { width: 18px; height: 18px; }
+                    `;
+                    document.head.append(style);
+                    host.innerHTML = '<div role="button" tabindex="0">'
+                        + '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" /></svg>'
+                        + 'Sign in with Google</div>';
+                    requestAnimationFrame(() => {
+                        const rect = host.querySelector('svg').getBoundingClientRect();
+                        window.googleFirstPaint = { width: rect.width, height: rect.height };
+                    });
+                }
+                requestAnimationFrame(renderGoogleButton);
+            """,
+        ))
+        login_page = user.go(SitePages.LOGIN_PAGE)
+        user.page.wait_for_function("() => window.googleFirstPaint")
+        assert user.page.evaluate("window.googleFirstPaint") == {"width": 18, "height": 18}
+        form = user.locate(
+            login_page.OWNER_SETUP_FORM if owner_setup else login_page.AUTH_METHOD_FORM
+        )
+        expect(form.get_by_role("button", name="Sign in with Google", exact=True)).to_be_visible()
+
+
 # @matrix login : auth-method disabled-provider google-oauth
 # @template users/login.html::google_signin
 def test_login_hides_google_when_provider_is_disabled(monkeypatch):
@@ -938,6 +1018,7 @@ def test_login_hides_google_when_provider_is_disabled(monkeypatch):
     assert "google-signin-method" not in html
     assert "google-signin-owner" not in html
     assert "accounts.google.com/gsi/client" not in html
+    assert response.headers["Content-Security-Policy"] == CSP
     assert 'data-role="show-email-check"' in html
 
     with _owner_waiting_for_first_login():

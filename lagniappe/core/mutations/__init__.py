@@ -29,7 +29,9 @@ def plan_mutation(operation, *entities, registry=None):
     if operation is MutationOperation.DELETE:
         return plan_delete(*entities, registry=registry)
 
-    builder = MutationPlanBuilder(operation, entities, registry=registry)
+    builder = MutationPlanBuilder(
+        operation, entities, registry=registry, planner_for=planner_for
+    )
     for entity in entities:
         builder.plan_standard(entity, reason="explicit-root")
     return builder.build()

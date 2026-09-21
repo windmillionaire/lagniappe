@@ -5,19 +5,80 @@
 				"FORM",
 				{
 					"name": "Contact Form",
+					"hash": "contact-form",
 					"form_type": "page",
-					"categories": [{ "name": "Contacts" }, { "name": "People" }]
+					"categories": [
+						{"name": "Contacts", "hash": "contacts"},
+						{"name": "People", "hash": "people"}
+					],
+					"expected_columns": {
+						"name": {
+							"name": "Contact Form",
+							"kind": "form",
+							"requires": ["forms"],
+							"hash": "contact-form",
+							"form_type": "page",
+							"id": "contact-form"
+						},
+						"form_type": "page",
+						"categories": [
+							{"name": "Contacts", "kind": "category", "hash": "contacts", "id": "contacts"},
+							{"name": "People", "kind": "category", "hash": "people", "id": "people"}
+						],
+						"projects": []
+					}
 				}
 			],
 			[
 				"FORM",
 				{
 					"name": "Review Task",
+					"hash": "review-task",
 					"form_type": "task",
-					"projects": [{ "name": "Review Project", "hash": "prj_review" }]
+					"projects": [{"name": "Review Project", "hash": "prj_review"}],
+					"expected_columns": {
+						"name": {
+							"name": "Review Task",
+							"kind": "form",
+							"requires": ["forms"],
+							"hash": "review-task",
+							"form_type": "task",
+							"id": "review-task"
+						},
+						"form_type": "task",
+						"categories": [],
+						"projects": [
+							{
+								"name": "Review Project",
+								"kind": "project",
+								"hash": "prj_review",
+								"id": "prj_review"
+							}
+						]
+					}
 				}
 			],
-			["FORM", { "name": "Empty Form", "form_type": "category" }]
+			[
+				"FORM",
+				{
+					"name": "Empty Form",
+					"hash": "empty-form",
+					"form_type": "category",
+					"expected_columns": {
+						"name": {
+							"name": "Empty Form",
+							"kind": "form",
+							"requires": ["forms"],
+							"hash": "empty-form",
+							"form_type": "category",
+							"id": "empty-form"
+						},
+						"form_type": "category",
+						"categories": [],
+						"projects": []
+					}
+				}
+			]
 		]
 	}
 }

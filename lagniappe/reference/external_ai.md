@@ -1,6 +1,5 @@
 ---
 title: External AI Connections
-manual_section: ai
 related:
 - ai_tools
 - permissions

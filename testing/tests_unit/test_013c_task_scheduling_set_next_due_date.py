@@ -9,10 +9,9 @@ def test_next_due_date_recurring(get_test_entities):
     Recurring schedules calculate next due date from user_today()
     by adding the interval (days/weeks/months/years).
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from unittest.mock import patch
 
-    from dateutil.relativedelta import relativedelta
     from zoneinfo import ZoneInfo
 
     tz = ZoneInfo("America/Chicago")
@@ -24,9 +23,11 @@ def test_next_due_date_recurring(get_test_entities):
         with patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
         ):
-            for task in get_test_entities():
+            tasks = get_test_entities()
+            assert tasks
+            for task in tasks:
                 schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec.get("expected", {})
+                expected = task.test_spec["expected"]
                 task_name = task.test_spec.get("name", "Unknown")
 
                 # Set up the recurring section
@@ -37,20 +38,12 @@ def test_next_due_date_recurring(get_test_entities):
                 schedule = task.properties.schedule
                 schedule.set_next_due_date()
 
-                # Verify the result - calculate expected date from mock_today + delta
-                expected_delta = expected.get("delta")
-                delta = relativedelta(
-                    days=expected_delta.get("days", 0),
-                    weeks=expected_delta.get("weeks", 0),
-                    months=expected_delta.get("months", 0),
-                    years=expected_delta.get("years", 0),
-                )
-                expected_date = mock_today + delta
+                expected_date = datetime.fromisoformat(expected["expected_date"]).replace(tzinfo=tz)
 
                 assert task.due_date is not None, (
                     f"Failed for '{task_name}': due_date is None"
                 )
-                assert task.due_date == expected_date, (
+                assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
                     f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                 )
 
@@ -78,9 +71,11 @@ def test_next_due_date_scheduled(get_test_entities):
         with patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
         ):
-            for task in get_test_entities():
+            tasks = get_test_entities()
+            assert tasks
+            for task in tasks:
                 schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec.get("expected", {})
+                expected = task.test_spec["expected"]
                 task_name = task.test_spec.get("name", "Unknown")
 
                 # Set due_date based on days_ago
@@ -108,18 +103,19 @@ def test_next_due_date_scheduled(get_test_entities):
                     f"Failed for '{task_name}': due_date is None"
                 )
 
+                assert ("days_from_today" in expected) != ("expected_date" in expected)
                 if "days_from_today" in expected:
                     expected_date = mock_today + timedelta(
                         days=expected["days_from_today"]
                     )
-                    assert task.due_date == expected_date, (
+                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
                 elif "expected_date" in expected:
                     expected_date = datetime.strptime(
                         expected["expected_date"], "%Y-%m-%d"
                     ).replace(tzinfo=tz)
-                    assert task.due_date == expected_date, (
+                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
 
@@ -153,9 +149,11 @@ def test_next_due_date_periodic(get_test_entities):
         with patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
         ):
-            for task in get_test_entities():
+            tasks = get_test_entities()
+            assert tasks
+            for task in tasks:
                 schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec.get("expected", {})
+                expected = task.test_spec["expected"]
                 task_name = task.test_spec.get("name", "Unknown")
 
                 # Set due_date based on days_ago or months_ago
@@ -190,18 +188,19 @@ def test_next_due_date_periodic(get_test_entities):
                     f"Failed for '{task_name}': due_date is None"
                 )
 
+                assert ("days_from_today" in expected) != ("expected_date" in expected)
                 if "days_from_today" in expected:
                     expected_date = mock_today + timedelta(
                         days=expected["days_from_today"]
                     )
-                    assert task.due_date == expected_date, (
+                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
                 elif "expected_date" in expected:
                     expected_date = datetime.strptime(
                         expected["expected_date"], "%Y-%m-%d"
                     ).replace(tzinfo=tz)
-                    assert task.due_date == expected_date, (
+                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
 

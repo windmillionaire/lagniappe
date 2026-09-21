@@ -11,7 +11,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import form_changes as changes
+from lagniappe.core.tools.forms import changes, contracts, definitions, population
 from lagniappe.core.tools.database.utility import ExactEntityState
 
 from .base import DeferredJobAdapter
@@ -46,10 +46,10 @@ class FormChangeAdapter(DeferredJobAdapter):
         pending = deepcopy(form._starting_form_change)
         source = ExactEntityState(deepcopy(dict(form.db)))
         pending["job"] = job.urlsafe_key
-        changes.check_size({**form.db, changes.PENDING: pending})
-        form.db[changes.PENDING] = json.dumps(pending)
+        contracts.check_size({**form.db, contracts.PENDING: pending})
+        form.db[contracts.PENDING] = json.dumps(pending)
         form.db.pop("form_change_rejection", None)
-        return ((form, (changes.PENDING, "form_change_rejection")),), (
+        return ((form, (contracts.PENDING, "form_change_rejection")),), (
             (form.key, source),
         )
 
@@ -95,11 +95,11 @@ class FormChangeAdapter(DeferredJobAdapter):
         count = context.checkpoint.get("checked", 0)
         while True:
             form, change = changes.owned_change(context)
-            batch = changes.target_batch(form, cursor)
+            batch = population.target_batch(form, cursor)
             for raw in batch:
                 context.ensure_active()
-                target = changes.load_target(raw)
-                if target and target.db.get(changes.RECEIPT) != change["id"]:
+                target = population.load_target(raw)
+                if target and target.db.get(contracts.RECEIPT) != change["id"]:
                     if target.generation != change["source_generation"]:
                         raise ValidationError(
                             "A submission has an unexpected form generation and needs repair."
@@ -137,7 +137,7 @@ class FormChangeAdapter(DeferredJobAdapter):
     # @reason validate the complete scope again after a checkpoint resume, before the first write
     def verify_scope(self, context, form, change):
         if change.get("require_visibility") and not change["applied"]:
-            from lagniappe.core.tools.form_schema_updates import (
+            from lagniappe.core.tools.forms.schema_updates import (
                 inspect_scope,
                 validate_candidates,
                 STALE_MESSAGE,
@@ -161,11 +161,11 @@ class FormChangeAdapter(DeferredJobAdapter):
 
     def inspect(self, context):
         form = Entities.fetch_one(context.input("form").key, request=Fetch.root())
-        receipt = changes.json_value(form.db, "form_draft_receipt") if form else {}
+        receipt = contracts.json_value(form.db, "form_draft_receipt") if form else {}
         return (
             DeferredJobInspection.APPLIED
             if receipt.get("id") == context.parameters["change_id"]
-            and not form.db.get(changes.PENDING)
+            and not form.db.get(contracts.PENDING)
             else DeferredJobInspection.NOT_APPLIED
         )
 
@@ -176,14 +176,14 @@ class FormChangeAdapter(DeferredJobAdapter):
         form, change = changes.owned_change(context)
         self.verify_scope(context, form, change)
         if not change["applied"]:
-            expected = form.db[changes.PENDING]
+            expected = form.db[contracts.PENDING]
             change.update(applied=True, phase="applying")
-            form.db[changes.PENDING] = json.dumps(change)
+            form.db[contracts.PENDING] = json.dumps(change)
             form._form_change_write = True
             execute_mutation(
-                RootMutation.plan(form, property_mask=(changes.PENDING,)),
+                RootMutation.plan(form, property_mask=(contracts.PENDING,)),
                 guards=[
-                    (form.key, {changes.PENDING: expected}),
+                    (form.key, {contracts.PENDING: expected}),
                     (
                         context.job.key,
                         {"lease_token": context.job.lease_token, "status": "running"},
@@ -195,9 +195,9 @@ class FormChangeAdapter(DeferredJobAdapter):
         if not context.checkpoint.get("applied_all"):
             while True:
                 form, _change = changes.owned_change(context)
-                batch = changes.target_batch(form, cursor)
+                batch = population.target_batch(form, cursor)
                 for raw in batch:
-                    target = changes.load_target(raw)
+                    target = population.load_target(raw)
                     if target is None:
                         continue
                     prepared = self.prepare_ai_target(context, change, target)
@@ -231,19 +231,19 @@ class FormChangeAdapter(DeferredJobAdapter):
     # @matrix form-migration : ai-checkpoint external-provider-free retry
     # @pair form-migration:ai-telemetry
     def prepare_ai_target(self, context, change, target):
-        from lagniappe.core.tools import form_schema_updates as updates
+        from lagniappe.core.tools.forms import schema_updates as updates
         from lagniappe.core.tools.ai.form_conversion import generate_conversions
         from lagniappe.core.tools.ai.observability import ai_execution_context
 
-        if target.db.get(changes.RECEIPT) == change["id"]:
+        if target.db.get(contracts.RECEIPT) == change["id"]:
             return {}
         if change.get("report"):
             self.report_candidates(context, change)
-        values = changes.json_value(target.db, "submission")
+        values = contracts.json_value(target.db, "submission")
         needed = [
             item
             for item in change["operations"]
-            if item["rule"] == "ai" and updates.needs_ai_value(values.get(item["id"]))
+            if item["rule"] == "ai" and contracts.needs_ai_value(values.get(item["id"]))
         ]
         if not needed:
             return {}
@@ -334,10 +334,10 @@ class FormChangeAdapter(DeferredJobAdapter):
 
     def publish(self, context):
         from lagniappe.core.mutations import execute_mutation, plan_mutation
-        from lagniappe.core.tools import form_drafts
+        from lagniappe.core.tools.forms import drafts as form_drafts
 
         form, change = changes.owned_change(context)
-        target = changes.target_definition(form, change)
+        target = definitions.target_definition(form, change)
         target._form_change_write = True
         target._form_change_publication = change["id"]
         target._form_save_guard = (form.key, ExactEntityState(dict(form.db)))
@@ -370,7 +370,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         form = Entities.fetch_one(
             (job.inputs.get("form") or {}).get("id"), request=Fetch.root()
         )
-        pending = changes.json_value(form.db, changes.PENDING) if form else {}
+        pending = contracts.json_value(form.db, contracts.PENDING) if form else {}
         if pending.get("job") == job.urlsafe_key and pending.get("applied"):
             raise ValidationError(
                 "Some submissions may already be updated. Retry this change to finish it."
@@ -380,7 +380,7 @@ class FormChangeAdapter(DeferredJobAdapter):
     # @tests tests_unit/test_004l_form_schema_updates.py::test_preflight_rejection_releases_only_unapplied_change
     # @matrix form-migration : permissions preflight ownership
     def failure(self, context, error):
-        from lagniappe.core.tools.form_schema_updates import (
+        from lagniappe.core.tools.forms.schema_updates import (
             RESTRICTED_MESSAGE,
             STALE_MESSAGE,
         )
@@ -391,20 +391,20 @@ class FormChangeAdapter(DeferredJobAdapter):
         if str(error) not in {RESTRICTED_MESSAGE, STALE_MESSAGE}:
             return
         form = Entities.fetch_one(context.input("form").key, request=Fetch.root())
-        pending = changes.json_value(form.db, changes.PENDING) if form else {}
+        pending = contracts.json_value(form.db, contracts.PENDING) if form else {}
         if pending.get("job") != context.job.urlsafe_key or pending.get("applied"):
             return
-        expected = form.db.pop(changes.PENDING)
+        expected = form.db.pop(contracts.PENDING)
         form.db["form_change_rejection"] = json.dumps(
             {"id": pending["id"], "error": str(error)}
         )
         form._form_change_write = True
         execute_mutation(
             RootMutation.plan(
-                form, property_mask=(changes.PENDING, "form_change_rejection")
+                form, property_mask=(contracts.PENDING, "form_change_rejection")
             ),
             guards=[
-                (form.key, {changes.PENDING: expected}),
+                (form.key, {contracts.PENDING: expected}),
                 (
                     context.job.key,
                     {"lease_token": context.job.lease_token, "status": "running"},
@@ -419,7 +419,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         from lagniappe.core.tools.database import deferred_jobs
 
         form = Entities.fetch_one(context.input("form").key, request=Fetch.root())
-        if form and not form.db.get(changes.PENDING):
+        if form and not form.db.get(contracts.PENDING):
             from lagniappe.core.tools import cache
 
             cache.update(form)

@@ -40,7 +40,7 @@ const normalizeLineEndings = (value) =>
  * Markdown renderer. This detects; it never interprets or converts source.
  *
  * @testable true
- * @tests tests_js/test_048_markdown_paste.py::test_markdown_detection_is_conservative
+ * @tests tests_js/test_048_markdown_paste.mjs::test_markdown_detection_is_conservative
  * @matrix editor markdown : detection paste soft-wrap
  */
 export const looksLikeConvertibleMarkup = (content) => {
@@ -90,7 +90,7 @@ export const looksLikeConvertibleMarkup = (content) => {
  * transaction-produced range.
  *
  * @testable true
- * @tests tests_js/test_048_markdown_paste.py::test_source_insertion_tracks_the_inserted_block
+ * @tests tests_js/test_048_markdown_paste.mjs::test_source_insertion_tracks_the_inserted_block
  * @matrix editor markdown : inserted-range paste source-block
  */
 export const insertMarkdownSource = (view, content, rangeKey) => {

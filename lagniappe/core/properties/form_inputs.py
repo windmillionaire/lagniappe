@@ -1,4 +1,5 @@
 from datetime import datetime
+import math
 import re
 
 from dateutil import parser as date_parser
@@ -15,8 +16,8 @@ EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input_empty_column_value_is_blank
-# @tests tests_unit/test_004d_submitter.py::test_text_input_validate_import_space_joins_list_values
 # @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
+# @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
 # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
 # @matrix text-input : ai-value column empty-field empty-value field-factory filter-value import list-normalization save search-value
 class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
@@ -95,12 +96,23 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _editable = True
 
     # Form Attributes
+    # @testable true
+    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
+    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
+    # @matrix date-input : empty-value form-submission validation
     def validate_submission(self, value):
         """Parse form-submitted date string (YYYY-MM-DD format)."""
-        if value:
-            self.value = value  # DateMixin.value setter handles parsing
-        else:
-            self._value = None
+        try:
+            if value in (None, "", []):
+                self._value = None
+            elif not isinstance(value, str):
+                raise ValueError("Date input must be a string")
+            else:
+                self.value = value  # Keep the existing actor-timezone conversion.
+        except (ValueError, TypeError) as error:
+            raise ValidationError(
+                f"Invalid date for '{self.label}'. Use YYYY-MM-DD."
+            ) from error
 
     # AI Attributes
     def validate_ai(self, value):
@@ -151,14 +163,20 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
     # Form Attributes
     # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_time_form_invalid_format_raises
-    # @matrix time-input : form-submission validation
+    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
+    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
+    # @matrix time-input : empty-value form-submission validation
     def validate_submission(self, value):
         """Parse form-submitted time string (HH:MM format)."""
-        if value:
-            self.value = datetime.strptime(value, "%H:%M")
-        else:
-            self._value = None
+        try:
+            parsed = (
+                None if value in (None, "", []) else datetime.strptime(value, "%H:%M")
+            )
+        except (ValueError, TypeError) as error:
+            raise ValidationError(
+                f"Invalid time for '{self.label}'. Use HH:MM."
+            ) from error
+        self.value = parsed
 
     # Ingress Attributes
     def validate_import(self, value):
@@ -239,16 +257,21 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     # Form Attributes
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_number_form_accepts_zero
-    # @matrix number-input : form-submission zero
+    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
+    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
+    # @matrix number-input : empty-value form-submission validation zero
     def validate_submission(self, value):
         """Parse form-submitted number string to float."""
         try:
-            if value is None or (isinstance(value, str) and value.strip() == ""):
-                self.value = None
+            if value in (None, []) or (isinstance(value, str) and not value.strip()):
+                parsed = None
             else:
-                self.value = float(value)
-        except (ValueError, TypeError):
-            self.value = None
+                parsed = float(value)
+                if not math.isfinite(parsed):
+                    raise ValueError("Number must be finite")
+        except (ValueError, TypeError, OverflowError) as error:
+            raise ValidationError(f"Invalid number for '{self.label}'.") from error
+        self.value = parsed
 
     # AI Attributes
     def validate_ai(self, value):
@@ -288,10 +311,9 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
 # @testable true
 # @tests tests_unit/test_003a_submission_basic.py::test_submission_email_input
-# @tests tests_unit/test_004e_submission_behavior.py::test_submission_email_form_accepts_non_matching_string
-# @matrix email-input : ai-value filter-value form-submission import validation
+# @matrix email-input : ai-value filter-value import
 class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
-    """Email input field. Validates format against EMAIL_REGEX on import.
+    """Email input field. Validates format on browser submission, AI, and import.
 
     Set:
         value (str): Email address.
@@ -307,6 +329,19 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     # Column Attributes
     _ordering = Ordering.EXISTS
     _editable = True
+
+    # @testable true
+    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
+    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
+    # @matrix email-input : empty-value form-submission validation
+    def validate_submission(self, value):
+        """Reject nonempty malformed addresses without replacing an existing value."""
+        if value in (None, "", []):
+            self.value = None
+        elif not isinstance(value, str) or not EMAIL_REGEX.fullmatch(value):
+            raise ValidationError(f"Invalid email address for '{self.label}'.")
+        else:
+            self.value = value
 
     # AI Attributes
     def validate_ai(self, value):

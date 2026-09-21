@@ -1,7 +1,7 @@
 # @testable false
 # @covered-by config/deployment.py::normalize_deployment_settings
-# @reason fallback exception type for deployment validation without app imports
-class ConfigDeploymentSettingsError(ValueError):
+# @reason shared validation error exercised through deployment normalization
+class DeploymentSettingsError(ValueError):
     """Raised when deployment settings cannot be applied safely."""
 
 
@@ -11,21 +11,8 @@ MEMORY_SAFE_WORKER_LIMIT = 3
 
 # @testable false
 # @covered-by config/deployment.py::normalize_deployment_settings
-# @reason avoids importing the app package while setup creates config files
-def _deployment_settings_error_class():
-    try:
-        from lagniappe.core.exceptions import DeploymentSettingsError
-
-        return DeploymentSettingsError
-    except Exception:
-        return ConfigDeploymentSettingsError
-
-
-# @testable false
-# @covered-by config/deployment.py::normalize_deployment_settings
 # @reason shared validation detail for deployment integer settings
 def _deployment_int(settings, defaults, key, label, min_value=1):
-    DeploymentSettingsError = _deployment_settings_error_class()
     value = settings.get(key, defaults[key])
     try:
         parsed = int(value)
@@ -47,8 +34,6 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
 # @matrix config user-settings : app-yaml deployment-settings memory-pressure validation
 def normalize_deployment_settings(deployment_settings, *, enforce_worker_limit=True):
     from config import constants
-
-    DeploymentSettingsError = _deployment_settings_error_class()
 
     defaults = dict(constants.DEFAULT_DEPLOYMENT_SETTINGS)
     if not deployment_settings:

@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { BaseForm } from "../../../elements/base/baseForm";
-import { SelectBox } from "../../../elements/combobox";
-import { primitives } from "../../../elements/primitives";
-import { withTransition } from "../../../shared";
-import { setIcon } from "../../../shared/icons";
+import { SelectBox } from "../../../elements/combobox/index.mjs";
+import { primitives } from "../../../elements/primitives.mjs";
+import { FormController } from "../../../forms/controller.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { setIcon } from "../../../shared/icons.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure
@@ -37,7 +37,7 @@ export class Condition {
 			delete this.draftSetting;
 		}
 		this.complete = false;
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

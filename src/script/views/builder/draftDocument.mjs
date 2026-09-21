@@ -1,4 +1,4 @@
-import { IndependentDocument } from "../../elements/editor/independent";
+import { IndependentDocument } from "../../elements/editor/independent.mjs";
 
 /**
  * @testable infrastructure

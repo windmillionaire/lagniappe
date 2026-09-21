@@ -1,10 +1,10 @@
-import { STYLES } from "styles";
-import { BaseElement } from "./base/baseElement";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable infrastructure
- * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+ * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
  */
 export class TextareaElement extends BaseElement {
 	get value() {
@@ -23,7 +23,7 @@ export class TextareaElement extends BaseElement {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+	 * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
 	 * @matrix forms : clear input textarea
 	 */
 	clear() {

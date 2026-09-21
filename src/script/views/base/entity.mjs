@@ -1,6 +1,7 @@
-import { NavElement } from "../../elements/nav";
-import { debounce, withTransition } from "../../shared/utilities";
-import Core from "./core";
+import { NavElement } from "../../elements/nav.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { debounce } from "../../shared/utilities.mjs";
+import Core from "./core.mjs";
 
 /**
  * @testable infrastructure
@@ -168,8 +169,8 @@ export default class Entity extends Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_012_entity_layout_frontend.py::test_dynamic_mobile_secondary_uses_final_layout_state
-	 * @tests tests_js/test_012_entity_layout_frontend.py::test_overlapping_mobile_layout_updates_keep_secondary_nonpersistent
+	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_dynamic_mobile_secondary_uses_final_layout_state
+	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_overlapping_mobile_layout_updates_keep_secondary_nonpersistent
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_tasks_rejoins_section_switching
 	 * @matrix entity-layout : dynamic-secondary nested-layout page-mobile project-mobile
@@ -241,8 +242,8 @@ export default class Entity extends Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_012_entity_layout_frontend.py::test_entity_layout_ignores_already_consumed_reconcile_callback
-	 * @tests tests_js/test_012_entity_layout_frontend.py::test_initial_entity_layout_prepares_widget_before_one_transition
+	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_entity_layout_ignores_already_consumed_reconcile_callback
+	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_initial_entity_layout_prepares_widget_before_one_transition
 	 * @matrix entity-layout : nested-layout reconcile-callback
 	 * @pair startup:view-ready
 	 */

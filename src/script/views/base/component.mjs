@@ -1,7 +1,7 @@
-import { NavElement } from "../../elements/nav";
-import { captureError } from "../../shared/errors";
-import { withTransition } from "../../shared/utilities";
-import { loadWidget } from "../../widgets/loader";
+import { NavElement } from "../../elements/nav.mjs";
+import { captureError } from "../../shared/errors.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { loadWidget } from "../../widgets/loader.mjs";
 
 /**
  * @testable infrastructure
@@ -100,7 +100,7 @@ export default class ViewComponent {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_static_component_without_default_widget_activates
+	 * @tests tests_js/test_029_core_startup.mjs::test_static_component_without_default_widget_activates
 	 * @matrix navigation tabs : static-component visibility
 	 */
 	async activate(show) {
@@ -156,7 +156,7 @@ export default class ViewComponent {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_component_refresh_only_loads_collection_widgets
+	 * @tests tests_js/test_028_form_state_split.mjs::test_component_refresh_only_loads_collection_widgets
 	 * @matrix collections forms reconnect-refresh : explicit-collection-scope form-exclusion
 	 */
 	async prepareCollectionRefresh(skip = new Set()) {
@@ -232,8 +232,9 @@ export default class ViewComponent {
 
 	// this is called when a widget needs to be loaded/reloaded in response to an event
 	/**
-	 * @testable false
-	 * @reason foundational view lifecycle plumbing
+	 * @testable true
+	 * @tests tests_js/test_048_form_controls.mjs::test_validated_html_initializes_cold_widget_without_rebuilding_loaded_widget
+	 * @matrix user-groups : conditional-response initialization
 	 */
 	async load(widget = this.active, route = null) {
 		if (!widget || widget?.loaded) return null;
@@ -242,6 +243,7 @@ export default class ViewComponent {
 		const response = await this.view.load(this, route);
 		widget.modified = true;
 		if (!response) return null;
+		if (response.updated === false && widget.initialized) return null;
 		const responseTarget = response.html?.querySelector?.(
 			`[data-widget='${widget.name}']`,
 		);
@@ -365,7 +367,7 @@ export default class ViewComponent {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_closed_task_errors_persist_while_waiting_and_retrying
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_closed_task_errors_persist_while_waiting_and_retrying
 	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_completion_during_migration_returns_inline_error_without_saving
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_waits_for_acceptance_and_moves_closed_task
 	 * @matrix tasks : active-widget complete uncomplete update-state
@@ -480,7 +482,7 @@ export default class ViewComponent {
 	// Connected-DOM manipulation in widgets belongs in postreconcile().
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_component_render_does_not_wait_for_polling_reconciliation
+	 * @tests tests_js/test_029_core_startup.mjs::test_component_render_does_not_wait_for_polling_reconciliation
 	 * @matrix polling : component-render nonblocking subscription-lifecycle
 	 * @matrix startup : component-render deferred-services nonblocking
 	 */

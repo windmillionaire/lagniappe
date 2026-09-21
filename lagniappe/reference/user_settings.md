@@ -1,6 +1,5 @@
 ---
 title: User Settings
-manual_section: personalization
 related:
 - user_groups
 - permissions

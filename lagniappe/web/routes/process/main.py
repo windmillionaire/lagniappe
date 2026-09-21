@@ -155,8 +155,8 @@ def notification_email_delivery():
 
 
 # @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
+# @tests tests_e2e/006_tasks/test_006i_scheduled_delivery.py::test_scheduled_uncompletion_delivery_guards_and_preserves_due_date
+# @pair task-scheduling:delivery-auth
 # @pairs task-completion:uncomplete task-scheduling:schedule-queue
 @process.route("/uncomplete-task", methods=["POST"])
 def uncomplete_task():

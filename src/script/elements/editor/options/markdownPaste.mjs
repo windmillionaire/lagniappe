@@ -1,6 +1,8 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, generateElementId, request } from "../../../shared";
-import { buttons } from "../../buttons";
+import { STYLES } from "../../../generated/styles.mjs";
+import { ENDPOINTS } from "../../../shared/endpoints.mjs";
+import { request } from "../../../shared/request.mjs";
+import { generateElementId } from "../../../shared/utilities.mjs";
+import { buttons } from "../../buttons.mjs";
 
 /**
  * Own the nonmodal decision and asynchronous replacement for one pasted

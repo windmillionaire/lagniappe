@@ -83,7 +83,7 @@ After a style change:
 npm run dev
 venv/bin/python run.py traceability --styles --check --fail-on warning
 venv/bin/python run.py test testing/tests_tooling/test_006_style_traceability.py
-venv/bin/python run.py test testing/tests_js/test_018_style_pipeline.py
+venv/bin/python run.py test testing/tests_js/test_018_style_pipeline.mjs
 venv/bin/python run.py template-contracts --changed --check
 venv/bin/python run.py traceability --changed --check
 ```

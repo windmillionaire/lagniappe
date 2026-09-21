@@ -203,7 +203,8 @@
 								"cattest3",
 								"modified",
 								"timestamp",
-								"lt"
+								"lt",
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -219,7 +220,8 @@
 								"cattest3",
 								"modified",
 								"timestamp",
-								"lte"
+								"lte",
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -235,7 +237,8 @@
 								"cattest3",
 								"modified",
 								"timestamp",
-								"eq"
+								"eq",
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -251,7 +254,8 @@
 								"cattest3",
 								"modified",
 								"timestamp",
-								"gte"
+								"gte",
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -267,7 +271,8 @@
 								"cattest3",
 								"modified",
 								"timestamp",
-								"gt"
+								"gt",
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -283,7 +288,8 @@
 								"cattest3",
 								"modified",
 								"timestamp",
-								"between"
+								"between",
+								[1748799000.0, 1751304600.0]
 							],
 							"expected_details": {
 								"type": "timestamp",

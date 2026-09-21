@@ -147,7 +147,12 @@ examples; retain substantive instructions, caveats, confirmations, and next step
 
 ## Shared implementation
 
-`runner/presentation.py` owns semantic styles and the Rich renderer. Use its
+`runner/terminal.py` owns literal styling, ANSI normalization, and lazy Rich
+console construction. Both `runner/console.py` and `runner/presentation.py`
+depend on it; terminal primitives import neither layout nor presentation.
+`console.unstyle` and `presentation.styled` remain aliases of the shared helpers.
+
+`runner/presentation.py` owns semantic styles, output, and progress. Use its
 `heading`, `info`, `status`, `success`, `warning`, `error`, `secondary`, and
 `choice` helpers, plus `activity` for static progress text. They return formatted
 strings compatible with the layout helpers. Call `output` (imported as `print`

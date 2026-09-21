@@ -26,7 +26,8 @@ class FakeContext:
     def new_page(self, url="http://test.local/page"):
         page = FakePage(self, url)
         self.pages.append(page)
-        self.listeners["page"](page)
+        if "page" in self.listeners:
+            self.listeners["page"](page)
         return page
 
 
@@ -70,12 +71,12 @@ def _user(page):
     return SimpleNamespace(page=page)
 
 
-def test_collector_tracks_only_console_errors_and_later_context_pages():
+def test_collector_tracks_only_console_errors_on_existing_and_later_context_pages():
     collector = BrowserFailureCollector()
     context = FakeContext()
+    page = context.new_page()
     messages = []
     collector.monitor_context(context, label="Owner", console_messages=messages)
-    page = context.new_page()
 
     page.emit(
         "console",

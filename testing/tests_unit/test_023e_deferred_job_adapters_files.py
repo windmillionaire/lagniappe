@@ -202,7 +202,7 @@ def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
         set_phase=lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
-        file_adapters.ai,
+        file_adapters.ai_summarize,
         "generate_summary",
         lambda *_args, **_kwargs: file.properties.summarize,
     )

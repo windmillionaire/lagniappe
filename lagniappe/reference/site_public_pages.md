@@ -1,6 +1,5 @@
 ---
 title: Public Pages and Search Discovery
-manual_section: personalization
 related:
 - document_settings
 - site_settings

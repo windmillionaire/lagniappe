@@ -309,7 +309,9 @@ def behavior_path_fingerprints(repo_root: Path) -> dict[str, str]:
         if relative.startswith(BEHAVIOR_EXCLUDED_PREFIXES):
             continue
         path = repo_root / relative
-        if path.is_file() and path.suffix.lower() in BEHAVIOR_SUFFIXES:
+        if path.is_file() and (
+            path.suffix.lower() in BEHAVIOR_SUFFIXES or relative == ".nvmrc"
+        ):
             try:
                 fingerprints[relative] = behavior_file_fingerprint(path)
             except OSError:

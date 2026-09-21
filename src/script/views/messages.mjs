@@ -1,14 +1,14 @@
-import { STYLES } from "styles";
-import { ensureMessageComposer } from "../elements/messageComposer";
-import { ENDPOINTS, request } from "../shared";
-import { createIcon } from "../shared/icons";
-import Core from "./base/core";
+import { ensureMessageComposer } from "../elements/messageComposer.mjs";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { ENDPOINTS, request } from "../shared/index.mjs";
+import Core from "./base/core.mjs";
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
 /**
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_messages_view_refreshes_read_races_and_uses_delete_modal
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_messages_view_refreshes_read_races_and_uses_delete_modal
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
@@ -247,7 +247,9 @@ export default class Messages extends Core {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
 			return this.conversationDropdown || this._conversationDropdownPromise;
 		}
-		this._conversationDropdownPromise = import("../elements/combobox/dropdown")
+		this._conversationDropdownPromise = import(
+			"../elements/combobox/dropdown.mjs"
+		)
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				this.conversationDropdown = new Dropdown(this.selector).init({

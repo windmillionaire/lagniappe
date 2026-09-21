@@ -44,7 +44,7 @@ def install():
             )
         )
 
-    from installer.utils import check_gcloud_cli
+    from installer.commands import check_gcloud_cli
 
     ensure_pip_is_available()
     record_step("validate gcloud CLI")
@@ -73,11 +73,11 @@ def install():
         admin,
         ai_email,
         auth_email,
+        deploy,
         gcloud,
         identity,
         optional,
         redis,
-        utils,
     )
 
     steps = (
@@ -137,7 +137,7 @@ def install():
     )
     if consent.lower() == "y":
         record_step("deploy application")
-        utils.deploy_to_app_engine(
+        deploy.deploy_to_app_engine(
             print_final_summary=False,
             first_install=first_install and not getattr(SETTINGS, "RECOVERY_MODE", False),
         )

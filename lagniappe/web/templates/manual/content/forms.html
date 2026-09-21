@@ -1,4 +1,3 @@
-{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
 <div class="space-y-6">
   {% call card() %}
@@ -14,21 +13,17 @@
     </p>
   {% endcall %}
 
+  {{ heading("What Forms Are For", icon="form", kind="form") }}
   {% call card() %}
-    {{ manual_topic("create_form") }}
+    <ul class="text-base-medium space-y-2">
+      <li><strong>Data entry:</strong> fields for text, numbers, dates, selects, checkboxes, tables, locations, links, signatures, HTML blocks, and more.</li>
+      <li><strong>Tables:</strong> form fields can become sortable or filterable columns.</li>
+      <li><strong>Content types:</strong> different forms let one category hold several related record types.</li>
+      <li><strong>Permissions:</strong> a form can be restricted so pages or tasks using it are hidden from users outside allowed groups.</li>
+      <li><strong>AI context:</strong> form schemas tell AI what information should be extracted or generated.</li>
+    </ul>
   {% endcall %}
-  {% call card() %}
-    {{ manual_topic("form_builder") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("form_components") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("form_settings") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("form_element_changes") }}
-  {% endcall %}
+
   {{ heading("Example") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -43,6 +38,23 @@
       You can browse the whole category, or filter to just one form and work with
       fields specific to that type.
     </p>
+  {% endcall %}
+
+  {{ heading("Building Forms") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Forms can be built by hand in the form builder or generated from a
+      description with AI. AI is great for getting a first draft on the page;
+      it is worth a quick pass over field types, labels, required fields, and
+      permissions before using the form for important data.
+    </p>
+    {% call callout("tip", False) %}
+      A reused form affects every page or task attached to it. Renaming a
+      label keeps its answers, but replacing or deleting a field can convert
+      or clear existing answers when you save. Review those changes before
+      publishing them. Original completed submissions and task history keep
+      their recorded values; affected forms pause editing while the update runs.
+    {% endcall %}
   {% endcall %}
 
   {{ heading("Good to Know") }}

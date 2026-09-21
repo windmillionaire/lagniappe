@@ -19,6 +19,12 @@ The `Schedule` process property selects one of three stored schedule sections:
 Reviewed AI report actions validate and write the same structured schedule
 without invoking the scheduling model during execution.
 
+Generated schedule sections store the original prompt as `user-prompt`, matching
+the process-property storage convention. Reopening and submitting an unchanged
+prompt reuses the saved schedule without another model call. Successful
+regeneration removes the old `user_prompt` spelling from that section; existing
+records are not bulk-migrated.
+
 Dates are stored in UTC and projected in the user's timezone. `Completed`,
 `CompletedOn`, and `DueDate` remain separate values so a recurring task can
 stay active while temporarily completed.
@@ -50,6 +56,16 @@ month/year intervals instead retain interval semantics, including end-of-month
 clamping. Daily, weekly, and monthly calendar occurrences retain the prior due
 date's local wall-clock time; yearly calendar occurrences use local midnight.
 
+The skipped badge counts additional missed occurrences strictly after the earliest
+of `postponed_from` and `due_date`, and strictly before today's local midnight.
+The original outstanding occurrence and today's occurrence do not count as skipped.
+Calendar schedules include valid later occurrences in the baseline's own month
+or year; impossible dates remain excluded. A daily task due yesterday has zero
+skipped occurrences; one due two days ago has one. A December 25 yearly rule with
+a January 2023 baseline has two skipped occurrences by June 2025.
+Periodic interval schedules use the same exclusive endpoints. Recurring schedules
+restart from completion rather than accumulating skipped calendar occurrences.
+
 ## Completion and scheduled uncompletion
 
 Completing a scheduled task:
@@ -72,7 +88,7 @@ remain the current values. Ordinary Task views, tables, filters, and AI projecti
 use that current submission with the current Form, even while the Task is
 completed. Completion does not create a FormHistory record or copy Form assets.
 
-`tools/form_definitions.py` separates current reads from explicitly requested
+`tools/forms/definitions.py` separates current reads from explicitly requested
 originals. **View Original Submission** is offered to editors only when a completed
 Task's current submission has advanced beyond the envelope's generation and its
 values differ. The live Task's completion-details endpoint also requires edit

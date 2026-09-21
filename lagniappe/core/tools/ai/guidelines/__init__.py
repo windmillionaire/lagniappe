@@ -68,6 +68,7 @@ from .schema_evolution import (
 
 from .reports import (
     FILE_ORGANIZATION_GUIDELINES,
+    REPORT_PROPOSAL_GUIDELINES,
 )
 
 __all__ = [
@@ -121,4 +122,5 @@ __all__ = [
     "SCHEMA_EVOLUTION_GUIDELINES",
     # Report filing
     "FILE_ORGANIZATION_GUIDELINES",
+    "REPORT_PROPOSAL_GUIDELINES",
 ]

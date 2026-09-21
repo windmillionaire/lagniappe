@@ -19,7 +19,10 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai import planner as report_planner
+from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
+from lagniappe.core.tools.ai.reporting.proposals import selection as report_selection
+from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_operations, report_history
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
@@ -130,7 +133,7 @@ def _report_upload_manifest():
         request.form,
         input_name="tool-files",
     )
-    return ai.prepare_report_upload_manifest(records)
+    return report_uploads.prepare_report_upload_manifest(records)
 
 
 # @testable false
@@ -177,7 +180,7 @@ def _explain_ai_prompt():
         instructions=request.form.get("instructions"),
         input_files=_preview_report_files(),
     )
-    return responses.explain(ai.report_prompt(report, current_user))
+    return responses.explain(report_planner.report_prompt(report, current_user))
 
 
 # @testable false
@@ -374,7 +377,7 @@ def run_report(key):
     result = report.result if isinstance(report.result, dict) else {}
     retryable = (
         report.status == "failed"
-        and result.get("ledger_version") == ai.REPORT_LEDGER_VERSION
+        and result.get("ledger_version") == report_ledger.REPORT_LEDGER_VERSION
         and result.get("status") == "failed"
     )
     if report.status == "complete" and result.get("status") == "complete":
@@ -403,7 +406,10 @@ def run_report(key):
         return responses.error("Only ready or recoverable failed reports can be run.")
 
     from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
-    from lagniappe.core.tools import form_changes, form_schema_updates
+    from lagniappe.core.tools.forms import (
+        changes as form_changes,
+        schema_updates as form_schema_updates,
+    )
 
     try:
         if not retryable:
@@ -579,14 +585,14 @@ def skip_report_action(key, action_index):
     action_indexes = payload.get("action_indexes") or []
     include_dependencies = payload.get("include_dependencies") is not False
     if action_indexes:
-        result = ai.toggle_proposal_action_indexes(
+        result = report_selection.toggle_proposal_action_indexes(
             proposal,
             action_index - 1,
             [int(index) - 1 for index in action_indexes],
             include_dependencies=include_dependencies,
         )
     else:
-        result = ai.toggle_proposal_action_skip(proposal, action_index - 1)
+        result = report_selection.toggle_proposal_action_skip(proposal, action_index - 1)
     report.proposal = proposal
     if external_snapshot is not None:
         outcome = external_operations.save_plan_if_idle(

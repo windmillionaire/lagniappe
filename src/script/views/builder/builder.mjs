@@ -1,6 +1,6 @@
-import { SearchBox } from "../../elements/combobox/search";
-import { EntityMenu } from "../../elements/entityMenu";
-import { uploadElement } from "../../elements/upload";
+import { SearchBox } from "../../elements/combobox/search.mjs";
+import { EntityMenu } from "../../elements/entityMenu.mjs";
+import { directUpload } from "../../shared/directUpload.mjs";
 import {
 	captureError,
 	connectivity,
@@ -9,22 +9,22 @@ import {
 	HelpModal,
 	OfflineModal,
 	request,
-	withTransition,
-} from "../../shared";
-import { FormChangeStatus } from "./changeStatus";
-import { loadCondition } from "./conditions/loader";
-import { BuilderDraft } from "./draft";
-import { fieldKind, needsMigration, repairConditions } from "./migrations";
-import { ComponentsPanel } from "./panels/components";
-import { ConditionPanel } from "./panels/condition";
-import { ElementSettings } from "./panels/elementSettings";
-import { FormSettings } from "./panels/formSettings";
-import { Header } from "./panels/header";
-import { ModelElement, ModelPanel } from "./panels/model";
+} from "../../shared/index.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { FormChangeStatus } from "./changeStatus.mjs";
+import { loadCondition } from "./conditions/loader.mjs";
+import { BuilderDraft } from "./draft.mjs";
+import { fieldKind, needsMigration, repairConditions } from "./migrations.mjs";
+import { ComponentsPanel } from "./panels/components.mjs";
+import { ConditionPanel } from "./panels/condition.mjs";
+import { ElementSettings } from "./panels/elementSettings.mjs";
+import { FormSettings } from "./panels/formSettings.mjs";
+import { Header } from "./panels/header.mjs";
+import { ModelElement, ModelPanel } from "./panels/model.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.py::test_builder_destroys_owned_search_modal_and_panels_during_startup
+ * @tests tests_js/test_046_async_query_lifecycle.mjs::test_builder_destroys_owned_search_modal_and_panels_during_startup
  * @matrix forms : builder-lifecycle late-publication listener-teardown
  */
 class FormBuilder {
@@ -91,7 +91,8 @@ class FormBuilder {
 
 		this.model.init();
 		this.settings.init();
-		this.formSettings.init();
+		await this.formSettings.init();
+		if (this._destroyed) return this;
 		if (this.bootstrap?.pending_change)
 			this.setPendingChange(this.bootstrap.pending_change);
 
@@ -129,9 +130,9 @@ class FormBuilder {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
-	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
-	 * @tests tests_js/test_036c_form_migrations.py::test_builder_resumes_migration_polling_and_clears_completed_status
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_builder_owns_independent_editor_lifecycle_flushes
+	 * @tests tests_js/test_036c_form_migrations.mjs::test_builder_resumes_migration_polling_and_clears_completed_status
 	 * @matrix editor html-field : teardown
 	 * @matrix forms offline : builder-lifecycle
 	 * @matrix form-migration : progress recovery
@@ -365,13 +366,13 @@ class FormBuilder {
 			if (image.file.size > 1024 * 1024) {
 				let uploaded = image.uploads.get(route);
 				if (!uploaded) {
-					const session = await uploadElement.directUpload.createSession({
+					const session = await directUpload.createSession({
 						route,
 						file: image.file,
 						inputName,
 						replaceErrorPage: false,
 					});
-					const metadata = await uploadElement.directUpload.upload({
+					const metadata = await directUpload.upload({
 						file: image.file,
 						sessionUrl: session.session_url,
 						chunkSize: session.chunk_size,
@@ -406,7 +407,7 @@ class FormBuilder {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.py::test_builder_save_restores_unsubmitted_condition_buffer
+	 * @tests tests_js/test_036b_builder_draft.mjs::test_builder_save_restores_unsubmitted_condition_buffer
 	 * @matrix forms : draft-history stale-acknowledgement focus-recovery
 	 */
 	restoreDraft({ preserveFocus = false } = {}) {
@@ -539,7 +540,7 @@ class FormBuilder {
 	 * @matrix html-field : generated-document-undo retained-editor
 	 */
 	async prepareGeneratedDocuments(htmlFields) {
-		const { default: HtmlEditor } = await import("./conditions/html");
+		const { default: HtmlEditor } = await import("./conditions/html.mjs");
 		for (const [id, html] of Object.entries(htmlFields || {})) {
 			const element = this.elements.get(id);
 			if (
@@ -761,7 +762,7 @@ class FormBuilder {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_table_creation_defaults_columns_for_unsaved_preview
 	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
 	 */
 	createElement(schema) {

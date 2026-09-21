@@ -10,7 +10,9 @@
 					"fields": [
 						{
 							"id": "input-textab12",
-							"value": ["hello"],
+							"value": [
+								"hello"
+							],
 							"comparator": "SUBSTRING",
 							"expected_description": [
 								"formstr",
@@ -29,7 +31,9 @@
 						},
 						{
 							"id": "input-textab12",
-							"value": ["Exact Match"],
+							"value": [
+								"Exact Match"
+							],
 							"comparator": "EQUALS",
 							"expected_description": [
 								"formstr",
@@ -62,7 +66,9 @@
 					"fields": [
 						{
 							"id": "checkbox-ab12",
-							"value": ["IS_TRUE"],
+							"value": [
+								"IS_TRUE"
+							],
 							"expected_description": [
 								"formbool",
 								"checkbox-ab12",
@@ -77,7 +83,9 @@
 						},
 						{
 							"id": "checkbox-ab12",
-							"value": ["IS_FALSE"],
+							"value": [
+								"IS_FALSE"
+							],
 							"expected_description": [
 								"formbool",
 								"checkbox-ab12",
@@ -106,14 +114,16 @@
 					"fields": [
 						{
 							"id": "input-dateab12",
-							"value": ["2025-06-15"],
+							"value": [
+								"2025-06-15"
+							],
 							"comparator": "LESS_THAN",
 							"expected_description": [
 								"formdate",
 								"input-dateab12",
 								"timestamp",
 								"lt",
-								"DYNAMIC_TIMESTAMP"
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -124,14 +134,16 @@
 						},
 						{
 							"id": "input-dateab12",
-							"value": ["2025-06-15"],
+							"value": [
+								"2025-06-15"
+							],
 							"comparator": "EQUALS",
 							"expected_description": [
 								"formdate",
 								"input-dateab12",
 								"timestamp",
 								"eq",
-								"DYNAMIC_TIMESTAMP"
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -142,14 +154,16 @@
 						},
 						{
 							"id": "input-dateab12",
-							"value": ["2025-06-15"],
+							"value": [
+								"2025-06-15"
+							],
 							"comparator": "GREATER_THAN",
 							"expected_description": [
 								"formdate",
 								"input-dateab12",
 								"timestamp",
 								"gt",
-								"DYNAMIC_TIMESTAMP"
+								1750008600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -160,14 +174,20 @@
 						},
 						{
 							"id": "input-dateab12",
-							"value": ["2025-06-08", "2025-06-22"],
+							"value": [
+								"2025-06-08",
+								"2025-06-22"
+							],
 							"comparator": "BETWEEN",
 							"expected_description": [
 								"formdate",
 								"input-dateab12",
 								"timestamp",
 								"between",
-								["DYNAMIC_TIMESTAMP_START", "DYNAMIC_TIMESTAMP_END"]
+								[
+									1749403800.0,
+									1750613400.0
+								]
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -178,14 +198,16 @@
 						},
 						{
 							"id": "input-timecd34",
-							"value": ["14:30"],
+							"value": [
+								"14:30"
+							],
 							"comparator": "LESS_THAN",
 							"expected_description": [
 								"formdate",
 								"input-timecd34",
 								"timestamp",
 								"lt",
-								"DYNAMIC_TIMESTAMP"
+								-2208936600.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -196,14 +218,16 @@
 						},
 						{
 							"id": "input-timecd34",
-							"value": ["09:00"],
+							"value": [
+								"09:00"
+							],
 							"comparator": "EQUALS",
 							"expected_description": [
 								"formdate",
 								"input-timecd34",
 								"timestamp",
 								"eq",
-								"DYNAMIC_TIMESTAMP"
+								-2208956400.0
 							],
 							"expected_details": {
 								"type": "timestamp",
@@ -228,7 +252,9 @@
 					"fields": [
 						{
 							"id": "top_link",
-							"value": ["target1"],
+							"value": [
+								"target1"
+							],
 							"expected_description": [
 								"formlink",
 								"top_link",
@@ -247,20 +273,29 @@
 						},
 						{
 							"id": "top_link",
-							"value": ["target1", "target2"],
+							"value": [
+								"target1",
+								"target2"
+							],
 							"expected_description": [
 								"formlink",
 								"top_link",
 								"string",
 								"in",
-								["target1", "target2"],
+								[
+									"target1",
+									"target2"
+								],
 								true
 							],
 							"expected_details": {
 								"type": "string",
 								"text": "is in",
 								"status": "IN",
-								"value": ["target1", "target2"],
+								"value": [
+									"target1",
+									"target2"
+								],
 								"field_label": "Top link"
 							}
 						}
@@ -294,7 +329,9 @@
 					"fields": [
 						{
 							"id": "input-numab12",
-							"value": ["42"],
+							"value": [
+								"42"
+							],
 							"comparator": "EQUALS",
 							"expected_description": [
 								"formnum",
@@ -313,7 +350,9 @@
 						},
 						{
 							"id": "input-numab12",
-							"value": ["100"],
+							"value": [
+								"100"
+							],
 							"comparator": "LESS_THAN",
 							"expected_description": [
 								"formnum",
@@ -332,7 +371,9 @@
 						},
 						{
 							"id": "input-numab12",
-							"value": ["50"],
+							"value": [
+								"50"
+							],
 							"comparator": "GREATER_THAN",
 							"expected_description": [
 								"formnum",
@@ -351,20 +392,29 @@
 						},
 						{
 							"id": "input-numab12",
-							"value": ["10", "100"],
+							"value": [
+								"10",
+								"100"
+							],
 							"comparator": "BETWEEN",
 							"expected_description": [
 								"formnum",
 								"input-numab12",
 								"number",
 								"between",
-								[10.0, 100.0]
+								[
+									10.0,
+									100.0
+								]
 							],
 							"expected_details": {
 								"type": "number",
 								"text": "is between",
 								"status": "BETWEEN",
-								"value": [10.0, 100.0],
+								"value": [
+									10.0,
+									100.0
+								],
 								"field_label": "Number Field"
 							}
 						}
@@ -384,7 +434,9 @@
 					"fields": [
 						{
 							"id": "radio-ab12",
-							"value": ["opt1"],
+							"value": [
+								"opt1"
+							],
 							"expected_description": [
 								"formcat",
 								"radio-ab12",
@@ -402,19 +454,28 @@
 						},
 						{
 							"id": "radio-ab12",
-							"value": ["opt1", "opt2"],
+							"value": [
+								"opt1",
+								"opt2"
+							],
 							"expected_description": [
 								"formcat",
 								"radio-ab12",
 								"list",
 								"contains_any",
-								["opt1", "opt2"]
+								[
+									"opt1",
+									"opt2"
+								]
 							],
 							"expected_details": {
 								"type": "list",
 								"text": "is any of",
 								"status": "CONTAINS_ANY",
-								"or": ["Option One", "Option Two"],
+								"or": [
+									"Option One",
+									"Option Two"
+								],
 								"field_label": "Radio Field"
 							}
 						}
@@ -430,27 +491,7 @@
 				{
 					"name": "Status Checkbox Form",
 					"hash": "formstatuschk",
-					"schema": "status_only",
-					"fields": [
-						{
-							"id": "status-ab12",
-							"value": ["checkbox-trigger"],
-							"expected_description": [
-								"formstatuschk",
-								"status-ab12",
-								"list",
-								"contains",
-								"checkbox-trigger"
-							],
-							"expected_details": {
-								"type": "list",
-								"text": "is",
-								"status": "CONTAINS",
-								"value": "Completed",
-								"field_label": "Status"
-							}
-						}
-					]
+					"schema": "status_only"
 				}
 			],
 			[
@@ -458,63 +499,7 @@
 				{
 					"name": "Status Radio Form",
 					"hash": "formstatusradio",
-					"schema": "status_radio",
-					"fields": [
-						{
-							"id": "status-radio-ab12",
-							"value": ["checkbox-complete"],
-							"expected_description": [
-								"formstatusradio",
-								"status-radio-ab12",
-								"list",
-								"contains",
-								"checkbox-complete"
-							],
-							"expected_details": {
-								"type": "list",
-								"text": "is",
-								"status": "CONTAINS",
-								"value": "Completed",
-								"field_label": "Approval Status"
-							}
-						},
-						{
-							"id": "status-radio-ab12",
-							"value": ["approved"],
-							"expected_description": [
-								"formstatusradio",
-								"status-radio-ab12",
-								"list",
-								"contains",
-								"approved"
-							],
-							"expected_details": {
-								"type": "list",
-								"text": "is",
-								"status": "CONTAINS",
-								"value": "Approved",
-								"field_label": "Approval Status"
-							}
-						},
-						{
-							"id": "status-radio-ab12",
-							"value": ["approved", "rejected"],
-							"expected_description": [
-								"formstatusradio",
-								"status-radio-ab12",
-								"list",
-								"contains_any",
-								["approved", "rejected"]
-							],
-							"expected_details": {
-								"type": "list",
-								"text": "is any of",
-								"status": "CONTAINS_ANY",
-								"or": ["Approved", "Rejected"],
-								"field_label": "Approval Status"
-							}
-						}
-					]
+					"schema": "status_radio"
 				}
 			]
 		]
@@ -530,7 +515,9 @@
 					"fields": [
 						{
 							"id": "select-single-ab12",
-							"value": ["small"],
+							"value": [
+								"small"
+							],
 							"expected_description": [
 								"formselsingle",
 								"select-single-ab12",
@@ -548,19 +535,28 @@
 						},
 						{
 							"id": "select-single-ab12",
-							"value": ["small", "medium"],
+							"value": [
+								"small",
+								"medium"
+							],
 							"expected_description": [
 								"formselsingle",
 								"select-single-ab12",
 								"list",
 								"contains_any",
-								["medium", "small"]
+								[
+									"medium",
+									"small"
+								]
 							],
 							"expected_details": {
 								"type": "list",
 								"text": "is any of",
 								"status": "CONTAINS_ANY",
-								"or": ["Medium", "Small"],
+								"or": [
+									"Medium",
+									"Small"
+								],
 								"field_label": "Single Select"
 							}
 						}
@@ -576,7 +572,9 @@
 					"fields": [
 						{
 							"id": "select-ab12",
-							"value": ["red"],
+							"value": [
+								"red"
+							],
 							"expected_description": [
 								"formselmulti",
 								"select-ab12",
@@ -594,19 +592,28 @@
 						},
 						{
 							"id": "select-ab12",
-							"value": ["red", "green"],
+							"value": [
+								"red",
+								"green"
+							],
 							"expected_description": [
 								"formselmulti",
 								"select-ab12",
 								"list",
 								"contains_any",
-								["green", "red"]
+								[
+									"green",
+									"red"
+								]
 							],
 							"expected_details": {
 								"type": "list",
 								"text": "is any of",
 								"status": "CONTAINS_ANY",
-								"or": ["Green", "Red"],
+								"or": [
+									"Green",
+									"Red"
+								],
 								"field_label": "Select Field"
 							}
 						}

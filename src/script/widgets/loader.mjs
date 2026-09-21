@@ -7,82 +7,74 @@
  * - reconcile(): Sync this.visible and prepared state to the DOM (in transition)
  * - updated(response): Handle server response
  * - created(response): Post-create handling (reset forms)
- * - data: FormData getter for submissions
+ * - formData: FormData getter for submissions
  * - destroy(): Cleanup listeners
  */
 
-import { ENDPOINTS } from "../shared/endpoints";
-import { captureError } from "../shared/errors";
+import { ENDPOINTS } from "../shared/endpoints.mjs";
+import { captureError } from "../shared/errors.mjs";
 
 const WIDGETS = {
-	BaseList: () => import("../elements/base/baseList"),
-	CategoryInfo: () => import("./category"),
-	CollaborativeDocument: () => import("../elements/editor/collaborative"),
-	CreateCategory: () => import("./category"),
-	CreateForm: () => import("./form"),
-	CreateModelTask: () => import("./modelTasks"),
-	CreateNote: () => import("./note"),
-	CreatePage: () => import("./pageInfo"),
-	CreateProject: () => import("./projectInfo"),
-	CreateToolReport: () => import("./tools"),
-	CreateUserTask: () => import("./taskSettings"),
-	CreateTask: () => import("./taskSettings"),
-	CreateUser: () => import("./user"),
-	CreateUserGroup: () => import("./user"),
-	DirectoryList: () => import("./home/lists"),
-	DocumentSettings: () => import("./documentSettings"),
-	FileInfo: () => import("./fileInfo"),
-	PDFPreview: () => import("./filePdfPreview"),
-	FileUpload: () => import("./uploadFile"),
-	Filters: () => import("./filters"),
-	FilterResults: () => import("./tables"),
-	GroupPermissions: () => import("./user"),
-	HomeActivityList: () => import("./home/activity"),
-	HomePageList: () => import("./home/lists"),
-	HomeTaskList: () => import("./home/tasks"),
-	HomeProjectList: () => import("./home/lists"),
-	HomeCategoryList: () => import("./home/lists"),
-	ImportData: () => import("./ingress"),
-	IndexTable: () => import("./tables"),
-	IngressFileUpload: () => import("./ingressUpload"),
-	IngressList: () => import("./home/lists"),
-	MobileTableControls: () => import("./mobileTableControls"),
-	ModelTaskInfo: () => import("./modelTasks"),
-	ModelTaskList: () => import("./modelTasks"),
-	PageInfo: () => import("./pageInfo"),
-	PagePermissions: () => import("./pagePermissions"),
-	PagePhoto: () => import("./pagePhoto"),
-	PageTaskList: () => import("./pageTaskList"),
-	ProjectInfo: () => import("./projectInfo"),
-	PublicPermissions: () => import("./user"),
-	SavedFilters: () => import("./filters"),
-	SiteAiModels: () => import("./siteSettings/aiModels"),
-	SiteAdministrators: () => import("./siteSettings/administrators"),
-	SiteDeployment: () => import("./siteSettings/deployment"),
-	SiteInstallationAccess: () => import("./siteSettings/installationAccess"),
-	SiteImage: () => import("./siteSettings/image"),
-	SiteMaintenance: () => import("./siteSettings/maintenance"),
-	SiteServiceProviders: () => import("./siteSettings/providers"),
-	SiteSettings: () => import("./siteSettings"),
-	StarredList: () => import("./home/lists"),
-	TableEditor: () => import("./tableEditor"),
-	TableSorting: () => import("./tableSorting"),
-	TableVisibility: () => import("./tableVisibility"),
-	TaskForm: () => import("./taskForm"),
-	TaskHistory: () => import("./tables"),
-	TaskCombine: () => import("./taskSettings"),
-	TaskMove: () => import("./taskSettings"),
-	ToolReportList: () => import("./home/lists"),
-	TaskSettings: () => import("./taskSettings"),
-	UserSettings: () => import("./pageInfo"),
-};
-
-/** Sync-capable widgets that can run without a mounted view (offline replay). */
-const HEADLESS_WIDGETS = {
-	document: {
-		load: () => import("../elements/editor/collaborative"),
-		name: "CollaborativeDocument",
-	},
+	BaseList: () => import("../elements/base/baseList.mjs"),
+	CategoryInfo: () => import("./category.mjs"),
+	CollaborativeDocument: () => import("../elements/editor/collaborative.mjs"),
+	CreateCategory: () => import("./category.mjs"),
+	CreateForm: () => import("./form.mjs"),
+	CreateModelTask: () => import("./modelTasks.mjs"),
+	CreateNote: () => import("./note.mjs"),
+	CreatePage: () => import("./pageInfo.mjs"),
+	CreateProject: () => import("./projectInfo.mjs"),
+	CreateToolReport: () => import("./tools.mjs"),
+	CreateUserTask: () => import("./taskSettings.mjs"),
+	CreateTask: () => import("./taskSettings.mjs"),
+	CreateUser: () => import("./user.mjs"),
+	CreateUserGroup: () => import("./user.mjs"),
+	DirectoryList: () => import("./home/lists.mjs"),
+	DocumentSettings: () => import("./documentSettings.mjs"),
+	FileInfo: () => import("./fileInfo.mjs"),
+	PDFPreview: () => import("./filePdfPreview.mjs"),
+	FileUpload: () => import("./uploadFile.mjs"),
+	Filters: () => import("./filters.mjs"),
+	FilterResults: () => import("./filterResults.mjs"),
+	GroupPermissions: () => import("./userPermissions.mjs"),
+	HomeActivityList: () => import("./home/activity.mjs"),
+	HomePageList: () => import("./home/lists.mjs"),
+	HomeTaskList: () => import("./home/tasks.mjs"),
+	HomeProjectList: () => import("./home/lists.mjs"),
+	HomeCategoryList: () => import("./home/lists.mjs"),
+	ImportData: () => import("./ingress.mjs"),
+	IndexTable: () => import("./tables/indexTable.mjs"),
+	IngressFileUpload: () => import("./ingressUpload.mjs"),
+	IngressList: () => import("./home/lists.mjs"),
+	MobileTableControls: () => import("./tables/mobileControls.mjs"),
+	ModelTaskInfo: () => import("./modelTasks.mjs"),
+	ModelTaskList: () => import("./modelTasks.mjs"),
+	PageInfo: () => import("./pageInfo.mjs"),
+	PagePermissions: () => import("./pagePermissions.mjs"),
+	PagePhoto: () => import("./pagePhoto.mjs"),
+	PageTaskList: () => import("./pageTaskList.mjs"),
+	ProjectInfo: () => import("./projectInfo.mjs"),
+	PublicPermissions: () => import("./userPermissions.mjs"),
+	SavedFilters: () => import("./filters.mjs"),
+	SiteAiModels: () => import("./siteSettings/aiModels.mjs"),
+	SiteAdministrators: () => import("./siteSettings/administrators.mjs"),
+	SiteDeployment: () => import("./siteSettings/deployment.mjs"),
+	SiteInstallationAccess: () => import("./siteSettings/installationAccess.mjs"),
+	SiteImage: () => import("./siteSettings/image.mjs"),
+	SiteMaintenance: () => import("./siteSettings/maintenance.mjs"),
+	SiteServiceProviders: () => import("./siteSettings/providers.mjs"),
+	SiteSettings: () => import("./siteSettings.mjs"),
+	StarredList: () => import("./home/lists.mjs"),
+	TableEditor: () => import("./tables/editor.mjs"),
+	TableSorting: () => import("./tables/sorting.mjs"),
+	TableVisibility: () => import("./tables/visibility.mjs"),
+	TaskForm: () => import("./taskForm.mjs"),
+	TaskHistory: () => import("./taskHistory.mjs"),
+	TaskCombine: () => import("./taskSettings.mjs"),
+	TaskMove: () => import("./taskSettings.mjs"),
+	ToolReportList: () => import("./home/lists.mjs"),
+	TaskSettings: () => import("./taskSettings.mjs"),
+	UserSettings: () => import("./userSettings.mjs"),
 };
 
 const JSON_ATTRIBUTES = [
@@ -220,96 +212,4 @@ export async function loadWidget(component, show, extraAttributes = {}) {
 
 	if (widget.target) widget.target._lp_widget = widget;
 	return widget;
-}
-
-/**
- * Build a fully rendered, detached copy of a form widget for revision
- * comparison. The response document is cloned so the original remains
- * available if the user chooses to apply it.
- *
- * @testable infrastructure
- */
-export async function loadRevisionPreview(
-	liveWidget,
-	response,
-	{ readonly = liveWidget.readonly } = {},
-) {
-	const responseTarget = response.html?.querySelector(
-		`[data-widget='${liveWidget.name}']`,
-	);
-	if (!responseTarget) return null;
-
-	const container = document.createElement("div");
-	container.appendChild(responseTarget.cloneNode(true));
-	const view = {
-		key: liveWidget.key,
-		kind: liveWidget.kind,
-		readonly,
-		online: true,
-		hidden: false,
-		showExtractReloadNotice() {},
-	};
-	const component = {
-		elt: container,
-		view,
-		key: liveWidget.key,
-		kind: liveWidget.kind,
-		widgets: {},
-		get readonly() {
-			return readonly;
-		},
-	};
-	const preview = await loadWidget(component, liveWidget.name, {
-		revisionPreview: true,
-		schema: response.schema ?? null,
-		submission: response.submission ?? null,
-	});
-	const previewResponse = {
-		...response,
-		html: response.html?.cloneNode(true),
-	};
-
-	if (preview.updated) await preview.updated(previewResponse);
-	if (preview.prereconcile) await preview.prereconcile();
-	if (preview.postreconcile) preview.postreconcile();
-	return preview;
-}
-
-/**
- * @testable false
- * @covered-by src/script/widgets/loader.mjs::loadHeadlessWidget
- * @reason helper owned by the headless sync widget loader
- */
-function _headlessKind(sync_id) {
-	if (sync_id.endsWith(":document")) return "document";
-	return null;
-}
-
-/**
- * @testable true
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
- * @matrix sync : concurrency document headless-widget offline-replay
- *
- * Construct a sync-capable widget with no view or DOM chrome.
- * Caller runs init(), assigns remote/offlineRecord, then sync().
- */
-export async function loadHeadlessWidget({ sync_id, remote, offline }) {
-	const kind = _headlessKind(sync_id);
-	if (!kind) return null;
-
-	const { load, name } = HEADLESS_WIDGETS[kind];
-	const module = await load();
-	const Widget = module[name];
-
-	const target = document.createElement("div");
-	target.setAttribute("lp-sync", sync_id);
-	const fingerprint = remote?.fingerprint ?? offline?.fingerprint;
-	if (fingerprint) target.setAttribute("lp-fingerprint", fingerprint);
-	return new Widget({
-		target,
-		headless: true,
-		view: null,
-		readonly: true,
-		key: remote?.key ?? offline?.key,
-	});
 }

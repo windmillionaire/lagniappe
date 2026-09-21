@@ -713,7 +713,6 @@ def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
 # @matrix mcp-oauth : site-policy existing-grants user-binding
 # @source lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
 # @source lagniappe/core/tools/auth/remote_mcp.py::eligible_user
-@pytest.mark.unit
 def test_site_policy_blocks_existing_oauth_grants_and_public_users(oauth, monkeypatch):
     tokens = auth.exchange_token(_code(oauth))
     for flag in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):

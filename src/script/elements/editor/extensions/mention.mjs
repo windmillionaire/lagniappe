@@ -6,18 +6,15 @@ import {
 	shift,
 } from "@floating-ui/dom";
 import { mergeAttributes, Node } from "@tiptap/core";
-import { STYLES } from "styles";
-import {
-	captureError,
-	debounce,
-	generateElementId,
-	QueryLifecycle,
-	request,
-} from "../../../shared";
+import { STYLES } from "../../../generated/styles.mjs";
+import { captureError } from "../../../shared/errors.mjs";
+import { QueryLifecycle } from "../../../shared/queryLifecycle.mjs";
+import { request } from "../../../shared/request.mjs";
+import { debounce, generateElementId } from "../../../shared/utilities.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
  * @matrix mentions : node-attributes profile-link
  */
@@ -84,7 +81,7 @@ export const LagniappeMention = Node.create({
 
 /**
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
  * @pair mentions:query-detection
  */
 const currentQuery = (editor) => {
@@ -111,7 +108,7 @@ const queryKey = (active) =>
 
 /**
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
  * @matrix mentions : empty-results floating-menu keyboard mouse node-attributes pending-occurrence profile-link
  */
@@ -389,7 +386,7 @@ export class MentionSuggestions {
 
 /**
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
  * @pair mentions:pending-occurrence
  */
 export const collectMentions = (document) => {

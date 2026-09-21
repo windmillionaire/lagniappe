@@ -33,8 +33,12 @@ Global application behavior includes:
   cache must be cleared; and
 - the versioned `/l/poll` state endpoint.
 
-The CSP allows stylesheet elements only from the same origin and the Google
-Identity Services `/gsi/style` URL. Only `style-src-attr` permits
+The CSP allows stylesheet elements from the same origin and the Google
+Identity Services `/gsi/style` URL. Login responses that load GIS also generate
+a fresh `g.google_style_nonce`, place it on the GIS script, and authorize it
+in `style-src` and `style-src-elem`. GIS copies that nonce onto its injected
+button stylesheet; it does not grant permission to arbitrary inline scripts.
+Only `style-src-attr` permits
 `'unsafe-inline'`, for style attributes in rendered content. Table column
 visibility uses a constructed `CSSStyleSheet` adopted by the document and
 removes it when the view is destroyed. Tiptap's runtime CSS injection is
@@ -155,13 +159,13 @@ a third-party sharing library.
 
 ### Canonical application help
 
-`lagniappe/reference/<topic_id>.md` is the authored source for reference modals,
-help articles, overlapping manual sections, and AI help. Filenames are stable
+`lagniappe/reference/<topic_id>.md` is the authored source for contextual reference
+modals, help articles, search, and AI help. Filenames are stable
 lowercase snake_case IDs. There are no aliases: `create_form` is canonical and
 `form_creation` no longer resolves. Update callers directly when removing a topic.
 
-Each file starts with YAML front matter containing `title`, optional `related`
-(canonical IDs), and optional `manual_section` (an existing chapter key). Begin
+Each file starts with YAML front matter containing `title` and optional `related`
+(canonical IDs). Begin
 the body with a standalone summary paragraph, then use level-two or deeper
 headings. Describe what the user does, what happens next, and how the interface
 shows it. Name the actual button, message, badge, or disabled state. Avoid vague
@@ -172,13 +176,19 @@ Use `/help/<topic_id>` links for related guidance. The loader validates metadata
 and help/manual links; Jinja and live installation values do not belong in bodies.
 
 `reference.topics()` loads an immutable source catalog without Flask or Redis.
-`topic_html()` uses the existing Markdown/SafeHTML policies, adjusts embedded
-headings, and maps help links to chapter anchors inside the manual. `topic_sections()`
+`topic_html()` uses the existing Markdown/SafeHTML policies and adjusts headings
+when embedded in a modal. Related help links retain their `/help/` URLs. `topic_sections()`
 groups that body into sanitized introduction and detail fragments for template wrappers;
-those visual wrappers are never included in search or AI Markdown. Manual chapters
-include `manual_topic()` for full bodies or `manual_summary()` for derived
-introductions. Broader narrative and long installation/client procedures remain
-in their existing chapters. Embed each topic in its `manual_section` exactly once.
+those visual wrappers are never included in search or AI Markdown.
+
+The manual is authored independently in `web/templates/manual/content/`. It
+introduces the product with explanations, examples, a Quickstart tour, and
+longer installation/client procedures. Keep it readable without opening reference
+articles. There is no topic-to-chapter mapping, automatic embedding, or requirement
+to add a manual entry when adding help. Update the manual's explanations when
+product behavior changes; put control-specific procedures in reference topics.
+Manual chapter URLs remain stable, but the former embedded reference-topic
+fragment anchors are retired.
 
 `/reference/section/<topic_id>` returns the shared modal; `/help/<topic_id>`
 returns a signed-in article whose Close link returns Home. Both use exact IDs
@@ -186,7 +196,9 @@ and return 404 for unknown topics. General administrator guidance is readable
 by every signed-in user. The dedicated Configuration and Initial Prompt viewers
 keep their authorization and live payloads. Static explanations never include
 those payloads. `topic_context()` supplies configured email and permitted external
-connection details at request time; anonymous manual readers receive no such context.
+connection details at request time. The manual's own email and connection
+explanations retain equivalent authentication and feature guards; anonymous
+manual readers receive generic guidance without live account details.
 
 Packaged Markdown is runtime data and must remain included in deployments.
 Focused validation lives in `test_035_help.py` and `test_009e_help.py`; run normal

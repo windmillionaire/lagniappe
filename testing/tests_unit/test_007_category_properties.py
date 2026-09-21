@@ -9,6 +9,7 @@ Out of scope here: ``PageIndex.pages`` (database + ``url_for``),
 other suites where those paths are mocked or exercised end-to-end.
 """
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -36,6 +37,7 @@ def test_category_filters(get_test_entities, get_schema):
     entities = get_test_entities()
     categories = [e for e in entities if e.entity_kind == "category"]
     pages = [e for e in entities if e.entity_kind == "page"]
+    assert categories and pages
 
     # set schema on category forms
     for category in categories:
@@ -45,6 +47,7 @@ def test_category_filters(get_test_entities, get_schema):
 
     # set page properties and schemas on page forms
     for page in pages:
+        page.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
         page.name = page.test_spec.get("name")
         page.description = page.test_spec.get("description")
         if "public" in page.test_spec:
@@ -56,13 +59,18 @@ def test_category_filters(get_test_entities, get_schema):
         # attach all pages to this category as their model
         for page in pages:
             page.model = category
+            if "form" not in page.test_spec:
+                page.form = category.form
 
         # verify category.filters.conditions structure
         conditions = category.filters.conditions
-        # 7 base filter fields + 1 entity field per form
-        form_count = 1 if category.form else 0
-        expected_count = 7 + form_count
-        assert len(conditions) == expected_count
+        assert [c["field"] for c in conditions if "hash" not in c] == [
+            "name", "description", "categories", "has_document", "has_image",
+            "is_public", "modified",
+        ]
+        assert [(c["field"], c["hash"]) for c in conditions if "hash" in c] == [
+            tuple(item) for item in category.test_spec["expected_entity_fields"]
+        ]
 
         base_keys = {"field", "label", "kind", "icon"}
         entity_keys = base_keys | {"hash", "key"}
@@ -87,29 +95,26 @@ def test_category_filters(get_test_entities, get_schema):
         for page in pages:
             page_index = page.to_filter_index()
 
-            for f in category.properties.filters.conditions:
-                field_key = f["field"]
-                if "hash" in f:
-                    # entity-valued condition (form) — only pages with a fixture form;
-                    # others may inherit form from model category without a form filter key
-                    if field_key == "form" and page.test_spec.get("form"):
-                        assert page_index["form"] == page.properties.form.filter_value
-                elif field_key == "categories":
-                    assert page_index[field_key] == [category.hash]
-                elif field_key in category.filters.fields:
-                    property_id = category.filters.fields[field_key].id
-                    if page.properties.get(property_id):
-                        assert (
-                            page_index.get(field_key)
-                            == page.properties[property_id].filter_value
-                        )
+            projected_fields = {
+                "name", "description", "categories", "has_document", "has_image",
+                "is_public", "modified", "form",
+            }
+            expected_form = page.test_spec.get("form", category.test_spec.get("form"))
+            assert {key: value for key, value in page_index.items()
+                    if key in projected_fields} == {
+                **page.test_spec["expected_filter"],
+                "categories": [category.hash], "modified": 1767225600.0,
+                **({"form": expected_form["hash"]} if expected_form else {}),
+            }
 
 
 # @matrix category form-schema : delegation schema
 @pytest.mark.unit
 def test_category_schema(get_test_entities, get_schema):
     """Category.schema mirrors attached form.schema when a form exists; else None."""
-    for category in get_test_entities():
+    entities = get_test_entities()
+    assert entities
+    for category in entities:
         if category.test_spec.get("form"):
             category.form.schema = get_schema(category.test_spec["form"]["schema"])
             assert category.schema is category.form.schema
@@ -217,7 +222,8 @@ def test_category_filters_related_forms(get_test_entities, get_schema):
 
     assert category.form.hash in category.filters.entity_fields
     assert related.hash in category.filters.entity_fields
-    assert len(category.filters.conditions) == 7 + 2
+    assert [(c["field"], c["hash"]) for c in category.filters.conditions
+            if "hash" in c] == [("form", "primform1"), ("form", "relform1")]
 
 
 # @matrix category filters permissions : conditions entity-fields view-access

@@ -397,7 +397,7 @@ def path_matches_target(test_path: str, path: Path, target_path: str) -> bool:
     clean = target_path.strip("/")
     if not clean:
         return True
-    if clean.endswith(".py"):
+    if clean.endswith((".py", ".mjs")):
         return test_path == clean or path.name == clean or test_path.endswith(f"/{clean}")
     return (
         test_path == clean
@@ -436,45 +436,21 @@ def collect_template_references(
     normalized_target = normalize_target(target)
     template_target = normalize_template_target(target, repo_root)
 
-    for path in sorted(tests_root.rglob("test_*.py")):
-        source = path.read_text(encoding="utf-8")
-        lines = source.splitlines()
-        tree = ast.parse(source, filename=str(path))
+    paths = sorted([*tests_root.rglob("test_*.py"), *tests_root.rglob("test_*.mjs")])
+    for path in paths:
         test_path = relpath(path, tests_root)
-
-        def visit_body(body: list[ast.stmt], stack: list[str]) -> None:
-            for node in body:
-                if isinstance(node, ast.ClassDef):
-                    visit_body(node.body, [*stack, node.name])
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    qualname = "::".join([*stack, node.name])
-                    if node.name.startswith("test_"):
-                        nodeid = f"{test_path}::{qualname}"
-                        if template_target or target_matches_test(normalized_target, test_path, qualname):
-                            metadata_text = traceability.metadata_text_for_python_node(
-                                node, lines
-                            )
-                            for template_ref in parse_template_tags(metadata_text):
-                                template_path, macro = split_template_ref(template_ref)
-                                if not target_matches_template(
-                                    template_target, template_path, macro
-                                ):
-                                    continue
-                                references.append(
-                                    TemplateReference(
-                                        nodeid=nodeid,
-                                        test_path=test_path,
-                                        qualname=qualname,
-                                        template_ref=template_ref,
-                                        template_path=template_path,
-                                        macro=macro,
-                                        lineno=node.lineno,
-                                        todos=parse_todo_tags(metadata_text),
-                                    )
-                                )
-                    visit_body(node.body, [*stack, node.name])
-
-        visit_body(tree.body, [])
+        for qualname, info in traceability.collect_file_test_symbol_info(path).items():
+            if not template_target and not target_matches_test(normalized_target, test_path, qualname):
+                continue
+            for template_ref in info.metadata.templates:
+                template_path, macro = split_template_ref(template_ref)
+                if target_matches_template(template_target, template_path, macro):
+                    references.append(TemplateReference(
+                        nodeid=f"{test_path}::{qualname}", test_path=test_path,
+                        qualname=qualname, template_ref=template_ref,
+                        template_path=template_path, macro=macro,
+                        lineno=info.lineno, todos=info.metadata.todos,
+                    ))
 
     return references
 
@@ -1358,6 +1334,18 @@ def helper_method_selectors(
 
 
 def find_test_node(path: Path, qualname: str) -> ast.AST | None:
+    if path.suffix == ".mjs":
+        rows = traceability.native_js.inventory(path)["cases"]
+        row = next((row for row in rows if row["name"] == qualname), None)
+        if row is None:
+            return None
+        # Feed literal evidence into the existing selector visitor without
+        # treating the first JavaScript selector as a Python docstring.
+        literals = ast.List(
+            elts=[ast.Constant(value=value) for value in row["selectors"]],
+            ctx=ast.Load(),
+        )
+        return ast.Module(body=[ast.Expr(value=literals)], type_ignores=[])
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     parts = qualname.split("::")
 

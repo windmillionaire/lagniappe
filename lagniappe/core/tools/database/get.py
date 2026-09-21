@@ -565,8 +565,9 @@ def page_tasks_with_history(page):
     return tasks + history
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
+# @testable true
+# @tests tests_e2e/002_home/test_002o_home_task_count.py::test_user_task_count_aggregates_owned_and_assigned_tasks_once
+# @matrix home : task-count ownership assignment deduplication
 def user_task_count(page):
     """Count tasks owned by or assigned to a page."""
     f = Filter().any_of(
@@ -710,7 +711,7 @@ def form_instance_users(form_key):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_activity_query_filters_requested_types
-# @matrix activity : ancestor query type-order
+# @matrix activity : ancestor query multi-type type-order
 def activity(parent, types=("note", "notification")):
     """Fetch activity items belonging to ``parent``."""
     parent_key = datastore_key(parent)

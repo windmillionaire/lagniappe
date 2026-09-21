@@ -185,6 +185,8 @@ def iter_source_files(repo_root: Path, source_roots: Iterable[Path]) -> Iterable
         if not source_root.exists():
             continue
         for path in sorted(source_root.rglob("*")):
+            if path.is_relative_to(repo_root / "src/script/generated"):
+                continue
             if not path.is_file():
                 continue
             surface = source_surface(path)

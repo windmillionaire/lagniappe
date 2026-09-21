@@ -1,7 +1,7 @@
-import { buttons } from "../../elements/buttons";
-import { SelectBox } from "../../elements/combobox";
-import { request } from "../../shared";
-import { SiteSetting } from "./base";
+import { buttons } from "../../elements/buttons.mjs";
+import { SelectBox } from "../../elements/combobox/index.mjs";
+import { request } from "../../shared/index.mjs";
+import { SiteSetting } from "./base.mjs";
 
 const INSTANCE_CLASSES = {
 	automatic: ["F1", "F2", "F4", "F4_1G"],
@@ -198,7 +198,7 @@ export class SiteDeployment extends SiteSetting {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_deployment_caps_workers_only_for_f2_and_b2
+	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_deployment_caps_workers_only_for_f2_and_b2
 	 * @matrix admin : deployment-settings memory-pressure scaling-controls
 	 */
 	_syncWorkerLimit() {

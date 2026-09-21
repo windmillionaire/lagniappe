@@ -1,8 +1,10 @@
-import { STYLES } from "styles";
-import { primitives } from "../elements/primitives";
-import { ENDPOINTS, request, withTransition } from "../shared";
-import { setIcon } from "../shared/icons";
-import { TableElement } from "./table";
+import { STYLES } from "../generated/styles.mjs";
+import { ENDPOINTS } from "../shared/endpoints.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { primitives } from "./primitives.mjs";
+import { TableElement } from "./table.mjs";
 
 /**
  * @testable true

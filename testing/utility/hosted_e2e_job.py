@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tarfile
@@ -22,6 +23,7 @@ EVIDENCE_PATH = REPOSITORY_ROOT / "testing/evidence/latest.json"
 MAX_FOCUSED_TARGETS = 50
 HOSTED_E2E_ENVIRONMENTS = ("standard",)
 STANDARD_JOB = "lagniappe-e2e"
+TEST_SUITES = ("tests_unit", "tests_js", "tests_tooling", "tests_e2e")
 
 
 def _required_environment(name: str) -> str:
@@ -41,10 +43,10 @@ def _hosted_environment() -> str:
 
 
 # @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
 # @matrix hosted-e2e : argument-injection focused-execution target-validation
 def validate_focused_targets(targets) -> tuple[str, ...]:
-    """Return bounded existing E2E paths/nodeids safe for job arg overrides."""
+    """Validate individual nodeid syntax and file scope before job overrides."""
     normalized = tuple(str(target).strip() for target in targets or ())
     if not normalized:
         raise RuntimeError("Focused hosted E2E requires at least one --target.")
@@ -55,48 +57,59 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
     if len(set(normalized)) != len(normalized):
         raise RuntimeError("Focused hosted E2E targets must be unique.")
 
-    e2e_root = (REPOSITORY_ROOT / "testing/tests_e2e").resolve()
     for target in normalized:
         if not target or len(target) > 512:
             raise RuntimeError("Focused hosted E2E received an invalid target.")
-        if any(character in target for character in (",", "\x00", "\r", "\n")):
+        if "," in target or any(
+            ord(character) < 32 or ord(character) == 127 for character in target
+        ):
             raise RuntimeError(
                 "Focused hosted E2E targets cannot contain commas or control characters."
             )
         path_text, separator, selector = target.partition("::")
-        if not path_text.startswith("testing/tests_e2e/"):
-            raise RuntimeError(
-                "Focused hosted E2E targets must be real testing/tests_e2e paths."
-            )
         relative_path = Path(path_text)
-        if relative_path.is_absolute() or ".." in relative_path.parts:
+        if (
+            len(relative_path.parts) < 3
+            or relative_path.parts[0] != "testing"
+            or relative_path.parts[1] not in TEST_SUITES
+        ):
+            raise RuntimeError(
+                "Focused hosted tests must belong to unit, JavaScript, tooling, or E2E."
+            )
+        if ".." in relative_path.parts or relative_path.as_posix() != path_text:
             raise RuntimeError(
                 "Focused hosted E2E targets cannot traverse directories."
             )
         target_path = (REPOSITORY_ROOT / relative_path).resolve()
+        suite_root = REPOSITORY_ROOT / "testing" / relative_path.parts[1]
         if (
-            not target_path.is_relative_to(e2e_root)
-            or target_path.suffix != ".py"
+            not target_path.is_relative_to(suite_root)
+            or not target_path.name.startswith("test_")
+            or target_path.suffix not in {".py", ".mjs"}
+            or (target_path.suffix == ".mjs" and relative_path.parts[1] != "tests_js")
             or not target_path.is_file()
         ):
             raise RuntimeError(
-                "Focused hosted E2E targets must name existing E2E Python files."
+                "Focused hosted tests must name existing test files inside their suite."
             )
-        if separator and (
-            not selector or any(not component for component in selector.split("::"))
-        ):
+        pattern = (
+            r"test_[A-Za-z0-9_]+"
+            if target_path.suffix == ".mjs"
+            else r"(?:[A-Za-z_][A-Za-z0-9_]*::)*test_[A-Za-z0-9_]+(?:\[[^\[\]]+\])?"
+        )
+        if not separator or not re.fullmatch(pattern, selector):
             raise RuntimeError(
-                "Focused hosted E2E received an invalid nodeid selector."
+                "Focused hosted tests require individual path::test_name nodeids, not files or directories."
             )
     return normalized
 
 
 # @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
 # @matrix hosted-e2e : argument-injection focused-execution target-validation
+# @pair hosted-e2e:suite-scope
 def _pytest_command(
-    suite: str,
     targets=(),
     *,
     environment="standard",
@@ -104,9 +117,7 @@ def _pytest_command(
     if environment not in HOSTED_E2E_ENVIRONMENTS:
         raise RuntimeError("Hosted E2E job received an invalid environment.")
     targets = tuple(targets or ())
-    if suite == "all":
-        if targets:
-            raise RuntimeError("All hosted tests do not accept focused targets.")
+    if not targets:
         pytest_targets = [
             "unit",
             "js",
@@ -115,18 +126,12 @@ def _pytest_command(
             "-m",
             "not unfinished",
         ]
-    elif suite == "full":
-        if targets:
-            raise RuntimeError("Full hosted E2E does not accept focused targets.")
-        pytest_targets = ["e2e"]
-    elif suite == "focused":
+    else:
         pytest_targets = [
             *validate_focused_targets(targets),
             "-m",
             "not unfinished",
         ]
-    else:
-        raise RuntimeError(f"Unsupported hosted E2E suite {suite!r}.")
     return [
         sys.executable,
         str(REPOSITORY_ROOT / "run.py"),
@@ -245,33 +250,33 @@ def _upload_artifacts(manifest: dict) -> None:
                 bucket.blob(f"{prefix}/{name}").upload_from_filename(path)
 
 
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_container_runs_complete_or_nodeids_and_records_scope
+# @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
 def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--suite",
-        choices=("all", "full", "focused"),
-        default="all",
+        "--target",
+        action="append",
+        default=[],
+        help="Run one test nodeid; repeat for more. Omit to run all complete suites.",
     )
-    parser.add_argument("--target", action="append", default=[])
     args = parser.parse_args(arguments)
 
     environment = _hosted_environment()
-    targets = (
-        validate_focused_targets(args.target)
-        if args.suite == "focused"
-        else tuple(args.target)
-    )
+    targets = validate_focused_targets(args.target) if args.target else ()
+    suite = "focused" if targets else "all"
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
     started_at = datetime.now(timezone.utc)
     result = subprocess.run(
-        _pytest_command(args.suite, targets, environment=environment),
+        _pytest_command(targets, environment=environment),
         cwd=REPOSITORY_ROOT,
     )
     finished_at = datetime.now(timezone.utc)
     manifest = _artifact_manifest(
-        suite=args.suite,
+        suite=suite,
         exit_status=result.returncode,
         execution=execution,
         started_at=started_at,

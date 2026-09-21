@@ -1,0 +1,1966 @@
+// biome-ignore-all lint/correctness/noUnusedVariables: each case selects from one standard worker sandbox boundary
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createServiceWorkerContext } from "../utility/js/service_worker.mjs";
+
+/** @matrix cache : no-store service-worker */
+test("test_no_store_304_discards_cached_response", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (request.headers.has("X-Lagniappe-If-None-Match")) {
+			throw new Error("SW used the removed custom ETag header");
+		}
+		if (request.headers.get("If-None-Match") === '"cached-etag"') {
+			return new Response(null, {
+				status: 304,
+				headers: { "Cache-Control": "private, no-store" },
+			});
+		}
+
+		return new Response("fresh", {
+			status: 200,
+			headers: { "Cache-Control": "NO-STORE" },
+		});
+	};
+	const request = new Request("https://example.test/l/token", {
+		credentials: "include",
+	});
+	responseCache.entries.set(
+		request.url,
+		new Response("cached", {
+			headers: { ETag: '"cached-etag"' },
+		}),
+	);
+
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/l/token",
+	);
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "fresh") {
+		throw new Error(`Expected fresh response body, got ${body}`);
+	}
+	if (responseCache.entries.has(request.url)) {
+		throw new Error("no-store response remained in the response cache");
+	}
+	if (responseCache.puts !== 0) {
+		throw new Error("no-store response was written to the response cache");
+	}
+	if (fetchCalls.length !== 2) {
+		throw new Error(
+			`Expected conditional fetch plus fresh fetch, got ${fetchCalls.length}`,
+		);
+	}
+	if (fetchCalls[0].headers.get("If-None-Match") !== '"cached-etag"') {
+		throw new Error("first request was not conditional");
+	}
+});
+
+/** @matrix cache csrf : network-only service-worker token */
+test("test_token_request_is_network_only_without_client_cache_directives", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (request.cache === "no-store") {
+			throw new Error("frontend forced token cache policy");
+		}
+		if (request.headers.has("Cache-Control")) {
+			throw new Error("frontend sent a token cache-control header");
+		}
+		return new Response("fresh-token", {
+			headers: { "Cache-Control": "no-store" },
+		});
+	};
+	const request = new Request("https://example.test/l/token", {
+		credentials: "include",
+		headers: { "X-Lagniappe-Request": "true" },
+	});
+	responseCache.entries.set(request.url, new Response("stale-token"));
+
+	const waitUntil = [];
+	const response = await context.handleNetworkOnlyGet({
+		request,
+		waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+	});
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "fresh-token") {
+		throw new Error(`Expected fresh token body, got ${body}`);
+	}
+	if (fetchCalls.length !== 1) {
+		throw new Error(
+			`Expected one network token fetch, got ${fetchCalls.length}`,
+		);
+	}
+	if (responseCache.entries.has(request.url)) {
+		throw new Error("stale token response remained in the response cache");
+	}
+	if (responseCache.puts !== 0) {
+		throw new Error(
+			"no-store token response was written to the response cache",
+		);
+	}
+});
+
+/** @matrix cache : invalidation no-store service-worker acknowledgement */
+test("test_invalidation_response_waits_for_acknowledgement_and_is_not_stored", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	let completed = 0;
+	process.on("beforeExit", () => {
+		if (completed !== 2)
+			throw new Error("Acknowledgement test did not complete");
+	});
+	for (const cacheControl of ["private, no-cache", "no-store"]) {
+		let finishAcknowledgement;
+		let acknowledgementStarted;
+		const started = new Promise((resolve) => {
+			acknowledgementStarted = resolve;
+		});
+		context.checkForCacheInvalidation = async (response) => {
+			if (response.headers.has("X-Lagniappe-Invalidate-Cache")) {
+				acknowledgementStarted();
+				await new Promise((resolve) => {
+					finishAcknowledgement = resolve;
+				});
+				return { invalidated: true, acknowledged: true };
+			}
+			return { invalidated: false };
+		};
+		context.fetch = async () =>
+			new Response("current page", {
+				headers: {
+					"X-Lagniappe-Invalidate-Cache": "true",
+					"Cache-Control": cacheControl,
+				},
+			});
+		const request = new Request("https://example.test/");
+		responseCache.entries.set(request.url, new Response("old page"));
+		const pending = [];
+		let returned = false;
+		const result = context
+			.handleCacheable(
+				{ request, waitUntil: (promise) => pending.push(promise) },
+				"/",
+			)
+			.then((response) => {
+				returned = true;
+				return response;
+			});
+		await started;
+		await new Promise((resolve) => setImmediate(resolve));
+		if (returned)
+			throw new Error("Invalidating response overtook its acknowledgement");
+		finishAcknowledgement();
+		const response = await result;
+		await Promise.all(pending);
+		if ((await response.text()) !== "current page")
+			throw new Error("Lost live response");
+		if (responseCache.puts || responseCache.entries.has(request.url)) {
+			throw new Error("Invalidation response was retained in Cache Storage");
+		}
+		completed += 1;
+	}
+});
+
+/** @matrix cache : invalidation no-store service-worker browser-validators */
+test("test_previously_stored_invalidation_is_discarded_before_reuse", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const request = new Request("https://example.test/", {
+		headers: { "If-None-Match": '"old"' },
+	});
+	responseCache.entries.set(
+		request.url,
+		new Response("old page", {
+			headers: {
+				ETag: '"old"',
+				"X-Lagniappe-Invalidate-Cache": "true",
+			},
+		}),
+	);
+	context.fetch = async (fresh) => {
+		if (fresh.cache !== "reload" || fresh.headers.has("If-None-Match")) {
+			throw new Error(
+				"Stored invalidation reused a browser or worker validator",
+			);
+		}
+		return new Response("clean page", { headers: { ETag: '"current"' } });
+	};
+	const pending = [];
+	const response = await context.handleCacheable(
+		{ request, waitUntil: (promise) => pending.push(promise) },
+		"/",
+	);
+	await Promise.all(pending);
+	if (
+		(await response.text()) !== "clean page" ||
+		response.headers.has("X-Lagniappe-Invalidate-Cache")
+	) {
+		throw new Error("Previously cached invalidation was replayed");
+	}
+	if (
+		!responseCache.deletes.includes(request.url) ||
+		responseCache.puts !== 1
+	) {
+		throw new Error(
+			"Invalidation entry was not replaced with the clean response",
+		);
+	}
+});
+
+/** @matrix cache request : conditional-response dom-refresh service-worker */
+test("test_cached_304_marks_response_not_updated", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return new Response(null, { status: 304 });
+	};
+
+	const request = new Request("https://example.test/pages/example/tasks", {
+		headers: { "X-Lagniappe-Request": "true" },
+	});
+	responseCache.entries.set(
+		request.url,
+		new Response("unchanged tasks", {
+			headers: { ETag: '"tasks-etag"' },
+		}),
+	);
+
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/pages/example/tasks",
+	);
+	await Promise.all(waitUntil);
+
+	if ((await response.text()) !== "unchanged tasks") {
+		throw new Error("304 did not reuse the cached response body");
+	}
+	if (response.headers.get("X-Lagniappe-Updated") !== "false") {
+		throw new Error("304 cache reuse did not expose the unchanged marker");
+	}
+	if (fetchCalls[0].headers.get("If-None-Match") !== '"tasks-etag"') {
+		throw new Error("cached response ETag was not used for validation");
+	}
+});
+
+/** @matrix cache offline : ajax response-shape service-worker */
+test("test_application_get_failure_returns_503_instead_of_offline_html", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async () => {
+		throw new Error("offline");
+	};
+	staticCache.entries.set("/offline", new Response("offline document"));
+
+	const request = new Request("https://example.test/pages/example/tasks", {
+		headers: { "X-Lagniappe-Request": "true" },
+	});
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil() {},
+		},
+		"/pages/example/tasks",
+	);
+
+	if (response.status !== 503) {
+		throw new Error(`Expected an explicit 503, got ${response.status}`);
+	}
+	if (!response.headers.get("Content-Type").includes("application/json")) {
+		throw new Error("AJAX failure did not return JSON");
+	}
+	const body = await response.json();
+	if (
+		body.ok !== false ||
+		body.error !== "You are offline" ||
+		body.retryable !== false ||
+		body.outcomeUncertain !== true
+	) {
+		throw new Error(`Unexpected offline response: ${JSON.stringify(body)}`);
+	}
+});
+
+/** @matrix cache offline : navigation response-shape service-worker */
+test("test_navigation_failure_uses_offline_document", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	staticCache.entries.set("/offline", new Response("offline document"));
+
+	const request = {
+		mode: "navigate",
+		headers: new Headers(),
+	};
+	const response = await context.unavailableResponse(request);
+
+	if (
+		response.status !== 200 ||
+		(await response.text()) !== "offline document"
+	) {
+		throw new Error("Navigation failure did not return the offline document");
+	}
+});
+
+/** @matrix cache : activation ownership service-worker */
+test("test_activation_clears_only_application_owned_caches", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	await context.updateCaches();
+
+	const deleted = new Set(context.deletedCaches);
+	if (!deleted.has("static-cache") || !deleted.has("response-cache")) {
+		throw new Error(
+			`Application caches were not reset: ${context.deletedCaches}`,
+		);
+	}
+	if (deleted.has("third-party-cache")) {
+		throw new Error("Activation deleted a cache it does not own");
+	}
+});
+
+/** @matrix cache : invalidation service-worker */
+test("test_304_response_with_invalidation_header_fetches_fresh_response", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (request.headers.has("X-Lagniappe-If-None-Match")) {
+			throw new Error("SW used the removed custom ETag header");
+		}
+		if (request.headers.get("If-None-Match") === '"cached-etag"') {
+			return new Response(null, {
+				status: 304,
+				headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+			});
+		}
+		if (request.cache !== "reload") {
+			throw new Error(
+				`Expected reload fetch after invalidation, got ${request.cache}`,
+			);
+		}
+		return new Response("fresh page");
+	};
+	vm.runInContext(
+		`
+	invalidationChecks = 0;
+	checkForCacheInvalidation = async (response) => {
+	  if (response.headers.get("X-Lagniappe-Invalidate-Cache")) {
+	    invalidationChecks += 1;
+	  }
+	  return { invalidated: true };
+	};
+	`,
+		context,
+	);
+
+	const request = new Request("https://example.test/pages/example/tasks", {
+		credentials: "include",
+	});
+	responseCache.entries.set(
+		request.url,
+		new Response("cached page", {
+			headers: { ETag: '"cached-etag"' },
+		}),
+	);
+
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/pages/example/tasks",
+	);
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "fresh page") {
+		throw new Error(`Expected fresh response body, got ${body}`);
+	}
+	if (context.invalidationChecks !== 1) {
+		throw new Error(
+			`Expected one invalidation check, got ${context.invalidationChecks}`,
+		);
+	}
+	if (fetchCalls.length !== 2) {
+		throw new Error(
+			`Expected conditional fetch plus reload fetch, got ${fetchCalls.length}`,
+		);
+	}
+	if (fetchCalls[0].headers.get("If-None-Match") !== '"cached-etag"') {
+		throw new Error("request was not conditional");
+	}
+	if (fetchCalls[1].headers.has("If-None-Match")) {
+		throw new Error("reload request kept the stale conditional ETag");
+	}
+});
+
+/** @matrix cache : browser-validators service-worker */
+test("test_dynamic_fetch_preserves_browser_validators_without_stored_etag", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (request.headers.get("If-None-Match") !== '"browser-cache-etag"') {
+			throw new Error(
+				"dynamic fetch did not preserve browser-supplied If-None-Match",
+			);
+		}
+		if (
+			request.headers.get("If-Modified-Since") !==
+			"Sun, 28 Jun 2026 17:18:51 GMT"
+		) {
+			throw new Error(
+				"dynamic fetch did not preserve browser-supplied If-Modified-Since",
+			);
+		}
+		if (request.headers.has("X-Lagniappe-If-None-Match")) {
+			throw new Error("dynamic fetch used the removed custom ETag header");
+		}
+		return new Response("fresh page");
+	};
+
+	const request = new Request("https://example.test/categories/category-key", {
+		headers: {
+			"If-None-Match": '"browser-cache-etag"',
+			"If-Modified-Since": "Sun, 28 Jun 2026 17:18:51 GMT",
+		},
+	});
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/categories/category-key",
+	);
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "fresh page") {
+		throw new Error(`Expected fresh response body, got ${body}`);
+	}
+	if (fetchCalls.length !== 1) {
+		throw new Error(`Expected one network fetch, got ${fetchCalls.length}`);
+	}
+});
+
+/** @matrix cache : cached-response network-validation service-worker */
+test("test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	let releaseNetwork;
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return await new Promise((resolve) => {
+			releaseNetwork = resolve;
+		});
+	};
+
+	const request = new Request("https://example.test/filters/saved-filter", {
+		credentials: "include",
+	});
+	responseCache.entries.set(request.url, new Response("stale filter page"));
+
+	const waitUntil = [];
+	let settled = false;
+	const pending = context
+		.handleCacheable(
+			{
+				request,
+				waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+			},
+			"/filters/saved-filter",
+		)
+		.then((response) => {
+			settled = true;
+			return response;
+		});
+
+	await new Promise((resolve) => setTimeout(resolve, 850));
+	if (settled) {
+		throw new Error("Cached GET returned before network validation completed");
+	}
+
+	releaseNetwork(
+		new Response("fresh filter page", {
+			headers: { ETag: '"fresh-etag"' },
+		}),
+	);
+	const response = await pending;
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "fresh filter page") {
+		throw new Error(`Expected validated filter page, got ${body}`);
+	}
+	if (fetchCalls.length !== 1) {
+		throw new Error(`Expected one validating fetch, got ${fetchCalls.length}`);
+	}
+});
+
+/** @matrix cache : invalidation service-worker */
+test("test_redirect_response_with_invalidation_header_clears_cache", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return new Response("", {
+			status: 302,
+			headers: {
+				Location: "/",
+				"X-Lagniappe-Invalidate-Cache": "true",
+			},
+		});
+	};
+	vm.runInContext(
+		`
+	invalidationChecks = 0;
+	checkForCacheInvalidation = async (response) => {
+	  if (response.headers.get("X-Lagniappe-Invalidate-Cache")) {
+	    invalidationChecks += 1;
+	  }
+	  return { invalidated: true };
+	};
+	`,
+		context,
+	);
+
+	const request = new Request(
+		"https://example.test/users/login?test_user=a@example.test",
+		{
+			credentials: "include",
+		},
+	);
+
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/users/login",
+	);
+	await Promise.all(waitUntil);
+
+	if (response.status !== 302) {
+		throw new Error(`Expected redirect response, got ${response.status}`);
+	}
+	if (context.invalidationChecks !== 1) {
+		throw new Error(
+			`Expected redirect invalidation check, got ${context.invalidationChecks}`,
+		);
+	}
+	if (responseCache.puts !== 0) {
+		throw new Error("redirect response was written to the response cache");
+	}
+});
+
+/** @matrix cache : invalidation service-worker */
+test("test_cache_invalidation_confirmation_posts_after_local_clear", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const validateCalls = [];
+	context.fetch = async (url, options = {}) => {
+		if (url === "/l/token") {
+			if (options.credentials !== "include") {
+				throw new Error(
+					`Expected token credentials include, got ${options.credentials}`,
+				);
+			}
+			if (
+				options.cache !== undefined ||
+				options.headers["Cache-Control"] !== undefined
+			) {
+				throw new Error("Worker overrode server-owned token cache policy");
+			}
+			return new Response("csrf-token");
+		}
+		if (url === "/l/validate-user") {
+			validateCalls.push(options);
+			return new Response(JSON.stringify({ cacheCleared: true }), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+		throw new Error(`Unexpected fetch ${url}`);
+	};
+	vm.runInContext(
+		`
+	checkForCacheInvalidation = realCheckForCacheInvalidation;
+	`,
+		context,
+	);
+
+	const result = await context.checkForCacheInvalidation(
+		new Response("", {
+			headers: {
+				"X-Lagniappe-Invalidate-Cache": "true",
+				"X-Lagniappe-Cache-Revision": "user:actor:revision",
+			},
+		}),
+	);
+
+	if (!result.invalidated || !result.cacheCleared || !result.acknowledged) {
+		throw new Error("cache invalidation did not report a confirmed clear");
+	}
+	if (validateCalls.length !== 1) {
+		throw new Error(
+			`Expected one validate-user call, got ${validateCalls.length}`,
+		);
+	}
+	const body = JSON.parse(validateCalls[0].body);
+	if (body.cacheRevision !== "user:actor:revision") {
+		throw new Error("Acknowledgement lost the observed server revision");
+	}
+	if (
+		!body.cacheCleared ||
+		!body.responseCacheCleared ||
+		"etagStoreCleared" in body
+	) {
+		throw new Error(
+			`validate-user payload did not confirm cache clearing: ${validateCalls[0].body}`,
+		);
+	}
+	if (validateCalls[0].headers["X-CSRFToken"] !== "csrf-token") {
+		throw new Error("validate-user did not include refreshed CSRF token");
+	}
+});
+
+/** @matrix cache : acknowledgement concurrency invalidation retry service-worker */
+test("test_cache_acknowledgements_do_not_coalesce_different_revisions", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const started = [];
+	const confirmations = [];
+	const waiting = [];
+	context.fetch = async (url, options = {}) => {
+		if (url === "/l/token") return new Response("csrf-token");
+		const body = JSON.parse(options.body);
+		confirmations.push(body);
+		return new Promise((resolve) => {
+			waiting.push(resolve);
+			started[confirmations.length - 1]();
+		});
+	};
+	vm.runInContext(
+		`checkForCacheInvalidation = realCheckForCacheInvalidation;`,
+		context,
+	);
+	const response = (revision) =>
+		new Response("", {
+			headers: {
+				"X-Lagniappe-Invalidate-Cache": "true",
+				"X-Lagniappe-Cache-Revision": revision,
+			},
+		});
+	const firstStarted = new Promise((resolve) => started.push(resolve));
+	const secondStarted = new Promise((resolve) => started.push(resolve));
+	const first = context.checkForCacheInvalidation(response("first"));
+	await firstStarted;
+	const second = context.checkForCacheInvalidation(response("second"));
+	await secondStarted;
+	waiting[0](
+		new Response(JSON.stringify({ cacheCleared: false, retry: true })),
+	);
+	waiting[1](new Response(JSON.stringify({ cacheCleared: true })));
+	const [a, b] = await Promise.all([first, second]);
+	if (
+		a.acknowledged !== false ||
+		b.acknowledged !== true ||
+		confirmations[0].cacheRevision !== "first" ||
+		confirmations[1].cacheRevision !== "second" ||
+		b.cacheGeneration <= a.cacheGeneration
+	) {
+		throw new Error(
+			"New invalidation reused the older clear or acknowledgement",
+		);
+	}
+});
+
+/** @matrix cache : acknowledgement failure invalidation retry service-worker */
+test("test_cache_invalidation_requires_explicit_server_acknowledgement", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const captures = [];
+	context.self.Sentry = {
+		captureException(error, options) {
+			captures.push({ message: error.message, ...options });
+		},
+	};
+
+	const scenarios = [
+		{
+			stage: "token-response",
+			fetch: async (url) =>
+				new Response("", { status: url === "/l/token" ? 500 : 200 }),
+			validateCalls: 0,
+		},
+		{
+			stage: "token-empty",
+			fetch: async (url) =>
+				new Response(url === "/l/token" ? "   " : "", { status: 200 }),
+			validateCalls: 0,
+		},
+		{
+			stage: "validation-response",
+			fetch: async (url) =>
+				url === "/l/token"
+					? new Response("csrf-token")
+					: new Response("", { status: 503 }),
+			validateCalls: 1,
+		},
+		{
+			stage: "validation-body",
+			fetch: async (url) =>
+				url === "/l/token"
+					? new Response("csrf-token")
+					: new Response("not-json", { status: 200 }),
+			validateCalls: 1,
+		},
+		{
+			stage: "validation-acknowledgement",
+			fetch: async (url) =>
+				url === "/l/token"
+					? new Response("csrf-token")
+					: new Response(JSON.stringify({ cacheCleared: false }), {
+							status: 200,
+							headers: { "Content-Type": "application/json" },
+						}),
+			validateCalls: 1,
+		},
+	];
+
+	vm.runInContext(
+		`checkForCacheInvalidation = realCheckForCacheInvalidation;`,
+		context,
+	);
+	for (const scenario of scenarios) {
+		let validateCalls = 0;
+		context.fetch = async (url, options = {}) => {
+			if (url === "/l/validate-user") validateCalls += 1;
+			return scenario.fetch(url, options);
+		};
+		const before = captures.length;
+		const result = await context.checkForCacheInvalidation(
+			new Response("", {
+				headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+			}),
+		);
+		if (result.acknowledged !== false) {
+			throw new Error(`Expected failed acknowledgement for ${scenario.stage}`);
+		}
+		if (validateCalls !== scenario.validateCalls) {
+			throw new Error(
+				`Unexpected validate calls for ${scenario.stage}: ${validateCalls}`,
+			);
+		}
+		if (
+			captures.length !== before + 1 ||
+			captures.at(-1).stage !== scenario.stage
+		) {
+			throw new Error(
+				`Expected one ${scenario.stage} capture: ${JSON.stringify(captures)}`,
+			);
+		}
+		if (
+			captures.at(-1).message.includes("csrf-token") ||
+			"body" in captures.at(-1)
+		) {
+			throw new Error(
+				"Validation diagnostics included sensitive response data",
+			);
+		}
+	}
+
+	let validationAttempts = 0;
+	context.fetch = async (url) => {
+		if (url === "/l/token") return new Response("csrf-token");
+		validationAttempts += 1;
+		return new Response(
+			JSON.stringify({ cacheCleared: validationAttempts > 1 }),
+			{
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			},
+		);
+	};
+	const invalidation = new Response("", {
+		headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+	});
+	const first = await context.checkForCacheInvalidation(invalidation.clone());
+	const second = await context.checkForCacheInvalidation(invalidation.clone());
+	if (
+		first.acknowledged !== false ||
+		second.acknowledged !== true ||
+		validationAttempts !== 2
+	) {
+		throw new Error(
+			"A failed acknowledgement did not reset for the next invalidation header",
+		);
+	}
+});
+
+/** @matrix cache : etag redirect-mode service-worker */
+test("test_conditional_fetch_preserves_original_request_redirect_mode", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (request.redirect !== "manual") {
+			throw new Error(`Expected redirect mode manual, got ${request.redirect}`);
+		}
+		if (request.credentials !== "include") {
+			throw new Error(
+				`Expected credentials include, got ${request.credentials}`,
+			);
+		}
+		if (request.headers.get("X-Original") !== "yes") {
+			throw new Error("conditional fetch dropped original headers");
+		}
+		if (request.headers.has("X-Lagniappe-If-None-Match")) {
+			throw new Error("conditional fetch used the removed custom ETag header");
+		}
+		if (request.headers.get("If-None-Match") !== '"cached-etag"') {
+			throw new Error("conditional fetch did not attach the stored ETag");
+		}
+		return new Response("fresh");
+	};
+	const request = new Request("https://example.test/users/login", {
+		credentials: "include",
+		headers: { "X-Original": "yes" },
+		redirect: "manual",
+	});
+	responseCache.entries.set(
+		request.url,
+		new Response("cached", {
+			headers: { ETag: '"cached-etag"' },
+		}),
+	);
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/users/login",
+	);
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "fresh") {
+		throw new Error(`Expected fresh response body, got ${body}`);
+	}
+	if (fetchCalls.length !== 1) {
+		throw new Error(`Expected one fetch, got ${fetchCalls.length}`);
+	}
+});
+
+/** @matrix cache : redirected-response service-worker */
+test("test_redirected_responses_are_discarded_and_not_cached", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		const response = new Response("followed home");
+		Object.defineProperty(response, "redirected", { value: true });
+		return response;
+	};
+
+	const request = new Request("https://example.test/users/login");
+	const cached = new Response("stale login redirect");
+	Object.defineProperty(cached, "redirected", { value: true });
+	responseCache.entries.set(request.url, cached);
+
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+		},
+		"/users/login",
+	);
+	await Promise.all(waitUntil);
+
+	if (!response.redirected) {
+		throw new Error("redirected network response was not returned");
+	}
+	if (responseCache.entries.has(request.url)) {
+		throw new Error("redirected response remained in the response cache");
+	}
+	if (responseCache.puts !== 0) {
+		throw new Error("redirected response was written to the response cache");
+	}
+	if (!responseCache.deletes.includes(request.url)) {
+		throw new Error("redirected cached response was not deleted");
+	}
+});
+
+/** @matrix cache : no-store service-worker static-assets */
+test("test_no_store_static_response_is_not_cached", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return new Response("asset", {
+			status: 200,
+			headers: { "Cache-Control": "no-cache, no-store" },
+		});
+	};
+
+	const request = new Request("https://example.test/chunks/app.js");
+	staticCache.entries.set(
+		request.url,
+		new Response("stale", {
+			headers: { "Cache-Control": "no-store" },
+		}),
+	);
+	const waitUntil = [];
+	const response = await context.handleStatic({
+		request,
+		waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
+	});
+	await Promise.all(waitUntil);
+
+	const body = await response.text();
+	if (body !== "asset") {
+		throw new Error(`Expected static response body, got ${body}`);
+	}
+	if (fetchCalls.length !== 1) {
+		throw new Error(
+			"no-store static cache hit was served instead of refetched",
+		);
+	}
+	if (staticCache.entries.has(request.url)) {
+		throw new Error("no-store static response remained in the static cache");
+	}
+	if (staticCache.puts !== 0) {
+		throw new Error("no-store static response was written to the static cache");
+	}
+	if (!staticCache.deletes.includes(request.url)) {
+		throw new Error("no-store static response did not clear its cache key");
+	}
+});
+
+/** @matrix cache : retry service-worker static-assets */
+test("test_static_asset_retries_transient_failures_and_caches_recovery", async () => {
+	const { context, fetchCalls, listeners, staticCache, clientMessages } =
+		createServiceWorkerContext();
+	const timers = [];
+	context.setTimeout = (callback, delay) => timers.push({ callback, delay });
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		if (fetchCalls.length === 1) {
+			return new Response("<h1>temporarily unavailable</h1>", {
+				status: 503,
+				headers: { "Content-Type": "text/html" },
+			});
+		}
+		if (fetchCalls.length === 2) throw new TypeError("connection reset");
+		return new Response("export const ready = true;", {
+			headers: { "Content-Type": "text/javascript" },
+		});
+	};
+	const request = new Request(
+		"https://example.test/chunks/foundation.js?v=btest",
+		{
+			credentials: "include",
+			headers: { "If-None-Match": '"old"', "X-Asset-Request": "retained" },
+		},
+	);
+	const pending = [];
+	let responsePromise;
+	listeners.get("fetch")({
+		request,
+		respondWith: (promise) => {
+			responsePromise = promise;
+		},
+		waitUntil: (promise) => pending.push(promise),
+	});
+	for (const [index, delay] of [250, 750].entries()) {
+		await new Promise(setImmediate);
+		assert.equal(fetchCalls.length, index + 1, "must wait before retrying");
+		assert.equal(
+			staticCache.entries.size,
+			0,
+			"failed responses must not be cached",
+		);
+		assert.equal(timers[index].delay, delay);
+		timers[index].callback();
+	}
+	const response = await responsePromise;
+	await Promise.all(pending);
+	assert.equal(response.status, 200);
+	assert.equal(await response.text(), "export const ready = true;");
+	assert.equal(
+		await staticCache.entries.get(request.url).text(),
+		"export const ready = true;",
+	);
+	assert.equal(staticCache.puts, 1);
+	assert.equal(fetchCalls.length, 3);
+	assert.equal(timers.length, 2);
+	assert.deepEqual(
+		clientMessages,
+		[],
+		"recovered fetches must not signal an outage",
+	);
+	for (const retried of fetchCalls.slice(1)) {
+		assert.equal(retried.url, request.url);
+		assert.equal(retried.credentials, "include");
+		assert.equal(retried.headers.get("X-Asset-Request"), "retained");
+		assert.equal(retried.cache, "reload");
+		assert.equal(retried.headers.has("If-None-Match"), false);
+	}
+});
+
+/** @matrix cache : retry service-worker static-assets */
+test("test_static_asset_retry_budget_preserves_failure", async () => {
+	for (const status of [500, 502, 503, 504, "network", "upstream-html"]) {
+		const { context, staticCache, fetchCalls, clientMessages } =
+			createServiceWorkerContext();
+		const delays = [];
+		context.setTimeout = (callback, delay) => {
+			delays.push(delay);
+			queueMicrotask(callback);
+		};
+		context.fetch = async (request) => {
+			fetchCalls.push(request);
+			if (status === "network") throw new TypeError("connection reset");
+			if (status === "upstream-html") {
+				return new Response("<h1>raw host error</h1>", {
+					status: 502,
+					headers: { "Content-Type": "text/html" },
+				});
+			}
+			return new Response("still unavailable", { status });
+		};
+		const pending = [];
+		const response = await context.handleStatic({
+			request: new Request("https://example.test/chunks/app.js"),
+			waitUntil: (promise) => pending.push(promise),
+		});
+		await Promise.all(pending);
+		assert.equal(response.status, typeof status === "number" ? status : 503);
+		if (typeof status === "number")
+			assert.equal(await response.text(), "still unavailable");
+		if (status === "upstream-html") {
+			assert.equal(response.headers.get("X-Lagniappe-Upstream-Status"), "502");
+			assert.equal((await response.text()).includes("raw host error"), false);
+			assert.equal(
+				clientMessages.length,
+				1,
+				"report only the exhausted outage",
+			);
+		}
+		assert.equal(fetchCalls.length, 3, `bounded attempts for ${status}`);
+		assert.deepEqual(delays, [250, 750]);
+		assert.equal(staticCache.entries.size, 0);
+	}
+});
+
+/** @matrix cache : retry service-worker static-assets */
+test("test_static_asset_does_not_retry_permanent_errors_or_mutations", async () => {
+	for (const [method, status, headers] of [
+		["GET", 400],
+		["GET", 403],
+		["GET", 404],
+		["GET", 429],
+		["GET", 503, { "X-Lagniappe-Error": "true" }],
+		["POST", 503],
+		["PUT", 503],
+		["DELETE", 503],
+		["HEAD", 503],
+	]) {
+		const { context, fetchCalls, staticCache } = createServiceWorkerContext();
+		context.setTimeout = () => assert.fail("request must not be retried");
+		context.fetch = async (request) => {
+			fetchCalls.push(request);
+			return new Response("not retryable", { status, headers });
+		};
+		const response = await context.handleStatic({
+			request: new Request("https://example.test/chunks/app.js", { method }),
+			waitUntil: () => assert.fail("error must not be cached"),
+		});
+		assert.equal(response.status, status);
+		assert.equal(await response.text(), "not retryable");
+		assert.equal(fetchCalls.length, 1);
+		assert.equal(staticCache.entries.size, 0);
+	}
+});
+
+/** @matrix cache : abort retry service-worker static-assets */
+test("test_static_asset_abort_stops_retries", async () => {
+	for (const abortDuringBackoff of [false, true]) {
+		const { context, fetchCalls, staticCache } = createServiceWorkerContext();
+		const controller = new AbortController();
+		let retry;
+		context.setTimeout = (callback) => {
+			retry = callback;
+		};
+		context.fetch = async (request) => {
+			fetchCalls.push(request);
+			if (!abortDuringBackoff)
+				throw new DOMException("cancelled", "AbortError");
+			return new Response("retry later", { status: 503 });
+		};
+		const pending = context.handleStatic({
+			request: new Request("https://example.test/chunks/app.js", {
+				signal: controller.signal,
+			}),
+			waitUntil: () => assert.fail("aborted fetch must not be cached"),
+		});
+		await new Promise(setImmediate);
+		if (abortDuringBackoff) {
+			assert.equal(typeof retry, "function");
+			controller.abort();
+			retry();
+		} else {
+			assert.equal(retry, undefined);
+		}
+		assert.equal((await pending).status, 503);
+		assert.equal(fetchCalls.length, 1, "aborts must not trigger another fetch");
+		assert.equal(staticCache.entries.size, 0);
+	}
+});
+
+/** @matrix cache : cache-hit service-worker static-assets */
+test("test_static_asset_cache_hit_avoids_network", async () => {
+	const { context, fetchCalls, staticCache } = createServiceWorkerContext();
+	const request = new Request("https://example.test/chunks/app.js?v=btest");
+	staticCache.entries.set(request.url, new Response("cached asset"));
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return new Response("unexpected network asset");
+	};
+	const response = await context.handleStatic({ request });
+	assert.equal(await response.text(), "cached asset");
+	assert.deepEqual(fetchCalls, []);
+	assert.equal(staticCache.puts, 0);
+});
+
+/** @matrix cache : precache service-worker static-assets retry no-store */
+test("test_precache_retries_transient_failures_and_preserves_cache_policy", async () => {
+	const { context, staticCache, vm } = createServiceWorkerContext();
+	const attempts = new Map();
+	context.setTimeout = (callback) => queueMicrotask(callback);
+	context.fetch = async (request) => {
+		const name = new URL(request.url).pathname;
+		const attempt = (attempts.get(name) ?? 0) + 1;
+		attempts.set(name, attempt);
+		if (name.endsWith("missing.js"))
+			return new Response("missing", { status: 404 });
+		if (attempt === 1 || name.endsWith("unavailable.js")) {
+			return new Response("retry later", { status: 503 });
+		}
+		return new Response(`asset: ${name}`, {
+			headers: {
+				"Cache-Control": name.endsWith("private.js") ? "no-store" : "no-cache",
+			},
+		});
+	};
+	vm.runInContext(
+		`PRECACHE_URLS.push(
+		"/chunks/recovered.js?v=btest", "/chunks/private.js?v=btest",
+		"/chunks/missing.js?v=btest", "/chunks/unavailable.js?v=btest"
+	)`,
+		context,
+	);
+	await context.precacheStaticAssets();
+	assert.deepEqual(Object.fromEntries(attempts), {
+		"/chunks/recovered.js": 2,
+		"/chunks/private.js": 2,
+		"/chunks/missing.js": 1,
+		"/chunks/unavailable.js": 3,
+	});
+	assert.deepEqual(
+		[...staticCache.entries.keys()],
+		["https://example.test/chunks/recovered.js?v=btest"],
+	);
+	assert.equal(
+		await staticCache.entries.values().next().value.text(),
+		"asset: /chunks/recovered.js",
+	);
+});
+
+/** @matrix cache : precache service-worker static-assets */
+test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.setTimeout = (callback) => queueMicrotask(callback);
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		const pathname = new URL(request.url).pathname;
+		if (pathname.endsWith("/missing.js")) {
+			throw new Error("simulated chunk miss");
+		}
+		if (pathname.endsWith("/no-store.js")) {
+			return new Response("do not cache", {
+				headers: { "Cache-Control": "no-store" },
+			});
+		}
+		return new Response(pathname, {
+			headers: { "Cache-Control": "no-cache" },
+		});
+	};
+
+	vm.runInContext(
+		`
+	PRECACHE_URLS.push(
+	  "/chunks/addLink.js?v=btest123",
+	  "/chunks/no-store.js?v=btest123",
+	  "/chunks/missing.js?v=btest123"
+	);
+	`,
+		context,
+	);
+
+	await context.precacheStaticAssets();
+
+	const chunkUrl = "https://example.test/chunks/addLink.js?v=btest123";
+	const noStoreUrl = "https://example.test/chunks/no-store.js?v=btest123";
+	const missingUrl = "https://example.test/chunks/missing.js?v=btest123";
+
+	if (!staticCache.entries.has(chunkUrl)) {
+		throw new Error("chunk bundle was not precached");
+	}
+	if (staticCache.entries.has(noStoreUrl)) {
+		throw new Error("no-store chunk was precached");
+	}
+	if (staticCache.entries.has(missingUrl)) {
+		throw new Error("failed chunk was precached");
+	}
+	assert.equal(
+		fetchCalls.filter((request) => request.url === chunkUrl).length,
+		1,
+	);
+	assert.equal(
+		fetchCalls.filter((request) => request.url === noStoreUrl).length,
+		1,
+	);
+	assert.equal(
+		fetchCalls.filter((request) => request.url === missingUrl).length,
+		3,
+	);
+	if (!fetchCalls.every((request) => request.cache === "reload")) {
+		throw new Error("precache fetches did not bypass the HTTP cache");
+	}
+	if (!fetchCalls.every((request) => request.url.includes("?v=btest123"))) {
+		throw new Error("precache fetches dropped the build version");
+	}
+});
+
+/** @matrix cache : etag query route-class service-worker sibling-invalidation */
+test("test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const qualifyingPaths = [
+		"/",
+		"/l/get/pages",
+		"/categories/example",
+		"/pages/index",
+		"/pages/rows",
+	];
+
+	for (const pathname of qualifyingPaths) {
+		responseCache.entries.clear();
+		responseCache.deletes.length = 0;
+		const current = `https://example.test${pathname}?page=2`;
+		const sibling = `https://example.test${pathname}?page=1`;
+		const otherPath = `https://example.test/other?page=1`;
+		responseCache.entries.set(current, new Response("current"));
+		responseCache.entries.set(sibling, new Response("sibling"));
+		responseCache.entries.set(otherPath, new Response("other"));
+
+		await context.clearSiblingCacheEntries('"new"', '"old"', current, pathname);
+
+		if (!responseCache.entries.has(current)) {
+			throw new Error(`${pathname} removed the current cache key`);
+		}
+		if (responseCache.entries.has(sibling)) {
+			throw new Error(`${pathname} retained a stale query sibling`);
+		}
+		if (!responseCache.entries.has(otherPath)) {
+			throw new Error(`${pathname} removed a different path`);
+		}
+	}
+
+	responseCache.entries.clear();
+	const ordinary = "https://example.test/pages/example?page=2";
+	const ordinarySibling = "https://example.test/pages/example?page=1";
+	responseCache.entries.set(ordinary, new Response("current"));
+	responseCache.entries.set(ordinarySibling, new Response("sibling"));
+	await context.clearSiblingCacheEntries(
+		'"new"',
+		'"old"',
+		ordinary,
+		"/pages/example",
+	);
+	if (!responseCache.entries.has(ordinarySibling)) {
+		throw new Error("An unconfigured route cleared a query sibling");
+	}
+
+	await context.clearSiblingCacheEntries(
+		'"same"',
+		'"same"',
+		ordinary,
+		"/pages/index",
+	);
+	if (!responseCache.entries.has(ordinarySibling)) {
+		throw new Error("An unchanged validator cleared a query sibling");
+	}
+});
+
+/** @matrix cache : batch eviction quota service-worker throttle */
+test("test_quota_eviction_is_throttled_and_bounded_to_oldest_entries", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	let estimateCalls = 0;
+	context.self.navigator.storage = {
+		async estimate() {
+			estimateCalls += 1;
+			return { usage: 91, quota: 100 };
+		},
+	};
+	for (let index = 0; index < 250; index += 1) {
+		const url = `https://example.test/cached/${String(index).padStart(3, "0")}`;
+		responseCache.entries.set(url, new Response(String(index)));
+	}
+
+	vm.runInContext(
+		`
+	_lastEvictionCheck = 0;
+	Date.now = () => 120000;
+	`,
+		context,
+	);
+	await context.maybeEvictForQuota();
+
+	if (estimateCalls !== 1) {
+		throw new Error(`Expected one storage estimate, got ${estimateCalls}`);
+	}
+	if (
+		responseCache.deletes.length !== 200 ||
+		responseCache.entries.size !== 50
+	) {
+		throw new Error(
+			`Eviction was not bounded to 200: ${responseCache.deletes.length}`,
+		);
+	}
+	if (
+		!responseCache.deletes[0].endsWith("/000") ||
+		!responseCache.deletes[199].endsWith("/199")
+	) {
+		throw new Error(
+			"Eviction did not remove the oldest insertion-ordered entries",
+		);
+	}
+
+	vm.runInContext("Date.now = () => 120001;", context);
+	await context.maybeEvictForQuota();
+	if (estimateCalls !== 1 || responseCache.deletes.length !== 200) {
+		throw new Error("Quota work was not throttled within sixty seconds");
+	}
+});
+
+/** @matrix cache : eviction failure quota service-worker unavailable */
+test("test_quota_eviction_tolerates_unavailable_and_failed_estimates", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	vm.runInContext(
+		`
+	_lastEvictionCheck = 0;
+	Date.now = () => 120000;
+	`,
+		context,
+	);
+	delete context.self.navigator.storage;
+	await context.maybeEvictForQuota();
+
+	context.self.navigator.storage = {
+		async estimate() {
+			throw new Error("estimate unavailable");
+		},
+	};
+	vm.runInContext("Date.now = () => 180000;", context);
+	await context.maybeEvictForQuota();
+
+	context.self.navigator.storage = {
+		async estimate() {
+			return { usage: 50, quota: 100 };
+		},
+	};
+	vm.runInContext("Date.now = () => 240000;", context);
+	await context.maybeEvictForQuota();
+	if (responseCache.deletes.length !== 0) {
+		throw new Error("Unavailable or below-threshold estimates evicted entries");
+	}
+});
+
+/** @matrix cache offline : cache-miss fallback navigation service-worker */
+test("test_navigation_failure_without_cached_offline_document_returns_503", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const response = await context.offlineFallback();
+	if (response.status !== 503 || (await response.text()) !== "Offline") {
+		throw new Error(
+			"Missing offline document did not produce the navigation 503",
+		);
+	}
+	if (response.headers.get("Content-Type")?.includes("application/json")) {
+		throw new Error("Navigation fallback unexpectedly returned JSON");
+	}
+});
+
+/** @matrix offline request : mutation response-shape service-worker */
+test("test_mutation_failure_returns_json_503", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async () => {
+		throw new Error("offline mutation");
+	};
+	const request = new Request("https://example.test/pages/example", {
+		method: "PATCH",
+		body: JSON.stringify({ name: "Updated" }),
+		headers: { "Content-Type": "application/json" },
+	});
+	const response = await context.handleRequest(
+		{ request, waitUntil() {} },
+		"/pages/example",
+	);
+	if (
+		response.status !== 503 ||
+		!response.headers.get("Content-Type").includes("application/json")
+	) {
+		throw new Error("Mutation failure did not return a JSON 503");
+	}
+	const body = await response.json();
+	if (body.ok !== false || body.error !== "You are offline") {
+		throw new Error(`Unexpected mutation fallback: ${JSON.stringify(body)}`);
+	}
+});
+
+/** @matrix browser-protocol connectivity : controller service-worker validation version */
+test("test_worker_accepts_only_versioned_valid_connectivity_messages", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const valid = {
+		protocol: "lagniappe-browser",
+		protocol_version: 4,
+		type: "connectivity-state",
+		state: {
+			browser: "online",
+			server: "offline",
+			visibility: "hidden",
+			controller: "controlled",
+		},
+	};
+	if (!context.receiveConnectivityMessage(valid)) {
+		throw new Error("Valid connectivity message was rejected");
+	}
+	const accepted = vm.runInContext("_connectivity", context);
+	if (accepted.server !== "offline" || accepted.visibility !== "hidden") {
+		throw new Error(
+			`Connectivity state was not applied: ${JSON.stringify(accepted)}`,
+		);
+	}
+
+	for (const invalid of [
+		{ ...valid, protocol_version: 3 },
+		{ ...valid, type: "server-status" },
+		{ ...valid, state: { ...valid.state, server: "maybe" } },
+	]) {
+		if (context.receiveConnectivityMessage(invalid)) {
+			throw new Error(
+				`Invalid connectivity message was accepted: ${JSON.stringify(invalid)}`,
+			);
+		}
+	}
+	const retained = vm.runInContext("_connectivity", context);
+	if (retained.server !== "offline") {
+		throw new Error("Invalid message changed the retained connectivity state");
+	}
+});
+
+/** @matrix request-errors service-worker : application-error-marker classification upstream-unavailable */
+test("test_worker_classifies_only_unmarked_upstream_html_failures", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	for (const status of [500, 502, 503, 504]) {
+		const raw = new Response("<html>upstream</html>", {
+			status,
+			headers: { "Content-Type": "text/html; charset=utf-8" },
+		});
+		if (!context.isUpstreamUnavailableResponse(raw)) {
+			throw new Error(`Unmarked upstream HTML ${status} was not classified`);
+		}
+		const marked = new Response("<html>application error</html>", {
+			status,
+			headers: {
+				"Content-Type": "text/html; charset=utf-8",
+				"X-Lagniappe-Error": "true",
+			},
+		});
+		if (context.isUpstreamUnavailableResponse(marked)) {
+			throw new Error(`Application-marked HTML ${status} was misclassified`);
+		}
+	}
+	if (
+		context.isUpstreamUnavailableResponse(
+			new Response("json", {
+				status: 503,
+				headers: { "Content-Type": "application/json" },
+			}),
+		)
+	) {
+		throw new Error("Non-HTML application response was misclassified");
+	}
+});
+
+/** @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable */
+test("test_upstream_failure_notifies_controlled_clients_with_bounded_state", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const request = new Request(
+		"https://example.test/pages/secret-entity-id?private=yes",
+		{ method: "GET" },
+	);
+	const upstream = new Response("<html>failure contains private data</html>", {
+		status: 504,
+		headers: {
+			"Content-Type": "text/html",
+			Server: "x".repeat(200),
+			"X-Cloud-Trace-Context": "trace-value",
+		},
+	});
+	await context.notifyUpstreamUnavailable(request, upstream, { stale: true });
+	if (clientMessages.length !== 1) {
+		throw new Error(
+			`Expected one client message, got ${clientMessages.length}`,
+		);
+	}
+	const message = clientMessages[0];
+	if (
+		message.protocol_version !== 4 ||
+		message.type !== "upstream-unavailable" ||
+		message.state.route_class !== "pages" ||
+		message.state.server.length !== 128 ||
+		!message.state.trace_header_present ||
+		!message.state.stale
+	) {
+		throw new Error(`Unexpected client diagnostic: ${JSON.stringify(message)}`);
+	}
+	const serialized = JSON.stringify(message);
+	for (const secret of [
+		"secret-entity-id",
+		"private=yes",
+		"failure contains private data",
+		"trace-value",
+	]) {
+		if (serialized.includes(secret)) {
+			throw new Error(`Client diagnostic exposed ${secret}`);
+		}
+	}
+});
+
+/** @matrix cache request-errors service-worker : stale-cache upstream-unavailable */
+test("test_upstream_failure_uses_marked_stale_cache_without_caching_5xx", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const request = new Request("https://example.test/pages/example", {
+		credentials: "include",
+	});
+	responseCache.entries.set(
+		request.url,
+		new Response("current application page", {
+			status: 200,
+			headers: { "Content-Type": "text/html", ETag: '"safe"' },
+		}),
+	);
+	context.fetch = async (networkRequest) => {
+		fetchCalls.push(networkRequest);
+		return new Response("<html>upstream failure</html>", {
+			status: 503,
+			headers: {
+				"Content-Type": "text/html",
+				Server: "Google Frontend",
+			},
+		});
+	};
+	const waitUntil = [];
+	const response = await context.handleCacheable(
+		{
+			request,
+			waitUntil(promise) {
+				waitUntil.push(Promise.resolve(promise));
+			},
+		},
+		"/pages/example",
+	);
+	await Promise.all(waitUntil);
+	if (
+		response.status !== 200 ||
+		(await response.text()) !== "current application page" ||
+		response.headers.get("X-Lagniappe-Upstream-Unavailable") !== "true" ||
+		response.headers.get("X-Lagniappe-Stale-Cache") !== "true" ||
+		response.headers.get("X-Lagniappe-Upstream-Status") !== "503"
+	) {
+		throw new Error(
+			"Upstream failure did not return an explicitly marked stale response",
+		);
+	}
+	if (responseCache.puts !== 0 || clientMessages[0]?.state?.stale !== true) {
+		throw new Error(
+			"Upstream failure was cached or did not notify stale state",
+		);
+	}
+});
+
+/** @matrix request-errors service-worker : branded-response retry upstream-unavailable */
+test("test_upstream_failure_without_cache_returns_branded_retryable_503", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	const request = { mode: "navigate", method: "GET", headers: new Headers() };
+	const upstream = new Response("<html>raw host error</html>", {
+		status: 502,
+		headers: { "Content-Type": "text/html", Server: "Google Frontend" },
+	});
+	const response = context.brandedUpstreamResponse(request, upstream);
+	const body = await response.text();
+	if (
+		response.status !== 503 ||
+		response.headers.get("Retry-After") !== "5" ||
+		response.headers.get("X-Lagniappe-Upstream-Status") !== "502" ||
+		!body.includes("Lagniappe is temporarily unavailable") ||
+		!body.includes("Try again") ||
+		body.includes("raw host error")
+	) {
+		throw new Error("Navigation did not receive the branded retryable 503");
+	}
+});
+
+/** @matrix request-errors service-worker : branded-response mutation no-replay upstream-unavailable */
+test("test_mutation_upstream_failure_returns_uncertain_json_without_replay", async () => {
+	const {
+		cacheNames,
+		clientMessages,
+		context,
+		deletedCaches,
+		fetchCalls,
+		listeners,
+		responseCache,
+		staticCache,
+		vm,
+	} = createServiceWorkerContext();
+	context.fetch = async (request) => {
+		fetchCalls.push(request);
+		return new Response("<html>raw host error</html>", {
+			status: 500,
+			headers: { "Content-Type": "text/html" },
+		});
+	};
+	const request = new Request("https://example.test/pages/example", {
+		method: "PATCH",
+		body: JSON.stringify({ name: "private form value" }),
+		headers: { "Content-Type": "application/json" },
+	});
+	const waitUntil = [];
+	const response = await context.handleRequest(
+		{
+			request,
+			waitUntil(promise) {
+				waitUntil.push(Promise.resolve(promise));
+			},
+		},
+		"/pages/example",
+	);
+	await Promise.all(waitUntil);
+	const body = await response.json();
+	if (
+		fetchCalls.length !== 1 ||
+		response.status !== 503 ||
+		body.code !== "upstream_instance_unavailable" ||
+		body.retryable !== false ||
+		body.outcomeUncertain !== true ||
+		clientMessages[0]?.state?.outcome_uncertain !== true
+	) {
+		throw new Error(
+			`Mutation failure was not safely translated: ${JSON.stringify(body)}`,
+		);
+	}
+});

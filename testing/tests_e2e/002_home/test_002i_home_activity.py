@@ -539,10 +539,14 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
 
     _warm_offline_create_widgets(home)
 
+    # The italic font may already be cached before this offline workflow.
+    # Account for its cache miss without requiring a font failure to occur.
     with browser_failures.expect_http_error(
         user,
         status=503,
         path=FONTS["source-sans-italic-latin"],
+        count=0,
+        max_count=1,
     ):
         with browser_failures.expect_http_error(
             user,

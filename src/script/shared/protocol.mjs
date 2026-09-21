@@ -1,7 +1,15 @@
-import BROWSER_PROTOCOL from "../../../config/browser_protocol.json";
+import BROWSER_PROTOCOL from "../../../config/browser_protocol.json" with {
+	type: "json",
+};
 
 export const BROWSER_PROTOCOL_ID = BROWSER_PROTOCOL.id;
 export const BROWSER_PROTOCOL_VERSION = BROWSER_PROTOCOL.version;
+
+/**
+ * @testable true
+ * @tests tests_js/test_021_browser_protocol.mjs::test_browser_protocol_contains_versioned_worker_messages
+ * @matrix browser-protocol : message-types
+ */
 export const WORKER_MESSAGES = Object.freeze({ ...BROWSER_PROTOCOL.messages });
 
 /**
@@ -15,7 +23,7 @@ function isRecord(value) {
 
 /**
  * @testable true
- * @tests tests_js/test_021_browser_protocol.py::test_connectivity_messages_are_versioned_and_validated
+ * @tests tests_js/test_021_browser_protocol.mjs::test_connectivity_messages_are_versioned_and_validated
  * @matrix browser-protocol : connectivity validation
  */
 export function validateConnectivityState(state) {
@@ -30,8 +38,7 @@ export function validateConnectivityState(state) {
 
 /**
  * @testable true
- * @tests tests_js/test_021_browser_protocol.py::test_browser_protocol_contains_versioned_worker_messages
- * @tests tests_js/test_021_browser_protocol.py::test_connectivity_messages_are_versioned_and_validated
+ * @tests tests_js/test_021_browser_protocol.mjs::test_connectivity_messages_are_versioned_and_validated
  * @matrix browser-protocol : connectivity envelope producer version
  */
 export function connectivityMessage(state) {
@@ -57,7 +64,7 @@ const UPSTREAM_RETRY_OUTCOMES = new Set([
 
 /**
  * @testable true
- * @tests tests_js/test_021_browser_protocol.py::test_upstream_unavailable_messages_are_versioned_and_privacy_bounded
+ * @tests tests_js/test_021_browser_protocol.mjs::test_upstream_unavailable_messages_are_versioned_and_privacy_bounded
  * @matrix browser-protocol request-errors : upstream-unavailable validation
  */
 export function validateUpstreamUnavailableState(state) {
@@ -81,7 +88,7 @@ export function validateUpstreamUnavailableState(state) {
 
 /**
  * @testable true
- * @tests tests_js/test_021_browser_protocol.py::test_upstream_unavailable_messages_are_versioned_and_privacy_bounded
+ * @tests tests_js/test_021_browser_protocol.mjs::test_upstream_unavailable_messages_are_versioned_and_privacy_bounded
  * @matrix browser-protocol request-errors : envelope privacy producer upstream-unavailable version
  */
 export function upstreamUnavailableMessage(state) {

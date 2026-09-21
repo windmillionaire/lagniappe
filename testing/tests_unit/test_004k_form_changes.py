@@ -18,9 +18,11 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import MutationConflict, ValidationError
 from lagniappe.core.mutations import executor
-from lagniappe.core.tools import (
-    form_changes as changes,
-    form_conversions as conversions,
+from lagniappe.core.tools.forms import (
+    definitions,
+    population,
+    changes,
+    conversions,
 )
 from lagniappe.core.tools.database import get as database_get, utility
 from lagniappe.core.tools.deferred_jobs.adapters.form_change import FormChangeAdapter
@@ -156,11 +158,12 @@ def migration(monkeypatch):
 def test_pending_definition_resolves_each_generation(migration):
     form = migration.form
     target = record("page", "page", form=form.key)
-    assert changes.effective_definition(target, form).schema[0]["input"] == "text"
+    assert definitions.effective_definition(target, form).schema[0]["input"] == "text"
     target.db["generation"] = 1
-    resolved = changes.effective_definition(target, form)
+    resolved = definitions.effective_definition(target, form)
     assert resolved.schema[0]["input"] == "number"
     assert resolved.generation == 1
+    assert changes.PENDING not in resolved.db
     assert form.generation == 0
     assert changes.PENDING in form.db
 
@@ -192,11 +195,14 @@ def test_pending_and_removed_fields_are_withheld_from_tables_and_filters(migrati
     assert "answer" not in filtered.fields
     catalog = field_catalog(category, migration.actor)
     assert (migration.form.hash, "answer") not in catalog
-    assert any(entry.allowed_values for entry in catalog.values())  # Form restriction stays available.
+    assert sum(
+        migration.form.hash in (entry.allowed_values or {})
+        for entry in catalog.values()
+    ) == 1
     with pytest.raises(FilterContractError, match="unavailable"):
         resolve_filter_field(category, migration.form.hash, "answer", migration.actor)
 
-    published = changes.target_definition(migration.form)
+    published = definitions.target_definition(migration.form)
     category, table, filtered = projections(published)
     if remove:
         assert "answer" not in table.fields
@@ -223,7 +229,7 @@ def test_start_stages_intent_without_enumerating_submissions(migration, monkeypa
         "migration": {"version": 1, "clear_invalid": True},
     }
     monkeypatch.setattr(
-        changes,
+        population,
         "target_batch",
         lambda *args: pytest.fail("Save enumerated submissions"),
     )
@@ -269,14 +275,23 @@ def test_prepare_target_preserves_completion_and_original_answers(migration, env
     converted = changes.prepare_target(task, migration.change)
     assert converted.completed
     assert converted.generation == 1
+    assert converted.db["schema_version"] == "new"
+    assert converted.db[changes.RECEIPT] == "change1"
     assert json.loads(converted.db["submission"]) == {"answer": 7, "unrelated": False}
     original = json.loads(converted.db["completed_submission"])
-    assert (
-        original == envelope
-        if envelope
-        else original["submission"] == {"answer": "7", "unrelated": False}
-    )
-    assert json.loads(converted.db[changes.NOTICE])["answer"]["value"] == "7"
+    assert original == (envelope or {
+        "submission": {"answer": "7", "unrelated": False},
+        "form_key": database_get.urlsafe_key(migration.form.key),
+        "generation": 0,
+    })
+    assert json.loads(converted.db[changes.NOTICE]) == {"answer": {
+        "schema": {
+            "id": "answer", "type": "input", "input": "text", "title": "Answer",
+        },
+        "value": "7",
+        "generation": 0,
+        "reason": "converted",
+    }}
     assert task.db == before
 
 
@@ -405,7 +420,7 @@ def test_adapter_checks_all_values_before_applying(migration, monkeypatch):
         next_cursor = None
 
     monkeypatch.setattr(
-        changes, "target_batch", lambda form, cursor: Batch([first.db, second.db])
+        population, "target_batch", lambda form, cursor: Batch([first.db, second.db])
     )
     with pytest.raises(ValidationError, match="unexpected form generation"):
         FormChangeAdapter().prepare(migration.context)
@@ -432,10 +447,10 @@ def test_form_authority_migrates_restricted_submissions(migration, monkeypatch, 
     class Batch(list):
         next_cursor = None
 
-    monkeypatch.setattr(changes, "target_batch", lambda form, cursor: Batch([target.db]))
+    monkeypatch.setattr(population, "target_batch", lambda form, cursor: Batch([target.db]))
     FormChangeAdapter().prepare(migration.context)
     assert migration.context.checkpoint["validated"] is True
-    converted = changes.prepare_target(changes.load_target(target.db), migration.change)
+    converted = changes.prepare_target(population.load_target(target.db), migration.change)
     assert json.loads(converted.db["submission"]) == {"answer": 7}
     assert json.loads(converted.db[changes.NOTICE])["answer"]["value"] == "007"
     assert converted.db["restricted_to"] == ["admin"]
@@ -466,13 +481,23 @@ def test_notice_shows_only_changed_fields_and_cells(migration):
     )
     form = record("form", "table-form", form_type="page", schema=json.dumps([schema]))
     page.form = form
+    before = deepcopy(page.db)
     result = changes.notice_projection(page)
-    assert len(result) == 2
-    assert result[0]["label"] == "Items · Row 1 · Quantity"
-    assert result[0]["reason"] == "converted"
-    assert result[1]["label"] == "Items · Row 3 · Quantity"
-    assert result[1]["reason"] == "invalid"
-    assert changes.NOTICE in page.db
+    assert result == [
+        {
+            "label": "Items · Row 1 · Quantity",
+            "before": "2",
+            "after": "2",
+            "reason": "converted",
+        },
+        {
+            "label": "Items · Row 3 · Quantity",
+            "before": "bad",
+            "after": "Not provided",
+            "reason": "invalid",
+        },
+    ]
+    assert page.db == before
 
 
 # @matrix form-migration : retry cancellation ownership

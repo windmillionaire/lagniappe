@@ -1,8 +1,9 @@
-import { STYLES } from "styles";
-import { BaseList } from "../../elements/base/baseList";
-import { Dropdown } from "../../elements/combobox";
-import { request, withTransition } from "../../shared";
-import { setIcon } from "../../shared/icons";
+import { BaseList } from "../../elements/base/baseList.mjs";
+import { Dropdown } from "../../elements/combobox/index.mjs";
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { request } from "../../shared/index.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * @testable false

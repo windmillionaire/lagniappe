@@ -1,6 +1,6 @@
 /**
  * @testable true
- * @tests tests_js/test_036c_form_migrations.py::test_schema_changes_and_condition_repairs_are_local
+ * @tests tests_js/test_036c_form_migrations.mjs::test_schema_changes_and_condition_repairs_are_local
  * @matrix form-migration : schema-only stable-identity conditions
  */
 export const fieldKind = (field) =>
@@ -14,7 +14,7 @@ export const fieldKind = (field) =>
 
 /**
  * @testable true
- * @tests tests_js/test_036c_form_migrations.py::test_schema_changes_and_condition_repairs_are_local
+ * @tests tests_js/test_036c_form_migrations.mjs::test_schema_changes_and_condition_repairs_are_local
  * @matrix form-migration : schema-only stable-identity
  */
 export const needsMigration = (before, after) =>
@@ -37,7 +37,7 @@ export const needsMigration = (before, after) =>
 
 /**
  * @testable true
- * @tests tests_js/test_036c_form_migrations.py::test_schema_changes_and_condition_repairs_are_local
+ * @tests tests_js/test_036c_form_migrations.mjs::test_schema_changes_and_condition_repairs_are_local
  * @matrix form-migration : conditions
  */
 export const repairConditions = (schema) => {

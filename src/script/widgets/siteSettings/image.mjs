@@ -1,8 +1,9 @@
-import { BaseUpload } from "../../elements/base/baseUpload";
-import { UploadMenu, uploadElement } from "../../elements/upload";
-import { request, withTransition } from "../../shared";
-import { setIcon } from "../../shared/icons";
-import { SiteSetting } from "./base";
+import { BaseUpload } from "../../elements/base/baseUpload.mjs";
+import { UploadMenu, uploadElement } from "../../elements/upload.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { request } from "../../shared/index.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { SiteSetting } from "./base.mjs";
 
 const SPLASH_PREFIX = "splash-";
 

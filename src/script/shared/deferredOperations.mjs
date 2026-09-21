@@ -1,6 +1,6 @@
-import { captureError } from "./errors";
-import { createIcon } from "./icons";
-import { withTransition } from "./utilities";
+import { captureError } from "./errors.mjs";
+import { createIcon } from "./icons.mjs";
+import { withTransition } from "./transitions.mjs";
 
 /**
  * @testable false
@@ -57,8 +57,8 @@ function operationNodeVisible(node) {
  * Reconcile every visible deferred operation through the shared poll contract.
  *
  * @testable true
- * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
- * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
+ * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_batches_orders_and_renders_status
+ * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
  * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
  */

@@ -61,7 +61,7 @@ def test_managed_local_test_origin_ignores_request_host_headers(monkeypatch):
     assert email_links.origin() == "https://app.example.test"
 
 
-# @matrix notification-email : html idempotency immediate notification pending-filter presence-suppression
+# @matrix notification-email : html idempotency immediate notification pending-filter presence-suppression retry-release
 def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     store = MemoryDatastore()
@@ -201,6 +201,54 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
         now=now + timedelta(minutes=15),
     ) == {"state": "suppressed"}
     assert len(sent) == 1
+
+    retry_source_key = store.key(
+        KINDS.activity.value,
+        "retry-notice",
+        parent=recipient.key,
+    )
+    retry_source = DatastoreEntity(key=retry_source_key)
+    retry_source.update({"type": "notification", "notification_type": "ordinary"})
+    store.put(retry_source)
+    retry_delivery = email_capture.record_notification_event(
+        recipient,
+        retry_source_key,
+        body="Retry provider delivery",
+        now=now + timedelta(minutes=20),
+    )
+    monkeypatch.setattr(
+        email_delivery.presence,
+        "recently_active",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        email_presentation.smtp,
+        "send_email",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("SMTP unavailable")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="SMTP unavailable"):
+        email_delivery.deliver(
+            retry_delivery.key.to_legacy_urlsafe().decode(),
+            now=now + timedelta(minutes=25),
+        )
+    retry_row = store.get(retry_delivery.key)
+    assert retry_row["state"] == "pending"
+    assert "lease_token" not in retry_row
+    assert "lease_expires" not in retry_row
+
+    monkeypatch.setattr(
+        email_presentation.smtp,
+        "send_email",
+        lambda *args, **kwargs: sent.append((args, kwargs)) or True,
+    )
+    assert email_delivery.deliver(
+        retry_delivery.key.to_legacy_urlsafe().decode(),
+        now=now + timedelta(minutes=25),
+    ) == {"state": "sent"}
+    assert len(sent) == 2
 
 
 # @pair notification-email:document-mention

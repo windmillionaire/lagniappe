@@ -54,7 +54,8 @@ These instructions apply to the whole repository unless a more specific
 - Before adding or materially reshaping tests, check
   `documentation/TESTING_WRITING_TESTS.md`.
 - When reviewing or annotating an existing test, check
-  `documentation/TESTING_TEST_REVIEW.md`.
+  `documentation/TESTING_TRACEABILITY_TOOL.md` as well as the test-writing
+  guidelines above.
 - Keep the `testing/` root clean. Miscellaneous test utilities belong in
   `testing/utility/`; tooling and repository-health tests belong in
   `testing/tests_tooling/`.

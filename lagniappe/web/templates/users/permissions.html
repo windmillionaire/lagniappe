@@ -1,0 +1,56 @@
+{% macro levels(config, entry=None) %}
+  {% set selected = entry.level if entry and entry.level else config.levels[0] %}
+  {% set selected = 'NONE' if selected == 'RESTRICTED' else selected %}
+  <fieldset class="{{ styles.radio.fieldset.row }} min-w-0 flex-1 flex-wrap">
+    {% for level in config.levels %}
+      <label data-role="label" class="{{ styles.radio.label }}">
+        <input type="radio"
+               {% if entry %}name="{{ entry.id or entry.name }}"{% endif %}
+               value="{{ level }}"
+               {% if selected == level %}checked{% endif %}
+               class="{{ styles.radio.default }} order-first">
+        <span>{{ level }}</span>
+      </label>
+    {% endfor %}
+  </fieldset>
+{% endmacro %}
+
+{% macro specific_permission(config, entry=None) %}
+  <li class="flex flex-row flex-wrap items-center gap-x-4 gap-y-2">
+    <label data-role="label" class="{{ styles.checkbox.label }}">
+      <div class="{{ styles.checkbox.container }} order-first">
+        <input type="checkbox" checked data-role="remove-permission" class="{{ styles.checkbox.default }}">
+        {{ render_icon('check', styles.checkbox.icon) }}
+      </div>
+      <span data-role="permission-name">{{ (entry.label or entry.name) if entry else '' }}</span>
+    </label>
+    {{ levels(config, entry) }}
+  </li>
+{% endmacro %}
+
+{% macro sections(configs) %}
+  <div data-form-control="permission-sections" class="flex flex-col gap-4">
+    {% for name in ['public', 'models', 'forms', 'users', 'groups', 'categories', 'projects', 'pages'] %}
+      {% set config = configs.get(name) %}
+      {% if config %}
+        <div data-section="{{ name }}" data-kind="{{ config.kind or 'default' }}"
+             class="w-full rounded-md pt-2 pb-3 px-3 outline-1 bg-slate-100 outline-user-default">
+          <h3 class="text-lg font-bold text-base-dark mb-3">{{ config.title }}</h3>
+          {% if config.select %}
+            <input type="text" data-role="permission-picker"
+                   name="{{ config.select.id }}" data-index="{{ config.select.index }}"
+                   data-kind="{{ config.select.kind }}"
+                   data-placeholder="{{ config.select.placeholder }}"
+                   placeholder="{{ config.select.placeholder }}" class="{{ styles.input }}">
+            <ul data-role="permission-list" class="flex flex-col gap-2 empty:hidden mt-4">
+              {% for entry in config.permissions %}{{ specific_permission(config, entry) }}{% endfor %}
+            </ul>
+            <template>{{ specific_permission(config) }}</template>
+          {% else %}
+            {{ levels(config, config.permission) }}
+          {% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}

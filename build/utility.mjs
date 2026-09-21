@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
 	existsSync,
+	mkdirSync,
 	readdirSync,
 	readFileSync,
 	renameSync,
@@ -35,6 +36,7 @@ const INTERACTION_FOUNDATION_MODULES = new Set([
 	"shared/errors.mjs",
 	"shared/notificationState.mjs",
 	"shared/request.mjs",
+	"shared/transitions.mjs",
 	"shared/utilities.mjs",
 	"views/base/shell.mjs",
 ]);
@@ -49,7 +51,7 @@ const CORE_FOUNDATION_MODULES = new Set([
 ]);
 const INDEX_FOUNDATION_MODULES = new Set([
 	"views/base/index.mjs",
-	"widgets/tableVisibilityState.mjs",
+	"widgets/tables/visibilityState.mjs",
 ]);
 
 /**
@@ -58,6 +60,9 @@ const INDEX_FOUNDATION_MODULES = new Set([
  * @reason private durability helper exercised through generated build outputs
  */
 const atomicWriteFileSync = (pathValue, content) => {
+	if (existsSync(pathValue) && readFileSync(pathValue, "utf8") === content)
+		return;
+	mkdirSync(path.dirname(pathValue), { recursive: true });
 	const temporary = `${pathValue}.tmp-${process.pid}`;
 	try {
 		writeFileSync(temporary, content);
@@ -73,8 +78,8 @@ const atomicWriteFileSync = (pathValue, content) => {
  * Connectivity stays separate because the main boot entry imports it too.
  *
  * @testable true
- * @tests tests_js/test_032_build_configuration.py::test_interaction_preloads_have_stable_manual_chunks
- * @tests tests_js/test_032_build_configuration.py::test_templates_preload_registered_view_and_interaction_foundations
+ * @tests tests_js/test_032_build_configuration.mjs::test_interaction_preloads_have_stable_manual_chunks
+ * @tests tests_js/test_032_build_configuration.mjs::test_templates_preload_registered_view_and_interaction_foundations
  * @matrix frontend-build : chunking interaction-foundation modulepreload
  */
 const interactionFoundationChunk = (id) => {
@@ -97,7 +102,7 @@ const interactionFoundationChunk = (id) => {
 
 /**
  * @testable false
- * @covered-by build/utility.mjs::virtualStyleModuleSource
+ * @covered-by build/utility.mjs::javascriptStyleModuleSource
  * @reason private serializer exercised through emitted module sources
  */
 const stringify = (yaml) => {
@@ -121,7 +126,7 @@ const ICON_WEIGHTS = new Set(ICON_REGISTRY_SCHEMA.weights);
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_icon_registry_rejects_invalid_ids_and_material_symbol_records
+ * @tests tests_js/test_018_style_pipeline.mjs::test_icon_registry_rejects_invalid_ids_and_material_symbol_records
  * @pair style-build:icon-schema-validation
  */
 const normalizeIconRegistry = (value, path = "icons") => {
@@ -178,8 +183,8 @@ const iconsYaml = normalizeIconRegistry(rawIconsYaml);
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
- * @tests tests_js/test_018_style_pipeline.py::test_style_registry_rejects_untyped_and_unknown_leaves
+ * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
+ * @tests tests_js/test_018_style_pipeline.mjs::test_style_registry_rejects_untyped_and_unknown_leaves
  * @matrix style-build : runtime-parity schema-validation
  */
 const normalizeStyleRegistry = (value, path = "styles") => {
@@ -365,20 +370,20 @@ const stylesYaml = normalizeStyleRegistry(rawStylesYaml);
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
+ * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @pair style-build:runtime-parity
  */
-const virtualStyleModuleSource = (styles) => {
-	return `const STYLES = ${stringify(styles)};\nexport { STYLES };`;
+const javascriptStyleModuleSource = (styles) => {
+	return `// This file is auto-generated. Do not edit manually.\nconst STYLES = ${stringify(styles)};\nexport { STYLES };`;
 };
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
+ * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @pair style-build:runtime-parity
  */
-const virtualIconModuleSource = (icons) => {
-	return `const ICONS = ${stringify(icons)};\nexport { ICONS };`;
+const javascriptIconModuleSource = (icons) => {
+	return `// This file is auto-generated. Do not edit manually.\nconst ICONS = ${stringify(icons)};\nexport { ICONS };`;
 };
 
 /**
@@ -412,7 +417,7 @@ const pythonStringify = (value, depth = 0) => {
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
+ * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @pair style-build:runtime-parity
  */
 const pythonStyleModuleSource = (name, registry) => {
@@ -422,45 +427,45 @@ const pythonStyleModuleSource = (name, registry) => {
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_style_pipeline_contract_names_authored_inputs_and_outputs
- * @tests tests_js/test_022_build_chunk_versioning.py::test_text_fonts_share_css_preload_and_asset_identity
+ * @tests tests_js/test_018_style_pipeline.mjs::test_style_pipeline_contract_names_authored_inputs_and_outputs
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_text_fonts_share_css_preload_and_asset_identity
  * @pair style-build:pipeline-contract
  * @pair frontend-build:font-delivery
  */
-const buildStyles = () => {
-	const virtualModules = new Map([
+const buildStyles = () => ({
+	name: "build-styles",
+	buildStart: generateStyleModules,
+});
+
+/**
+ * @testable true
+ * @tests tests_js/test_000_native_harness.mjs::test_registry_generation_is_idempotent_and_repairs_missing_outputs
+ * @pair style-build:runtime-parity
+ */
+const generateStyleModules = () => {
+	for (const [output, content] of [
 		[
-			STYLE_PIPELINE.registry.virtual_module,
-			virtualStyleModuleSource(stylesYaml),
+			STYLE_PIPELINE.registry.javascript_styles,
+			javascriptStyleModuleSource(stylesYaml),
 		],
 		[
-			STYLE_PIPELINE.registry.icons_virtual_module,
-			virtualIconModuleSource(iconsYaml),
+			STYLE_PIPELINE.registry.javascript_icons,
+			javascriptIconModuleSource(iconsYaml),
 		],
-	]);
-	return {
-		name: "build-styles",
-		resolveId(source) {
-			return virtualModules.has(source) ? source : null;
-		},
-		load(id) {
-			return virtualModules.get(id) ?? null;
-		},
-		generateBundle() {
-			atomicWriteFileSync(
-				`./${STYLE_PIPELINE.registry.python_fonts}`,
-				pythonStyleModuleSource("FONTS", fontUrls),
-			);
-			atomicWriteFileSync(
-				`./${STYLE_PIPELINE.registry.python_icons}`,
-				pythonStyleModuleSource("ICONS", iconsYaml),
-			);
-			atomicWriteFileSync(
-				`./${STYLE_PIPELINE.registry.python_styles}`,
-				pythonStyleModuleSource("STYLES", stylesYaml),
-			);
-		},
-	};
+		[
+			STYLE_PIPELINE.registry.python_styles,
+			pythonStyleModuleSource("STYLES", stylesYaml),
+		],
+		[
+			STYLE_PIPELINE.registry.python_icons,
+			pythonStyleModuleSource("ICONS", iconsYaml),
+		],
+		[
+			STYLE_PIPELINE.registry.python_fonts,
+			pythonStyleModuleSource("FONTS", fontUrls),
+		],
+	])
+		atomicWriteFileSync(output, content);
 };
 
 /**
@@ -525,7 +530,7 @@ const resolvedChunkFileName = (importerFileName, specifier) => {
  * the mutation into production source maps.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_rollup_versions_generated_chunk_imports_and_precache_urls
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_rollup_versions_generated_chunk_imports_and_precache_urls
  * @tests tests_tooling/test_003_config.py::test_app_engine_chunk_handler_uses_immutable_cache_before_general_js
  * @matrix cache frontend-build : bundle-consistency chunk-versioning
  */
@@ -603,7 +608,7 @@ const updateConstantsBuildId = (buildId) => {
 
 /**
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_service_worker_records_the_build_identity
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_service_worker_records_the_build_identity
  * @matrix frontend-build : build-identity service-worker
  */
 const updateServiceWorker = (buildId) => {
@@ -660,7 +665,7 @@ const emitPdfWorker = () => {
  * document.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_third_party_notices_are_emitted_with_browser_assets
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_third_party_notices_are_emitted_with_browser_assets
  * @matrix frontend-build licensing : browser-notice-delivery
  */
 const emitThirdPartyLicenses = () => {
@@ -702,8 +707,8 @@ const fontUrls = Object.fromEntries(
  * used by font emission and server-side preload links.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_material_symbols_css_points_to_the_content_hashed_font
- * @tests tests_js/test_022_build_chunk_versioning.py::test_text_fonts_share_css_preload_and_asset_identity
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_material_symbols_css_points_to_the_content_hashed_font
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_text_fonts_share_css_preload_and_asset_identity
  * @matrix frontend-build icons : css-url-resolution font-delivery
  */
 const resolveFonts = () => ({
@@ -725,8 +730,8 @@ const resolveFonts = () => ({
  * remove obsolete fonts. Upstream maintenance inputs are never browser assets.
  *
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_material_symbols_subset_font_is_emitted_with_content_hash
- * @tests tests_js/test_022_build_chunk_versioning.py::test_text_fonts_share_css_preload_and_asset_identity
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_material_symbols_subset_font_is_emitted_with_content_hash
+ * @tests tests_js/test_022_build_chunk_versioning.mjs::test_text_fonts_share_css_preload_and_asset_identity
  * @matrix frontend-build icons : cache font-delivery stale-cleanup subset
  */
 const emitFonts = () => ({
@@ -757,7 +762,10 @@ export {
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
+	generateStyleModules,
 	interactionFoundationChunk,
+	javascriptIconModuleSource,
+	javascriptStyleModuleSource,
 	normalizeIconRegistry,
 	normalizeStyleRegistry,
 	precacheUrls,
@@ -767,6 +775,4 @@ export {
 	updateConstantsBuildId,
 	updateServiceWorker,
 	versionChunkImports,
-	virtualIconModuleSource,
-	virtualStyleModuleSource,
 };

@@ -1,4 +1,4 @@
-import { markPerformance, whenIdle } from "./shell";
+import { markPerformance, whenIdle } from "./shell.mjs";
 
 /**
  * @testable false
@@ -30,7 +30,7 @@ const loadOnce = (view, promiseKey, handleKey, loader) => {
 /** @testable infrastructure */
 export const ensureOfflineQueue = (view) =>
 	loadOnce(view, "_offlineQueuePromise", "offlineQueue", async () => {
-		const { OfflineQueue } = await import("../../shared/offlineQueue");
+		const { OfflineQueue } = await import("../../shared/offlineQueue.mjs");
 		if (view._destroyed) return null;
 		const queue = new OfflineQueue(view);
 		await queue.init();
@@ -39,12 +39,12 @@ export const ensureOfflineQueue = (view) =>
 
 /**
  * @testable true
- * @tests tests_js/test_022_refresh_frontend.py::test_page_task_subscription_survives_list_loading_before_polling_service
+ * @tests tests_js/test_022_refresh_frontend.mjs::test_page_task_subscription_survives_list_loading_before_polling_service
  * @matrix polling startup : subscription-lifecycle deferred-services
  */
 export const ensurePollingCoordinator = (view) =>
 	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
-		const { PollingCoordinator } = await import("../../shared/polling");
+		const { PollingCoordinator } = await import("../../shared/polling.mjs");
 		if (view._destroyed) return null;
 		const coordinator = new PollingCoordinator(view).init();
 		view.PollingCoordinator = coordinator;
@@ -59,7 +59,7 @@ export const ensurePollingCoordinator = (view) =>
 export const ensureSyncManager = (view) =>
 	loadOnce(view, "_syncPromise", "SyncManager", async () => {
 		await ensurePollingCoordinator(view);
-		const { SyncManager } = await import("../../shared/sync");
+		const { SyncManager } = await import("../../shared/sync.mjs");
 		if (view._destroyed) return null;
 		const manager = new SyncManager(view);
 		manager.init();
@@ -70,7 +70,7 @@ export const ensureSyncManager = (view) =>
 export const ensureEditWatcher = (view) =>
 	loadOnce(view, "_editWatcherPromise", "EditWatcher", async () => {
 		await ensurePollingCoordinator(view);
-		const { EditWatcher } = await import("../../shared/editWatcher");
+		const { EditWatcher } = await import("../../forms/revisions/watcher.mjs");
 		if (view._destroyed) return null;
 		const watcher = new EditWatcher(view);
 		watcher.init();
@@ -86,7 +86,7 @@ export const ensureDeferredOperations = (view) =>
 		async () => {
 			await ensurePollingCoordinator(view);
 			const { DeferredOperationManager } = await import(
-				"../../shared/deferredOperations"
+				"../../shared/deferredOperations.mjs"
 			);
 			if (view._destroyed) return null;
 			return new DeferredOperationManager(view).init();
@@ -99,7 +99,7 @@ export const ensureDeferredOperations = (view) =>
 export const ensureNotifications = (view) =>
 	loadOnce(view, "_notificationsPromise", "Notifications", async () => {
 		if (!document.querySelector("[data-role='notifications']")) return null;
-		const { Notifications } = await import("../../elements/notifications");
+		const { Notifications } = await import("../../elements/notifications.mjs");
 		if (view._destroyed) return null;
 		const notifications = new Notifications(view);
 		notifications.init();
@@ -111,7 +111,7 @@ export const ensureSearchBox = (view) =>
 	loadOnce(view, "_searchPromise", "SearchBox", async () => {
 		const search = document.querySelector("[lp-search]");
 		if (!search) return null;
-		const { SearchBox } = await import("../../elements/combobox/search");
+		const { SearchBox } = await import("../../elements/combobox/search.mjs");
 		if (view._destroyed) return null;
 		const box = new SearchBox(search);
 		await box.init();
@@ -121,7 +121,7 @@ export const ensureSearchBox = (view) =>
 /** @testable infrastructure */
 export const ensureEntityMenu = (view) =>
 	loadOnce(view, "_entityMenuPromise", "EntityMenu", async () => {
-		const { EntityMenu } = await import("../../elements/entityMenu");
+		const { EntityMenu } = await import("../../elements/entityMenu.mjs");
 		if (view._destroyed) return null;
 		return new EntityMenu(view);
 	});
@@ -129,7 +129,7 @@ export const ensureEntityMenu = (view) =>
 /** @testable infrastructure */
 export const ensureSubmissionManager = (view) =>
 	loadOnce(view, "_submissionPromise", "SubmissionManager", async () => {
-		const { SubmissionManager } = await import("./submission");
+		const { SubmissionManager } = await import("./submission.mjs");
 		if (view._destroyed) return null;
 		return new SubmissionManager(view);
 	});
@@ -138,7 +138,7 @@ export const ensureSubmissionManager = (view) =>
 export const ensureOfflineModal = (view) =>
 	loadOnce(view, "_offlineModalPromise", "offlineModal", async () => {
 		if (!view.offlineIndicator) return null;
-		const { OfflineModal } = await import("../../shared/modal");
+		const { OfflineModal } = await import("../../shared/modal.mjs");
 		if (view._destroyed) return null;
 		const modal = new OfflineModal(view, view.offlineIndicator);
 		modal.enable();
@@ -149,7 +149,7 @@ export const ensureOfflineModal = (view) =>
 export const ensureModalClasses = (view) =>
 	loadOnce(view, "_modalClassesPromise", "ModalClasses", async () => {
 		const { DeleteModal, HelpModal, Modal } = await import(
-			"../../shared/modal"
+			"../../shared/modal.mjs"
 		);
 		if (view._destroyed) return null;
 		return { DeleteModal, HelpModal, Modal };
@@ -195,7 +195,7 @@ export const initializeCoreServices = (view) => {
 	view._serviceStart = start;
 	const idle = start.then(() => whenIdle());
 	const offlineWork = idle.then(async () => {
-		const { inspectOfflineWork } = await import("../../shared/offlineWork");
+		const { inspectOfflineWork } = await import("../../shared/offlineWork.mjs");
 		return inspectOfflineWork(view);
 	});
 	view.offlineQueueReady = offlineWork.then(({ mutations }) =>
@@ -206,7 +206,7 @@ export const initializeCoreServices = (view) => {
 		: offlineWork.then(({ sync }) => (sync ? ensureSyncManager(view) : null));
 	view.initialReplayReady = view.offlineQueueReady.then(async (queue) => {
 		if (!queue) return 0;
-		const { replayOfflineQueue } = await import("./offlineReplay");
+		const { replayOfflineQueue } = await import("./offlineReplay.mjs");
 		return replayOfflineQueue(view, queue);
 	});
 

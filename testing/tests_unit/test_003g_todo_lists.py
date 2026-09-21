@@ -54,6 +54,10 @@ def test_todo_list_submission_projections():
     external["items"][0]["text"] = "Changed outside"
     assert field.value == expected
 
+    external_ai = field.ai_value
+    external_ai["items"][1]["checked"] = True
+    assert field.ai_value == expected
+
 
 # @matrix form-todo : ai-value import normalization validation
 @pytest.mark.unit
@@ -79,10 +83,22 @@ def test_todo_list_validation_and_import():
     assert field.column_value is None
     assert field.sort_value is False
 
+    preserved = {"items": [{"text": "Keep this", "checked": True}]}
+    field.validate_submission(preserved)
     with pytest.raises(ValidationError, match="checked value must be a boolean"):
         field.validate_submission({"items": [{"text": "Bad", "checked": "yes"}]})
+    assert field.value == preserved
     with pytest.raises(ValidationError, match="valid JSON"):
         field.validate_submission("not-json")
+    assert field.value == preserved
+
+    with pytest.raises(ValidationError, match="items.*list"):
+        field.validate_import({"items": "not-a-list"})
+    assert field.value == preserved
+
+    with pytest.raises(ValidationError, match="checked.*boolean"):
+        field.validate_import({"items": [{"text": "Bad", "checked": "yes"}]})
+    assert field.value == preserved
 
 
 # @pairs form-schema:form-type form-todo:task-only

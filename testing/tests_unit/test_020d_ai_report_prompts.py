@@ -14,7 +14,7 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix ai-report : active-request quota search-opt-in summary-prepass
+# @matrix ai-report : active-request quota search-opt-in service-tier summary-prepass
 # @pair files:normalization
 @pytest.mark.unit
 def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
@@ -52,8 +52,9 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     saved = []
     active_checks = []
 
-    def fake_generate_summary(file, raise_quota=False):
+    def fake_generate_summary(file, raise_quota=False, service_tier=None):
         assert raise_quota is True
+        assert service_tier == "priority"
         generated.append(file.filename)
         file.summary = f"Summary for {file.filename}"
         return file.properties.summarize
@@ -63,6 +64,7 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     summarized = organize_completion.summarize_report_input_files(
         report,
         save=saved.append,
+        service_tier="priority",
         ensure_active=lambda: active_checks.append(True),
     )
 

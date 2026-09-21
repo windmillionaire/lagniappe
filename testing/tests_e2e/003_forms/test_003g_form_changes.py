@@ -24,12 +24,12 @@ pytestmark = pytest.mark.e2e
 
 
 # @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
-# @source lagniappe/core/tools/form_changes.py::apply_target
+# @source lagniappe/core/tools/forms/changes.py::apply_target
 # @matrix form-migration : preflight batch-job publication recovery partial-read generation removed-link
 def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
-    from lagniappe.core.tools import form_changes, form_drafts
+    from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts, population
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
     from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
     from lagniappe.core.tools.deferred_jobs.adapters.form_change import FormChangeAdapter
@@ -63,7 +63,7 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
     draft["schema"][0]["input"] = "number"
     draft["schema"] = draft["schema"][:1]
     draft["migration"] = {"version": 1, "clear_invalid": True}
-    monkeypatch.setattr(form_changes, "BATCH_SIZE", 2)
+    monkeypatch.setattr(population, "BATCH_SIZE", 2)
     with monkeypatch.context() as held:
         held.setattr(DeferredJobs, "dispatch", lambda *args, **kwargs: "held")
         with web_app.test_request_context("/"):
@@ -72,14 +72,14 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
     operation = change["pending_change"]["operation"]
     checkpoint_stage = DeferredJobContext.checkpoint_stage
     batches = []
-    target_batch = form_changes.target_batch
+    target_batch = population.target_batch
 
     def track_batch(form, cursor=None):
         batch = target_batch(form, cursor)
         batches.append((cursor, batch.next_cursor, [row.key for row in batch]))
         return batch
 
-    monkeypatch.setattr(form_changes, "target_batch", track_batch)
+    monkeypatch.setattr(population, "target_batch", track_batch)
 
     def interrupt_check(context, stage, payload=None, **progress):
         result = checkpoint_stage(context, stage, payload, **progress)
@@ -159,7 +159,7 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
 def test_direct_stale_generation_write_is_rejected_after_migration(get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
-    from lagniappe.core.tools import form_changes, form_drafts
+    from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     user = get_user(Users.OWNER)
@@ -502,7 +502,7 @@ def test_offline_submission_survives_schema_migration_until_review(
 def test_builder_observes_migration_completion_without_leaving(get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
-    from lagniappe.core.tools import form_changes, form_drafts
+    from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     user = get_user(Users.OWNER)
@@ -562,7 +562,7 @@ def test_completion_during_migration_returns_inline_error_without_saving(
 ):
     from flask_login import login_user
     from lagniappe.web import app as web_app
-    from lagniappe.core.tools import form_changes, form_drafts
+    from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     user = get_user(Users.OWNER)

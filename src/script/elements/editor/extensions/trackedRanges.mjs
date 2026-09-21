@@ -30,7 +30,7 @@ const addOperation = (transaction, operation) => {
  * Associate a named range with the document produced by a transaction.
  *
  * @testable true
- * @tests tests_js/test_041_editor_decorations.py::test_named_tracked_ranges_map_independently
+ * @tests tests_js/test_041_editor_decorations.mjs::test_named_tracked_ranges_map_independently
  * @matrix editor : inserted-range range-mapping
  */
 export const setTrackedRangeInTransaction = (transaction, key, range) =>
@@ -41,7 +41,7 @@ export const setTrackedRangeInTransaction = (transaction, key, range) =>
  * appended ProseMirror transactions.
  *
  * @testable true
- * @tests tests_js/test_041_editor_decorations.py::test_named_tracked_ranges_map_independently
+ * @tests tests_js/test_041_editor_decorations.mjs::test_named_tracked_ranges_map_independently
  * @matrix ai editor markdown : inserted-range range-mapping
  */
 export const TrackedRanges = Extension.create({

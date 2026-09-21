@@ -259,7 +259,6 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     assert grouped[2]["attachments"][0]["file_summary"]["complete"] is True
     assert saved_batches[0] == ["report"]
     assert len(saved_batches) == 3
-    assert saved_batches[0] == ["report"]
     assert saved_batches[1][-1] == "report"
     assert saved_batches[-1] == ["report"]
 

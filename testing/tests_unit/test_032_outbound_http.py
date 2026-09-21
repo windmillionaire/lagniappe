@@ -1,7 +1,7 @@
 """Shared outbound HTTP policy, pinning, bounds, and privacy contracts."""
 
 from collections import deque
-from dataclasses import replace
+from dataclasses import FrozenInstanceError, replace
 from io import BytesIO
 import socket
 
@@ -34,9 +34,12 @@ class FakeResponse:
         self.chunks = list(chunks)
         self.closed = False
         self.close_error = close_error
+        self.chunks_read = 0
 
     def iter_content(self, chunk_size):
-        yield from self.chunks
+        for chunk in self.chunks:
+            self.chunks_read += 1
+            yield chunk
 
     def close(self):
         self.closed = True
@@ -192,6 +195,8 @@ def test_outbound_result_repr_and_diagnostic_never_expose_url_or_body():
     assert secret not in representation + rendered_diagnostic
     assert fragment not in representation + rendered_diagnostic
     assert body.decode() not in representation + rendered_diagnostic
+    assert "user:pass" not in representation + rendered_diagnostic
+    assert "/private" not in representation + rendered_diagnostic
     assert diagnostic == {
         "outcome": "http_error",
         "status": 503,
@@ -203,7 +208,7 @@ def test_outbound_result_repr_and_diagnostic_never_expose_url_or_body():
         "scheme": "https",
         "host": "example.test",
     }
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         result.size = 0
 
 
@@ -408,17 +413,26 @@ def test_user_fetch_pins_redirects_bounds_and_closes_every_response(monkeypatch)
         chunks=[b"<title>Done</title>"],
     )
     calls, sessions = _user_response(monkeypatch, [first, second, final])
+    resolutions = []
+    addresses = iter(("1.1.1.1", "8.8.8.8", "9.9.9.9"))
+
+    def resolve(host, port, **kwargs):
+        resolutions.append((host, port))
+        return [_record(next(addresses), port)]
+
+    monkeypatch.setattr(client.socket, "getaddrinfo", resolve)
 
     result = fetch_user_content("https://start.example/root", HTML_METADATA_POLICY)
 
     assert result.status is OutboundStatus.OK
     assert result.redirect_count == 2
     assert result.final_url == "https://other.example/final"
-    assert [call[0].host for call in calls] == [
-        "start.example",
-        "start.example",
-        "other.example",
+    assert [(call[0].url, call[1]) for call in calls] == [
+        ("https://start.example/root", "1.1.1.1"),
+        ("https://start.example/next", "8.8.8.8"),
+        ("https://other.example/final", "9.9.9.9"),
     ]
+    assert resolutions == [("start.example", 443), ("start.example", 443), ("other.example", 443)]
     assert all(response.closed for response in [first, second, final])
     assert all(session.closed for session in sessions)
 
@@ -493,6 +507,7 @@ def test_user_fetch_validates_media_deadline_and_raster_content(monkeypatch):
     _user_response(monkeypatch, [declared])
     assert fetch_user_content("https://example.test/", small_policy).status is OutboundStatus.TOO_LARGE
     assert declared.closed
+    assert declared.chunks_read == 0
 
     lying = FakeResponse(
         headers={
@@ -500,13 +515,15 @@ def test_user_fetch_validates_media_deadline_and_raster_content(monkeypatch):
             "Content-Length": "1",
             "Content-Encoding": "gzip",
         },
-        chunks=[b"1234", b"5"],
+        chunks=[b"1234", b"5", b"must-not-be-read"],
     )
     _user_response(monkeypatch, [lying])
     lying_result = fetch_user_content("https://example.test/", small_policy)
     assert lying_result.status is OutboundStatus.TOO_LARGE
     assert lying_result.size == 5
     assert lying.closed
+    assert lying.chunks_read == 2
+    assert lying_result.body == b""
 
     http_failure = FakeResponse(status=503)
     _user_response(monkeypatch, [http_failure])
@@ -523,15 +540,20 @@ def test_user_fetch_validates_media_deadline_and_raster_content(monkeypatch):
 
     timed_out = FakeResponse(headers={"Content-Type": "text/html"}, chunks=[b"ok"])
     _user_response(monkeypatch, [timed_out])
-    monkeypatch.setattr(
-        client,
-        "_stream_body",
-        lambda *args: (_ for _ in ()).throw(TimeoutError()),
-    )
-    assert fetch_user_content("https://example.test/", small_policy).status is OutboundStatus.TIMEOUT
+    now = [0.0]
+
+    def late_chunk(chunk_size):
+        now[0] = 3.0  # The operation's two-second deadline elapsed while reading.
+        yield b"ok"
+
+    with monkeypatch.context() as clock:
+        clock.setattr(client.time, "monotonic", lambda: now[0])
+        clock.setattr(timed_out, "iter_content", late_chunk)
+        timeout_result = fetch_user_content("https://example.test/", small_policy)
+    assert timeout_result.status is OutboundStatus.TIMEOUT
+    assert timeout_result.body == b""
     assert timed_out.closed
 
-    monkeypatch.undo()
     valid_image = _image_bytes()
     exact_body = valid_image + b"\0" * (BOOKMARK_IMAGE_POLICY.max_bytes - len(valid_image))
     exact = FakeResponse(
@@ -695,6 +717,23 @@ def test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure(monkeypa
     assert timeout_session.closed
     assert "private transport text" not in repr(timed_out)
 
+    deadline_response = FakeResponse(headers={"Content-Type": "application/json"})
+    deadline_session = FakeSession([deadline_response])
+    monkeypatch.setattr(client.requests, "Session", lambda: deadline_session)
+    now = [0.0]
+
+    def late_chunk(chunk_size):
+        now[0] = 5.0  # Exceeds this provider's four-second operation deadline.
+        yield b"{}"
+
+    with monkeypatch.context() as clock:
+        clock.setattr(client.time, "monotonic", lambda: now[0])
+        clock.setattr(deadline_response, "iter_content", late_chunk)
+        deadline_result = request_trusted_content("GET", "v1/data", policy)
+    assert deadline_result.status is OutboundStatus.TIMEOUT
+    assert deadline_result.body == b""
+    assert deadline_response.closed and deadline_session.closed
+
     close_failure = FakeResponse(
         headers={"Content-Type": "application/json"},
         chunks=[b"{}"],
@@ -779,3 +818,24 @@ def test_trusted_client_retries_only_explicit_method_and_status(monkeypatch):
     result = request_trusted_content("POST", "v1/data", policy)
     assert result.status is OutboundStatus.HTTP_ERROR
     assert post_response.closed and post_session.closed
+    assert len(post_session.calls) == 1
+
+    not_retryable = FakeResponse(404, {"Content-Type": "application/json"})
+    not_retryable_session = FakeSession([not_retryable])
+    monkeypatch.setattr(client.requests, "Session", lambda: not_retryable_session)
+    result = request_trusted_content("GET", "v1/data", policy)
+    assert result.status is OutboundStatus.HTTP_ERROR
+    assert result.http_status == 404
+    assert len(not_retryable_session.calls) == 1
+    assert not_retryable.closed and not_retryable_session.closed
+
+    failures = [FakeResponse(503), FakeResponse(503)]
+    created = [FakeSession([response]) for response in failures]
+    sessions = deque(created)
+    monkeypatch.setattr(client.requests, "Session", lambda: sessions.popleft())
+    exhausted = request_trusted_content("GET", "v1/data", policy)
+    assert exhausted.status is OutboundStatus.HTTP_ERROR
+    assert exhausted.http_status == 503
+    assert not sessions
+    assert all(len(session.calls) == 1 and session.closed for session in created)
+    assert all(response.closed for response in failures)

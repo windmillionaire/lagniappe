@@ -1,6 +1,6 @@
 """2.0.0 single-owner Files and materialized local restriction lists."""
 
-from .base import MigrationDataError
+from .base import MigrationDataError, _file_record_reference, _result, scan_kind
 from ..core import KINDS
 
 
@@ -9,8 +9,6 @@ from ..core import KINDS
 # @matrix files migrations : single-owner history conflict idempotence
 # @pair database-migrations:actionable-links
 def migrate_file_ownership(context):
-    from ..migrations import _file_record_reference, _result, scan_kind
-
     result = _result("FIL-001", "Single-owner Files")
     owners = {row.key: row for row in context.query_factory(KINDS.instances).fetch_iter()
               if row.get("type") in {"page", "task"}}
@@ -79,8 +77,6 @@ def migrate_file_ownership(context):
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restrictions_migration_only_persists_local_sources
 # @matrix permissions migrations : local-restrictions owner-only idempotence
 def migrate_local_restrictions(context):
-    from ..migrations import _result, scan_kind
-
     result = _result("RST-001", "Materialized local restrictions")
     groups = {row.key: row.get("hash") for row in context.query_factory(KINDS.users).fetch_iter()
               if row.get("type") in {"group", "public_group"}}

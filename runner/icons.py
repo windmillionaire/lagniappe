@@ -6,6 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
+import tempfile
 from urllib.parse import urlencode, urlparse, parse_qs
 from urllib.request import Request, urlopen
 
@@ -13,6 +15,7 @@ import yaml
 
 from runner.context import NPM_CLI, REPOSITORY_ROOT
 from runner.process import run_command
+from testing.utility.style_registry import flatten_icon_definitions, load_icons_schema
 
 
 ICONS_PATH = REPOSITORY_ROOT / "src/style/icons.yaml"
@@ -27,23 +30,12 @@ FONT_URL_RE = re.compile(r"src:\s*url\((https://fonts\.gstatic\.com/[^)]+)\)")
 # @testable true
 # @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
 # @pair icons:subset-request
-def _registry_glyphs(value):
-    if not isinstance(value, dict) or not value:
-        raise TypeError("icon registry nodes must be non-empty mappings")
-    if "glyph" in value:
-        glyph = value["glyph"]
-        if not isinstance(glyph, str) or not glyph:
-            raise TypeError("icon registry glyphs must be non-empty strings")
-        return [glyph]
-    return [glyph for child in value.values() for glyph in _registry_glyphs(child)]
-
-
-# @testable true
-# @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
-# @pair icons:subset-request
 def subset_request(icons_path=ICONS_PATH):
     registry = yaml.safe_load(Path(icons_path).read_text(encoding="utf-8")) or {}
-    icon_names = sorted(set(_registry_glyphs(registry)))
+    definitions = flatten_icon_definitions(
+        registry, schema=load_icons_schema(REPOSITORY_ROOT)
+    )
+    icon_names = sorted({definition["glyph"] for definition in definitions.values()})
     query = urlencode(
         {
             "family": FONT_FAMILY_QUERY,
@@ -84,9 +76,6 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
 
     font_path = Path(font_path)
     metadata_path = Path(metadata_path)
-    font_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    font_path.write_bytes(font)
 
     version = parse_qs(urlparse(font_url).query).get("v", ["unknown"])[0]
     metadata = {
@@ -103,7 +92,54 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
         "sha256": hashlib.sha256(font).hexdigest(),
     }
     payload = json.dumps(metadata, indent="\t")
-    metadata_path.write_text(f"{payload}\n", encoding="utf-8")
+    outputs = ((font_path, font), (metadata_path, f"{payload}\n".encode("utf-8")))
+    directories = []
+    prepared = []
+    published = []
+    retain_backups = False
+    try:
+        # Stage both files and their prior contents before replacing either.
+        # Each temporary directory is beside its destination for atomic rename.
+        for destination, content in outputs:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            directory = Path(tempfile.mkdtemp(
+                prefix=f".{destination.name}-", dir=destination.parent
+            ))
+            directories.append(directory)
+            candidate, backup = directory / "new", directory / "previous"
+            if destination.exists():
+                shutil.copy2(destination, backup)
+            candidate.write_bytes(content)
+            if backup.exists():
+                shutil.copymode(backup, candidate)
+            prepared.append((destination, candidate, backup))
+
+        for destination, candidate, backup in prepared:
+            candidate.replace(destination)
+            published.append((destination, backup))
+    except BaseException as error:
+        recovery_errors = []
+        for destination, backup in reversed(published):
+            try:
+                if backup.exists():
+                    backup.replace(destination)
+                else:
+                    destination.unlink(missing_ok=True)
+            except OSError as recovery_error:
+                recovery_errors.append(f"{destination}: {recovery_error}")
+        if recovery_errors:
+            retain_backups = True
+            raise RuntimeError(
+                "Icon subset publication failed and restoration was incomplete: "
+                + "; ".join(recovery_errors)
+                + ". Recovery files retained in: "
+                + ", ".join(str(directory) for directory in directories)
+            ) from error
+        raise
+    finally:
+        if not retain_backups:
+            for directory in directories:
+                shutil.rmtree(directory)
 
 
 # @testable true
@@ -133,4 +169,11 @@ def update_icons(
         f"({len(font):,} bytes)"
     )
     if rebuild:
-        run_command([NPM_CLI, "run", "dev"], check=True)
+        try:
+            run_command([NPM_CLI, "run", "dev"], check=True)
+        except (Exception, KeyboardInterrupt):
+            print(
+                "Frontend rebuild did not complete; refreshed icon sources are "
+                f"retained at {font_path} and {metadata_path}."
+            )
+            raise

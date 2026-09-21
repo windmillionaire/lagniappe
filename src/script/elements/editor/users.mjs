@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { USER_COLORS } from "../../config/editor";
-import { Dropdown } from "../combobox";
-import { createMenuButton } from "./dropdowns";
+import { STYLES } from "../../generated/styles.mjs";
+import { Dropdown } from "../combobox/index.mjs";
+import { USER_COLORS } from "./config.mjs";
+import { createMenuButton } from "./dropdowns.mjs";
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";
 

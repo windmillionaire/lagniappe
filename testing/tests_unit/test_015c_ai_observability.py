@@ -18,6 +18,53 @@ from lagniappe.core.tools.database import analytics as analytics_database
 pytestmark = pytest.mark.unit
 
 
+EXPECTED_SUMMARY_FIELDS = {
+    "active_provider_stage",
+    "cached_tokens",
+    "calls_per_round",
+    "correlation_id",
+    "created",
+    "deferred_contract_version",
+    "deferred_job_attempt",
+    "deferred_job_type",
+    "duration_ms",
+    "empty_response_retries",
+    "exact_call_cache_hits",
+    "location",
+    "model_tier",
+    "original_file_count",
+    "outcome",
+    "output_tokens",
+    "prompt_contract_id",
+    "prompt_contract_version",
+    "prompt_tokens",
+    "provider_requests",
+    "provider_responses",
+    "provider_result_chars",
+    "resolved_model",
+    "service_tier",
+    "stage",
+    "state",
+    "structured_final_used",
+    "success",
+    "surfaced_quota_stages",
+    "telemetry_id",
+    "telemetry_schema_version",
+    "terminal_error_category",
+    "terminal_error_class",
+    "thought_tokens",
+    "tool_calls",
+    "tool_names",
+    "tool_result_chars",
+    "tool_rounds",
+    "total_tokens",
+    "traffic_types",
+    "updated",
+    "validated_result_chars",
+    "workflow",
+}
+
+
 def _response(text=None, *, calls=(), usage=None):
     parts = [SimpleNamespace(text=text)] if text is not None else []
     return SimpleNamespace(
@@ -134,7 +181,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert len(persisted) == 1
     assert pruned == [True]
     summary = persisted[0]
-    assert set(summary) == set(observability.GenerationSummaryV1.__dataclass_fields__)
+    assert set(summary) == EXPECTED_SUMMARY_FIELDS
     assert sentinel not in json.dumps(summary, default=str)
     uuid.UUID(summary["correlation_id"])
     assert summary["workflow"] == "reports"
@@ -431,11 +478,9 @@ def test_observability_failures_never_change_generation_result_or_error(monkeypa
     with pytest.raises(RuntimeError) as caught:
         generator.generate_content(prompt)
     assert caught.value is original
-    assert [message for message, _args, _kwargs in warnings] == [
-        "Unable to persist AI observability summary.",
-        "Unable to prune AI observability summaries.",
-        "Unable to prune AI observability summaries.",
-    ]
+    assert len(warnings) == 3
+    assert "persist" in warnings[0][0].lower()
+    assert all("prune" in message.lower() for message, _args, _kwargs in warnings[1:])
     assert all(kwargs == {"exc_info": True} for _message, _args, kwargs in warnings)
 
 

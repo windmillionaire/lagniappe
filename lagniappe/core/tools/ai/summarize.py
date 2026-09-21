@@ -7,9 +7,10 @@ from ...definitions import FileConsumer, enforce_file_consumer
 from ..database import assets as storage_assets
 from ..files.ooxml import extract_ooxml, is_supported_ooxml
 from ..files.ooxml import OOXMLExtractionError, OOXMLTruncationReason
-from .core import ai_model, provider_error_details
+from .core import ai_model
 from .guidelines import SUMMARY_GENERATION_GUIDELINES
 from .prompt import Prompt
+from .provider_policy import provider_error_details
 
 EXTRACTED_CONTEXT_LIMIT = 200_000
 EXTRACTED_CONTEXT_NOTE = (

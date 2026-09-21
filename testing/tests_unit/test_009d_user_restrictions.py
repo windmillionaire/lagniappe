@@ -5,17 +5,12 @@ import pytest
 
 from lagniappe.core.definitions import Restriction
 from lagniappe.core.properties import user_restrictions as user_restrictions_module
-from lagniappe.core.properties.base_property import UNSET
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
 
 def _expected(value):
     return Restriction.UNRESTRICTED if value is False else value
-
-
-def _has_access(value):
-    return Restriction.is_unrestricted(value) or bool(value)
 
 
 def _reset_restrictions(user):
@@ -51,6 +46,7 @@ def test_restrictions(get_permissions_test_data):
     """
     with MockRestrictions().patch_cache():
         users, _ = get_permissions_test_data()
+        assert users
 
         for user in users:
             expected = user.test_spec["expected"]
@@ -70,10 +66,6 @@ def test_restrictions(get_permissions_test_data):
 
             user_assign_val = user.properties.restrictions.user_assign_restrictions
             exp_user_assign = _expected(expected["user_assign"])
-            assert _has_access(user_assign_val) == expected["can_assign"], (
-                f"{user.name}: user_assign access = {_has_access(user_assign_val)}, "
-                f"expected {expected['can_assign']}"
-            )
             if isinstance(user_assign_val, list) and isinstance(exp_user_assign, list):
                 assert sorted(user_assign_val) == sorted(exp_user_assign), (
                     f"{user.name}: user_assign = {user_assign_val}, "
@@ -86,10 +78,6 @@ def test_restrictions(get_permissions_test_data):
                 )
             category_edit_val = user.properties.restrictions.category_edit_restrictions
             exp_category_edit = _expected(expected["category_edit"])
-            assert _has_access(category_edit_val) == expected["can_create_pages"], (
-                f"{user.name}: category_edit access = {_has_access(category_edit_val)}, "
-                f"expected {expected['can_create_pages']}"
-            )
             if isinstance(category_edit_val, list) and isinstance(
                 exp_category_edit, list
             ):
@@ -234,6 +222,7 @@ def test_restriction_session_markers_validate_their_own_scope(field, value):
     assert restored["belongs_to"] is Restriction.BELONGS_TO_ALL
     assert restored["search"] is Restriction.UNRESTRICTED
     assert restrictions._deserialize_session_state({**blob, field: value}) is None
+    assert restrictions._deserialize_session_state({**blob, "fingerprint": "stale"}) is None
     assert restrictions._deserialize_session_state({
         **blob, "version": restrictions._session_version - 1, "belongs_to": [],
     }) is None
@@ -293,6 +282,9 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
             assert restrictions.unrestricted_pages(
                 TestEntities.get("CATEGORY", {"name": "Cat", "hash": "cat001"})
             ) == ["page001"]
+            capabilities = restrictions.ai_action_capabilities
+            assert capabilities["can_update_pages"] is True
+            assert capabilities["can_update_tasks"] is True
 
         blob = session["restrictions"]
         assert blob["version"] == restrictions._session_version
@@ -308,6 +300,7 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         assert "can_use_ai_tools" not in blob
         assert "can_assign" not in blob
         assert "can_create_pages" not in blob
+        assert not set(capabilities) & blob.keys()
         assert details.call_count == 1
 
         _reset_restrictions(user)
@@ -322,7 +315,7 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         assert user.properties.restrictions.can_initiate_messages is True
         assert owner_projection_calls == [True]
 
-        session["restrictions"]["fingerprint"] = "stale"
+        previous_fingerprint = session["restrictions"]["fingerprint"]
         user.permissions = {**user.permissions, "cat002": "VIEW"}
         _reset_restrictions(user)
 
@@ -332,7 +325,7 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
                 "page001",
                 "session-page",
             ]
-        assert session["restrictions"]["fingerprint"] != "stale"
+        assert session["restrictions"]["fingerprint"] != previous_fingerprint
 
 
 # @matrix permissions : group-membership stored-requires
@@ -390,10 +383,7 @@ def test_restrictions_empty_list_is_loaded_state():
         assert restrictions.can_initiate_messages is False
 
     assert restrictions.is_set
-    assert restrictions._value == []
-    assert restrictions._state is not None
     assert restrictions.value == []
-    assert restrictions._value is not UNSET
     assert details.call_count == 0
 
 

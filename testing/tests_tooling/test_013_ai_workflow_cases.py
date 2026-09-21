@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.tooling
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-LIBRARY_ROOT = REPOSITORY_ROOT / "testing_ai_workflows"
+LIBRARY_ROOT = REPOSITORY_ROOT / "testing" / "ai_test_cases"
 CASES_ROOT = LIBRARY_ROOT / "cases"
 BUILD_IGNORE_FILES = (
     "runner/hosted_e2e_container/gcloudignore",
@@ -97,8 +97,8 @@ def test_raw_workflow_captures_are_ignored_without_hiding_case_material(tmp_path
         text=True,
         timeout=10,
     )
-    fixture_library = tmp_path / "testing_ai_workflows"
-    fixture_library.mkdir()
+    fixture_library = tmp_path / "testing" / "ai_test_cases"
+    fixture_library.mkdir(parents=True)
     (fixture_library / ".gitignore").write_bytes(
         (LIBRARY_ROOT / ".gitignore").read_bytes()
     )
@@ -112,10 +112,10 @@ def test_raw_workflow_captures_are_ignored_without_hiding_case_material(tmp_path
 
     private_paths = set()
     public_paths = {
-        "testing_ai_workflows/README.md",
-        "testing_ai_workflows/ROUND_3.md",
-        "testing_ai_workflows/latest_results.json",
-        "testing_ai_workflows/comparisons/example.md",
+        "testing/ai_test_cases/README.md",
+        "testing/ai_test_cases/ROUND_3.md",
+        "testing/ai_test_cases/latest_results.json",
+        "testing/ai_test_cases/comparisons/example.md",
     }
     for case in _case_directories():
         prefix = case.relative_to(REPOSITORY_ROOT).as_posix()
@@ -150,8 +150,8 @@ def test_raw_workflow_captures_are_ignored_without_hiding_case_material(tmp_path
 
 def test_workflow_library_and_raw_artifacts_stay_out_of_deployment_payloads():
     app_ignore = (REPOSITORY_ROOT / ".gcloudignore").read_text("utf-8").splitlines()
-    assert "/testing_ai_workflows/" in app_ignore
+    assert "/testing/ai_test_cases/" in app_ignore
     for name in BUILD_IGNORE_FILES:
         rules = (REPOSITORY_ROOT / name).read_text("utf-8").splitlines()
-        assert "testing_ai_workflows/cases/*/artifacts/" in rules, name
-        assert "!/testing_ai_workflows/.gitignore" in rules, name
+        assert "testing/ai_test_cases/cases/*/artifacts/" in rules, name
+        assert "!/testing/ai_test_cases/.gitignore" in rules, name

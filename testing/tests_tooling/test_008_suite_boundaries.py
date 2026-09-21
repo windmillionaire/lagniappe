@@ -67,10 +67,23 @@ E2E_SYNTHETIC_INPUT_EVENTS = {
 }
 E2E_SYNTHETIC_LIFECYCLE_EVENTS = {"focus", "offline", "online"}
 E2E_NONRETRYING_BROWSER_GETTERS = {"get_attribute", "inner_text"}
+E2E_LOCATOR_FACTORIES = {
+    "get_by_alt_text",
+    "get_by_label",
+    "get_by_placeholder",
+    "get_by_role",
+    "get_by_test_id",
+    "get_by_text",
+    "get_by_title",
+    "locate",
+    "locator",
+}
 E2E_DIRECT_AI_HELPERS = {
     "complete_ask_report",
     "complete_organize_submissions",
 }
+
+
 def _python_files(*roots):
     for root in roots:
         yield from root.rglob("*.py")
@@ -95,29 +108,151 @@ def _package_imports(path, package):
     return imports
 
 
-def _e2e_route_bypass_violations(path):
-    """Return route imports and decorator bypasses in one E2E module."""
+def _attribute_name(node):
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        return ".".join([node.id, *reversed(parts)])
+    return None
+
+
+def _e2e_cache_invalidation_violations(path):
+    """Return out-of-band invalidation clearing from one E2E support module."""
     tree = ast.parse(path.read_text(), filename=str(path))
     violations = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "clear_cache_invalidation"
+        ):
+            violations.append(f"{path}:{node.lineno} defines clear_cache_invalidation")
+            continue
+
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "setattr"
+            and len(node.args) >= 3
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "invalidate_cache"
+            and isinstance(node.args[2], ast.Constant)
+            and node.args[2].value is False
+        ):
+            violations.append(
+                f"{path}:{node.lineno} clears invalidate_cache with setattr"
+            )
+            continue
+
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+
+        if (
+            isinstance(value, ast.Constant)
+            and value.value is False
+            and any(_cache_invalidation_target(target) for target in targets)
+        ):
+            violations.append(
+                f"{path}:{node.lineno} clears invalidate_cache directly"
+            )
+
+    return violations
+
+
+def _e2e_process_state_violations(path):
+    """Return module booleans that cache durable E2E setup state."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+
+        if not (isinstance(value, ast.Constant) and isinstance(value.value, bool)):
+            continue
+
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id.endswith(
+                E2E_PROCESS_STATE_SUFFIXES
+            ):
+                violations.append(f"{path}:{node.lineno} defines {target.id}")
+
+    return violations
+
+
+def _e2e_native_fetch_violations(path):
+    """Return browser scripts that replace the native fetch implementation."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        for match in E2E_NATIVE_FETCH_ASSIGNMENT.finditer(node.value):
+            line = node.lineno + node.value[: match.start()].count("\n")
+            violations.append(f"{path}:{line} assigns native fetch")
+
+    return violations
+
+
+def _e2e_route_bypass_violations(path):
+    """Return direct route calls and decorator bypasses in one E2E module."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    route_names = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name == "lagniappe.web.routes" or alias.name.startswith(
                     "lagniappe.web.routes."
                 ):
-                    violations.append(f"{path}:{node.lineno} imports {alias.name}")
+                    route_names.add(alias.asname or alias.name)
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module == "lagniappe.web.routes" or module.startswith(
                 "lagniappe.web.routes."
             ):
-                violations.append(f"{path}:{node.lineno} imports {module}")
+                route_names.update(alias.asname or alias.name for alias in node.names)
             elif module == "lagniappe.web" and any(
                 alias.name == "routes" for alias in node.names
             ):
-                violations.append(f"{path}:{node.lineno} imports lagniappe.web.routes")
-        elif isinstance(node, ast.Attribute) and node.attr == "__wrapped__":
-            violations.append(f"{path}:{node.lineno} accesses __wrapped__")
+                route_names.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name == "routes"
+                )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            target = _attribute_name(node.func)
+            if target and any(
+                target == name or target.startswith(f"{name}.")
+                for name in route_names
+            ):
+                violations.append(
+                    f"{path}:{node.lineno} calls imported route {target}"
+                )
+        elif (
+            isinstance(node, ast.Attribute)
+            and node.attr == "__wrapped__"
+            and (target := _attribute_name(node.value))
+            and any(
+                target == name or target.startswith(f"{name}.")
+                for name in route_names
+            )
+        ):
+            violations.append(f"{path}:{node.lineno} accesses route __wrapped__")
     return violations
 
 
@@ -262,13 +397,62 @@ def _e2e_wait_shortcut_violations(path):
     return violations
 
 
-def _browser_snapshot_method(node):
+def _is_locator_expression(node, locator_names):
+    if _attribute_name(node) in locator_names:
+        return True
+    if isinstance(node, ast.Attribute):
+        return node.attr in {"first", "last"} and _is_locator_expression(
+            node.value, locator_names
+        )
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return False
+    return node.func.attr in E2E_LOCATOR_FACTORIES or (
+        node.func.attr in {"filter", "nth"}
+        and _is_locator_expression(node.func.value, locator_names)
+    )
+
+
+def _locator_names(scope):
+    names = set()
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(scope):
+            if isinstance(node, (ast.For, ast.AsyncFor)):
+                is_locator = (
+                    isinstance(node.iter, ast.Call)
+                    and isinstance(node.iter.func, ast.Attribute)
+                    and node.iter.func.attr == "all"
+                    and _is_locator_expression(node.iter.func.value, names)
+                )
+                targets = [node.target]
+            elif isinstance(node, ast.Assign):
+                is_locator = _is_locator_expression(node.value, names)
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign):
+                is_locator = _is_locator_expression(node.value, names)
+                targets = [node.target]
+            else:
+                continue
+            if not is_locator:
+                continue
+            for target in targets:
+                name = _attribute_name(target)
+                if name is not None and name not in names:
+                    names.add(name)
+                    changed = True
+    return names
+
+
+def _browser_snapshot_method(node, locator_names):
     """Return the raw locator getter name represented by one call, if any."""
     if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
         return None
-    if node.func.attr in E2E_NONRETRYING_BROWSER_GETTERS:
-        return node.func.attr
-    if node.func.attr == "count" and not node.args and not node.keywords:
+    if (
+        node.func.attr in E2E_NONRETRYING_BROWSER_GETTERS | {"count"}
+        and _is_locator_expression(node.func.value, locator_names)
+        and (node.func.attr != "count" or (not node.args and not node.keywords))
+    ):
         return node.func.attr
     return None
 
@@ -300,39 +484,41 @@ def _e2e_nonretrying_assertion_violations(path):
     tree = ast.parse(path.read_text(), filename=str(path))
     violations = []
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assert):
-            for child in ast.walk(node.test):
-                if method := _browser_snapshot_method(child):
-                    violations.append(
-                        f"{path}:{child.lineno} asserts raw {method}() snapshot"
-                    )
-
-        if (
-            isinstance(node, (ast.For, ast.AsyncFor))
-            and isinstance(node.iter, ast.Call)
-            and isinstance(node.iter.func, ast.Attribute)
-            and node.iter.func.attr == "all"
-        ):
-            violations.append(f"{path}:{node.iter.lineno} iterates locator.all()")
-
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "range"
-        ):
-            continue
-        for child in ast.walk(node):
-            if _browser_snapshot_method(child) == "count":
-                violations.append(
-                    f"{path}:{child.lineno} enumerates range(locator.count())"
-                )
-
     for scope in (
         node
         for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     ):
+        locator_names = _locator_names(scope)
+        for node in ast.walk(scope):
+            if isinstance(node, ast.Assert):
+                for child in ast.walk(node.test):
+                    if method := _browser_snapshot_method(child, locator_names):
+                        violations.append(
+                            f"{path}:{child.lineno} asserts raw {method}() snapshot"
+                        )
+
+            if (
+                isinstance(node, (ast.For, ast.AsyncFor))
+                and isinstance(node.iter, ast.Call)
+                and isinstance(node.iter.func, ast.Attribute)
+                and node.iter.func.attr == "all"
+                and _is_locator_expression(node.iter.func.value, locator_names)
+            ):
+                violations.append(f"{path}:{node.iter.lineno} iterates locator.all()")
+
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "range"
+            ):
+                continue
+            for child in ast.walk(node):
+                if _browser_snapshot_method(child, locator_names) == "count":
+                    violations.append(
+                        f"{path}:{child.lineno} enumerates range(locator.count())"
+                    )
+
         snapshot_assignments = {}
         for node in ast.walk(scope):
             if isinstance(node, ast.Assign):
@@ -343,7 +529,7 @@ def _e2e_nonretrying_assertion_violations(path):
                 value = node.value
             else:
                 continue
-            method = _browser_snapshot_method(value)
+            method = _browser_snapshot_method(value, locator_names)
             if method is None:
                 continue
             for target in targets:
@@ -371,37 +557,73 @@ def _e2e_nonretrying_assertion_violations(path):
 
 
 def _runs_node(path):
-    for node in ast.walk(ast.parse(path.read_text(), filename=str(path))):
+    tree = ast.parse(path.read_text(), filename=str(path))
+    subprocess_modules = {"subprocess"}
+    subprocess_calls = set()
+    shutil_modules = {"shutil"}
+    shutil_which_calls = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "subprocess":
+                    subprocess_modules.add(alias.asname or alias.name)
+                elif alias.name == "shutil":
+                    shutil_modules.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "subprocess":
+                subprocess_calls.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name
+                    in {"call", "check_call", "check_output", "Popen", "run"}
+                )
+            elif node.module == "shutil":
+                shutil_which_calls.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name == "which"
+                )
+
+    for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         if (
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "shutil"
+            and node.func.value.id in shutil_modules
             and node.func.attr == "which"
             and node.args
             and isinstance(node.args[0], ast.Constant)
             and node.args[0].value == "node"
         ):
             return True
-        if not (
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id in shutil_which_calls
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value == "node"
+        ):
+            return True
+
+        is_subprocess_call = (
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "subprocess"
+            and node.func.value.id in subprocess_modules
             and node.func.attr
-            in {
-                "call",
-                "check_call",
-                "check_output",
-                "Popen",
-                "run",
-            }
-            and node.args
-            and isinstance(node.args[0], (ast.List, ast.Tuple))
-            and node.args[0].elts
-        ):
+            in {"call", "check_call", "check_output", "Popen", "run"}
+        ) or (
+            isinstance(node.func, ast.Name) and node.func.id in subprocess_calls
+        )
+        if not is_subprocess_call:
             continue
-        executable = node.args[0].elts[0]
+        command = node.args[0] if node.args else next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "args"),
+            None,
+        )
+        if not isinstance(command, (ast.List, ast.Tuple)) or not command.elts:
+            continue
+        executable = command.elts[0]
         if isinstance(executable, ast.Constant) and executable.value == "node":
             return True
     return False
@@ -462,6 +684,45 @@ def _permission_decorator_fetch_keyword(node):
     return None
 
 
+def _route_entity_fetch_violations(path):
+    """Return route access that bypasses an explicit entity fetch request."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    for node in ast.walk(tree):
+        if _entities_call(node, "load"):
+            violations.append(f"{path}:{node.lineno} uses Entities.load")
+        elif (
+            _entities_call(node, "fetch") or _entities_call(node, "fetch_one")
+        ) and not any(keyword.arg == "request" for keyword in node.keywords):
+            violations.append(
+                f"{path}:{node.lineno} uses {node.func.attr} without request=Fetch..."
+            )
+        elif _entities_call(node, "get") and any(
+            keyword.arg == "load"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is True
+            for keyword in node.keywords
+        ):
+            violations.append(f"{path}:{node.lineno} uses Entities.get(load=True)")
+        elif (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and _uses_injected_entity(node)
+            and not _has_permission_decorator(node)
+        ):
+            violations.append(
+                f"{path}:{node.lineno} uses kwargs['entity'] without @permission"
+            )
+        elif (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and (keyword := _permission_decorator_fetch_keyword(node)) is not None
+        ):
+            violations.append(
+                f"{path}:{keyword.value.lineno} passes fetch to @permission"
+            )
+
+    return violations
+
+
 def test_lower_level_suites_do_not_import_web_package():
     violations = {}
     for path in _python_files(*LOWER_LEVEL_SUITES):
@@ -492,54 +753,49 @@ def test_tooling_suite_does_not_execute_node():
     assert violations == []
 
 
+def test_suite_import_and_node_guards_recognize_real_syntax(tmp_path):
+    imports = tmp_path / "test_imports.py"
+    imports.write_text(
+        "import lagniappe.web.routes as routes\n"
+        "from lagniappe import web as application_web\n"
+        "import lagniappe\n"
+        "WEB_PACKAGE = 'lagniappe.web'\n"
+    )
+
+    assert _package_imports(imports, "lagniappe.web") == [
+        "lagniappe.web.routes",
+        "lagniappe.web",
+    ]
+
+    direct_node = tmp_path / "test_direct_node.py"
+    for source in (
+        "import subprocess as process\nprocess.run(args=['node', 'case.mjs'])\n",
+        "from subprocess import run as execute\nexecute(['node', 'case.mjs'])\n",
+        "import shutil as files\nfiles.which('node')\n",
+        "from shutil import which as find_executable\nfind_executable('node')\n",
+    ):
+        direct_node.write_text(source)
+        assert _runs_node(direct_node) is True, source
+    harmless = tmp_path / "test_harmless_commands.py"
+    harmless.write_text(
+        "import subprocess\n"
+        "import shutil\n"
+        "subprocess.run(['npm', 'run', 'build'])\n"
+        "shutil.which('python')\n"
+    )
+
+    assert _runs_node(harmless) is False
+
+
 def test_e2e_support_does_not_clear_user_cache_invalidation_out_of_band():
     """Only the browser acknowledgement route may clear persisted invalidation."""
     violations = []
     for path in _python_files(*E2E_CACHE_CONTRACT_ROOTS):
-        tree = ast.parse(path.read_text(), filename=str(path))
         relative = path.relative_to(REPOSITORY_ROOT)
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and node.name == "clear_cache_invalidation"
-            ):
-                violations.append(
-                    f"{relative}:{node.lineno} defines clear_cache_invalidation"
-                )
-                continue
-
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "setattr"
-                and len(node.args) >= 3
-                and isinstance(node.args[1], ast.Constant)
-                and node.args[1].value == "invalidate_cache"
-                and isinstance(node.args[2], ast.Constant)
-                and node.args[2].value is False
-            ):
-                violations.append(
-                    f"{relative}:{node.lineno} clears invalidate_cache with setattr"
-                )
-                continue
-
-            if isinstance(node, ast.Assign):
-                targets = node.targets
-                value = node.value
-            elif isinstance(node, ast.AnnAssign):
-                targets = [node.target]
-                value = node.value
-            else:
-                continue
-
-            if (
-                isinstance(value, ast.Constant)
-                and value.value is False
-                and any(_cache_invalidation_target(target) for target in targets)
-            ):
-                violations.append(
-                    f"{relative}:{node.lineno} clears invalidate_cache directly"
-                )
+        violations.extend(
+            violation.replace(str(path), str(relative), 1)
+            for violation in _e2e_cache_invalidation_violations(path)
+        )
 
     assert violations == []
 
@@ -548,26 +804,11 @@ def test_e2e_modules_do_not_cache_durable_setup_in_process_booleans():
     """Durable E2E preconditions must be checked against the living datastore."""
     violations = []
     for path in _python_files(TESTING_ROOT / "tests_e2e"):
-        tree = ast.parse(path.read_text(), filename=str(path))
         relative = path.relative_to(REPOSITORY_ROOT)
-        for node in tree.body:
-            if isinstance(node, ast.Assign):
-                targets = node.targets
-                value = node.value
-            elif isinstance(node, ast.AnnAssign):
-                targets = [node.target]
-                value = node.value
-            else:
-                continue
-
-            if not (isinstance(value, ast.Constant) and isinstance(value.value, bool)):
-                continue
-
-            for target in targets:
-                if isinstance(target, ast.Name) and target.id.endswith(
-                    E2E_PROCESS_STATE_SUFFIXES
-                ):
-                    violations.append(f"{relative}:{node.lineno} defines {target.id}")
+        violations.extend(
+            violation.replace(str(path), str(relative), 1)
+            for violation in _e2e_process_state_violations(path)
+        )
 
     assert violations == []
 
@@ -576,18 +817,40 @@ def test_e2e_modules_do_not_replace_native_browser_fetch():
     """Endpoint failures and stubs belong at Playwright's routing boundary."""
     violations = []
     for path in _python_files(TESTING_ROOT / "tests_e2e"):
-        tree = ast.parse(path.read_text(), filename=str(path))
         relative = path.relative_to(REPOSITORY_ROOT)
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
-                continue
-            for offset, line in enumerate(node.value.splitlines()):
-                if E2E_NATIVE_FETCH_ASSIGNMENT.search(line):
-                    violations.append(
-                        f"{relative}:{node.lineno + offset} assigns native fetch"
-                    )
+        violations.extend(
+            violation.replace(str(path), str(relative), 1)
+            for violation in _e2e_native_fetch_violations(path)
+        )
 
     assert violations == []
+
+
+def test_e2e_state_and_fetch_guards_reject_bypasses_and_accept_live_checks(tmp_path):
+    invalidation = tmp_path / "invalidation.py"
+    invalidation.write_text(
+        "def clear_cache_invalidation():\n"
+        "    user.invalidate_cache = False\n"
+        "    setattr(user, 'invalidate_cache', False)\n"
+    )
+    assert len(_e2e_cache_invalidation_violations(invalidation)) == 3
+
+    durable_state = tmp_path / "durable_state.py"
+    durable_state.write_text(
+        "WORKSPACE_READY = False\n"
+        "def check_live_state():\n"
+        "    request_ready = False\n"
+        "    return request_ready\n"
+    )
+    assert len(_e2e_process_state_violations(durable_state)) == 1
+
+    native_fetch = tmp_path / "native_fetch.py"
+    native_fetch.write_text(
+        "page.evaluate(\"\"\"window\n"
+        ".fetch = replacement\"\"\")\n"
+        "page.evaluate(\"const original = window.fetch\")\n"
+    )
+    assert len(_e2e_native_fetch_violations(native_fetch)) == 1
 
 
 def test_e2e_support_does_not_fabricate_pointer_input_or_layout_widths():
@@ -700,13 +963,31 @@ def test_e2e_assertion_guard_rejects_locator_snapshots(tmp_path):
     allowed = tmp_path / "test_identifier_extraction.py"
     allowed.write_text(
         "def test_example():\n"
+        "    item = page.locator('[data-key]')\n"
         "    expect(item).to_have_attribute('data-key', NONEMPTY)\n"
         "    key = item.get_attribute('data-key')\n"
         "    entity = fetch(key)\n"
         "    assert entity is not None\n"
+        "    assert records.count() == 2\n"
     )
 
     assert _e2e_nonretrying_assertion_violations(allowed) == []
+
+
+def test_e2e_assertion_guard_tracks_locator_attributes(tmp_path):
+    path = tmp_path / "test_locator_attribute.py"
+    path.write_text(
+        "def test_example(self):\n"
+        "    self.links = page.locator('a')\n"
+        "    links = self.links\n"
+        "    assert links.count() == 2\n"
+        "    assert self.links.first.inner_text() == 'Home'\n"
+    )
+
+    violations = _e2e_nonretrying_assertion_violations(path)
+
+    assert any("asserts raw count() snapshot" in item for item in violations)
+    assert any("asserts raw inner_text() snapshot" in item for item in violations)
 
 
 def test_e2e_modules_do_not_import_or_bypass_route_functions():
@@ -718,16 +999,45 @@ def test_e2e_modules_do_not_import_or_bypass_route_functions():
     assert violations == []
 
 
-def test_e2e_route_bypass_guard_rejects_synthetic_white_box_test(tmp_path):
+@pytest.mark.parametrize(
+    "import_statement, route",
+    [
+        ("from lagniappe.web.routes.home import site", "site.site_update"),
+        ("from lagniappe.web.routes.home.site import site_update as handler", "handler"),
+        ("from lagniappe.web import routes", "routes.home.site.site_update"),
+        ("import lagniappe.web.routes.home.site", "lagniappe.web.routes.home.site.site_update"),
+        ("import lagniappe.web.routes.home.site as site", "site.site_update"),
+    ],
+    ids=["from-module", "from-function-alias", "from-package", "qualified", "module-alias"],
+)
+def test_e2e_route_bypass_guard_rejects_synthetic_white_box_test(
+    tmp_path, import_statement, route
+):
     path = tmp_path / "test_route_bypass.py"
     path.write_text(
-        "from lagniappe.web.routes.home import site\nsite.site_update.__wrapped__()\n"
+        f"{import_statement}\n"
+        f"{route}()\n"
     )
 
     violations = _e2e_route_bypass_violations(path)
 
-    assert any("imports lagniappe.web.routes.home" in item for item in violations)
-    assert any("accesses __wrapped__" in item for item in violations)
+    assert any("calls imported route" in item for item in violations)
+
+    path.write_text(f"{import_statement}\n{route}.__wrapped__()\n")
+    violations = _e2e_route_bypass_violations(path)
+    assert any("accesses route __wrapped__" in item for item in violations)
+
+    patch_only = tmp_path / "test_route_boundary_patch.py"
+    patch_only.write_text(
+        "from lagniappe.web.routes.process import main as process_routes\n"
+        "import lagniappe.web.routes.home.site\n"
+        "monkeypatch.setattr(process_routes, 'Entities', fake_entities)\n"
+        "client.post('/process/example')\n"
+        "lagniappe.unrelated_helper()\n"
+        "lagniappe.unrelated_helper.__wrapped__()\n"
+    )
+
+    assert _e2e_route_bypass_violations(patch_only) == []
 
 
 def test_e2e_modules_do_not_bypass_durable_ai_workers():
@@ -761,40 +1071,37 @@ def test_web_routes_use_explicit_entity_fetch_boundaries():
     """Route code must not reintroduce identifier-dependent relation expansion."""
     violations = []
     for path in _python_files(ROUTES_ROOT):
-        tree = ast.parse(path.read_text(), filename=str(path))
         relative = path.relative_to(REPOSITORY_ROOT)
-        for node in ast.walk(tree):
-            if _entities_call(node, "load"):
-                violations.append(f"{relative}:{node.lineno} uses Entities.load")
-            elif (
-                _entities_call(node, "fetch") or _entities_call(node, "fetch_one")
-            ) and not any(keyword.arg == "request" for keyword in node.keywords):
-                violations.append(
-                    f"{relative}:{node.lineno} uses {node.func.attr} without request=Fetch..."
-                )
-            elif _entities_call(node, "get") and any(
-                keyword.arg == "load"
-                and isinstance(keyword.value, ast.Constant)
-                and keyword.value.value is True
-                for keyword in node.keywords
-            ):
-                violations.append(
-                    f"{relative}:{node.lineno} uses Entities.get(load=True)"
-                )
-            elif (
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and _uses_injected_entity(node)
-                and not _has_permission_decorator(node)
-            ):
-                violations.append(
-                    f"{relative}:{node.lineno} uses kwargs['entity'] without @permission"
-                )
-            elif (
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and (keyword := _permission_decorator_fetch_keyword(node)) is not None
-            ):
-                violations.append(
-                    f"{relative}:{keyword.value.lineno} passes fetch to @permission"
-                )
+        violations.extend(
+            violation.replace(str(path), str(relative), 1)
+            for violation in _route_entity_fetch_violations(path)
+        )
 
     assert violations == []
+
+
+def test_route_fetch_guard_rejects_implicit_expansion_and_accepts_requests(tmp_path):
+    prohibited = tmp_path / "prohibited.py"
+    prohibited.write_text(
+        "Entities.load(key)\n"
+        "Entities.fetch(key)\n"
+        "Entities.fetch_one(key)\n"
+        "Entities.get(key, load=True)\n"
+        "@permission(fetch=Fetch.ALL)\n"
+        "def decorated(**kwargs):\n"
+        "    return kwargs['entity']\n"
+        "def undecorated(**kwargs):\n"
+        "    return kwargs['entity']\n"
+    )
+    allowed = tmp_path / "allowed.py"
+    allowed.write_text(
+        "Entities.fetch(key, request=Fetch.RELATED)\n"
+        "Entities.fetch_one(key, request=Fetch.RELATED)\n"
+        "Entities.get(key, load=False)\n"
+        "@permission\n"
+        "def decorated(**kwargs):\n"
+        "    return kwargs['entity']\n"
+    )
+
+    assert len(_route_entity_fetch_violations(prohibited)) == 6
+    assert _route_entity_fetch_violations(allowed) == []

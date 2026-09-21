@@ -28,8 +28,12 @@ class FakeAuthority:
 
 @pytest.fixture
 def import_config_testing(monkeypatch):
+    import runner
     from runner import context as runner_context
 
+    # import_module also publishes its result on the parent package. Restore
+    # that attribute as well as sys.modules so later from-imports stay isolated.
+    monkeypatch.setattr(runner, "testing", getattr(runner, "testing", None), raising=False)
     original_config_modules = {
         name: module
         for name, module in sys.modules.items()
@@ -275,17 +279,21 @@ def test_test_frontend_bundle_replaces_stale_production_build(
 def test_run_py_test_server_command_dispatches_start(monkeypatch, capsys):
     import run
 
+    calls = []
     fake_config = types.ModuleType("config")
     fake_config.__path__ = []
     fake_config.SETTINGS = types.SimpleNamespace(
         test_config={"BASE_URL": "http://127.0.0.1:5000"}
     )
     fake_config_testing = types.ModuleType("runner.testing")
-    fake_config_testing.start_managed_test_server = lambda packs: {
-        "pid": 2468,
-        "keeper_pid": 2467,
-        "seed_summary": None,
-    }
+    fake_config_testing.start_managed_test_server = lambda packs: (
+        calls.append(packs)
+        or {
+            "pid": 2468,
+            "keeper_pid": 2467,
+            "seed_summary": None,
+        }
+    )
 
     def unexpected_teardown():
         raise AssertionError("teardown should not run for --start")
@@ -301,6 +309,7 @@ def test_run_py_test_server_command_dispatches_start(monkeypatch, capsys):
     assert run.run_test_server_command(["--start"]) == 0
 
     output = capsys.readouterr().out
+    assert calls == [()]
     assert "http://127.0.0.1:5000" in output
     assert "2468" in output
 
@@ -503,6 +512,14 @@ def test_run_test_server_records_identity_and_requires_nonce_health(
         ),
     ]
     assert authority.updates == [{"server": identity}]
+    assert (
+        "health",
+        ("http://127.0.0.1:5000", authority.nonce),
+        {
+            "expected_pid": 4321,
+            "expected_mode": authority.mode,
+        },
+    ) in calls
 
 
 def test_run_py_test_server_command_dispatches_start_load(monkeypatch, capsys):
@@ -557,20 +574,18 @@ def test_run_py_test_server_command_dispatches_start_load(monkeypatch, capsys):
     assert "Seed landing: Filter Project - http://127.0.0.1:5000/projects/abc" in output
 
 
-def test_test_server_seed_static_site_page_landing_metadata():
-    from config import File
-
-    dev_settings = File.DEV_YAML.load().get("test_settings", {})
-    if "SERVER_NAME" not in dev_settings:
-        pytest.skip("test_settings in lagniappe_dev.yaml must define SERVER_NAME")
-
-    from testing.definitions import SitePages
+def test_test_server_seed_static_resource_landing_metadata():
     from testing.utility import test_server_seed
 
-    landing = SitePages.TASK_INDEX.get(None)
+    landing = types.SimpleNamespace(
+        title="Task Index",
+        url_suffix="/tasks/index",
+        _url_prefix="http://127.0.0.1:5000",
+    )
+    enum_member = types.SimpleNamespace(name="TASK_INDEX")
 
     assert (
-        test_server_seed._resource_name(landing, SitePages.TASK_INDEX) == "Task Index"
+        test_server_seed._resource_name(landing, enum_member) == "Task Index"
     )
     assert (
         test_server_seed._resource_url(landing) == "http://127.0.0.1:5000/tasks/index"

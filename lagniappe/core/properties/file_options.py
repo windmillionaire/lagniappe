@@ -1,5 +1,5 @@
 from ..mixins import ColumnMixin
-from ..tools.ai import summarize_file
+from ..tools.ai.summarize import summarize_file
 from ..tools.files.extract import get_file_text
 from .base_process import ProcessProperty
 from .base_property import Property
@@ -71,7 +71,6 @@ class Summarize(ProcessProperty):
     # @tests tests_unit/test_006_file_properties.py::test_summarize_process
     # @tests tests_unit/test_006_file_properties.py::test_summarize_update_uses_enable_field_name
     # @tests tests_unit/test_006_file_properties.py::test_summarize_update_upload_search_summary_remains_opt_in
-    # @tests tests_unit/test_006_file_properties.py::test_summarize_update_starts_without_browser_routing_identity
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
     # @matrix file : deferred-dispatch option-preservation search-opt-in summarize update

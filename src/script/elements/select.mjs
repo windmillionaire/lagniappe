@@ -1,8 +1,8 @@
-import { STYLES } from "styles";
-import { SelectBox } from "../elements/combobox";
-import { areEqual } from "../shared/utilities";
-import { BaseElement } from "./base/baseElement";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { areEqual } from "../shared/utilities.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { SelectBox } from "./combobox/index.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable true

@@ -143,8 +143,8 @@ def test_ai_report_process_state_stores_report_metadata(monkeypatch):
 
     assert report.status == "ready"
     assert report.pending is False
-    assert report.proposal is proposal
-    assert report.result is result
+    assert report.proposal == proposal
+    assert report.result == result
     assert report.deferred_job == {
         "key": "active-job-key",
         "idempotency_key": "active-idempotency-key",

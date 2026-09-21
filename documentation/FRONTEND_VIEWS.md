@@ -93,10 +93,18 @@ saved documents retain the document surface.
 `views/base/index.mjs` extends Core for User, Form, Category, and Task indexes.
 It owns the tools component, inline table editing, and mobile controls.
 
+`widgets/tables/` owns `IndexTable` and its sorting, editing, visibility, and
+mobile controls. Each has a focused module loaded through the existing widget
+registry names. `widgets/taskHistory.mjs` and `widgets/filterResults.mjs` own
+their feature-specific embedded tables; both reuse `EmbeddedTable` from
+`elements/base/baseTable.mjs`, which also owns the shared `BaseTable`.
+
 Large tables have two readiness stages. `TableVisibilityState` applies saved
 column visibility before first paint. The interactive checkbox panel and
 sorting controls remain lazy; sorting appears only after chained row loading
-and `TableSorting` initialization complete.
+and `TableSorting` initialization complete. `widgets/tables/visibilityState.mjs`
+stays in the build's `index-foundation` chunk and is imported directly by the
+index view and the lazy visibility panel, which shares the view's state instance.
 
 ## Specialized views
 
@@ -111,7 +119,7 @@ shared entity patch service and saves changed models together.
 Help articles use `ShellView` directly through the shared view registry. Their
 server-rendered article has no entity polling or Report state. The report-style
 header's Close link returns Home; Markdown body rendering is shared with the
-reference modal and manual.
+reference modal. The manual has independently authored introductory chapters.
 
 The Form Builder owns an unsaved local schema and does not extend Core. It still
 implements the shared connectivity `sync()` lifecycle. See
@@ -184,6 +192,18 @@ generic collection refresh targets.
 instance per component. Unknown names receive `DefaultWidget`, which provides
 only visibility and configuration for simple show/hide targets.
 
+Specialized construction belongs to its consuming feature:
+`forms/revisions/preview.mjs` builds detached form comparison widgets through
+`loadWidget()`, and `elements/editor/headless.mjs` owns the headless registry and
+lazy document construction used by offline replay. The generic loader does not
+import either adapter.
+
+`widgets/userSettings.mjs` owns `UserSettings`, including user groups, Page
+associations, notification preferences, and API-key controls. It and
+`PagePermissions` independently extend `FormWidget`; their shared restriction
+control is declared in HTML and owned by `FormController`.
+`widgets/pageInfo.mjs` owns Page information and creation.
+
 The loader provides `enable()`, `disable()`, and synchronous `reconcile()`.
 Widgets implement only the members they need:
 
@@ -193,7 +213,7 @@ Widgets implement only the members they need:
 | `updated(response)` / `created(response)` | Prepare server response state. |
 | `prereconcile()` | Finish imports, detached rendering, or data work. |
 | `postreconcile()` | Commit connected-DOM work synchronously. |
-| `data` | Contribute `FormData` to the component. |
+| `formData` | Contribute `FormData` to the component. |
 | `showError(message)` | Present a validation error. |
 | `destroy()` | Remove listeners and owned resources. |
 
@@ -201,7 +221,7 @@ Loader settings come from the widget target, component, and view: key, kind,
 readonly, visibility, persistence, endpoint registry, and parsed JSON values
 such as schema, submission, conditions, columns, selected, preload, and options.
 
-Most behavioral widgets extend `FormElement`, `BaseList`, `BaseTable`, or
+Most behavioral widgets extend `FormWidget`, `BaseList`, `BaseTable`, or
 `BaseUpload`. See [FRONTEND_FORMS.md](FRONTEND_FORMS.md) and
 [FRONTEND_ELEMENTS.md](FRONTEND_ELEMENTS.md).
 

@@ -33,7 +33,6 @@ def clear_topic_caches():
 # @pair help:canonical-source
 def test_topics_are_canonical_and_portable():
     corpus = reference.topics()
-    assert len(corpus) == 45
     assert 'form_creation' not in corpus
     assert {'navigation', 'search', 'filters', 'documents', 'offline',
             'messages_notifications', 'task_scheduling', 'task_history',
@@ -92,16 +91,18 @@ def test_topic_lookup_rejects_aliases_and_paths(topic_id):
 
 
 # @pair help:rendering
-def test_topic_rendering_preserves_safety_and_manual_links(monkeypatch):
-    source = b'---\ntitle: One\nmanual_section: forms\n---\nA summary.\n\n## Details\n\n[More](/help/one)\n\n<script>secret()</script>'
+def test_topic_rendering_preserves_safety_and_links(monkeypatch):
+    source = b'---\ntitle: One\n---\nA summary.\n\n## Details\n\n[More](/help/one) and [Installation](/manual/installation)\n\n<script>secret()</script>'
     monkeypatch.setattr(reference, '_sources', lambda: (('one', source),))
     article = reference.topic_html('one')
-    embedded = reference.topic_html('one', embedded=True, manual=True)
+    embedded = reference.topic_html('one', embedded=True)
     assert isinstance(article, SafeHTML) and isinstance(embedded, SafeHTML)
     assert '<h2>Details</h2>' in article
     assert '<h3>Details</h3>' in embedded
-    assert 'href="/manual/forms#one"' in embedded
-    assert 'script' not in article and 'secret()' not in article
+    for html in (article, embedded):
+        assert 'href="/help/one"' in html
+        assert 'href="/manual/installation"' in html
+        assert 'script' not in html and 'secret()' not in html
     introduction, details = reference.topic_sections('one')
     assert isinstance(introduction, SafeHTML) and isinstance(details, SafeHTML)
     assert BeautifulSoup(introduction, 'html.parser').get_text() == 'A summary.'
@@ -242,7 +243,7 @@ def test_index_upgrade_does_not_hide_provider_failures(memory_cache):
 # @matrix help : publication version
 def test_population_is_versioned_atomic_and_skips_warm_start(memory_cache, monkeypatch):
     version = help_cache.ensure_help()
-    assert len(memory_cache.hashes) == 46
+    assert len(memory_cache.hashes) == len(reference.topics()) + 1
     key = f'{HELP_PREFIX}{version}:create_form'
     row = memory_cache.hashes[key]
     assert row['topic_id'] == 'create_form' and row['kind'] == 'help'
@@ -277,7 +278,7 @@ def test_failed_population_is_retryable_and_cache_loss_repopulates(memory_cache)
     memory_cache.hashes.clear()
     memory_cache.values.clear()
     assert help_cache.ensure_help() == version
-    assert len(memory_cache.hashes) == 45
+    assert len(memory_cache.hashes) == len(reference.topics())
 
 
 # @pair help:publication

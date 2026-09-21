@@ -35,6 +35,7 @@ DEFAULT_REPORT_PATH = Path("reports/style-traceability.md")
 PIPELINE_INPUT_PATHS = (
     Path("build/rollup.config.mjs"),
     Path("build/rollup.dev.config.mjs"),
+    Path("build/rollup.shared.mjs"),
     Path("build/utility.mjs"),
     Path("testing/utility/style_compile.mjs"),
     Path("package.json"),
@@ -149,7 +150,8 @@ class StylePipeline:
     registry_schema: str
     icons: str
     icons_schema: str
-    virtual_module: str
+    javascript_output: str
+    javascript_icons_output: str
     python_output: str
     python_icons_output: str
     icon_count: int
@@ -545,6 +547,12 @@ def _css_import_graph(
 
 
 def _load_generated_registry(path: Path, constant: str) -> object:
+    if path.suffix == ".mjs":
+        source = path.read_text(encoding="utf-8")
+        match = re.search(rf"^const {constant} = (.*);\nexport \{{ {constant} \}};\s*$", source, re.MULTILINE | re.DOTALL)
+        if not match:
+            raise ValueError(f"{path} does not contain the generated {constant} JSON payload")
+        return json.loads(match.group(1))
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for statement in tree.body:
         if not isinstance(statement, ast.Assign) or len(statement.targets) != 1:
@@ -569,7 +577,8 @@ def _pipeline_inventory(
             registry_schema="",
             icons="",
             icons_schema="",
-            virtual_module="",
+            javascript_output="",
+            javascript_icons_output="",
             python_output="",
             python_icons_output="",
             icon_count=0,
@@ -604,13 +613,13 @@ def _pipeline_inventory(
     css_entry = str(css.get("entry", ""))
     candidate_validator = str(css.get("candidate_validator", ""))
     issues: list[dict[str, str]] = []
-    if contract.get("schema_version") != 3:
+    if contract.get("schema_version") != 4:
         issues.append(
             {
                 "kind": "unsupported-style-pipeline-schema",
                 "severity": "error",
                 "location": "src/style/pipeline.json",
-                "message": "style pipeline schema_version must be 3",
+                "message": "style pipeline schema_version must be 4",
             }
         )
     imports, reachable, unreachable, duplicate, import_issues = _css_import_graph(
@@ -872,6 +881,7 @@ def _pipeline_inventory(
                     }
                 )
 
+    authored = None
     parity: bool | None = None
     generated_path = repo_root / python_output
     source_registry = repo_root / registry_path
@@ -1011,6 +1021,19 @@ def _pipeline_inventory(
             }
         )
 
+    for key, constant, normalized in (
+        ("javascript_styles", "STYLES", authored if parity is not None else None),
+        ("javascript_icons", "ICONS", normalized_icons),
+    ):
+        output = str(registry.get(key, ""))
+        try:
+            if not output:
+                raise ValueError(f"Registry contract is missing {key}")
+            if _load_generated_registry(repo_root / output, constant) != normalized:
+                raise ValueError(f"generated {constant} differs from its YAML registry")
+        except (OSError, TypeError, ValueError) as exc:
+            issues.append({"kind": "generated-javascript-registry-drift", "severity": "error", "location": output or "src/style/pipeline.json", "message": str(exc)})
+
     return StylePipeline(
         configured=True,
         contract_path="src/style/pipeline.json",
@@ -1019,7 +1042,8 @@ def _pipeline_inventory(
         registry_schema=registry_schema,
         icons=icons_path,
         icons_schema=icons_schema,
-        virtual_module=str(registry.get("virtual_module", "")),
+        javascript_output=str(registry.get("javascript_styles", "")),
+        javascript_icons_output=str(registry.get("javascript_icons", "")),
         python_output=python_output,
         python_icons_output=python_icons_output,
         icon_count=icon_count,

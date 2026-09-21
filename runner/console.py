@@ -4,8 +4,9 @@ import re
 import shutil
 import unicodedata
 
+from runner.terminal import styled, unstyle
 
-_SGR = re.compile(r"\x1b\[[0-9;]*m")
+
 _MARKER = re.compile(
     r"(?:\x1b\[[0-9;]*m)*(?:[•*?✓✔✗!-]|\d+[.)]|\[(?:OK|X|!)\])"
     r"(?:\x1b\[[0-9;]*m)*\s+"
@@ -25,13 +26,6 @@ def terminal_width(width=None):
     if width is None:
         width = min(100, shutil.get_terminal_size(fallback=(80, 24)).columns - 1)
     return max(1, int(width))
-
-
-# @testable false
-# @covered-by runner/console.py::wrap_text
-# @reason ANSI styling has no display width
-def unstyle(message):
-    return _SGR.sub("", str(message))
 
 
 # @testable false
@@ -92,8 +86,6 @@ def wrap_text(message, width=None):
 # @matrix setup : interactive-input terminal-wrapping
 def format_prompt(message, width=None, *, default=None, hint=None, stream=None):
     """Render a Primer question without changing the caller's input semantics."""
-    from runner.presentation import styled
-
     width = terminal_width(width)
     text = unstyle(message).rstrip()
     leading = "\n" * (len(text) - len(text.lstrip("\n")))

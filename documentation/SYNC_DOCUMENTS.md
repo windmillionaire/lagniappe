@@ -33,17 +33,22 @@ Redis uses isolated keys per document:
 Document state expires after five minutes. Presence fields expire after one
 minute and are refreshed by the active two-second poll. An existing document
 poll reads the state and refreshes its TTL with one Redis `GETEX`; it does not
-enter an optimistic transaction or rewrite the full document. When working
-state is absent, the poll enters the normal isolated transaction to create one
-new generation from the durable document asset. Document updates and asset
-refreshes continue to use optimistic transactions.
+download a durable snapshot, enter an optimistic transaction, or rewrite the
+full document. Authorization and document identity are checked on every poll.
+When working state is absent, the poll loads the durable YDoc (or legacy HTML
+fallback) once, then enters the normal isolated transaction to initialize a new
+generation. A generation created concurrently while loading or initializing
+takes precedence over that fallback. Document updates and asset refreshes
+continue to use optimistic transactions and fresh durable reads where required.
 
 ## Deltas and checkpoints
 
 `POST /l/sync` appends Yjs deltas under a Redis optimistic transaction. Every
 delta receives a monotonic revision. Polling returns:
 
-- a full snapshot when generation differs or the cursor predates compaction;
+- a full snapshot plus every retained delta after its base revision when
+  generation differs or the cursor predates compaction (an old generation's
+  numeric cursor must not filter the replacement generation's deltas);
 - only newer deltas otherwise; and
 - a presence list only when its digest changed.
 
@@ -112,6 +117,13 @@ operation receipt, including the expected post-append content signature, so a
 retry after a Report checkpoint failure does not append twice. AI/MCP document
 actions remain append-only. Inline edits, replacement and deletion belong in the
 editor; corrective plans do not automatically remove previously appended content.
+
+An applied receipt is final evidence that its operation committed, even if a user
+later edits or deletes the appended content. Its signature describes the historical
+post-append state, not a requirement that the current document still match. Recovery
+reconciles the Report checkpoint from that receipt without flagging later content
+edits as drift, appending again, restoring deleted text, or making another document
+version. Existing fresh-access checks still apply.
 
 After an append commits, the server publishes a new revision/generation with the
 merged snapshot. Connected/offline clients merge it using the existing sync

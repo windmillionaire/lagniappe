@@ -1,6 +1,6 @@
 /**
  * @testable true
- * @tests tests_js/test_016_combobox_frontend.py::test_submitter_clear_can_suppress_change_notification
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_submitter_clear_can_suppress_change_notification
  * @pair combobox:clear-notification
  */
 export const Submitter = (Combobox) =>

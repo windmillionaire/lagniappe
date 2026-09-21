@@ -97,9 +97,10 @@ def _entity_result(descriptor, entity, *, ingress=False):
     return _revision_result(descriptor, revision, payload)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason document permission and Redis projection are exercised through route coverage
+# @testable true
+# @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_loads_storage_only_on_cache_miss
+# @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_rejects_unavailable_documents_before_loading_state
+# @matrix polling : authorization document read-path unavailable
 def _document_result(descriptor, entity, client_id):
     if not entity or not entity.allowed(Action.VIEW, user=current_user):
         return _result(descriptor, "unavailable")
@@ -109,7 +110,7 @@ def _document_result(descriptor, entity, client_id):
         return _result(descriptor, "unavailable")
     payload = cache.poll_document(
         descriptor["sync_id"],
-        seed=entity.state(descriptor["sync_id"]),
+        seed=lambda: entity.state(descriptor["sync_id"]),
         client_id=client_id,
         user=current_user.details,
         generation=descriptor["generation"],

@@ -132,12 +132,14 @@ def _apply_update(
     reload(installer)
     reload(config)
     from config import SETTINGS, constants
-    from installer import create_config, gcloud, utils
+    from installer import commands, create_config, deploy, gcloud, utils
 
     reload(constants)
+    reload(commands)
     create_config = reload(create_config)
     gcloud = reload(gcloud)
-    utils = reload(utils)
+    reload(utils)
+    deploy = reload(deploy)
     from runner.deploy import verify_runtime_deploy_surface
 
     installed_version = str(
@@ -189,7 +191,7 @@ def _apply_update(
         format_prompt("Deploy app now", hint="y/N")
     )
     if consent.casefold() == "y":
-        utils.deploy_to_app_engine(
+        deploy.deploy_to_app_engine(
             print_final_summary=False,
             upgrade_notice_handled=True,
         )

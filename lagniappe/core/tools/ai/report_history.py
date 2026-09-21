@@ -3,10 +3,11 @@
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai
-from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+
+from . import external_operations
+from .reporting import uploads as report_uploads
 
 
 # @testable true
@@ -24,7 +25,7 @@ def delete_report_record(report):
         outcome = external_operations.delete_plan_if_idle(report, snapshot, report, *files_to_delete)
         if outcome == agent_api_store.PLAN_OPERATION_COMMITTED:
             try:
-                ai.cleanup_report_upload_manifest(report)
+                report_uploads.cleanup_report_upload_manifest(report)
             except (ValueError, TypeError, AttributeError, KeyError):
                 pass  # Obsolete payloads cannot prevent deletion of the report.
         return outcome
@@ -47,7 +48,7 @@ def delete_report_record(report):
     # Fence deletion before cleaning up evidence owned by the current report.
     DeferredJobs.cancel(deferred_job)
     report.upload_manifest = upload_manifest
-    ai.cleanup_report_upload_manifest(report)
+    report_uploads.cleanup_report_upload_manifest(report)
     return agent_api_store.PLAN_OPERATION_COMMITTED
 
 

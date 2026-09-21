@@ -1,6 +1,4 @@
 import { mkdirSync, readFileSync } from "node:fs";
-import json from "@rollup/plugin-json";
-import resolve from "@rollup/plugin-node-resolve";
 import replace from "@rollup/plugin-replace";
 import { sentryRollupPlugin } from "@sentry/rollup-plugin";
 import tailwindcss from "@tailwindcss/postcss";
@@ -9,8 +7,7 @@ import * as yaml from "js-yaml";
 import { minify } from "rollup-plugin-esbuild";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
-import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
-import { recordBuildArtifacts } from "./publication.mjs";
+import { createRollupConfig } from "./rollup.shared.mjs";
 import { resolveSentryBuild } from "./sentry.mjs";
 import { startupBudget } from "./startupBudget.mjs";
 import {
@@ -19,29 +16,14 @@ import {
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
-	interactionFoundationChunk,
 	resolveFonts,
 	STYLE_PIPELINE,
 	updateServiceWorker,
-	versionChunkImports,
 } from "./utility.mjs";
 
 const reportsDir = "./reports";
 mkdirSync(reportsDir, { recursive: true });
 const uploadedSourceMaps = "./lagniappe/web/static/**/*.map";
-const thirdPartyLicenseBanner =
-	"/*! Third-party licenses: /third-party-licenses.txt */";
-const mainInputs = {
-	main: "./src/script/main.mjs",
-	public: "./src/script/public.mjs",
-	...Object.fromEntries(
-		Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
-			entry,
-			`./src/script/${source.replace(/^\.\//, "")}`,
-		]),
-	),
-};
-
 const settings = yaml.load(
 	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
 );
@@ -62,162 +44,60 @@ const sentryPlugins = (project, sourcemaps) =>
 		: [];
 const buildId = process.env.LAGNIAPPE_FRONTEND_BUILD_ID || generateBuildId();
 
-export default [
-	// Login bundle
-	{
-		input: "./src/script/login.mjs",
-		output: {
-			file: "./lagniappe/web/static/login.js",
-			format: "esm",
-			sourcemap: sentry.sourcemap,
-			name: "login",
-			minifyInternalExports: true,
-			banner: thirdPartyLicenseBanner,
-		},
-		plugins: [
-			buildStyles(),
-			json(),
-			resolve({
-				browser: true,
-				extensions: ["js", ".mjs", ".json"],
-				preferBuiltins: false,
-			}),
-			minify({ legalComments: "eof" }),
-			replace({
-				preventAssignment: true,
-				values: {
-					"process.env.NODE_ENV": JSON.stringify("production"),
-					__VERSION__: packageMetadata.version,
-				},
-			}),
-			...sentryPlugins("lagniappe-frontend", {}),
-			recordBuildArtifacts(),
-		],
-		onwarn(warning, warn) {
-			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
-				return;
-			warn(warning);
-		},
-	},
-	// Browser error-monitoring bundle (loaded only when monitoring is enabled)
-	{
-		input: "./src/script/sentry.mjs",
-		output: {
-			file: "./lagniappe/web/static/sentry.js",
-			format: "esm",
-			sourcemap: sentry.sourcemap,
-			name: "sentry",
-			minifyInternalExports: true,
-			banner: thirdPartyLicenseBanner,
-		},
-		plugins: [
-			json(),
-			resolve({
-				browser: true,
-				extensions: ["js", ".mjs", ".json"],
-				preferBuiltins: false,
-			}),
-			minify({ legalComments: "eof" }),
-			replace({
-				preventAssignment: true,
-				values: {
-					"process.env.NODE_ENV": JSON.stringify("production"),
-					__VERSION__: packageMetadata.version,
-				},
-			}),
-			...sentryPlugins("lagniappe-frontend", {}),
-			recordBuildArtifacts(),
-		],
-		onwarn(warning, warn) {
-			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
-				return;
-			warn(warning);
-		},
-	},
-	// Main bundle
-	{
-		input: mainInputs,
-		output: {
-			dir: "./lagniappe/web/static/",
-			entryFileNames: ({ name }) =>
-				name === "main" ? "script.js" : "chunks/views/[name].js",
-			chunkFileNames: "chunks/[name].js",
-			manualChunks: interactionFoundationChunk,
-			onlyExplicitManualChunks: true,
-			format: "esm",
-			sourcemap: sentry.sourcemap,
-			name: "lagniappe",
-			minifyInternalExports: true,
-			banner: thirdPartyLicenseBanner,
-		},
-		plugins: [
-			json(),
-			resolve({
-				browser: true,
-				extensions: ["js", ".mjs", ".json"],
-				preferBuiltins: false,
-			}),
-			versionChunkImports(buildId),
-			minify({ legalComments: "eof" }),
-			postcss({
-				extract: STYLE_PIPELINE.css.output,
-				plugins: [
-					tailwindcss(),
-					resolveFonts(),
-					cssnano({
-						preset: "default",
-					}),
-				],
-				sourceMap: false,
-				extensions: [".scss", ".css"],
-				modules: false,
-				inject: false,
-			}),
-			replace({
-				preventAssignment: true,
-				values: {
-					"process.env.NODE_ENV": JSON.stringify("production"),
-					__BUILD_ID__: JSON.stringify(buildId),
-					__VERSION__: packageMetadata.version,
-				},
-			}),
-			buildStyles(),
-			emitFonts(),
-			emitPdfWorker(),
-			emitThirdPartyLicenses(),
-			startupBudget(),
-			updateServiceWorker(buildId),
-			...sentryPlugins("lagniappe-frontend", {
-				filesToDeleteAfterUpload: uploadedSourceMaps,
-			}),
-			visualizer({
-				filename: `${reportsDir}/bundle-stats.html`,
-				gzipSize: true,
-				brotliSize: true,
-				template: "treemap", // or "sunburst", "network"
-			}),
-			recordBuildArtifacts({
-				final: true,
-				buildId,
-				mode: "production",
-				version: packageMetadata.version,
-				extraArtifacts: [
-					"lagniappe/web/start/styles/icons.py",
-					"lagniappe/web/start/styles/fonts.py",
-					"lagniappe/web/start/styles/styles.py",
-					"lagniappe/web/static/sw.js",
-				],
-			}),
-		],
-		onwarn(warning, warn) {
-			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
-				return;
-			if (
-				warning.code === "CIRCULAR_DEPENDENCY" &&
-				warning.ids?.some((id) => id.includes("y-prosemirror"))
-			)
-				return;
-			warn(warning);
-		},
-	},
-];
+export default createRollupConfig({
+	buildId,
+	mode: "production",
+	version: packageMetadata.version,
+	output: { sourcemap: sentry.sourcemap, minifyInternalExports: true },
+	entryPlugins: () => [
+		minify({ legalComments: "eof" }),
+		replace({
+			preventAssignment: true,
+			values: {
+				"process.env.NODE_ENV": JSON.stringify("production"),
+				__VERSION__: packageMetadata.version,
+			},
+		}),
+		...sentryPlugins("lagniappe-frontend", {}),
+	],
+	mainPlugins: [
+		minify({ legalComments: "eof" }),
+		postcss({
+			extract: STYLE_PIPELINE.css.output,
+			plugins: [
+				tailwindcss(),
+				resolveFonts(),
+				cssnano({
+					preset: "default",
+				}),
+			],
+			sourceMap: false,
+			extensions: [".scss", ".css"],
+			modules: false,
+			inject: false,
+		}),
+		replace({
+			preventAssignment: true,
+			values: {
+				"process.env.NODE_ENV": JSON.stringify("production"),
+				__BUILD_ID__: JSON.stringify(buildId),
+				__VERSION__: packageMetadata.version,
+			},
+		}),
+		buildStyles(),
+		emitFonts(),
+		emitPdfWorker(),
+		emitThirdPartyLicenses(),
+		startupBudget(),
+		updateServiceWorker(buildId),
+		...sentryPlugins("lagniappe-frontend", {
+			filesToDeleteAfterUpload: uploadedSourceMaps,
+		}),
+		visualizer({
+			filename: `${reportsDir}/bundle-stats.html`,
+			gzipSize: true,
+			brotliSize: true,
+			template: "treemap", // or "sunburst", "network"
+		}),
+	],
+});

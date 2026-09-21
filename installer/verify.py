@@ -10,9 +10,9 @@ def validate_installation():
     """Validate local setup state without creating or retargeting resources."""
     from config import verify_generation_manifest
     from runner.deploy import verify_runtime_deploy_surface
-    from installer import utils
+    from installer.commands import check_gcloud_cli
 
-    utils.check_gcloud_cli()
+    check_gcloud_cli()
     verify_generation_manifest()
     verify_runtime_deploy_surface()
     return True

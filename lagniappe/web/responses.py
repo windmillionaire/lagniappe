@@ -28,7 +28,11 @@ from lagniappe.core.definitions import (
 from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.tools.form_definitions import definition_for, original_completion, rendered_html_fields
+from lagniappe.core.tools.forms.definitions import (
+    definition_for,
+    original_completion,
+    rendered_html_fields,
+)
 from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
@@ -54,6 +58,7 @@ def offline():
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
+# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
 # @pair request-errors:plain-validation
 def error(error, exception=None):
     if exception:
@@ -970,6 +975,9 @@ def filter_condition(data, condition, filter=False, options=False):
 # --- User Responses ---
 
 
+# @testable true
+# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
+# @matrix user-groups : group-create nav
 def create_group(group):
     form_partial = get_template_attribute("users/tools.html", "group_permissions")
     selector_partial = get_template_attribute(
@@ -977,25 +985,20 @@ def create_group(group):
         "group_selector",
     )
 
-    return form_partial(group) + selector_partial(group), 200
+    sections = group.properties.permissions.permissions_form()["sections"]
+    return form_partial(group, sections) + selector_partial(group), 200
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
-def group_permissions(group, public=False, update=False):
-    data = group.properties.permissions.permissions_form()
-    if not public:
-        data["name"] = group.name
-
+# @testable true
+# @matrix user-groups : permission-update
+def group_permissions(group, public=False):
     if public:
         template = get_template_attribute("users/tools.html", "public_permissions")
     else:
         template = get_template_attribute("users/tools.html", "group_permissions")
 
-    if update:
-        data["html"] = template(group)
-
-    return entity_response((jsonify(data), 200), group)
+    sections = group.properties.permissions.permissions_form()["sections"]
+    return entity_response((template(group, sections), 200), group)
 
 
 # --- Search Responses ---

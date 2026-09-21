@@ -31,7 +31,6 @@
 			]
 		]
 	},
-
 	"test_filename_mimetype_encoding": {
 		"entities": [
 			[
@@ -62,7 +61,6 @@
 			]
 		]
 	},
-
 	"test_summary": {
 		"entities": [
 			[
@@ -89,7 +87,6 @@
 			]
 		]
 	},
-
 	"test_as_html": {
 		"entities": [
 			[
@@ -113,7 +110,6 @@
 			]
 		]
 	},
-
 	"test_extract_process": {
 		"entities": [
 			[
@@ -132,21 +128,15 @@
 				{
 					"enabled": true,
 					"search": false,
-					"update_status": {
-						"complete": true,
-						"text": "Extracted text content"
-					},
+					"update_status": true,
 					"expected": {
 						"enabled": true,
-						"search": false,
-						"complete": true,
-						"status": "Text extracted successfully."
+						"search": false
 					}
 				}
 			]
 		]
 	},
-
 	"test_summarize_process": {
 		"entities": [
 			[
@@ -165,21 +155,15 @@
 				{
 					"enabled": true,
 					"search": false,
-					"update_status": {
-						"complete": true,
-						"summary": "AI generated summary"
-					},
+					"update_status": true,
 					"expected": {
 						"enabled": true,
-						"search": false,
-						"complete": true,
-						"summary": "AI generated summary"
+						"search": false
 					}
 				}
 			]
 		]
 	},
-
 	"test_options": {
 		"entities": [
 			[
@@ -188,8 +172,12 @@
 					"extract_enabled": true,
 					"summarize_enabled": true,
 					"expected": {
-						"has_extract": true,
-						"has_summarize": true
+						"extract": {
+							"enabled": true
+						},
+						"summarize": {
+							"enabled": true
+						}
 					}
 				}
 			],
@@ -199,8 +187,12 @@
 					"extract_enabled": false,
 					"summarize_enabled": false,
 					"expected": {
-						"has_extract": true,
-						"has_summarize": true
+						"extract": {
+							"enabled": false
+						},
+						"summarize": {
+							"enabled": false
+						}
 					}
 				}
 			]

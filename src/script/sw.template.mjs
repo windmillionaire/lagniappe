@@ -8,6 +8,7 @@ const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
 const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
 const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
 const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
+const STATIC_RETRY_DELAYS_MS = [250, 750];
 const BROWSER_PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;
 const TOKEN_REQUEST = {
 	credentials: "include",
@@ -30,7 +31,7 @@ function captureError(error, context = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_activation_clears_only_application_owned_caches
+ * @tests tests_js/test_008_service_worker.mjs::test_activation_clears_only_application_owned_caches
  * @matrix cache : activation ownership service-worker
  */
 async function updateCaches() {
@@ -42,8 +43,10 @@ async function updateCaches() {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_precache_static_assets_warms_configured_urls_and_ignores_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_precache_static_assets_warms_configured_urls_and_ignores_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_precache_retries_transient_failures_and_preserves_cache_policy
  * @matrix cache : precache service-worker static-assets
+ * @matrix cache : retry no-store
  */
 async function precacheStaticAssets() {
 	const cache = await caches.open(CACHE);
@@ -52,12 +55,55 @@ async function precacheStaticAssets() {
 			const request = new Request(new URL(url, self.location.origin).href, {
 				cache: "reload",
 			});
-			const response = await fetch(request);
+			const response = await fetchStaticAsset(request);
 			if (response.ok && !responsePreventsStorage(response)) {
 				await cache.put(request, response.clone());
 			}
 		}),
 	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/sw.template.mjs::handleStatic
+ * @covered-by src/script/sw.template.mjs::precacheStaticAssets
+ * @reason bounded static GET retries are exercised through serving and cache warming
+ */
+async function fetchStaticAsset(request) {
+	let currentRequest = request;
+	for (let attempt = 0; ; attempt += 1) {
+		let response;
+		try {
+			response = await fetch(currentRequest);
+		} catch (error) {
+			if (
+				request.method !== "GET" ||
+				request.signal.aborted ||
+				error?.name === "AbortError" ||
+				attempt === STATIC_RETRY_DELAYS_MS.length
+			) {
+				throw error;
+			}
+		}
+		if (
+			response &&
+			(request.method !== "GET" ||
+				request.signal.aborted ||
+				!UPSTREAM_STATUSES.has(response.status) ||
+				response.headers.has("X-Lagniappe-Error") ||
+				attempt === STATIC_RETRY_DELAYS_MS.length)
+		) {
+			return response;
+		}
+		// Discard failed bodies before another attempt, and avoid replaying an
+		// HTTP-cache error or a conditional request without a usable cached body.
+		await response?.body?.cancel().catch(() => {});
+		await new Promise((resolve) =>
+			setTimeout(resolve, STATIC_RETRY_DELAYS_MS[attempt]),
+		);
+		if (request.signal.aborted) throw request.signal.reason;
+		currentRequest = networkRequest(request, { cache: "reload" });
+	}
 }
 
 /**
@@ -199,9 +245,9 @@ function validateUserOnce(cacheConfirmation) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_confirmation_posts_after_local_clear
- * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_requires_explicit_server_acknowledgement
- * @tests tests_js/test_008_service_worker.py::test_cache_acknowledgements_do_not_coalesce_different_revisions
+ * @tests tests_js/test_008_service_worker.mjs::test_cache_invalidation_confirmation_posts_after_local_clear
+ * @tests tests_js/test_008_service_worker.mjs::test_cache_invalidation_requires_explicit_server_acknowledgement
+ * @tests tests_js/test_008_service_worker.mjs::test_cache_acknowledgements_do_not_coalesce_different_revisions
  * @matrix cache : acknowledgement concurrency failure invalidation retry service-worker
  */
 async function checkForCacheInvalidation(response, options = {}) {
@@ -222,7 +268,7 @@ async function checkForCacheInvalidation(response, options = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes
+ * @tests tests_js/test_008_service_worker.mjs::test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes
  * @matrix cache : etag query route-class service-worker sibling-invalidation
  */
 async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
@@ -277,8 +323,8 @@ async function discardCachedResponse(cache, request) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.mjs::test_no_store_304_discards_cached_response
+ * @tests tests_js/test_008_service_worker.mjs::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
  * @matrix cache : acknowledgement invalidation no-store service-worker
  */
 async function handleUncacheableResponse(
@@ -306,8 +352,8 @@ const EVICTION_THROTTLE_MS = 60_000;
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_quota_eviction_is_throttled_and_bounded_to_oldest_entries
- * @tests tests_js/test_008_service_worker.py::test_quota_eviction_tolerates_unavailable_and_failed_estimates
+ * @tests tests_js/test_008_service_worker.mjs::test_quota_eviction_is_throttled_and_bounded_to_oldest_entries
+ * @tests tests_js/test_008_service_worker.mjs::test_quota_eviction_tolerates_unavailable_and_failed_estimates
  * @matrix cache : batch eviction failure quota service-worker throttle unavailable
  */
 async function maybeEvictForQuota() {
@@ -346,7 +392,7 @@ let _connectivity = {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_worker_accepts_only_versioned_valid_connectivity_messages
+ * @tests tests_js/test_008_service_worker.mjs::test_worker_accepts_only_versioned_valid_connectivity_messages
  * @matrix browser-protocol connectivity : controller service-worker validation version
  */
 function receiveConnectivityMessage(data) {
@@ -371,7 +417,7 @@ function receiveConnectivityMessage(data) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_worker_classifies_only_unmarked_upstream_html_failures
+ * @tests tests_js/test_008_service_worker.mjs::test_worker_classifies_only_unmarked_upstream_html_failures
  * @matrix request-errors service-worker : application-error-marker classification upstream-unavailable
  */
 function isUpstreamUnavailableResponse(response) {
@@ -428,7 +474,7 @@ function boundedServer(response) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_upstream_failure_notifies_controlled_clients_with_bounded_state
+ * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_notifies_controlled_clients_with_bounded_state
  * @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable
  */
 async function notifyUpstreamUnavailable(
@@ -492,7 +538,7 @@ function upstreamHeaders(
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
+ * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
  * @matrix cache request-errors service-worker : stale-cache upstream-unavailable
  */
 function markedStaleResponse(cached, upstream) {
@@ -508,8 +554,8 @@ function markedStaleResponse(cached, upstream) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_upstream_failure_without_cache_returns_branded_retryable_503
- * @tests tests_js/test_008_service_worker.py::test_mutation_upstream_failure_returns_uncertain_json_without_replay
+ * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_without_cache_returns_branded_retryable_503
+ * @tests tests_js/test_008_service_worker.mjs::test_mutation_upstream_failure_returns_uncertain_json_without_replay
  * @matrix request-errors service-worker : branded-response mutation no-replay retry upstream-unavailable
  */
 function brandedUpstreamResponse(request, upstream) {
@@ -627,8 +673,14 @@ self.addEventListener("fetch", (event) => {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_no_store_static_response_is_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retries_transient_failures_and_caches_recovery
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retry_budget_preserves_failure
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_does_not_retry_permanent_errors_or_mutations
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_abort_stops_retries
+ * @tests tests_js/test_008_service_worker.mjs::test_static_asset_cache_hit_avoids_network
  * @matrix cache : no-store service-worker static-assets
+ * @matrix cache : retry abort cache-hit
  */
 async function handleStatic(event) {
 	const cache = await caches.open(CACHE);
@@ -640,7 +692,7 @@ async function handleStatic(event) {
 	}
 
 	try {
-		const response = await fetch(event.request);
+		const response = await fetchStaticAsset(event.request);
 		if (isUpstreamUnavailableResponse(response)) {
 			return handleUpstreamUnavailable(event, event.request, response);
 		}
@@ -661,7 +713,7 @@ async function handleStatic(event) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_navigation_failure_without_cached_offline_document_returns_503
+ * @tests tests_js/test_008_service_worker.mjs::test_navigation_failure_without_cached_offline_document_returns_503
  * @matrix cache offline : cache-miss fallback navigation service-worker
  */
 async function offlineFallback() {
@@ -673,8 +725,8 @@ async function offlineFallback() {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_application_get_failure_returns_503_instead_of_offline_html
- * @tests tests_js/test_008_service_worker.py::test_navigation_failure_uses_offline_document
+ * @tests tests_js/test_008_service_worker.mjs::test_application_get_failure_returns_503_instead_of_offline_html
+ * @tests tests_js/test_008_service_worker.mjs::test_navigation_failure_uses_offline_document
  * @matrix cache offline : ajax navigation response-shape service-worker
  */
 async function unavailableResponse(request) {
@@ -704,9 +756,9 @@ async function unavailableResponse(request) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_dynamic_fetch_preserves_browser_validators_without_stored_etag
- * @tests tests_js/test_008_service_worker.py::test_conditional_fetch_preserves_original_request_redirect_mode
- * @tests tests_js/test_008_service_worker.py::test_304_response_with_invalidation_header_fetches_fresh_response
+ * @tests tests_js/test_008_service_worker.mjs::test_dynamic_fetch_preserves_browser_validators_without_stored_etag
+ * @tests tests_js/test_008_service_worker.mjs::test_conditional_fetch_preserves_original_request_redirect_mode
+ * @tests tests_js/test_008_service_worker.mjs::test_304_response_with_invalidation_header_fetches_fresh_response
  * @matrix cache : browser-validators etag invalidation redirect-mode service-worker
  */
 function networkRequest(request, { etag, cache } = {}) {
@@ -727,7 +779,7 @@ function networkRequest(request, { etag, cache } = {}) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_cached_304_marks_response_not_updated
+ * @tests tests_js/test_008_service_worker.mjs::test_cached_304_marks_response_not_updated
  * @matrix cache request : conditional-response dom-refresh service-worker
  */
 function markResponseNotUpdated(response) {
@@ -742,7 +794,7 @@ function markResponseNotUpdated(response) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_token_request_is_network_only_without_client_cache_directives
+ * @tests tests_js/test_008_service_worker.mjs::test_token_request_is_network_only_without_client_cache_directives
  * @matrix cache csrf : network-only service-worker token
  */
 async function handleNetworkOnlyGet(event) {
@@ -767,14 +819,14 @@ async function handleNetworkOnlyGet(event) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_no_store_304_discards_cached_response
- * @tests tests_js/test_008_service_worker.py::test_cached_304_marks_response_not_updated
- * @tests tests_js/test_008_service_worker.py::test_304_response_with_invalidation_header_fetches_fresh_response
- * @tests tests_js/test_008_service_worker.py::test_redirect_response_with_invalidation_header_clears_cache
- * @tests tests_js/test_008_service_worker.py::test_redirected_responses_are_discarded_and_not_cached
- * @tests tests_js/test_008_service_worker.py::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
- * @tests tests_js/test_008_service_worker.py::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
- * @tests tests_js/test_008_service_worker.py::test_previously_stored_invalidation_is_discarded_before_reuse
+ * @tests tests_js/test_008_service_worker.mjs::test_no_store_304_discards_cached_response
+ * @tests tests_js/test_008_service_worker.mjs::test_cached_304_marks_response_not_updated
+ * @tests tests_js/test_008_service_worker.mjs::test_304_response_with_invalidation_header_fetches_fresh_response
+ * @tests tests_js/test_008_service_worker.mjs::test_redirect_response_with_invalidation_header_clears_cache
+ * @tests tests_js/test_008_service_worker.mjs::test_redirected_responses_are_discarded_and_not_cached
+ * @tests tests_js/test_008_service_worker.mjs::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
+ * @tests tests_js/test_008_service_worker.mjs::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
+ * @tests tests_js/test_008_service_worker.mjs::test_previously_stored_invalidation_is_discarded_before_reuse
  * @matrix cache : browser-validators cached-response invalidation network-validation no-store redirected-response service-worker
  */
 async function handleCacheable(event, pathname) {
@@ -901,7 +953,7 @@ async function handleCacheable(event, pathname) {
 
 /**
  * @testable true
- * @tests tests_js/test_008_service_worker.py::test_mutation_failure_returns_json_503
+ * @tests tests_js/test_008_service_worker.mjs::test_mutation_failure_returns_json_503
  * @matrix offline request : mutation response-shape service-worker
  */
 async function handleRequest(event, pathname) {

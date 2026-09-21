@@ -1,10 +1,6 @@
-import { Renderer } from "../../../elements/renderer";
-import {
-	areEqual,
-	captureError,
-	request,
-	withTransition,
-} from "../../../shared";
+import { FormRenderer } from "../../../forms/renderer.mjs";
+import { areEqual, captureError, request } from "../../../shared/index.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
 
 /**
  * @testable infrastructure
@@ -160,7 +156,7 @@ export class Header {
 
 		let renderer = null;
 		if (!active) {
-			renderer = new Renderer({
+			renderer = new FormRenderer({
 				target: this.previewPanel,
 				schema: this.builder.schema,
 				kind: "form",
@@ -214,7 +210,7 @@ export class Header {
 	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_save_feedback_retains_keyboard_focus
 	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_generation_is_one_undoable_unsaved_command
 	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
-	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
+	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
 	 */
 	saveForm() {

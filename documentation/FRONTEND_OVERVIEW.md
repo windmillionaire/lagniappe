@@ -74,8 +74,10 @@ stable root, so AJAX section replacement does not discard its listeners.
 
 ## Shared Utilities (`shared/`)
 
-Public shared APIs are re-exported from `shared/index.mjs` as a single import
-point; internal implementation modules are noted below. Modules:
+Internal modules import shared helpers from their concrete owners. The
+`shared/index.mjs` facade still exposes other shared APIs for application
+composition; transitions and recent-search cleanup use direct imports only.
+Modules:
 
 | Module | Purpose |
 |---|---|
@@ -84,9 +86,6 @@ point; internal implementation modules are noted below. Modules:
 | `endpoints.mjs` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
 | `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Subscription-owned visible-blur eligibility lets rendered deferred operations retain their normal cadence for at most ten minutes without waking other work. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/l/ping` miss. |
 | `notificationState.mjs` | Parses `X-Lagniappe-Notification-State`, stores the latest generation/revision/count before the lazy menu loads, updates the badge, and publishes state changes to menu/coordinator consumers. |
-| `editWatcher.mjs` | `EditWatcher` -- fingerprint-based entity discovery, polling subscriptions, form-lock restoration, and the stable watched-form service facade. |
-| `editReconciler.mjs` | `EditReconciler` -- per-form authoritative replacement probes, draft and queued-mutation comparison, and revision resolution. Internal to `EditWatcher`. |
-| `editRevisionModal.mjs` | Field-by-field and whole-form revision review modals. Internal to `EditReconciler`. |
 | `deferredOperations.mjs` | `DeferredOperationManager` -- owner-authorized operation subscriptions and revision-aware terminal destination reconciliation. |
 | `errors.mjs` | `captureError()`, `captureNetworkError()`, and `configureSentry()` -- collect DOM context from the nearest widget/component/view elements and forward to the configured local Sentry bundle + console. The client initializes only when an installation DSN is rendered. Its event processor removes SDK request payloads and identity context, applies the exact diagnostic-header allowlist, recursively redacts recognized credentials/payloads, and bounds nested context. |
 | `request.mjs` | `request.get/post/put/patch/delete` -- wraps `fetch` with CSRF token injection, targeted retry for responses explicitly identified as CSRF failures, 422 validation error handling, redirect following, and JSON/HTML content-type detection. A service-worker `X-Lagniappe-Updated: false` marker is exposed as `response.updated === false` so refresh consumers can skip unchanged DOM work. |
@@ -96,7 +95,18 @@ point; internal implementation modules are noted below. Modules:
 | `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |
 | `protocol.mjs` | Connectivity worker-message validation and construction. Server state does not cross the service-worker boundary. |
 | `user.mjs` | `updateUserData()` performs the retryable startup timezone update without browser geolocation. `updateUserLocation()` is started by `LocationBox`, requests geolocation on demand, and serializes its session write after the timezone update so client-side session-cookie responses cannot overwrite one another. |
-| `utilities.mjs` | `withTransition()` (View Transitions API wrapper with debug mode), `debounce()`, `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
+| `transitions.mjs` | `withTransition()` and its shared queue: batches same-turn DOM commits, joins nested calls, and resolves after the update without waiting for the animation. |
+| `storage.mjs` | Best-effort `localStore` and `sessionStore` adapters; `clearRecentSearchResults()` synchronously removes `recent-` keys from local storage and propagates storage errors. |
+| `utilities.mjs` | `debounce()`, `showBriefly()` (transient feedback using the shared transition scheduler), `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
+
+## Forms (`forms/`)
+
+FormController, FormRenderer, and reusable controls live in `forms/`.
+`forms/revisions/` groups the lazy EditWatcher service, its reconciler, review
+modals, and detached preview adapter. Pure representation comparisons and
+migration notices are separate sibling modules. FormWidget retains the widget
+and replacement lifecycle in `widgets/base/formWidget.mjs`.
+See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 
 ## Styles and build output
 
@@ -120,6 +130,7 @@ src/
 │   ├── sw.template.mjs        # Service worker template
 │   ├── config/                # Editor configuration
 │   ├── elements/              # Form elements (see FRONTEND_ELEMENTS.md)
+│   ├── forms/                 # Form controllers, controls, and revisions (see FRONTEND_FORMS.md)
 │   ├── login/                 # Login form classes
 │   ├── shared/                # Shared utilities (above)
 │   ├── views/                 # View classes (see FRONTEND_VIEWS.md)

@@ -27,6 +27,7 @@ def test_htmlize_sanitizes_markdown_html():
     assert 'href="https://example.com"' in html
     assert 'rel="noopener noreferrer"' in html
     assert ">Bad<" in html
+    assert BeautifulSoup(html, "html.parser").find("a", string="Bad").get("href") is None
 
 
 # @matrix files security : html-sanitization markdown table
@@ -75,6 +76,7 @@ def test_htmlize_sanitizes_text_html():
     assert 'href="mailto:test@example.com"' in html
     assert 'colspan="2"' in html
     assert "rowspan" not in html
+    assert BeautifulSoup(html, "html.parser").find("strong").get_text() == "world"
 
 
 # @matrix editor files markdown : hard-break soft-wrap
@@ -363,7 +365,9 @@ def test_safe_html_policy_is_typed_idempotent_and_ephemeral():
     assert type(once + "") is str
     assert type(f"{once}") is str
     assert type(Markup(once)) is Markup
-    assert json.loads(json.dumps({"html": once}))["html"] == str(once)
+    restored = json.loads(json.dumps({"html": once}))["html"]
+    assert restored == str(once)
+    assert type(restored) is str
 
 
 # @matrix files security : code html-sanitization mimetype plain-text
@@ -378,15 +382,21 @@ def test_htmlize_escapes_code_plain_text_and_mimetype_attributes(monkeypatch):
     assert "<script>" not in code
     assert "&lt;script&gt;bad&lt;/script&gt;" in code
     assert 'onmouseover="bad"' not in code
+    code_tag = BeautifulSoup(code, "html.parser").find("code")
+    assert set(code_tag.attrs) == {"class"}
+    assert code_tag.get_text() == "<script>bad</script>"
     assert "<img" not in plain
     assert "&lt;img src=x onerror=bad&gt; &amp; text" in plain
 
 
 def _image_owner(url):
-    asset = SimpleNamespace(url=url)
+    assets = {
+        "image_intro_owned": SimpleNamespace(url=url),
+        "image_other_owned": SimpleNamespace(url="https://assets.test/form/image_other_owned.png"),
+    }
     owner = SimpleNamespace(
-        assets={"image_intro_owned": {"type": "image"}},
-        get_asset=lambda name: asset if name == "image_intro_owned" else None,
+        assets={name: {"type": "image"} for name in assets},
+        get_asset=assets.get,
     )
     return owner
 
@@ -401,6 +411,7 @@ def test_form_content_policy_keeps_only_owned_images():
         'alt="Diagram" onerror="bad()" '
         'style="width: 55%; float: left; position: fixed; background: url(javascript:bad)">'
         '<img src="https://external.test/tracker.png">'
+        '<img src="https://assets.test/form/image_other_owned.png">'
         '<script>alert(1)</script>'
     )
 
@@ -415,9 +426,10 @@ def test_form_content_policy_keeps_only_owned_images():
     assert len(images) == 1
     assert images[0]["src"] == owned
     assert images[0]["alt"] == "Diagram"
-    assert images[0]["style"] == (
-        "width:55%;display:block;float:left;margin:0 1em 1em 0"
-    )
+    declarations = (part.split(":", 1) for part in images[0]["style"].split(";") if part.strip())
+    assert {name.strip(): value.strip() for name, value in declarations} == {
+        "width": "55%", "display": "block", "float": "left", "margin": "0 1em 1em 0",
+    }
     assert "onclick" not in html
     assert "onerror" not in html
     assert "javascript" not in html
@@ -436,6 +448,7 @@ def test_public_document_policy_keeps_only_rewritten_owned_images():
     rewritten = "https://site.test/pages/public/id/images/image_first.png"
     html = file_html.sanitize_public_document_html(
         '<h2>Public</h2><img src="https://private.test/page/image_first.png">'
+        '<img src="https://external.test/page/image_first.png">'
         '<img src="data:image/png;base64,AAAA"><iframe>embed</iframe>',
         [(source, rewritten)],
     )

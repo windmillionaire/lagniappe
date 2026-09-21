@@ -444,7 +444,7 @@ def test_ai_settings_payload_normalizes_runtime_settings_against_discovery(monke
 def test_site_updates_return_the_migration_report(monkeypatch):
     report = {"status": "current", "counts": {"complete": 2}}
     monkeypatch.setattr(
-        cache_rebuild.database_migrations,
+        site_admin.database_migrations,
         "run_data_migrations",
         lambda: report,
     )
@@ -470,6 +470,31 @@ def test_cache_rebuild_is_blocked_until_migrations_are_current(monkeypatch):
 
     assert result.rebuilt is False
     assert result.migration_status is report
+
+
+# @source lagniappe/core/tools/site/cache_rebuild.py::rebuild_application_cache
+# @matrix cache : batching validation
+@pytest.mark.parametrize("chunk_size", [0, -1])
+def test_cache_rebuild_rejects_invalid_size_before_clearing(monkeypatch, chunk_size):
+    monkeypatch.setattr(
+        cache_rebuild.database_migrations,
+        "get_migration_status",
+        lambda: {"status": "current", "cache_refresh_allowed": True},
+    )
+    monkeypatch.setattr(
+        cache_rebuild.cache,
+        "delete_cache",
+        lambda: pytest.fail("invalid rebuild must not clear the cache"),
+    )
+    for name in ("all_models", "all_instances", "all_files", "all_users"):
+        monkeypatch.setattr(
+            cache_rebuild.database_get,
+            name,
+            lambda: pytest.fail("invalid rebuild must not scan stored entities"),
+        )
+
+    with pytest.raises(ValueError, match="positive"):
+        cache_rebuild.rebuild_application_cache(chunk_size=chunk_size)
 
 
 # @matrix cache : batching current migration-gate
@@ -578,7 +603,11 @@ def test_cache_rebuild_reports_bad_records_and_continues(monkeypatch, missing_ty
     detail = result.cache_status["errors"][0]
     assert detail["url"] == f"/tasks/{bad_key}"
     assert detail["link_label"] == "Orphan task"
-    assert detail["message"] == ("Entity type is missing." if missing_type else "task.page is required")
+    if missing_type:
+        assert "type" in detail["message"].casefold()
+    else:
+        assert "page" in detail["message"].casefold()
+        assert "required" in detail["message"].casefold()
     assert len(captured) == 1
 
 

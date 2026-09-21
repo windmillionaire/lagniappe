@@ -1,6 +1,5 @@
 ---
 title: Form Components
-manual_section: forms
 related:
 - form_builder
 - form_settings

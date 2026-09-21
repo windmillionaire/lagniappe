@@ -5,9 +5,11 @@ from types import SimpleNamespace
 from google.api_core import exceptions as google_exceptions
 import pytest
 
+from lagniappe.core import exceptions as core_exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import notifications as notification_database
 from lagniappe.core.tools.database import transactions
+from lagniappe.core.tools.email.notifications import capture as email_capture
 from lagniappe.core.tools.notifications import service as notification_service
 from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 
@@ -17,6 +19,7 @@ pytestmark = pytest.mark.unit
 
 # @matrix notifications : aggregate-count aggregate-repair cache-failure-isolation idempotency ordinary-clear ordinary-count ordinary-create ordinary-delete revision transaction-retry
 # @matrix notifications : body html-stripping
+# @matrix notification-email notifications : failure-isolation idempotency
 def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(notification_database.DATA, "_datastore_client", store)
@@ -26,6 +29,19 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     )
     store.put(aggregate)
     monkeypatch.setattr(Entities, "fetch_one", lambda row, request: row)
+    email_attempts = []
+    email_errors = []
+
+    def fail_email_capture(*args, **kwargs):
+        email_attempts.append((args, kwargs))
+        raise RuntimeError("email capture unavailable")
+
+    monkeypatch.setattr(email_capture, "record_notification_event", fail_email_capture)
+    monkeypatch.setattr(
+        core_exceptions,
+        "capture",
+        lambda *args, **kwargs: email_errors.append((args, kwargs)),
+    )
 
     first, created = notification_service.create_ordinary_notification(
         user,
@@ -42,6 +58,10 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     assert replay.key == first.key
     assert first["body"] == "First"
     assert aggregate["ordinary_count"] == 1
+    assert len(email_attempts) == 1
+    assert email_errors[0][1]["context"] == {
+        "operation": "notification-email-capture"
+    }
 
     second, _created = notification_service.create_ordinary_notification(
         user,
@@ -88,8 +108,6 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     assert attempts == [0.05, 0.1]
 
     captured = []
-    from lagniappe.core import exceptions as core_exceptions
-
     monkeypatch.setattr(
         core_exceptions,
         "capture",

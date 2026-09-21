@@ -8,7 +8,11 @@ from google.genai import types
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import form_conversions, form_drafts, form_schema_updates
+from lagniappe.core.tools.forms import (
+    conversions as form_conversions,
+    drafts as form_drafts,
+    schema_updates as form_schema_updates,
+)
 from ..references import hash_reference
 
 

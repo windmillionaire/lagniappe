@@ -1,4 +1,4 @@
-import Entity from "./base/entity";
+import Entity from "./base/entity.mjs";
 
 /**
  * @testable true

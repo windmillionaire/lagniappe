@@ -6,12 +6,22 @@
 				{
 					"name": "Empty form - only own page",
 					"hash": "user01",
-					"page": { "name": "User Page 1", "hash": "puser1" },
+					"page": {
+						"name": "User Page 1",
+						"hash": "puser1"
+					},
 					"permissions": {},
 					"form_data": {},
 					"expected": {
-						"after": [false, false, false, false],
-						"restricted": []
+						"after": [
+							false,
+							false,
+							false,
+							false
+						],
+						"permissions": {
+							"puser1": "EDIT"
+						}
 					}
 				}
 			],
@@ -20,26 +30,88 @@
 				{
 					"name": "General models:VIEW covers specific",
 					"hash": "user02",
-					"page": { "name": "User Page 2", "hash": "puser2" },
+					"page": {
+						"name": "User Page 2",
+						"hash": "puser2"
+					},
 					"permissions": {},
-					"form_data": { "models": "VIEW" },
+					"form_data": {
+						"models": "VIEW"
+					},
 					"expected": {
-						"after": [true, false, true, true],
-						"restricted": []
+						"after": [
+							true,
+							false,
+							true,
+							true
+						],
+						"permissions": {
+							"models": "VIEW",
+							"puser2": "EDIT"
+						}
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Specific page with restricted category",
+					"hash": "user03",
+					"page": {
+						"name": "User Page 3",
+						"hash": "puser3"
+					},
+					"permissions": {},
+					"form_data": {
+						"page001": "EDIT"
+					},
+					"expected": {
+						"after": [
+							false,
+							false,
+							true,
+							false
+						],
+						"permissions": {
+							"cat001": "RESTRICTED",
+							"page001": "EDIT",
+							"puser3": "EDIT"
+						}
 					}
 				}
 			]
 		],
 		"resources": [
-			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "VIEW"],
-			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "EDIT"],
+			[
+				[
+					"CATEGORY",
+					{
+						"name": "Category",
+						"hash": "cat001"
+					}
+				],
+				"VIEW"
+			],
+			[
+				[
+					"CATEGORY",
+					{
+						"name": "Category",
+						"hash": "cat001"
+					}
+				],
+				"EDIT"
+			],
 			[
 				[
 					"PAGE",
 					{
 						"name": "Page 1 under category",
 						"hash": "page001",
-						"model": { "name": "Category", "hash": "cat001" }
+						"model": {
+							"name": "Category",
+							"hash": "cat001"
+						}
 					}
 				],
 				"VIEW"
@@ -50,7 +122,10 @@
 					{
 						"name": "Page 2 under category",
 						"hash": "page002",
-						"model": { "name": "Category", "hash": "cat001" }
+						"model": {
+							"name": "Category",
+							"hash": "cat001"
+						}
 					}
 				],
 				"VIEW"

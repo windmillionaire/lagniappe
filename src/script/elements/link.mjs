@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { FacetsBox } from "../elements/combobox";
-import { areEqual } from "../shared/utilities";
-import { BaseElement } from "./base/baseElement";
-import { formatting } from "./formatting";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { areEqual } from "../shared/utilities.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { FacetsBox } from "./combobox/index.mjs";
+import { formatting } from "./formatting.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable infrastructure

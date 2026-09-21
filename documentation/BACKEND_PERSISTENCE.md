@@ -108,6 +108,15 @@ completed entry left by an earlier cleanup failure.
 Shared bounded Datastore contention retry lives in `transactions.py`. A retry
 must repeat the complete read/check/write transaction body.
 
+Guarded mutations and atomic job starts batch distinct guard keys inside that
+transaction, in groups of at most 1,000 (the Datastore
+[Lookup limit](https://docs.cloud.google.com/datastore/docs/concepts/limits)).
+Results are matched by key; every supplied expectation still applies, including
+multiple expectations for the same row. Subset, exact-row, and absence guards
+retain their separate meanings. The SDK retries deferred reads; an unresolved
+key after those retries aborts the operation rather than satisfying an absence
+guard. Contention retries read and check all guards again.
+
 ## Query contract
 
 `database/filter.py` wraps Datastore queries with `eq`, `any_of`, `all_of`, and
@@ -119,6 +128,16 @@ layer.
 branches compose as false inside OR expressions, while a denied top-level/AND
 filter dominates the query. Every `Query` terminal method returns its typed
 empty result without constructing a Datastore query when the filter denies all.
+
+`Query.count()` uses a Datastore `COUNT` aggregation over the existing keys-only
+query and returns a Python integer, including zero. It retains filters, ancestor,
+and ordering, and continues to count the full result set regardless of the
+builder's limit/cursor. Only the aggregate is transferred to the application.
+Home's task count keeps its single owned-or-assigned OR filter for active,
+incomplete Tasks; a Task matching both branches counts once. No count cache or
+maintained counter is involved. See Google's
+[aggregation-query behavior](https://docs.cloud.google.com/datastore/docs/aggregation-queries#behavior_and_limitations)
+when introducing new query shapes, especially projections of array properties.
 
 Keep queries bounded and ordered. When a browser list uses a cursor, preserve
 provider order through `Entities.fetch()` instead of applying a second sort
@@ -150,6 +169,13 @@ pre-commit exception is cleanup of a definitely uncommitted upload-finalization
 attempt, and that deletion must name the exact attempt-unique path and generation.
 Temporary upload sources are instead deleted after their File/Report checkpoint,
 using a generation precondition and idempotent already-absent handling.
+
+The immediate-copy path in `copy_direct_upload_file` also supplies
+the captured source generation as a deletion precondition. An absent source or
+generation mismatch leaves the successful copy intact; cleanup never retries
+without the precondition. Other storage failures propagate with the copied
+destination still recorded on the upload. Report/autofill finalization opts out
+of immediate cleanup and retains its post-checkpoint cleanup/retry protocol.
 
 ## Data migrations
 

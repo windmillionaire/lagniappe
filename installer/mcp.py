@@ -20,7 +20,7 @@ from runner.console import format_prompt
 from installer import iam, wrap_text
 from installer.errors import ProviderTransientError, SetupError, retry_provider_call
 from installer.state import record_mutation, record_step
-from installer.utils import run_gcloud_command
+from installer.commands import run_gcloud_command
 from runner.context import REPOSITORY_ROOT, setup_command
 
 SERVICE = "lagniappe-mcp"
@@ -490,6 +490,8 @@ def prepare_deployment(settings=None, *, announce_progress=True):
     deployer = settings.get("DEPLOYER_EMAIL") or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
     if not deployer:
         raise SetupError("MCP requires the saved installer/deployer identity.")
+    if announce_progress:
+        print(ui.activity("Preparing MCP service before App Engine deployment"), flush=True)
     reconcile_resources(target, deployer)
     service = _service(target)
     saved_resource = settings.get("MCP_RESOURCE")
@@ -516,6 +518,8 @@ def prepare_deployment(settings=None, *, announce_progress=True):
     reconcile_access(target, ["run", "services"], SERVICE,
                      [(iam.principal_member(deployer), ["roles/run.admin"])],
                      flags=[f"--region={target.region}"])
+    if announce_progress:
+        print(ui.success("MCP preparation complete"), flush=True)
     return target
 
 
@@ -626,7 +630,7 @@ def handoff_access(settings, *, owner=None, remove_installer=None):
 # @matrix mcp-install : cli-routing retry confirmation default-no no-mutation
 def configure_mcp():
     from installer.verify import prepare_existing_installation
-    from installer.utils import deploy_to_app_engine
+    from installer.deploy import deploy_to_app_engine
     prepare_existing_installation()
     if not requested(SETTINGS.APP) and not SETTINGS.APP.get("MCP_RESOURCE"):
         raise SetupError(f"External AI is disabled. Choose it with {setup_command('ai')} first.")

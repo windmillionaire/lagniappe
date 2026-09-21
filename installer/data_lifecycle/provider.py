@@ -331,7 +331,7 @@ class ProviderContext:
             raise DataLifecycleError("Provider command must be a nonempty argument array.")
         runner = self.gcloud
         if runner is None:
-            from installer.utils import run_gcloud_command
+            from installer.commands import run_gcloud_command
 
             runner = run_gcloud_command
         result = runner(arguments, timeout=timeout)

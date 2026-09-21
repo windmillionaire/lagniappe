@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { withTransition } from "../shared";
-import { buttons } from "./buttons";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { buttons } from "./buttons.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable infrastructure

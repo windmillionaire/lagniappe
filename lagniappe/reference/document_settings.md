@@ -1,6 +1,5 @@
 ---
 title: Public Page
-manual_section: personalization
 related:
 - documents
 - site_public_pages

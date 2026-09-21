@@ -1,7 +1,7 @@
 import Sortable from "sortablejs";
-import { STYLES } from "styles";
-import { CONFIG } from "../../../config/builder";
-import { primitives } from "../../../elements/primitives";
+import { primitives } from "../../../elements/primitives.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { CONFIG } from "../config.mjs";
 
 /**
  * @testable infrastructure
@@ -183,7 +183,7 @@ const _model = (schema) => {
 
 /**
  * @testable true
- * @tests tests_js/test_019_form_sync_frontend.py::test_builder_model_defaults_are_presentation_only
+ * @tests tests_js/test_019_form_sync_frontend.mjs::test_builder_model_defaults_are_presentation_only
  * @matrix form-schema forms : builder immutable-schema presentation-defaults
  */
 const _presentation = (schema) => {

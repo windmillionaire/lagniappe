@@ -156,7 +156,7 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
     assert "/installer/" in ignore
     assert "/runner/" in ignore
     assert "/mcp/" in ignore
-    assert "/testing_ai_workflows/" in ignore
+    assert "/testing/ai_test_cases/" in ignore
     assert "/setup/" not in ignore
     assert "**/gha-creds-*.json" in ignore
     for local_only in (
@@ -190,11 +190,11 @@ def test_google_location_aliases_keep_app_engine_and_regional_resources_distinct
 def test_dependency_upgrade_tracks_all_requirement_files():
     from runner import upgrade
 
-    assert [path.name for path in upgrade.REQUIREMENTS_PATHS] == [
+    assert [path.as_posix() for path in upgrade.REQUIREMENTS_PATHS] == [
         "requirements-installer.txt",
         "requirements.txt",
         "requirements-dev.txt",
-        "font-requirements.txt",
+        "build/font-requirements.txt",
     ]
 
 
@@ -312,6 +312,13 @@ def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
         ]
     )
     pin_path = tmp_path / ".nvmrc"
+    (tmp_path / "package.json").write_text(json.dumps({"engines": {"node": ">=24.0.0"}, "name": "example"}))
+    (tmp_path / "package-lock.json").write_text(json.dumps({"packages": {"": {"engines": {"node": ">=24.0.0"}}}}))
+    docker_path = tmp_path / upgrade.NODE_DOCKERFILE_PATH
+    docker_path.parent.mkdir(parents=True)
+    docker_path.write_text("FROM node:24-bookworm-slim@sha256:" + "a" * 64 + " AS node-runtime\n")
+    image = "node:26.5.0-bookworm-slim@sha256:" + "b" * 64
+    monkeypatch.setattr(upgrade, "resolve_node_image", lambda version: image)
     original_update_pin = upgrade.update_node_version_pin
 
     monkeypatch.setattr(upgrade.Path, "home", lambda: tmp_path)
@@ -325,6 +332,9 @@ def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     report = upgrade.UpgradeReport()
     assert upgrade.upgrade_node(report)
     assert pin_path.read_text(encoding="utf-8") == "26.5.0\n"
+    assert json.loads((tmp_path / "package.json").read_text())["engines"]["node"] == ">=26.5.0"
+    assert json.loads((tmp_path / "package-lock.json").read_text())["packages"][""]["engines"]["node"] == ">=26.5.0"
+    assert docker_path.read_text() == f"FROM {image} AS node-runtime\n"
     assert any(
         change.name == "Node.js pin" and change.after == "26.5.0"
         for change in report.changes

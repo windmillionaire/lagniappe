@@ -1,12 +1,14 @@
-import { captureError, debounce, QueryLifecycle } from "../../shared";
-import { Combobox } from "./combobox";
+import { captureError } from "../../shared/errors.mjs";
+import { QueryLifecycle } from "../../shared/queryLifecycle.mjs";
+import { debounce } from "../../shared/utilities.mjs";
+import { Combobox } from "./combobox.mjs";
 
 /**
  * Shared input, cancellation, publication, and teardown lifecycle for remote
  * comboboxes. Subclasses implement _input() and their result rendering only.
  *
  * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.py::test_remote_combobox_invalidates_before_debounce_and_on_destroy
+ * @tests tests_js/test_046_async_query_lifecycle.mjs::test_remote_combobox_invalidates_before_debounce_and_on_destroy
  * @matrix async-query combobox : debounce dismissal stale-publication teardown
  */
 export class RemoteQueryCombobox extends Combobox {

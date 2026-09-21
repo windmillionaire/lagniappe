@@ -1,12 +1,14 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, request, updateUserLocation } from "../../shared";
-import { setIcon } from "../../shared/icons";
-import { RemoteQueryCombobox } from "./remote";
+import { STYLES } from "../../generated/styles.mjs";
+import { ENDPOINTS } from "../../shared/endpoints.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { request } from "../../shared/request.mjs";
+import { updateUserLocation } from "../../shared/user.mjs";
+import { RemoteQueryCombobox } from "./remote.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_starts_location_sync_on_init
- * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_waits_for_session_sync_before_search
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_location_combobox_starts_location_sync_on_init
+ * @tests tests_js/test_016_combobox_frontend.mjs::test_location_combobox_waits_for_session_sync_before_search
  * @matrix location : initialization on-demand request-ordering session-update
  */
 export class LocationBox extends RemoteQueryCombobox {

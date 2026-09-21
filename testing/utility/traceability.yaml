@@ -1,5 +1,6 @@
 source_roots:
   - build/publication.mjs
+  - build/rollup.shared.mjs
   - build/sentry.mjs
   - build/utility.mjs
   - mcp/src
@@ -36,6 +37,7 @@ test_roots:
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_005_test_session.py
   - testing/tests_tooling/test_005a_frontend_build.py
+  - testing/tests_tooling/test_007_entity_fingerprint_contract.py
   - testing/tests_tooling/test_007_run_py_test_command.py
   - testing/tests_tooling/test_008_data_lifecycle.py
   - testing/tests_tooling/test_009_hosted_e2e.py
@@ -61,11 +63,13 @@ annotated_source_roots:
   - config/remote_mcp.py
   - testing/utility/runtime_outbound_http.py
   - testing/utility/hosted_deferred_jobs.py
+  - testing/utility/hosted_e2e_job.py
   - testing/utility/live_ai.py
   - run.py
   - runner/context.py
   - runner/console.py
   - runner/presentation.py
+  - runner/terminal.py
   - runner/adc.py
   - runner/deploy.py
   - runner/development.py
@@ -163,6 +167,7 @@ suggestions:
     - template
 
 exclude:
+  - "src/script/generated/**"
   - "**/__pycache__/**"
   - "**/*.pyc"
   - "**/*.map"

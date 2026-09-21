@@ -1,7 +1,7 @@
-import { request } from "../../../shared";
-import { BaseForm } from "../../base/baseForm";
-import { buttons } from "../../buttons";
-import { primitives } from "../../primitives";
+import { FormController } from "../../../forms/controller.mjs";
+import { request } from "../../../shared/request.mjs";
+import { buttons } from "../../buttons.mjs";
+import { primitives } from "../../primitives.mjs";
 
 /**
  * @testable true
@@ -45,7 +45,7 @@ class PinVersion {
 		this.input.maxLength = 100;
 		this.html = [this.input, buttons.submit({ kind: "editor" })];
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

@@ -12,7 +12,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import MutationConflict
 from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
 from lagniappe.core.tools.ai.reporting.execution import batch as batches, runner
-from lagniappe.core.tools.ai.reporting.execution.actions import base
+from lagniappe.core.tools.ai.reporting.execution.actions.base import ReportActionAdapter
 from lagniappe.core.tools.cache import documents
 from lagniappe.core.tools.document_crdt import append_fragment
 from lagniappe.core.properties.common_assets import Document
@@ -234,16 +234,16 @@ def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
 def test_batch_boundaries_resume_without_replaying_completed_work(monkeypatch):
     state = setup_case(monkeypatch, [create("project", "first"), create("project", "second"), create("project", "third")])
     monkeypatch.setattr(batches, "MAX_BATCH_ACTIONS", 2)
-    original = base._execute_action
-    def fail_third(action, *args, **kwargs):
+    original = ReportActionAdapter.apply
+    def fail_third(adapter, action, *args, **kwargs):
         if action["id"] == "third":
             raise RuntimeError("Interrupted preparation")
-        return original(action, *args, **kwargs)
-    monkeypatch.setattr(base, "_execute_action", fail_third)
+        return original(adapter, action, *args, **kwargs)
+    monkeypatch.setattr(ReportActionAdapter, "apply", fail_third)
     result = runner.run_report(state.report, state.actor)
     assert [record["status"] for record in result["actions"]] == ["complete", "complete", "failed"]
     first_ids = {key for key, item in state.rows.items() if item.entity_kind == "project"}
-    monkeypatch.setattr(base, "_execute_action", original)
+    monkeypatch.setattr(ReportActionAdapter, "apply", original)
     # Simulate another process loading the saved report before Retry.
     report = clone(state.rows[state.report.urlsafe_key])
     state.report = report

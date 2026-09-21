@@ -1,8 +1,7 @@
-import { FacetedSearchElement } from "../elements/facetedSearch";
-import { FormElement } from "../elements/form";
-import { InputElement } from "../elements/input";
-import { PermissionsForm } from "../elements/permissions";
-import { RadioElement } from "../elements/radio";
+import { FacetedSearchElement } from "../elements/facetedSearch.mjs";
+import { InputElement } from "../elements/input.mjs";
+import { RadioElement } from "../elements/radio.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable true
@@ -10,11 +9,11 @@ import { RadioElement } from "../elements/radio";
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
- * @tests tests_js/test_044_user_widget_frontend.py::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
+ * @tests tests_js/test_044_user_widget_frontend.mjs::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
  * @matrix users : create-form create-form-reset focus-preservation group-selector multiple submitted-form-data visibility-isolation
  * @pair users:page-form-preserved
  */
-export class CreateUser extends FormElement {
+export class CreateUser extends FormWidget {
 	init() {
 		this.messages = {
 			submit: "Create User",
@@ -118,7 +117,7 @@ export class CreateUser extends FormElement {
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
  * @matrix user-groups : group-create nav
  */
-export class CreateUserGroup extends FormElement {
+export class CreateUserGroup extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {
@@ -172,114 +171,5 @@ export class CreateUserGroup extends FormElement {
 			this._newGroupSelector = null;
 			this.component.nav = null;
 		}
-	}
-}
-
-/**
- * @testable true
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
- * @matrix permissions public-groups : active permission-update public
- */
-export class PublicPermissions extends PermissionsForm {
-	init() {
-		this.messages = {
-			submit: "Update Public Permissions",
-			submitting: "Updating Public Permissions",
-			submitted: "Public Permissions Updated",
-		};
-		super.init();
-	}
-}
-
-/**
- * @testable true
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
- * @tests tests_js/test_044_user_widget_frontend.py::test_group_permissions_tracks_rename_draft_after_target_rebuild
- * @matrix user-groups : entity-permissions general-permissions permission-update rename reset-rebinding
- */
-export class GroupPermissions extends PermissionsForm {
-	constructor(attributes) {
-		super(attributes);
-		this._draftName = null;
-	}
-
-	get formData() {
-		const data = super.formData;
-		if (this._draftName !== null) data.set("name", this._draftName);
-		return data;
-	}
-
-	get html() {
-		const name = new InputElement(
-			this,
-			{
-				id: "name",
-				name: "name",
-				title: "Group Name",
-				input: "text",
-			},
-			this.target.dataset.name || "",
-		);
-		const nameEdit = name.edit;
-		nameEdit.addEventListener("input", (event) => {
-			if (event.target.matches("input[name='name']")) {
-				this._draftName = event.target.value;
-				this.target.dataset.name = event.target.value;
-			}
-		});
-
-		return [nameEdit, ...super.html];
-	}
-
-	init() {
-		this.messages = {
-			submit: "Update User Group",
-			submitting: "Updating User Group",
-			submitted: "User Group Updated",
-		};
-		super.init();
-	}
-
-	updated(response) {
-		if (response.name) {
-			if (
-				this._draftName !== null &&
-				response.name !== this._draftName.trim()
-			) {
-				return super.updated(response);
-			}
-
-			this._draftName = null;
-			this.target.dataset.name = response.name;
-			this.target.dataset.title = `${response.name} Permissions`;
-
-			const selector = Array.from(
-				this.component.elt.querySelectorAll(
-					"[data-role='group-selectors'] button[data-key]",
-				),
-			).find((button) => button.dataset.key === this.key);
-			const label = selector?.querySelector("[data-role='group-name']");
-			if (label) label.textContent = response.name;
-		}
-
-		return super.updated(response);
-	}
-}
-
-/**
- * @testable false
- * @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
- * @reason user permission persistence is owned by the backend property; this wrapper is not currently rendered by an E2E flow
- */
-export class UserPermissions extends PermissionsForm {
-	init() {
-		this.messages = {
-			submit: "Update User Permissions",
-			submitting: "Updating User Permissions",
-			submitted: "User Permissions Updated",
-		};
-		super.init();
 	}
 }

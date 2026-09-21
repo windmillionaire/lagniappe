@@ -18,12 +18,15 @@ def test_user_index(get_test_entities):
     from lagniappe.core.entities.index import UserIndex
 
     users = get_test_entities()
+    assert users
 
     # Set properties that need to be set via setter
     for user in users:
         user.name = user.test_spec.get("name")
         if "email" in user.test_spec:
             user.db["email"] = user.test_spec["email"]
+        # Materialize fixture groups before reading the real column projection.
+        user.properties.groups._value = user.groups
 
     user_index = UserIndex()
     user_index._users = users
@@ -56,7 +59,11 @@ def test_user_index(get_test_entities):
     for user in users:
         # name - returns entity details dict
         name_col = user.column("name")
-        assert name_col.column_value == user.details
+        assert {key: name_col.column_value[key] for key in ("id", "name", "hash")} == {
+            "id": user.test_spec["page"]["hash"],
+            "name": user.test_spec["name"],
+            "hash": user.test_spec["hash"],
+        }
 
         # email - returns email string
         email_col = user.column("email")
@@ -64,14 +71,13 @@ def test_user_index(get_test_entities):
 
         # groups - returns list of group details
         groups_col = user.column("groups")
-        expected_groups = [g.reference_details for g in user.groups]
-        assert groups_col.column_value == expected_groups
-
-        # last_login - column exists (value tested elsewhere due to timezone context)
-        assert user.column("last_login") is not None
-
-        # modified - column exists (value tested elsewhere due to timezone context)
-        assert user.column("modified") is not None
+        assert [
+            {key: group[key] for key in ("id", "name", "hash", "kind")}
+            for group in groups_col.column_value
+        ] == [
+            {"id": group["hash"], "name": group["name"], "hash": group["hash"], "kind": "group"}
+            for group in user.test_spec.get("groups", [])
+        ]
 
 
 # @matrix user-index : groups pagination public-group restrictions

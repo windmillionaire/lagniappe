@@ -1,6 +1,5 @@
 ---
 title: User Groups
-manual_section: permissions
 related:
 - create_user_group
 - permissions

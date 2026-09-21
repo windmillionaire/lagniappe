@@ -223,10 +223,20 @@ Omitting actions and selecting an empty list have different meanings. Empty
 selections must survive the remote workload-identity URL guard as `actions=`;
 test that envelope boundary as well as the direct REST adapter. Evidence-only
 uploads do not require filing or action guidance; filing guidance is conditional
-on organizing files. `submit_plan` privately checks the full current contract
+on organizing uploaded or existing workspace files. Upload classification rules
+appear in the contract only after uploads exist; otherwise it requires
+`file_usage=[]`. General proposal rules accompany selected `report_actions`
+guidance, while summary-writing rules accompany `summarize_file` guidance or the
+`file_summary` bundle. `submit_plan` privately checks the full current contract
 before saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
+
+The contract's `permissions` contains `allowed_actions` and `rules`. It does not
+repeat internal capability flags. An allowed action type still requires access
+to its exact records and destinations; use the read tools' record permissions
+and the selected action guidance. The actor endpoint's separate
+`capabilities.plans` indicates whether the external plan service is enabled.
 
 The MCP adapter accepts a bounded JSON Schema subset. Remote schemas may use
 `format: date` for calendar dates; other formats remain unsupported. Check new

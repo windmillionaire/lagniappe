@@ -1,7 +1,9 @@
-import { Modal, request, withTransition } from "../../../shared";
-import { BaseUpload } from "../../base/baseUpload";
-import { buttons } from "../../buttons";
-import { UploadMenu, uploadElement } from "../../upload";
+import { Modal } from "../../../shared/modal.mjs";
+import { request } from "../../../shared/request.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
+import { BaseUpload } from "../../base/baseUpload.mjs";
+import { buttons } from "../../buttons.mjs";
+import { UploadMenu, uploadElement } from "../../upload.mjs";
 
 const IMAGE_DROPZONE_TEXT =
 	"Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";

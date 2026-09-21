@@ -143,9 +143,12 @@ def _mutate(sync_id, seed, transform):
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
 # @tests tests_unit/test_010_sync_cache.py::test_missing_document_poll_initializes_from_durable_seed
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_lazy_seed_recovers_after_eviction
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_preserves_generation_created_while_loading_seed
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_seed_failure_leaves_cache_uninitialized
 # @matrix polling : concurrency document initialization read-path ttl write-amplification
 def _read_document_state(sync_id, seed):
-    """Read existing state with a sliding TTL, initializing only on a miss."""
+    """Read with a sliding TTL; resolve a seed mapping or factory only on a miss."""
     document_key = Sync.DOCUMENTS.key(sync_id)
     state = _decode(
         cache.redis.getex(
@@ -156,6 +159,10 @@ def _read_document_state(sync_id, seed):
     if state is not None:
         return state
 
+    # Load durable assets outside WATCH, once even if initialization retries.
+    # _mutate rechecks Redis so a concurrent generation wins over this seed.
+    if callable(seed):
+        seed = seed()
     state, _result = _mutate(sync_id, seed, lambda current: None)
     return state
 
@@ -207,6 +214,7 @@ def _register_presence(sync_id, client_id, user):
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
+# @tests tests_unit/test_010_sync_cache.py::test_document_generation_change_returns_all_retained_deltas
 # @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
 # @matrix polling sync : author-attribution delta document presence revision snapshot
@@ -220,7 +228,7 @@ def poll_document(
     revision=None,
     presence_digest=None,
 ):
-    """Return the state changes and presence visible after ``revision``."""
+    """Return changes after ``revision``; ``seed`` may be a lazy fallback factory."""
     state = _read_document_state(sync_id, seed)
     users, current_presence_digest = _register_presence(
         sync_id,
@@ -232,10 +240,12 @@ def poll_document(
     requires_snapshot = (
         not generation_matches or known_revision < int(state["base_revision"])
     )
+    # A snapshot starts at this generation's base, not the previous client's cursor.
+    delta_start = int(state["base_revision"]) if requires_snapshot else known_revision
     updates = [
         update
         for update in state.get("updates", [])
-        if int(update.get("revision") or 0) > known_revision
+        if int(update.get("revision") or 0) > delta_start
     ]
     payload = {
         "generation": state["generation"],

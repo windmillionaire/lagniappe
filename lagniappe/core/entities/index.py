@@ -140,6 +140,7 @@ class TaskIndex(Index):
             assigned_to=self._assigned_to,
         )
         if not db.results:
+            self.cursor = None  # The undated query has its own cursor space.
             return self.undated_tasks()
         self.cursor = db.next_cursor
         if self.cursor:

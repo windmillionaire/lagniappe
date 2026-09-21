@@ -39,9 +39,23 @@ def test_messaging_entities_and_owner_toggles_are_fail_closed():
     conversation = MessageConversation(testing=True)
     message = Message(testing=True)
     marker = MentionMarker(testing=True)
-    assert "participant_names" in conversation.exclude_from_index
-    assert "body" in message.exclude_from_index
-    assert "hidden_for" in message.exclude_from_index
+    assert conversation.exclude_from_index == frozenset(
+        {
+            "participant_names",
+            "unread_counts",
+            "read_through",
+            "cleared_through",
+        }
+    )
+    assert message.exclude_from_index == frozenset(
+        {
+            "body",
+            "operation_id",
+            "sender_name",
+            "recipient_name",
+            "hidden_for",
+        }
+    )
     assert marker.exclude_from_index == frozenset({"occurrence_id", "display_name"})
 
     notification = Notification(testing=True)
@@ -56,6 +70,8 @@ def test_messaging_entities_and_owner_toggles_are_fail_closed():
     assert notification.aggregate_revision == 7
     assert notification.message_revision == 5
     assert notification.aggregate_generation == "generation-a"
+
+
 # @matrix migrations : idempotency notification-discriminator
 def test_notification_discriminator_migration_is_idempotent():
     notification = {"type": "notification"}
@@ -66,6 +82,8 @@ def test_notification_discriminator_migration_is_idempotent():
     assert notification["notification_type"] == "ordinary"
     assert second.changed is False
     assert canonicalize_notification_record({"type": "note"}).changed is False
+
+
 # @matrix task-assignment : idempotency self-exclusion transition
 def test_task_assignment_notice_uses_stable_transition_identity(monkeypatch):
     task = TestEntities.get("TASK", {"name": "Review", "hash": "task-notice"})
@@ -109,4 +127,3 @@ def test_task_assignment_notice_uses_stable_transition_identity(monkeypatch):
     actor.page.properties.user._value = actor
     task._add_assignment_notice(actor, actor.page)
     assert captured == []
-

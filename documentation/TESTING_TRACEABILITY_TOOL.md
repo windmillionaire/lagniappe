@@ -1,5 +1,8 @@
 # Testing Traceability
 
+For native Node cases, shared fixtures, and the step-by-step migration recipe,
+see [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md).
+
 `testing/utility/traceability.py` connects durable source symbols to the tests
 that exercise them. It is designed to answer three practical questions:
 
@@ -54,6 +57,15 @@ Run focused checks first for useful feedback, expand locally when that is
 worthwhile, and clearly hand off any affected tests that were not rerun. The
 release workflow still establishes the complete validated evidence set before
 main.
+
+Each report shares a lazy in-memory file index across Python source inventory,
+test discovery, scaffold matching, and source suggestions. Those stages read
+each file and parse its Python syntax once, then reuse function spans, source
+segments, and called names. Scaffold matching excludes the test's own decorators
+while retaining calls in its defaults and nested functions. The index is
+discarded after the report, including on failure, so subsequent reports see
+file edits. This adds no persistent cache; semantic fingerprints and the
+template/style analyzers keep their existing inspection rules.
 
 ## Closing the agent feedback loop
 
@@ -123,6 +135,25 @@ The final traceability command fails when a changed or referenced test is not
 recorded as passing for the current fingerprint. This makes “tests passed” a
 checkable artifact rather than prose in an agent response.
 
+After changing a Python test's parameter IDs or converting it to a parameterized
+test, run its whole function nodeid explicitly, without a `[case-id]` suffix or
+selection filters:
+
+```bash
+venv/bin/python run.py test testing/tests_unit/test_file.py::test_name
+```
+
+A successful whole-function run replaces that function's old parameter
+records. A file-level run merges results and may leave retired cases in the
+manifest, making otherwise passing current cases appear stale. Do not edit the
+evidence file manually to remove them.
+
+Native `.mjs` cases use the same metadata tags in comments immediately before
+`test("test_name", ...)`. Their runner/fixture code, imported test helpers,
+package manifests, and registry inputs are execution dependencies; they do not
+create inferred application coverage links. Deleted native cases are pruned
+from evidence just like Python definitions.
+
 Static AST discovery is the default and does not import the application.
 `--verify-collection` is an opt-in diagnostic that compares the inventory with
 real pytest collection when collection behavior itself is in question.
@@ -171,6 +202,7 @@ Supported tags are:
 - `@testable true|false|infrastructure`
 - `@tests <pytest nodeid or glob>`
 - `@source <source path>::<qualified symbol>` on a test
+- `@node-program <repository-relative .mjs path>` on a test that executes a separate Node program
 - `@scaffolding <helper path>::<symbol>`
 - `@covered-by <source path>::<symbol>`
 - `@reason <why direct testing is inappropriate>`
@@ -238,6 +270,13 @@ test's unrelated cells do not expand the graph further.
 
 Unknown or nearly misspelled traceability tags are diagnosed. `@suggestion` is
 not a supported tag; use `@todo` when a missing behavior should remain visible.
+
+Use `@node-program` for a retained Python/Node boundary test. It adds the
+program and the standard Node execution dependencies to that test's evidence
+and changed-file selection without creating source ownership or behavior cells.
+The path must name an existing `.mjs` file within the repository; repeat the
+tag for multiple programs. See [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md)
+for the migration recipe.
 
 ## Focus modes
 
@@ -321,10 +360,19 @@ as `tests_unit/test_example.py`. MCP service tests live there too, even though
 the runner executes them in the service's isolated dependency environment.
 Absolute paths, traversal and the retired `repo:` client-test roots are rejected.
 
+`--test TARGET` filters tests already discovered within the configured
+`test_roots`; naming a file explicitly does not expand those roots. The default
+configuration includes the behavior suites and selected tooling owners, not
+every tooling meta-test. `--test matched no discovered tests` can therefore mean
+that an existing test is outside report scope, not that pytest cannot run it.
+Review such tests directly, or use `--config` with a deliberately scoped
+configuration when a reverse report is needed. Do not broaden the repository's
+default roots merely to make a one-off review command match.
+
 Suite placement remains independent of traceability:
 
 - backend logic: `testing/tests_unit/`
-- JavaScript without DOM/browser dependency: `testing/tests_js/`
+- JavaScript without a live browser/server dependency: `testing/tests_js/`
 - repository setup/config/tool health: `testing/tests_tooling/`
 - browser/server workflows: `testing/tests_e2e/`
 
@@ -334,7 +382,8 @@ Template selector and macro contracts are a related but separate report. See
 ## Important limits
 
 A link proves that evidence is declared and current; it does not prove that the
-assertions are strong. Test review still needs to reject tests that only inspect
-source text, imports, or symbol existence without validating behavior. See
-[TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) and
+assertions are strong. Check whether a test proves its claimed behavior;
+source text or imports can be legitimate inputs for a repository policy test,
+but do not prove runtime behavior. See the
+[test-writing checklist](TESTING_WRITING_TESTS.md#basic-test-review-checklist) and
 [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md).

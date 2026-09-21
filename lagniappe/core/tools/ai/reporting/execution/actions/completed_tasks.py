@@ -11,7 +11,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import dates
 from lagniappe.core.tools.database import get as database_get
 
-from .....form_definitions import (
+from lagniappe.core.tools.forms.definitions import (
     require_mutable_submission,
     capture_completed_submission,
     validate_completion_values,

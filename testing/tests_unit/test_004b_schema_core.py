@@ -23,9 +23,12 @@ from lagniappe.core.properties.schema import (
 @pytest.mark.unit
 def test_schema_validate_ai_filters_invalid_top_level(get_test_entities):
     for entity in get_test_entities():
+        payload = copy.deepcopy(entity.test_spec["ai_payload"])
+        before = copy.deepcopy(payload)
         schema = entity.properties.schema
-        schema.validate_ai(copy.deepcopy(entity.test_spec["ai_payload"]))
+        schema.validate_ai(payload)
         assert [e["id"] for e in schema.value] == entity.test_spec["expected_ids"]
+        assert payload == before
 
 
 # @matrix form-schema html-field : ai-value validation
@@ -33,23 +36,27 @@ def test_schema_validate_ai_filters_invalid_top_level(get_test_entities):
 def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
     for entity in get_test_entities():
         calls = []
+        payload = copy.deepcopy(entity.test_spec["ai_payload"])
+        before = copy.deepcopy(payload)
         entity.form_type = "task"
         entity.set_html_field = lambda fid, html: calls.append([fid, html])
         schema = entity.properties.schema
-        schema.validate_ai(copy.deepcopy(entity.test_spec["ai_payload"]))
+        schema.validate_ai(payload)
         assert calls == entity.test_spec["expected_set_html_calls"]
         assert [e["id"] for e in schema.value] == entity.test_spec["expected_ids"]
         assert "html" not in schema.value[0]
+        assert payload == before
 
 
 # @matrix form-schema html-field : ai-value markdown validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "form_type,field",
+    "form_type,field,message",
     [
         (
             "task",
             {"id": "intro", "type": "html", "title": "Intro", "html": "<b>raw</b>"},
+            "content_markdown instead of html",
         ),
         (
             "task",
@@ -59,6 +66,7 @@ def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
                 "title": "Intro",
                 "content_markdown": 42,
             },
+            "non-empty content_markdown",
         ),
         (
             "page",
@@ -68,14 +76,17 @@ def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
                 "title": "Intro",
                 "content_markdown": "Intro",
             },
+            "only on generated task forms",
         ),
     ],
 )
-def test_schema_validate_ai_rejects_raw_or_invalid_static_content(form_type, field):
+def test_schema_validate_ai_rejects_raw_or_invalid_static_content(
+    form_type, field, message
+):
     form = Entities.FORM(testing=True)
     form.form_type = form_type
 
-    with pytest.raises(exceptions.ValidationError):
+    with pytest.raises(exceptions.ValidationError, match=message):
         form.properties.schema.validate_ai([field])
 
 
@@ -83,13 +94,16 @@ def test_schema_validate_ai_rejects_raw_or_invalid_static_content(form_type, fie
 @pytest.mark.unit
 def test_schema_validate_ai_table_filters_bad_columns(get_test_entities):
     for entity in get_test_entities():
+        payload = copy.deepcopy(entity.test_spec["ai_payload"])
+        before = copy.deepcopy(payload)
         schema = entity.properties.schema
-        schema.validate_ai(copy.deepcopy(entity.test_spec["ai_payload"]))
+        schema.validate_ai(payload)
         table = schema.value[0]
         assert table["id"] == "rows"
         assert [c["id"] for c in table["columns"]] == entity.test_spec[
             "expected_table_column_ids"
         ]
+        assert payload == before
 
 
 # @matrix form-schema : cache fields previous
@@ -135,7 +149,12 @@ def test_schema_create_field_known_text_input(get_test_entities):
             entity=entity,
         )
         assert isinstance(field, TextInput)
-        assert field.id == "t"
+        assert {
+            "id": field.id,
+            "label": field.label,
+            "kind": field.kind,
+            "icon": field.icon,
+        } == entity.test_spec["expected_field"]
 
 
 # @matrix form-schema : canonicalization membership versioning

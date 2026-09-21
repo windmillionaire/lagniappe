@@ -2,7 +2,7 @@
 Tests for authoritative file reconciliation after processing completes.
 
 Verified against:
-- src/script/shared/editWatcher.mjs
+- src/script/forms/revisions/watcher.mjs
 - src/script/widgets/fileInfo.mjs
 - src/script/views/file.mjs
 - lagniappe/web/routes/files/main.py

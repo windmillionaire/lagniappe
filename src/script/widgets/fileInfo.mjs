@@ -1,19 +1,19 @@
-import { STYLES } from "styles";
-import { FormElement } from "../elements/form";
-import { InputElement } from "../elements/input";
-import { primitives } from "../elements/primitives";
-import { SectionToggle } from "../elements/sectionToggle";
-import { TextareaElement } from "../elements/textarea";
-import { setIcon } from "../shared/icons";
+import { InputElement } from "../elements/input.mjs";
+import { primitives } from "../elements/primitives.mjs";
+import { SectionToggle } from "../elements/sectionToggle.mjs";
+import { TextareaElement } from "../elements/textarea.mjs";
+import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable true
  * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_summary_completion_stages_authoritative_info_until_reset
- * @tests tests_js/test_039_file_processing_reconciliation.py::test_file_info_extract_completion_requests_one_reload_notice
+ * @tests tests_js/test_039_file_processing_reconciliation.mjs::test_file_info_extract_completion_requests_one_reload_notice
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_moves_between_page_and_task
  * @matrix file : active-reset authoritative-remount extract linked-pages polling reload status summarize summary text-tab
  */
-export class FileInfo extends FormElement {
+export class FileInfo extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.aiCreate = this.target.dataset.aiCreate === "true";

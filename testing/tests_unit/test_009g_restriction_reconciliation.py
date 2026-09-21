@@ -1,5 +1,5 @@
 """Restriction sources, minimal loading, migrations and queued cache updates."""
-import hashlib
+from copy import deepcopy
 import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -65,7 +65,9 @@ class _HashPipeline:
     ({"page": ["admin", "a"], "page_form": ["b"]}, {"page": ["admin"], "page_form": ["b"]}),
 ])
 def test_restrictions_normalize_source_clauses(policy, expected):
+    original = deepcopy(policy)
     assert normalize_restrictions(policy) == expected
+    assert policy == original
 
 
 # @matrix permissions relations : required-parent unloaded-relation
@@ -143,7 +145,7 @@ def test_reconciliation_change_detection_and_forced_retry(monkeypatch, cached, r
     from google.cloud import datastore
     from lagniappe.core.definitions import MutationEffectType
     from lagniappe.core.mutations.executor import consume_mutation_intents
-    from lagniappe.core.tools.form_drafts import prepare_form_publication
+    from lagniappe.core.tools.forms.drafts import prepare_form_publication
 
     row = datastore.Entity(key=datastore.Key("models", "changed-form", project="unit-project"))
     row.update(type="form", form_type="task", name="Restricted Form", hash="changed-form",
@@ -220,7 +222,7 @@ def test_form_creation_and_content_edits_do_not_queue_reconciliation(monkeypatch
     from google.cloud import datastore
     from lagniappe.core.definitions import MutationEffectType
     from lagniappe.core.mutations.executor import consume_mutation_intents
-    from lagniappe.core.tools.form_drafts import prepare_form_publication
+    from lagniappe.core.tools.forms.drafts import prepare_form_publication
 
     row = datastore.Entity(key=datastore.Key("models", "content-form", project="unit-project"))
     row.update(type="form", form_type="task", name="Content Form", hash="content-form",
@@ -274,8 +276,11 @@ def test_form_creation_and_content_edits_do_not_queue_reconciliation(monkeypatch
 def test_restricted_fingerprints_share_the_entity_and_cache_formula():
     modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
     base = base_fingerprint(modified)
-    assert base == hashlib.md5(modified.isoformat().encode("utf-8")).hexdigest()
+    assert base == base_fingerprint(modified)
+    assert base != base_fingerprint(modified + timedelta(seconds=1))
     assert restricted_fingerprint(base, {"page": ["b", "a", "b"]}, form_version="v1") == restricted_fingerprint(base, {"page": ["a", "b"]}, form_version="v1")
+    assert restricted_fingerprint(base, {"page": ["a"]}, form_version="v1") != restricted_fingerprint(base, {"page": ["b"]}, form_version="v1")
+    assert restricted_fingerprint(base, {}, form_version="v1") != restricted_fingerprint(base, {}, form_version="v2")
     assert restricted_fingerprint(base, {}, form_version="") != restricted_fingerprint(base, {})
     form = TestEntities.get("FORM", {"hash": "fingerprint-form", "restricted_to": ["a"]})
     form.version = "v1"
@@ -431,9 +436,11 @@ def test_file_migration_normalizes_history_and_preserves_conflicts():
         "pages": [page.key], "tasks": [task.key],
     })
     datastore = _Datastore([page, other_page, task, history, file, conflict, canonical, missing_owner, same_page_conflict])
+    preserved = {row.key: deepcopy(row) for row in (conflict, missing_owner, same_page_conflict)}
     context = migrations.MigrationContext(datastore.query_factory, datastore.write, datastore)
     outcome = migrate_file_ownership(context)
     assert outcome["changed"] == 2 and outcome["failed"] == 3
+    assert len(outcome["errors"]) == 3
     for detail, affected, label in zip(
         outcome["errors"], (conflict, missing_owner, same_page_conflict),
         ("Conflicting attachment", "scan.pdf", "Separate legacy attachments")
@@ -443,9 +450,8 @@ def test_file_migration_normalizes_history_and_preserves_conflicts():
     stored = datastore.rows[file.key]
     assert stored["task"] == task.key and "tasks" not in stored and "pages" not in stored
     assert {"task", "page", "file"} <= set(stored["requires"])
-    assert datastore.rows[conflict.key] == conflict
-    assert datastore.rows[missing_owner.key] == missing_owner
-    assert datastore.rows[same_page_conflict.key] == same_page_conflict
+    for key, original in preserved.items():
+        assert datastore.rows[key] == original
     assert datastore.rows[canonical.key]["page"] == page.key
     assert datastore.rows[canonical.key]["task"] == task.key
     assert migrate_file_ownership(context)["changed"] == 0

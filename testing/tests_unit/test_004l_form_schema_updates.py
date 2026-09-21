@@ -12,10 +12,11 @@ from lagniappe.core.definitions import DeferredJobType
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import (
-    form_changes,
-    form_conversions as conversions,
-    form_schema_updates as updates,
+from lagniappe.core.tools.forms import (
+    population,
+    changes as form_changes,
+    conversions,
+    schema_updates as updates,
 )
 from lagniappe.core.tools.ai import core as ai_core, form_conversion, observability, planner
 from lagniappe.core.tools.ai.prompt import Prompt
@@ -99,7 +100,7 @@ def scope(monkeypatch):
         )
 
     monkeypatch.setattr(Entities, "fetch_one", fetch)
-    monkeypatch.setattr(form_changes, "target_batch", batch)
+    monkeypatch.setattr(population, "target_batch", batch)
     monkeypatch.setattr(Entities.FORM, "allowed", lambda self, action, user=None: True)
     monkeypatch.setattr(
         Entities.TASK,
@@ -132,6 +133,7 @@ def scope(monkeypatch):
 
 # @matrix form-migration : schema-operations stable-identity validation
 def test_operations_preserve_identity_and_validate_final_schema(scope):
+    original = deepcopy(scope.form.schema)
     assert [field["id"] for field in scope.target] == ["notes", "count"]
     assert scope.target[0] == {"id": "notes", "type": "todo", "title": "Notes"}
     assert scope.form.schema[0]["type"] == "textarea"
@@ -139,9 +141,13 @@ def test_operations_preserve_identity_and_validate_final_schema(scope):
     with pytest.raises(ValidationError, match="IDs"):
         updates.apply_operations(
             scope.form.schema,
-            [{"op": "update_field", "schema_id": "notes", "patch": {"id": "changed"}}],
+            [
+                scope.operations[0],
+                {"op": "update_field", "schema_id": "notes", "patch": {"id": "changed"}},
+            ],
             "task",
         )
+    assert scope.form.schema == original
     with pytest.raises(ValidationError, match="reuse"):
         updates.apply_operations(
             scope.form.schema,
@@ -165,6 +171,7 @@ def test_operations_preserve_identity_and_validate_final_schema(scope):
         scope.form.schema, [{"op": "reorder_fields", "ids": ["count", "notes"]}], "task"
     )
     assert [field["id"] for field in reordered] == ["count", "notes"]
+    assert scope.form.schema == original
 
 
 # @matrix form-migration : complete-scope permissions affected-values pagination
@@ -194,7 +201,7 @@ def test_scope_is_exhaustive_permission_checked_and_projects_only_affected_value
         updates.inspect_scope(scope.form, scope.changes[1:], scope.actor)
 
 
-# @source lagniappe/core/tools/form_schema_updates.py::inspect_scope
+# @source lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @matrix form-migration : affected-values pagination
 @pytest.mark.parametrize("before, after, clears", [("000", 0, False), ("007", 7, False), ("unknown", None, True)])
 def test_scalar_preview_reports_exact_conversion_and_clearing(scope, before, after, clears):
@@ -278,7 +285,9 @@ def test_ai_candidates_validate_exact_shapes_without_truthiness_coercion():
         conversions.validate_ai_candidate(
             {"value": {"rows": [{"n": 0}, {"n": "private invalid value"}]}}, table
         )
-    assert str(invalid.value) == "“Quantity”, row 2: the converted value must be a number."
+    message = str(invalid.value)
+    assert all(detail in message for detail in ("Quantity", "row 2", "number"))
+    assert "private invalid value" not in message
     todo = {"type": "todo"}
     for value in [
         {"items": [{"text": "a", "checked": "false"}]},
@@ -419,7 +428,8 @@ def test_conversion_failure_status_names_columns_and_checks_target_visibility(sc
         }]},
     })
     status = form_changes.change_response(scope.form, scope.actor)["pending_change"]
-    assert status["error"] == "The AI could not produce a number for “Quantity”."
+    assert "Quantity" in status["error"] and "number" in status["error"]
+    assert "quantity-private-id" not in status["error"]
     assert status["failed_entity"] is None
     assert status["can_cancel"] is False
 
@@ -446,6 +456,7 @@ def test_conversion_failure_status_names_columns_and_checks_target_visibility(sc
 # @matrix form-migration ai : preview pagination read-only complete-scope
 def test_preview_paginates_and_rejects_stale_cursor(scope):
     scope.tasks[1].completed = True
+    snapshot = [deepcopy(entity.db) for entity in [scope.form, *scope.tasks]]
     args = {
         "id": scope.form.urlsafe_key,
         "operations": scope.operations,
@@ -454,15 +465,19 @@ def test_preview_paginates_and_rejects_stale_cursor(scope):
     }
     first = execute_preview_form_schema_update(args, scope.actor)
     assert first["has_more"] and first["returned"] == 2
-    assert first["instances"][0]["entity"].startswith("hash:")
+    assert [item["entity"] for item in first["instances"]] == [
+        "hash:task00000000", "hash:task10000000",
+    ]
     assert [item["completed"] for item in first["instances"]] == [False, True]
     second = execute_preview_form_schema_update(
         {**args, "cursor": first["next_cursor"]}, scope.actor
     )
     assert second["returned"] == 1 and not second["has_more"]
+    assert second["instances"][0]["entity"] == "hash:task20000000"
+    assert second["next_cursor"] is None
     assert second["instances"][0]["completed"] is False
     assert second["scope_fingerprint"] == first["scope_fingerprint"]
-    assert not scope.form.db.get(form_changes.PENDING)
+    assert [entity.db for entity in [scope.form, *scope.tasks]] == snapshot
     scope.tasks[-1].db["submission"] = json.dumps({"notes": "drift"})
     assert "error" in execute_preview_form_schema_update(
         {**args, "cursor": first["next_cursor"]}, scope.actor

@@ -77,6 +77,17 @@ deadline. Report planning also has a ten-minute total lifetime from job creation
 including queue waits; each attempt uses the earlier deadline. Execution control is checked between provider rounds and
 tool calls and immediately before apply.
 
+While awaiting a provider, cancellation checks run about once per second and
+read the durable lease token without writing the job. Local deadline, known
+claim loss, and heartbeat failure checks run before and after that read.
+During an attempt, the initial execution heartbeat and the 60-second background
+heartbeat extend the lease; progress and checkpoint writes retain their existing
+purposes.
+Cancellation therefore remains observable at the next one-second provider check
+(plus database latency), independently of renewal. Each execution boundary still
+reads ownership afresh, and publication/checkpoint transactions retain their
+authoritative token checks. No cached ownership hint authorizes a mutation.
+
 Site generation of corrective plans requires AI.CREATE, including retries and
 proposal revisions. The report adapter rechecks that entitlement before provider
 preparation and publication. External corrective proposals and their approved
@@ -207,16 +218,20 @@ owner diagnostic JSON and its safe references.
 
 ## Form changes
 
-`form_changes.py` and `adapters/form_change.py` implement one Form update without
-a separate migration subsystem. Builder Save uses `start_writes()` to persist the
+`tools/forms/changes.py` and `deferred_jobs/adapters/form_change.py` implement one
+Form update without a separate migration subsystem. Builder Save uses
+`start_writes()` to persist the
 Form's `pending_form_change`, DeferredJob, Notification and Form-scoped lock in
 one guarded transaction. The pending payload owns the proposed schema/content,
 conversion operations, actor timezone and source/target generations. Selection
 in the builder does not query submissions. AI Save and AI report preparation
 check complete population visibility before reservation.
 
-The worker enumerates all live Page/Task rows attached to the Form, including
-completed Tasks, in cursor batches of 50. Edit access to the Form authorizes its
+The worker and schema previews share `tools/forms/population.py` to enumerate
+all live Page/Task rows attached to the Form, including completed Tasks, in
+cursor batches of 50. `tools/forms/contracts.py` owns the persisted keys and
+payload helpers shared by publication, previews, locks, and execution. Edit
+access to the Form authorizes its
 deterministic schema migration across all attached submissions, including those
 on restricted Pages. The job rechecks Form edit access; it does not require the
 actor to view or edit each Page/Task. Submission restrictions still govern viewing

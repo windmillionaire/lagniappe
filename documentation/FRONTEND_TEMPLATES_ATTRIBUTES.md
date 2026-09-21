@@ -113,6 +113,7 @@ Most behavior in this system depends on `data-*` values on the active
 | Attribute | Used for |
 |---|---|
 | `data-widget` | Widget registry name, such as `PageInfo`, `TaskSettings`, `IndexTable`, or `CollaborativeDocument`. |
+| `data-form-control` | Reusable control owned by the containing `FormController`: `permission-sections` or `access-restrictions`. Supported on the form root or a descendant; initialization and destruction follow the form lifecycle. |
 | `data-route` | GET/POST/PUT endpoint for load/create/update. Component `data-route` is the fallback. |
 | `data-destination` | Post-create or deferred destination in `componentId:widgetName` form. |
 | `data-title` | Nav title while the widget is active. |

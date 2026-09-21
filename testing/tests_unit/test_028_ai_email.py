@@ -244,7 +244,33 @@ def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
             assert "signed-secret" not in repr(upload)
         finally:
             upload.close()
-    assert closed == [True, True]
+
+    for max_file_bytes, max_total_bytes, total_bytes in (
+        (10, 20, 0),
+        (20, 20, 10),
+    ):
+        client = ResendAIEmailClient(
+            "re_full",
+            "re_send",
+            request=lambda *_args, **_kwargs: _HTTPResponse(
+                {"download_url": "https://cdn.resend.app/signed-secret"}
+            ),
+            download_request=lambda *_args, **_kwargs: Download(),
+        )
+        with pytest.raises(AIEmailRejection, match="size limit"):
+            client.download_received_attachment(
+                "email-1",
+                {
+                    "id": "attachment-1",
+                    "filename": "notes.txt",
+                    "content_type": "text/plain",
+                },
+                max_file_bytes=max_file_bytes,
+                max_total_bytes=max_total_bytes,
+                total_bytes=total_bytes,
+            )
+
+    assert closed == [True, True, True, True]
 
 
 # @matrix ai-email sender-auth : alignment authentication-results dmarc sender-auth telemetry
@@ -474,7 +500,6 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
 
     assert [attachment.id for attachment in attachments] == ["photo"]
 
-
     image_only = normalize_resend_message(
         {
             "id": "email-image-only",
@@ -531,18 +556,6 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
         "REPORT", {"name": "Legacy", "parent": user, "user": user}
     )
     assert legacy.origin == "web"
-
-
-# @matrix ai-email : attachments generation privacy routing structured-output utility-model validation
-
-
-# @matrix ai-email : attachment-contract routing validation
-
-
-# @matrix ai-email : routing utility-model attachment-contract
-
-
-# @matrix ai-email : attachment-only deterministic inline routing
 
 
 # @matrix ai-email files : temporary-view-ownership
@@ -715,6 +728,7 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     user.is_public = False
     report = SimpleNamespace(urlsafe_key="report-one")
     states = []
+    user_lookups = []
     monkeypatch.setattr(
         email_database, "claim_ai_email_event", lambda *_args: {"claimed": True}
     )
@@ -725,7 +739,9 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     )
     monkeypatch.setattr(email_database, "release_ai_email_event", lambda *_args: None)
     monkeypatch.setattr(
-        database_get, "user", lambda email: "raw-user" if email == user.email else None
+        database_get,
+        "user",
+        lambda email: user_lookups.append(email) or "raw-user",
     )
     monkeypatch.setattr(
         Entities,
@@ -752,7 +768,34 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     )
     assert result.state == "accepted"
     assert result.report is report
-    assert states == ["accepted"]
+    assert user_lookups == ["Owner@example.com"]
+
+    user.email = "different@example.com"
+    mismatched = ai_email.process_resend_email(
+        {"type": "email.received", "data": {"email_id": "email-2"}},
+        "event-2",
+        _config(),
+        "secret",
+        client=_InboundClient(),
+    )
+    assert mismatched.state == "ignored"
+    assert mismatched.code == "sender_unknown"
+
+    monkeypatch.setattr(
+        email_database,
+        "claim_ai_email_event",
+        lambda *_args: {"claimed": False, "reason": "terminal"},
+    )
+    duplicate = ai_email.process_resend_email(
+        {"type": "email.received", "data": {"email_id": "email-3"}},
+        "event-3",
+        _config(),
+        "secret",
+        client=_InboundClient(),
+    )
+    assert duplicate.state == "duplicate"
+    assert duplicate.code == "terminal"
+    assert states == ["accepted", "ignored"]
 
 
 # @matrix ai-email : idempotency privacy report-handoff routing
@@ -877,9 +920,6 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     assert starts[0].job_type.value == "report-ai"
     assert starts[0].idempotency_key == f"ai-email/report/{'a' * 64}"
     assert feedback == [(report, "acceptance")]
-
-
-# @matrix ai-email deferred-jobs : idempotency permissions routing utility-model
 
 
 # @matrix ai-email deferred-jobs feedback : diagnostics failure privacy terminal-delivery

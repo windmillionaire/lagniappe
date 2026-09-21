@@ -12,11 +12,10 @@ from .actions.base import (
 from .actions.checkpoints import _record_action_result
 from .actions.recovery import (
     _is_recoverable_action_error,
-    _is_required_file_placement,
     _record_recoverable_action_error,
     _record_required_file_placement_error,
 )
-from .actions.registry import report_action_adapter
+from .actions.registry import _is_required_file_placement, report_action_adapter
 from .actions.results import (
     _diagnostic_entity,
 )

@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { setIcon } from "../shared/icons";
-import { BaseElement } from "./base/baseElement";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable infrastructure

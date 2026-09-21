@@ -5,7 +5,7 @@ import re
 
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.tools.files.html import render_markdown
-from lagniappe.core.tools.form_drafts import validate_draft_schema
+from lagniappe.core.tools.forms.drafts import validate_draft_schema
 
 NEW_IDENTITY = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 

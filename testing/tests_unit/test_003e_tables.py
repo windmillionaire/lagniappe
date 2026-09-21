@@ -66,7 +66,7 @@ def _run_row_submission_case(entity, get_schema):
         if mock
         else nullcontext()
     )
-    with ctx:
+    with ctx as get_link_attributes:
         rs = entity.test_spec["row_submission"]
         table = entity.properties.submission.fields[rs["table_id"]]
         row = table.validate_row_submission(
@@ -76,6 +76,10 @@ def _run_row_submission_case(entity, get_schema):
             )
         )
         assert row == entity.test_spec["expected_row"]
+        if mock:
+            get_link_attributes.assert_called_once_with(
+                entity.test_spec["expected_link_lookup"]
+            )
 
 
 # @matrix form-table : column db-value form-submission
@@ -214,6 +218,10 @@ def test_table_import_row_length_mismatch(get_test_entities, get_schema):
     for entity in get_test_entities():
         spec = entity.test_spec
         entity.form.schema = get_schema(spec["form"]["schema"])
+        original_submission = {
+            "tbl": {"rows": [{"a": "already", "b": "stored"}]}
+        }
+        entity.db["submission"] = json.dumps(original_submission)
         with pytest.raises(ValidationError) as excinfo:
             entity.import_submission(
                 spec["import_submission"],
@@ -221,6 +229,7 @@ def test_table_import_row_length_mismatch(get_test_entities, get_schema):
             )
         assert spec["expected_error_substring"] in str(excinfo.value)
         assert "Row length does not match number of columns" in str(excinfo.value)
+        assert json.loads(entity.db["submission"]) == original_submission
 
 
 # @matrix form-table : import validation
@@ -253,5 +262,8 @@ def test_table_validate_submission_invalid_json(get_test_entities, get_schema):
     for entity in get_test_entities():
         entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
         table = entity.properties.submission.fields["type_grid"]
+        original = {"rows": [{"cx_label": "Existing value"}]}
+        table.validate_submission(original)
         with pytest.raises(json.JSONDecodeError):
             table.validate_submission("{not valid json")
+        assert table.db_value == original

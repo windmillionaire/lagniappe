@@ -1,6 +1,6 @@
 """Follow-up migrations for File Page ancestry and canonical restrictions."""
 
-from .base import MigrationDataError
+from .base import MigrationDataError, _file_record_reference, _result, scan_kind
 from ..core import KINDS
 
 
@@ -8,8 +8,6 @@ from ..core import KINDS
 # @tests tests_unit/test_018b_database_migrations.py::test_file_page_migration_backfills_task_ancestry_and_preserves_staging
 # @matrix files migrations : history parent-key conflict idempotence
 def migrate_file_pages(context):
-    from ..migrations import _file_record_reference, _result, scan_kind
-
     result = _result("FIL-002", "File Page ancestry")
     owners = {
         row.key: row
@@ -78,8 +76,6 @@ def migrate_file_pages(context):
 # @tests tests_unit/test_018b_database_migrations.py::test_canonical_restrictions_migration_preserves_local_settings_and_inheritance
 # @matrix permissions migrations : local-restrictions admin-only idempotence
 def migrate_canonical_restrictions(context):
-    from ..migrations import _result, scan_kind
-
     result = _result("RST-002", "Canonical restriction groups")
     groups = {
         row.key: row.get("hash")

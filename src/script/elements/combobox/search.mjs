@@ -1,12 +1,13 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../../shared";
-import { RemoteQueryCombobox } from "./remote";
-import { Results } from "./results";
+import { STYLES } from "../../generated/styles.mjs";
+import { ENDPOINTS } from "../../shared/endpoints.mjs";
+import { request } from "../../shared/request.mjs";
+import { RemoteQueryCombobox } from "./remote.mjs";
+import { Results } from "./results.mjs";
 
 /**
  * @testable true
  * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
- * @tests tests_js/test_046_async_query_lifecycle.py::test_search_threshold_settles_stale_work_and_restores_recent_results
+ * @tests tests_js/test_046_async_query_lifecycle.mjs::test_search_threshold_settles_stale_work_and_restores_recent_results
  * @matrix search : recent-results stale-publication threshold
  * @pair search:page-navigation
  */

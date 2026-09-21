@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { CONFIG } from "../../../config/builder";
-import { primitives } from "../../../elements/primitives";
-import { withTransition } from "../../../shared";
+import { primitives } from "../../../elements/primitives.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { withTransition } from "../../../shared/transitions.mjs";
+import { CONFIG } from "../config.mjs";
 
 /**
  * @testable infrastructure
@@ -28,7 +28,7 @@ const _presentation = (schema) => {
 
 /**
  * @testable true
- * @tests tests_js/test_036_form_builder_frontend.py::test_builder_schema_lists_use_button_surfaces_and_centered_actions
+ * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_schema_lists_use_button_surfaces_and_centered_actions
  * @matrix forms : action-button-centering builder-list-actions
  */
 const _toggle = (icon, role, kind = "form", disabled = false) => {
@@ -600,7 +600,7 @@ export class ElementSettings {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.py::test_saved_controls_refresh_without_replacing_draft_inputs
+	 * @tests tests_js/test_036b_builder_draft.mjs::test_saved_controls_refresh_without_replacing_draft_inputs
 	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_inputs_use_replacement_panel_after_first_save
 	 * @matrix forms : builder-save stable-identity
 	 */

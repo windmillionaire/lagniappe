@@ -1,6 +1,5 @@
 ---
 title: Importing CSV Data
-manual_section: quickstart
 related:
 - create_form
 - create_page

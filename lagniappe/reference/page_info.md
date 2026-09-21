@@ -1,6 +1,5 @@
 ---
 title: Pages and Page Information
-manual_section: quickstart
 related:
 - create_page
 - documents

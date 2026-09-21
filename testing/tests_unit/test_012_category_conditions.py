@@ -15,7 +15,9 @@ import pytest
 @pytest.mark.unit
 def test_category_string_filters(get_test_entities, test_condition_definition):
     """Test STRING fields (name, description) with SUBSTRING and EQUALS comparators."""
-    for entity in get_test_entities():
+    entities = get_test_entities()
+    assert entities
+    for entity in entities:
         test_condition_definition(entity)
 
 
@@ -23,7 +25,9 @@ def test_category_string_filters(get_test_entities, test_condition_definition):
 @pytest.mark.unit
 def test_category_boolean_filters(get_test_entities, test_condition_definition):
     """Test BOOLEAN fields (has_document, has_image, is_public) with IS_TRUE and IS_FALSE."""
-    for entity in get_test_entities():
+    entities = get_test_entities()
+    assert entities
+    for entity in entities:
         test_condition_definition(entity)
 
 
@@ -31,14 +35,11 @@ def test_category_boolean_filters(get_test_entities, test_condition_definition):
 @pytest.mark.unit
 def test_category_timestamp_filters(get_test_entities, test_condition_definition):
     """Test TIMESTAMP field (modified) with LESS_THAN, EQUALS, GREATER_THAN comparators."""
-    from unittest.mock import patch
-    from zoneinfo import ZoneInfo
-
-    with patch(
-        "lagniappe.core.tools.dates.user_timezone", return_value=ZoneInfo("UTC")
-    ):
-        for entity in get_test_entities():
-            test_condition_definition(entity)
+    # The shared condition fixture fixes the user timezone to America/Chicago.
+    entities = get_test_entities()
+    assert entities
+    for entity in entities:
+        test_condition_definition(entity)
 
 
 # @matrix category filters : condition-definition entity-valued

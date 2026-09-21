@@ -408,23 +408,17 @@ def test_form_type(get_test_entities):
     - cache_key: "type"
     """
     for form in get_test_entities():
-        form.form_type = form.test_spec.get("form_type")
+        expected = form.test_spec["expected"]
+        form.form_type = form.test_spec["form_type"]
+        form_type = form.properties.form_type
 
-        # property value
-        assert (
-            form.form_type
-            == form.properties.form_type.value
-            == form.test_spec.get("form_type")
-        )
-
-        # DetailsMixin - details_value
-        assert form.details["form_type"] == form.form_type
-
-        # ColumnMixin - column_value
-        assert form.column("form_type").column_value == form.form_type
-
-        # CacheMixin - cache_key is "type", cache_value is value
-        assert form.to_cache["type"] == form.form_type
+        assert form.form_type == form_type.value == expected["value"]
+        assert form_type.sort_value == expected["sort_value"]
+        assert form.details["form_type"] == expected["details_value"]
+        assert form.column("form_type").column_value == expected["column_value"]
+        assert form_type.cache_key == "type"
+        assert form_type.cache_value == expected["cache_value"]
+        assert form.to_cache["type"] == expected["cache_value"]
 
 
 # @matrix form-schema : fields property
@@ -441,17 +435,11 @@ def test_form_schema(get_test_entities, get_schema):
     for form, schema in zip(forms, schemas):
         form.schema = schema
 
-        # schema value is the raw schema list
         assert form.schema == schema
-
-        # fields dict has correct keys (field IDs from schema)
-        assert set(form.fields.keys()) == {el["id"] for el in schema}
-
-        # each field has correct id and label
-        for element in schema:
-            field = form.fields[element["id"]]
-            assert field.id == element["id"]
-            assert field.label == element["title"]
+        assert {
+            field_id: {"id": field.id, "label": field.label}
+            for field_id, field in form.fields.items()
+        } == form.test_spec["expected_fields"]
 
 
 # @matrix form-schema form-table : table-fields
@@ -460,16 +448,7 @@ def test_form_table_fields(get_test_entities, get_schema):
     """Test table_fields returns column fields from Table elements."""
     for form in get_test_entities():
         form.schema = get_schema(form.test_spec["schema"])
-        table_fields = form.table_fields
-
-        if "complex" in form.test_spec["schema"]:
-            assert set(table_fields.keys()) == {
-                "row-namecd12",
-                "row-emailef34",
-                "row-primarygh",
-            }
-        else:
-            assert table_fields == {}
+        assert list(form.table_fields) == form.test_spec["expected_table_fields"]
 
 
 # @matrix form-schema html-field : html-fields
@@ -478,13 +457,9 @@ def test_form_html_fields(get_test_entities, get_schema):
     """Test html_fields returns HTML field objects."""
     for form in get_test_entities():
         form.schema = get_schema(form.test_spec["schema"])
-        html_fields = form.html_fields
-
-        if "complex" in form.test_spec["schema"]:
-            assert len(html_fields) == 1
-            assert html_fields[0].id == "html-instructqr"
-        else:
-            assert html_fields == []
+        assert [field.id for field in form.html_fields] == form.test_spec[
+            "expected_html_fields"
+        ]
 
 
 # @matrix filters form : conditions exclude-table-fields schema-fields
@@ -496,24 +471,9 @@ def test_form_filters(get_test_entities, get_schema):
     Non-filterable fields (e.g. html) are excluded.
     Table fields are excluded because their submissions are multi-row values.
     """
-    non_filterable = {"html", "table"}
-
     for form in get_test_entities():
-        schema = get_schema(form.test_spec["schema"])
-        form.schema = schema
-
-        conditions = form.filters.conditions
-
-        # build expected labels (tables expand to column titles, skip non-filterable)
-        expected_labels = []
-        for el in schema:
-            if el["type"] in non_filterable:
-                continue
-            expected_labels.append(el["title"])
-
-        # each condition has required keys
-        for cond in conditions:
-            assert {"field", "label", "kind", "icon"} <= cond.keys()
-
-        # labels match expected
-        assert [c["label"] for c in conditions] == expected_labels
+        form.schema = get_schema(form.test_spec["schema"])
+        assert [
+            [condition[key] for key in ("field", "label", "kind", "icon")]
+            for condition in form.filters.conditions
+        ] == form.test_spec["expected_conditions"]

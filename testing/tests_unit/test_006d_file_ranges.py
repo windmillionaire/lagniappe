@@ -25,6 +25,14 @@ def test_parse_byte_range_standard_and_suffix_forms():
     assert oversized_suffix.start == 0
     assert oversized_suffix.end == 99
 
+    clipped = file_ranges.parse_byte_range("bytes=95-125", 100)
+    assert (clipped.start, clipped.end, clipped.length) == (95, 99, 5)
+    assert clipped.content_range == "bytes 95-99/100"
+
+    single_byte = file_ranges.parse_byte_range("bytes=99-99", 100)
+    assert (single_byte.start, single_byte.end, single_byte.length) == (99, 99, 1)
+    assert single_byte.content_range == "bytes 99-99/100"
+
 
 # @matrix file preview : byte-range invalid-header
 @pytest.mark.unit

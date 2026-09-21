@@ -17,7 +17,7 @@ trusted clean commit with production build
   -> local command or GitHub WIF invokes the job
        acquire shared Redis lease
        clean test-prefixed data
-       run selected suites against exact version
+       run complete suites or individual nodeids against exact version
        upload reports, JUnit, evidence, manifest-last
   -> validate and merge exact-source evidence
   -> hosted-e2e teardown removes runnable version/job
@@ -118,18 +118,35 @@ Run all complete suites:
 venv/bin/python run.py hosted-e2e execute
 ```
 
-The default `all` scope includes unit, JavaScript, tooling, E2E, setup drift,
-and live provider contracts while excluding `unfinished`. `--suite full` runs
-E2E only. Trusted local diagnosis can pass one or more real paths/nodeids under
-`testing/tests_e2e/` with repeated `--target`; the container validates the
-bounded target again. GitHub exposes only fixed `all` and `full` scopes.
+With no targets, execution includes unit, JavaScript, tooling, E2E, setup drift,
+and live provider contracts while excluding `unfinished`. There is no suite
+selector. GitHub always runs this complete selection.
+
+For trusted local diagnosis, repeat `--target` to select individual test nodeids
+from any of the four suites, including native JavaScript cases:
+
+```bash
+venv/bin/python run.py hosted-e2e execute \
+  --target testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup \
+  --target testing/tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached
+```
+
+Targets must name existing files under `testing/tests_unit/`, `testing/tests_js/`,
+`testing/tests_tooling/`, or `testing/tests_e2e/`, followed by `::test_name` (or a
+Python class and test method). Python parameter IDs may select one instance.
+Files, directories, suite aliases, wildcards, duplicates, traversal, commas, and
+control characters are rejected. At most 50 nodeids of 512 characters each are
+accepted. Local dispatch and the container both validate file scope and nodeid
+syntax; pytest collection validates that each selected case exists.
 
 The job acquires the shared lease, removes stranded test-prefixed state, seeds
 the same persistence prerequisites as local startup, and runs one pytest
 session. Direct fixtures execute from Cloud Run; browser requests target the
 exact App Engine version. The runner image includes Git and POSIX process
 inspection tools because repository and test-session contracts run in that
-same container. Local execution follows status and imports results by default.
+same container. It also installs `libatomic1`, required by the Node runtime
+copied into the Python-based image. Local execution follows status and imports
+results by default.
 
 ## MCP coverage
 
@@ -200,10 +217,10 @@ evidence. Failed results import their failures and bounded tracebacks as the
 latest selected evidence.
 
 A successful complete `all` run replaces the local test inventory, removing
-retired node IDs and old parameter variants. Failed, focused, and E2E-only runs
-merge into existing evidence so unselected tests and earlier failures remain
-visible. Both the execution manifest and its evidence must report success
-before a complete import replaces prior results.
+retired node IDs and old parameter variants. Failed or partial runs merge into
+existing evidence so unselected tests and earlier failures remain visible. Both
+the execution manifest and its evidence must report success before a complete
+import replaces prior results.
 
 Use manifest start/end timestamps plus its exact App Engine service/version to
 query Cloud Logging after a failure. Logs can contain request paths, IPs, and

@@ -84,7 +84,7 @@ def _set_oversized_report_summary(file):
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_falls_back_for_large_files
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_unreadable_pdf_is_saved_skipped_and_reported
 # @matrix ai-report : issue persistence
-# @matrix ai-report : active-request fallback large-file quota search-opt-in summary-prepass unreadable-pdf
+# @matrix ai-report : active-request fallback large-file quota search-opt-in service-tier summary-prepass unreadable-pdf
 def summarize_report_input_files(
     report,
     save=None,
@@ -93,7 +93,7 @@ def summarize_report_input_files(
     service_tier=None,
     ensure_active=None,
 ):
-    """Generate missing summaries for report files before Organize planning."""
+    """Generate missing summaries for uploaded files before report planning."""
     summarized = []
     for file in report.input_files:
         attempted_summary = False

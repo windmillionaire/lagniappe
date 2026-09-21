@@ -1,12 +1,12 @@
-import { request } from "./request";
+import { request } from "./request.mjs";
 
 let userDataUpdate = null;
 let userLocationUpdate = null;
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_timezone_without_requesting_location
- * @tests tests_js/test_020_shared_utilities.py::test_unavailable_user_location_does_not_affect_timezone_sync
+ * @tests tests_js/test_020_shared_utilities.mjs::test_user_data_sync_posts_timezone_without_requesting_location
+ * @tests tests_js/test_020_shared_utilities.mjs::test_unavailable_user_location_does_not_affect_timezone_sync
  * @matrix timezone : page-load session-update
  * @pair location:permission-deferral
  */
@@ -94,9 +94,9 @@ function _getCurrentPosition(options) {
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_starts_on_demand_and_deduplicates
- * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_retries_failed_session_update
- * @tests tests_js/test_020_shared_utilities.py::test_unavailable_user_location_does_not_affect_timezone_sync
+ * @tests tests_js/test_020_shared_utilities.mjs::test_user_location_sync_starts_on_demand_and_deduplicates
+ * @tests tests_js/test_020_shared_utilities.mjs::test_user_location_sync_retries_failed_session_update
+ * @tests tests_js/test_020_shared_utilities.mjs::test_unavailable_user_location_does_not_affect_timezone_sync
  * @matrix location : deduplication geolocation on-demand retry session-update unavailable
  * @pair timezone:serialized-update
  */

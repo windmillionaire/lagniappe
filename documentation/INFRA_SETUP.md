@@ -128,6 +128,7 @@ unchanged when that confirmation is declined.
 | --- | --- |
 | `installer/install.py` | Ordered installation orchestration. |
 | `create_config.py` | Generated settings/deployment/index files and generation marker. |
+| `commands.py` | Generic gcloud execution, prerequisite checks, and provider-error translation. |
 | `gcloud.py` | Project, billing, APIs, App Engine, runtime IAM, buckets, Tasks, OCR. |
 | `identity.py`, `admin.py`, `auth_email.py` | Identity Platform, Owner/OAuth, authentication email. |
 | `domain/` | App Engine mapping and Cloudflare/manual DNS. |
@@ -135,10 +136,19 @@ unchanged when that confirmation is declined.
 | `redis.py`, `security.py` | Redis discovery, connection test, and TLS. |
 | `development.py` | Additive developer toolchain and test buckets. |
 | `upgrade.py` | Configuration update and source replacement workflow. |
+| `deploy.py` | Installer deployment, post-deploy checks, and completion output. |
+| `deployment.py` | Restore and normalize app-saved deployment settings. |
 | `handoff.py` | Delegated identity and IAM transfer. |
 | `data_lifecycle/` | Backup, archive, restore, and operator journals. |
 | `verify.py`, `doctor.py` | Focused validation and broader read-only audit. |
 | `package_install.py` | Bootstrap dependency transaction. |
+
+Import generic gcloud helpers from `installer.commands` and deployment
+orchestration from `installer.deploy`. `installer.utils` retains input validation
+and dependency guards, plus a lazy deployment forwarding function for upgrade
+processes started on older checkouts. New callers must use `installer.deploy`.
+The deployment workflow keeps its configuration and provider imports lazy so
+bootstrap command checks can run before setup dependencies are installed.
 
 ## Generated configuration
 
@@ -166,8 +176,9 @@ for Windows. See [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md).
 ## Operator output
 
 Follow [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) for the presentation contract.
-`runner/console.py` owns dependency-free layout; `runner/presentation.py` owns
-semantic styles and Rich progress. Bootstrap remains usable before Rich is
+`runner/console.py` owns layout; `runner/presentation.py` owns semantic styles
+and Rich progress. Both use `runner/terminal.py` for literal styling and lazy
+Rich console construction. Bootstrap remains usable before Rich is
 installed. The shared renderer preserves literal values and existing input
 semantics, respects `NO_COLOR`, and uses static progress where animation is
 unavailable. Windows validation targets PowerShell running `.\setup.cmd`.

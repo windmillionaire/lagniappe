@@ -1,13 +1,13 @@
-import { STYLES } from "styles";
 import * as Y from "yjs";
+import { STYLES } from "../../generated/styles.mjs";
 import {
 	base64ToUint8Array,
 	uint8ArrayToBase64,
 	waitForAttribute,
-} from "../../shared";
-import { collaborativeEditor } from "./editor";
-import { MentionSuggestions } from "./extensions";
-import { Toolbar } from "./toolbar";
+} from "../../shared/utilities.mjs";
+import { collaborativeEditor } from "./editor.mjs";
+import { MentionSuggestions } from "./extensions/index.mjs";
+import { Toolbar } from "./toolbar.mjs";
 
 /**
  * @testable true
@@ -40,7 +40,7 @@ export class CollaborativeDocument {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_renders_before_initial_state
+	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_renders_before_initial_state
 	 * @matrix sync : editor-readiness loader-free state-only
 	 */
 	init() {
@@ -172,7 +172,7 @@ export class CollaborativeDocument {
 	 * transactions cannot be mistaken for user-authored empty content.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
 	 * @matrix editor : empty-content initialization save-guard
 	 * @matrix sync : empty-content initialization parent-modified save-guard
@@ -188,7 +188,7 @@ export class CollaborativeDocument {
 	 * request was in flight. Remote-only changes do not make the document dirty.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @matrix sync : checkpoint concurrent-edit dirty-state
 	 */
 	commitSavedBaseline(snapshot, mentions = []) {
@@ -225,7 +225,7 @@ export class CollaborativeDocument {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 	 * @matrix sync : collaboration document offline-replay replay-order response-contract
@@ -241,7 +241,7 @@ export class CollaborativeDocument {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
 	 * @matrix sync : empty-content intentional-clear parent-modified save-guard
 	 */

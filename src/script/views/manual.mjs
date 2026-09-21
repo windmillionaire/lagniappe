@@ -1,13 +1,13 @@
-import { ENDPOINTS } from "../shared/endpoints";
-import { request } from "../shared/request";
-import { withTransition } from "../shared/utilities";
-import ShellView from "./base/shell";
+import { ENDPOINTS } from "../shared/endpoints.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import ShellView from "./base/shell.mjs";
 
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
  * @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
- * @tests tests_js/test_038_startup_specializations.py::test_manual_dropdown_loads_only_in_mobile_mode
+ * @tests tests_js/test_038_startup_specializations.mjs::test_manual_dropdown_loads_only_in_mobile_mode
  * @matrix manual : popstate responsive-navigation section-navigation
  * @pair startup:mobile-only-dropdown
  */
@@ -87,7 +87,7 @@ export default class Manual extends ShellView {
 		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
-		this._mobileDropdownPromise = import("../elements/combobox/dropdown")
+		this._mobileDropdownPromise = import("../elements/combobox/dropdown.mjs")
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				const menu = {

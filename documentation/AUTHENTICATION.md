@@ -92,8 +92,13 @@ session until the application rules pass.
 
 ## Google sign-in path
 
-Google Identity Services renders its control in Google's iframe. The CSP
-allows only the required Google `/gsi/` script, style, connection, and frame
+Google Identity Services initially renders a local fallback button, then
+replaces it with Google's iframe. Its SDK injects the fallback button's styles
+inline, copying the nonce from its script element. The login response generates
+a fresh nonce and authorizes those styles in its CSP. The `/gsi/style` resource
+only contains container styles; loading it early does not style the fallback
+button and cannot prevent an oversized logo when inline styles are blocked.
+The CSP allows only the required Google `/gsi/` script, style, connection, and frame
 paths; `frame-ancestors 'self'` controls who may embed Lagniappe.
 
 The GIS credential is posted to `POST /users/google-signin`. The server:

@@ -1,4 +1,4 @@
-import { SiteSetting } from "./base";
+import { SiteSetting } from "./base.mjs";
 
 /**
  * @testable false

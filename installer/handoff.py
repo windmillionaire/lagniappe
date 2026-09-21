@@ -237,7 +237,7 @@ def _remove_installer_project_access(
 def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     """Transfer Lagniappe-managed operator access from installer to Owner."""
     from config import File, SETTINGS
-    from installer import utils
+    from installer.deploy import deploy_to_app_engine
 
     if not File.APP_SETTINGS_YAML.exists():
         raise RuntimeError("Production settings are required before handoff.")
@@ -310,7 +310,7 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     settings["BOOTSTRAP_ADMIN_EMAIL"] = ""
     SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = owner_email
     SETTINGS.save()
-    (deploy or utils.deploy_to_app_engine)(print_final_summary=False)
+    (deploy or deploy_to_app_engine)(print_final_summary=False)
 
     record_step("remove installer managed-resource access")
     _remove_installer_resource_access(

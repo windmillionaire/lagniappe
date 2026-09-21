@@ -1,5 +1,5 @@
-import { withTransition } from "../shared";
-import { SitePublicPages } from "./siteSettings/publicPages";
+import { withTransition } from "../shared/transitions.mjs";
+import { SitePublicPages } from "./siteSettings/publicPages.mjs";
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
 const DEFAULT_SECTION = "maintenance";
@@ -20,7 +20,7 @@ const SETTING_WIDGETS = {
  * @testable true
  * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
  * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
- * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_coordinates_section_widgets
+ * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_settings_coordinates_section_widgets
  * @matrix admin : composite-widgets persistence sections site-settings
  * @matrix public-pages : live-settings
  */

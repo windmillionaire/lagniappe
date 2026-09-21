@@ -176,12 +176,36 @@ generated application settings, the matching release note, and the applicable
 version in the error-reporting privacy notice. It does not change that notice's
 effective date unless its substance changes.
 
+Both `version set` and `version note` require the same stable `X.Y.Z` form as
+`release-check`. Invalid values, including an invalid current version used by
+`version note`, are rejected before writing settings or release files.
+
 `run.py upgrade-dependencies` updates Node, npm, and the direct Python requirement
 sets to their latest releases, including major versions. Python resolution
 includes `build/font-requirements.txt` alongside installer, runtime, and
 development requirements. Transitive Python packages update when required by
 the selected direct upgrades. The separate locked MCP environment remains
 managed by the MCP tooling.
+
+Development follows the latest stable releases. The Node upgrade records that
+resolved version in `.nvmrc`, updates the minimum engine in `package.json` and
+the lockfile, and resolves the matching official `node:<version>-bookworm-slim`
+image digest for hosted E2E. The installer reads the same `.nvmrc` floor.
+An unavailable or invalid image stops this declaration update before files
+are changed. No Docker installation or image-layer download is required.
+The declaration update stages all changed files and recovery copies beside
+their destinations before publication, preserving existing file permissions.
+A caught publication error or Ctrl+C restores the previous files and removes
+any newly created pin. If restoration fails, the command reports the affected
+paths and retains recovery copies for manual repair; resolve that partial state
+before retrying. Cleanup failures leave the aligned files in place and report
+the staging directories that need removal. This is exception recovery, not a
+crash-atomic transaction across files. It does not undo the already-installed
+Node runtime or other completed dependency updates.
+At release freeze, `run.py release-check` validates the staged `.nvmrc`, both
+npm engine declarations, and the hosted image's matching version and digest
+pin. It checks recorded versions without making network requests or requiring
+an older development compatibility range.
 
 The command prints each step and streams subprocess output, including prompts,
 while keeping a report. Quiet machine-readable lookups have closed stdin; npm
@@ -203,6 +227,17 @@ the former maintainer command name `run.py upgrade` is no longer accepted.
 official Material Symbols subset from semantic IDs in `src/style/icons.yaml`.
 Normal builds use the vendored WOFF2 and do not contact Google Fonts. Reusing an
 existing semantic icon needs no refresh.
+
+Refresh validates the complete canonical icon registry before any download,
+including when called with `rebuild=False`. The font response must have the
+WOFF2 signature; metadata records its SHA-256 digest. Both outputs are staged
+before publication. If a file replacement fails, the previous files are
+restored; an incomplete restoration reports retained recovery-file locations.
+This recovery handles reported write failures, not an atomic two-file commit
+across a process or machine crash.
+
+After successful publication, a frontend rebuild failure returns failure and
+reports that the refreshed font and metadata remain available for inspection.
 
 ## Adding runner behavior
 

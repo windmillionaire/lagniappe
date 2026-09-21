@@ -8,7 +8,7 @@
 					"hash": "skip_rec001",
 					"page": { "name": "Parent Page", "hash": "page001" },
 					"schedule": { "unit": "day", "interval": 1 },
-					"days_ago": 0,
+					"starting_due_date": "2025-06-15",
 					"expected": { "skipped": 0 }
 				}
 			],
@@ -19,7 +19,7 @@
 					"hash": "skip_rec002",
 					"page": { "name": "Parent Page", "hash": "page002" },
 					"schedule": { "unit": "day", "interval": 1 },
-					"days_ago": -5,
+					"starting_due_date": "2025-06-20",
 					"expected": { "skipped": 0 }
 				}
 			],
@@ -30,7 +30,7 @@
 					"hash": "skip_rec003",
 					"page": { "name": "Parent Page", "hash": "page003" },
 					"schedule": { "unit": "day", "interval": 1 },
-					"days_ago": 1,
+					"starting_due_date": "2025-06-14",
 					"expected": { "skipped": 0 }
 				}
 			],
@@ -41,7 +41,7 @@
 					"hash": "skip_rec004",
 					"page": { "name": "Parent Page", "hash": "page004" },
 					"schedule": { "unit": "day", "interval": 1 },
-					"days_ago": 3,
+					"starting_due_date": "2025-06-12",
 					"expected": { "skipped": 2 }
 				}
 			],
@@ -52,7 +52,7 @@
 					"hash": "skip_rec005",
 					"page": { "name": "Parent Page", "hash": "page005" },
 					"schedule": { "unit": "day", "interval": 2 },
-					"days_ago": 5,
+					"starting_due_date": "2025-06-10",
 					"expected": { "skipped": 2 }
 				}
 			],
@@ -63,18 +63,18 @@
 					"hash": "skip_rec006",
 					"page": { "name": "Parent Page", "hash": "page006" },
 					"schedule": { "unit": "week", "interval": 1 },
-					"days_ago": 14,
+					"starting_due_date": "2025-06-01",
 					"expected": { "skipped": 1 }
 				}
 			],
 			[
 				"TASK",
 				{
-					"name": "Every 2 weeks - 15 days ago - 0 skipped (next at 14 days is today-ish)",
+					"name": "Every 2 weeks - 14 days ago - next occurrence today",
 					"hash": "skip_rec007",
 					"page": { "name": "Parent Page", "hash": "page007" },
 					"schedule": { "unit": "week", "interval": 2 },
-					"days_ago": 14,
+					"starting_due_date": "2025-06-01",
 					"expected": { "skipped": 0 }
 				}
 			],
@@ -85,7 +85,7 @@
 					"hash": "skip_rec008",
 					"page": { "name": "Parent Page", "hash": "page008" },
 					"schedule": { "unit": "week", "interval": 2 },
-					"days_ago": 29,
+					"starting_due_date": "2025-05-17",
 					"expected": { "skipped": 2 }
 				}
 			],
@@ -96,7 +96,7 @@
 					"hash": "skip_rec009",
 					"page": { "name": "Parent Page", "hash": "page009" },
 					"schedule": { "unit": "day", "interval": 0 },
-					"days_ago": 10,
+					"starting_due_date": "2025-06-05",
 					"expected": { "skipped": 0 }
 				}
 			],
@@ -107,7 +107,7 @@
 					"hash": "skip_rec010",
 					"page": { "name": "Parent Page", "hash": "page010" },
 					"schedule": { "unit": "invalid", "interval": 1 },
-					"days_ago": 10,
+					"starting_due_date": "2025-06-05",
 					"expected": { "skipped": 0 }
 				}
 			]
@@ -122,19 +122,19 @@
 					"hash": "skip_sch001",
 					"page": { "name": "Parent Page", "hash": "page001" },
 					"schedule": { "mode": "daily" },
-					"days_ago": 0,
+					"starting_due_date": "2025-06-18",
 					"expected": { "skipped": 0 }
 				}
 			],
 			[
 				"TASK",
 				{
-					"name": "Daily - 5 days ago - 5 skipped",
+					"name": "Daily - 5 days ago - 4 skipped before today",
 					"hash": "skip_sch002",
 					"page": { "name": "Parent Page", "hash": "page002" },
 					"schedule": { "mode": "daily" },
-					"days_ago": 5,
-					"expected": { "skipped": 5 }
+					"starting_due_date": "2025-06-13",
+					"expected": { "skipped": 4 }
 				}
 			],
 			[
@@ -144,7 +144,7 @@
 					"hash": "skip_sch003",
 					"page": { "name": "Parent Page", "hash": "page003" },
 					"schedule": { "mode": "weekly", "days": [0, 2, 4] },
-					"days_ago": 7,
+					"starting_due_date": "2025-06-11",
 					"expected": { "skipped": 2 }
 				}
 			],
@@ -155,7 +155,7 @@
 					"hash": "skip_sch004",
 					"page": { "name": "Parent Page", "hash": "page004" },
 					"schedule": { "mode": "weekly", "days": [0, 2, 4] },
-					"days_ago": 14,
+					"starting_due_date": "2025-06-04",
 					"expected": { "skipped": 5 }
 				}
 			],
@@ -166,7 +166,7 @@
 					"hash": "skip_sch005",
 					"page": { "name": "Parent Page", "hash": "page005" },
 					"schedule": { "mode": "weekly", "days": [5] },
-					"days_ago": 14,
+					"starting_due_date": "2025-06-04",
 					"expected": { "skipped": 2 }
 				}
 			],
@@ -177,27 +177,25 @@
 					"hash": "skip_sch006",
 					"page": { "name": "Parent Page", "hash": "page006" },
 					"schedule": { "mode": "monthly", "type": "specific_day", "day": 15 },
-					"months_ago": 3,
-					"from_day": 15,
+					"starting_due_date": "2025-03-15",
 					"expected": { "skipped": 3 }
 				}
 			],
 			[
 				"TASK",
 				{
-					"name": "Monthly last day - 3 months ago - 2 skipped",
+					"name": "Monthly last day - includes initial March 31 - 3 skipped",
 					"hash": "skip_sch007",
 					"page": { "name": "Parent Page", "hash": "page007" },
 					"schedule": { "mode": "monthly", "type": "last_day" },
-					"months_ago": 3,
-					"from_day": 28,
-					"expected": { "skipped": 2 }
+					"starting_due_date": "2025-03-28",
+					"expected": { "skipped": 3 }
 				}
 			],
 			[
 				"TASK",
 				{
-					"name": "Monthly first Monday - 3 months ago - 3 skipped",
+					"name": "Monthly first Monday - includes initial March 3 - 4 skipped",
 					"hash": "skip_sch008",
 					"page": { "name": "Parent Page", "hash": "page008" },
 					"schedule": {
@@ -206,15 +204,14 @@
 						"ordinal": 1,
 						"weekday": 0
 					},
-					"months_ago": 3,
-					"from_day": 1,
-					"expected": { "skipped": 3 }
+					"starting_due_date": "2025-03-01",
+					"expected": { "skipped": 4 }
 				}
 			],
 			[
 				"TASK",
 				{
-					"name": "Yearly Dec 25 - from Jan 2 years ago - 1 skipped",
+					"name": "Yearly Dec 25 - from Jan 2023 - 2 skipped",
 					"hash": "skip_sch009",
 					"page": { "name": "Parent Page", "hash": "page009" },
 					"schedule": {
@@ -223,9 +220,8 @@
 						"month": 12,
 						"day": 25
 					},
-					"years_ago": 2,
-					"from_month": 1,
-					"expected": { "skipped": 1 }
+					"starting_due_date": "2023-01-01",
+					"expected": { "skipped": 2 }
 				}
 			],
 			[
@@ -235,8 +231,7 @@
 					"hash": "skip_sch010",
 					"page": { "name": "Parent Page", "hash": "page010" },
 					"schedule": { "mode": "yearly", "type": "first_day", "month": 3 },
-					"years_ago": 2,
-					"from_month": 4,
+					"starting_due_date": "2023-04-01",
 					"expected": { "skipped": 2 }
 				}
 			]

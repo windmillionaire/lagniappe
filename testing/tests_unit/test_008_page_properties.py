@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 from google.cloud import datastore
 import pytest
 
+from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
 from lagniappe.core.definitions import (
@@ -50,7 +51,9 @@ def test_page_details(get_test_entities):
 
     Entity.details also adds "id" (urlsafe_key) and filters out None values.
     """
-    for page in get_test_entities():
+    pages = get_test_entities()
+    assert pages
+    for page in pages:
         page.name = page.test_spec.get("name")
 
         details = page.details
@@ -119,13 +122,15 @@ def test_page_document(get_test_entities):
 
     Document has special behavior:
     - filter_value is boolean (True if entity.assets has "document")
-    - cache_value and ai_value use entity.text_for_cache("document")
+    - cache_value and ai_value use the document asset text
     - cache_key is "doc"
     - filter_key is "has_document"
     - ai_key is "page_document" for PAGE
     """
-    for page in get_test_entities():
-        document_text = page.text_for_cache("document")
+    pages = get_test_entities()
+    assert pages
+    for page in pages:
+        document_text = page.test_spec.get("document")
 
         if document_text:
             # FilterMixin
@@ -148,7 +153,9 @@ def test_page_public(get_test_entities):
     - filter_key is "is_public"
     - Value reads from entity.db["public"], defaults to False
     """
-    for page in get_test_entities():
+    pages = get_test_entities()
+    assert pages
+    for page in pages:
         is_public = page.test_spec.get("public", False)
 
         if "public" in page.test_spec:
@@ -209,9 +216,14 @@ def test_page_public_settings_normalize_and_invalidate_discovery():
     assert page.public_settings["allow_indexing"] is False
     assert page.mutation_intents[0].intent.value == "public-discovery-invalidate"
 
-    with pytest.raises(Exception, match="120 characters or fewer"):
+    saved = page.db["public_settings"]
+    with pytest.raises(ValidationError, match="120"):
+        page.public_settings = {"title": "x" * 121}
+    assert page.db["public_settings"] == saved
+
+    with pytest.raises(ValidationError, match="120"):
         normalize_public_settings({"title": "x" * 121})
-    with pytest.raises(Exception, match="URL-safe key"):
+    with pytest.raises(ValidationError, match="URL-safe key"):
         normalize_public_settings({"directory_category": 123})
 
 
@@ -219,7 +231,9 @@ def test_page_public_settings_normalize_and_invalidate_discovery():
 @pytest.mark.unit
 def test_page_to_cache_public_user(get_test_entities):
     """Page.to_cache returns {} when the page has a user with is_public (profile page)."""
-    for page in get_test_entities():
+    pages = get_test_entities()
+    assert pages
+    for page in pages:
         spec_user = page.test_spec.get("user")
         if spec_user and spec_user.get("public"):
             page.name = page.test_spec.get("name")
@@ -228,7 +242,7 @@ def test_page_to_cache_public_user(get_test_entities):
             assert page.to_cache == {}
         else:
             page.name = page.test_spec.get("name")
-            text = page.text_for_cache("document")
+            text = page.test_spec.get("document")
             if text:
                 assert page.to_cache.get("doc") == text
 

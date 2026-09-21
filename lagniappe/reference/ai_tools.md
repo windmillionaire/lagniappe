@@ -1,6 +1,5 @@
 ---
 title: Create a Plan
-manual_section: ai
 related:
 - ai_email
 - external_ai
@@ -21,7 +20,7 @@ Plans remain available from Home. Open a plan to see its progress. After executi
 
 ## Saved reports
 
-Home's **Active**, **Executed**, and **Ask** filters select saved reports. Active includes pending proposals and work needing attention; Executed contains completed proposals; Ask contains answers. Counts include reports hidden by the other filters. Selecting Executed alone offers bulk deletion after confirmation. This deletes reports, undo history, and report-only uploads; created workspace records remain.
+Home's **Active**, **Executed**, and **Answers** filters select saved reports. Active includes pending proposals and work needing attention; Executed contains completed proposals; Answers contains saved answers without executable changes. Counts include reports hidden by the other filters. Selecting Executed alone offers bulk deletion after confirmation. This deletes reports, undo history, and report-only uploads; created workspace records remain.
 
 ## Access and evidence
 

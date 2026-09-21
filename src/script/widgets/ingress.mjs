@@ -1,7 +1,8 @@
 import { buttons } from "../elements/buttons.mjs";
-import { FacetsBox, SelectBox } from "../elements/combobox";
-import { primitives } from "../elements/primitives";
-import { captureError, Modal, request, withTransition } from "../shared";
+import { FacetsBox, SelectBox } from "../elements/combobox/index.mjs";
+import { primitives } from "../elements/primitives.mjs";
+import { captureError, Modal, request } from "../shared/index.mjs";
+import { withTransition } from "../shared/transitions.mjs";
 
 /**
  * @testable infrastructure
@@ -93,7 +94,7 @@ export class ImportData {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_stage_action_failure_restores_button_and_polling_for_retry
+	 * @tests tests_js/test_035_ingress_polling.mjs::test_ingress_stage_action_failure_restores_button_and_polling_for_retry
 	 * @matrix ingress ui-action : polling-recovery retryable-action single-flight stage-action
 	 */
 	_runStageAction(
@@ -181,7 +182,7 @@ export class ImportData {
 	 * @testable true
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
+	 * @tests tests_js/test_035_ingress_polling.mjs::test_ingress_next_waits_for_pending_stage_update
 	 * @matrix ingress : choose-type serialization stage-update
 	 */
 	async _change(e) {
@@ -502,7 +503,7 @@ export class ImportData {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
+	 * @tests tests_js/test_035_ingress_polling.mjs::test_ingress_next_waits_for_pending_stage_update
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @matrix ingress : next-action serialization stage-update
@@ -564,7 +565,7 @@ export class ImportData {
 	 * widget. A running import is remembered and catches up when reopened.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_polling_tracks_widget_visibility
+	 * @tests tests_js/test_035_ingress_polling.mjs::test_ingress_polling_tracks_widget_visibility
 	 * @matrix ingress polling : active-widget catch-up subscription-lifecycle visibility
 	 */
 	async syncPollingSubscription() {

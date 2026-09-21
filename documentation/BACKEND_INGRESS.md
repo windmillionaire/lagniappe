@@ -88,6 +88,20 @@ write. Cache refresh is post-commit. Infrastructure failures put the import in
 resumable `failed` state; row validation errors are ordinary results and do not
 stop the run.
 
+Unexpected row-planning exceptions also stop at that failure boundary, including
+failures after task or history allocation. No part of that row is committed and
+its cursor is unchanged; restart retries the same row. Only `ValidationError`
+is converted to an ordinary rejected-row result by the planner.
+
+Malformed checklist input raises a validation error and rejects the entire
+row, including its otherwise valid fields. A raised row-validation error
+discards all staged entities (and their pending history effects), records an
+error without an imported-entity result, and lets the cursor advance to later
+rows. The importer must not save a partial task with an emptied checklist.
+Ordinary checklist text still imports as one unchecked item; blank input
+remains a valid empty checklist. This does not change other field types'
+existing non-fatal diagnostic policies.
+
 ## Routes and workers
 
 All `/files/ingress` routes require `Resource.SITE`. They load the entity,

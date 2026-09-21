@@ -1,8 +1,8 @@
-import { FormElement } from "../elements/form";
-import { InputElement } from "../elements/input";
-import { SectionToggle } from "../elements/sectionToggle";
-import { TextareaElement } from "../elements/textarea";
-import { withTransition } from "../shared";
+import { InputElement } from "../elements/input.mjs";
+import { SectionToggle } from "../elements/sectionToggle.mjs";
+import { TextareaElement } from "../elements/textarea.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 const TASK_BUTTONS = {
 	selectUser: "facet",
@@ -16,7 +16,7 @@ const TASK_BUTTONS = {
 /**
  * @testable infrastructure
  */
-export class BaseTaskSettings extends FormElement {
+export class BaseTaskSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.buttons = {};
@@ -28,7 +28,7 @@ export class BaseTaskSettings extends FormElement {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
 	 * @matrix tasks : attach-form create model-task-link
 	 * @matrix tasks : retained-draft manual-form-choice
 	 */
@@ -85,7 +85,7 @@ export class BaseTaskSettings extends FormElement {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_settings_awaits_action_controls_and_cleans_up
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_settings_awaits_action_controls_and_cleans_up
 	 * @matrix tasks : action-control-lifecycle teardown
 	 */
 	async _initActions() {
@@ -221,7 +221,7 @@ export class TaskMove extends BaseTaskSettings {
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
  * @matrix task-combine : checkbox-submit delta lazy-form
  */
-export class TaskCombine extends FormElement {
+export class TaskCombine extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

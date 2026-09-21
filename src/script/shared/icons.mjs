@@ -1,8 +1,8 @@
-import { ICONS } from "icons";
+import { ICONS } from "../generated/icons.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @tests tests_js/test_018_style_pipeline.mjs::test_frontend_icon_helpers_render_structured_material_symbols
  * @matrix frontend-icons : lookup nested-ids registry
  */
 export const iconDefinition = (name) => {
@@ -16,7 +16,7 @@ export const iconDefinition = (name) => {
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @tests tests_js/test_018_style_pipeline.mjs::test_frontend_icon_helpers_render_structured_material_symbols
  * @matrix frontend-icons : accessibility animation fill semantic-markup weight
  */
 export const setIcon = (element, name, classes = "") => {
@@ -49,7 +49,7 @@ export const setIcon = (element, name, classes = "") => {
 
 /**
  * @testable true
- * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @tests tests_js/test_018_style_pipeline.mjs::test_frontend_icon_helpers_render_structured_material_symbols
  * @matrix frontend-icons : element-creation semantic-markup
  */
 export const createIcon = (name, classes = "") => {

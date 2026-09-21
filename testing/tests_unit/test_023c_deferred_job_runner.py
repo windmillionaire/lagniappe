@@ -421,6 +421,41 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         expired.ensure_active()
 
 
+# @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
+# @matrix deferred-jobs : cancellation reauthorization
+@pytest.mark.parametrize("cancel_at", ["prepare", "reauthorize"])
+def test_runner_rechecks_claim_before_applying_prepared_output(monkeypatch, cancel_at):
+    job = RunnerJob()
+    owned = [True]
+    adapter = RecordingAdapter()
+    registry = make_runner(monkeypatch, job, adapter)
+    monkeypatch.setattr(registry, "_claim_active", lambda *_args: owned[0])
+    original_prepare = adapter.prepare
+    original_authorize = adapter.authorize
+
+    def prepare(context):
+        result = original_prepare(context)
+        if cancel_at == "prepare":
+            owned[0] = False
+        return result
+
+    def authorize(context):
+        original_authorize(context)
+        if cancel_at == "reauthorize" and adapter.calls.count("authorize") == 2:
+            owned[0] = False
+
+    monkeypatch.setattr(adapter, "prepare", prepare)
+    monkeypatch.setattr(adapter, "authorize", authorize)
+
+    result = registry.run(job.urlsafe_key)
+
+    assert result.state is DeferredJobRunState.FAILED
+    assert result.error == "Deferred job was cancelled or superseded."
+    assert "apply" not in adapter.calls
+    assert "inspect" not in adapter.calls
+    assert job.result == {}
+
+
 # @pair deferred-jobs:retry
 def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypatch):
     provider_error = google_exceptions.TooManyRequests("busy")

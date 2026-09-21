@@ -1,5 +1,8 @@
 # Testing
 
+For native Node cases, shared fixtures, and the step-by-step migration recipe,
+see [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md).
+
 This is the command and suite entry point. Read
 [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) before adding or reshaping
 tests, [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) before running a recorded
@@ -12,7 +15,7 @@ session.
 | Suite | Location | Use it for |
 | --- | --- | --- |
 | Unit | `testing/tests_unit/` | Deterministic backend entities, properties, permissions, validation, and services. |
-| JavaScript | `testing/tests_js/` | Frontend modules that run in Node with small platform fakes and no live DOM/server. |
+| JavaScript | `testing/tests_js/` | Frontend modules in Node with jsdom and simulated persistence; no live browser/server. |
 | E2E | `testing/tests_e2e/` | Browser/server workflows, DOM, routing, storage lifecycle, rendering, and multi-user behavior. |
 | Tooling | `testing/tests_tooling/` | Setup/config smoke, runner, reporters, and repository health. |
 
@@ -159,7 +162,8 @@ source/template/style dependencies. Use:
   report behavior;
 - [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) when reviewing source
   ownership;
-- [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) when reviewing a test; and
+- [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md#basic-test-review-checklist)
+  for the behavior checklist when writing or reviewing a test; and
 - [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) for Jinja DOM
   contracts.
 

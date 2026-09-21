@@ -10,7 +10,7 @@ For current contracts and commands, use [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md)
 [Authentication](AUTHENTICATION.md#remote-mcp), and
 [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service). Evaluation procedure lives
 in [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md); individual results remain in
-the [workflow case library](../testing_ai_workflows/README.md).
+the [workflow case library](../testing/ai_test_cases/README.md).
 
 ## Start with the application API
 
@@ -114,14 +114,14 @@ schedules, related records, revision, contacts, images, mixed files and source
 retention. Natural prompts and fixtures were kept separate from operator
 rubrics. Raw exports stayed private; reviewed metrics and findings were tracked.
 
-The [second local round](../testing_ai_workflows/comparisons/mcp-round-2.md)
+The [second local round](../testing/ai_test_cases/comparisons/mcp-round-2.md)
 reduced model tool rounds from 133 to 100 across eleven jobs, while total time
-rose slightly. The [targeted third round](../testing_ai_workflows/comparisons/mcp-round-3.md)
+rose slightly. The [targeted third round](../testing/ai_test_cases/comparisons/mcp-round-3.md)
 confirmed same-Plan recovery and usable negative-answer Forms, with less
 discovery overhead. These were useful observations from combined changes and
 variable model runs, not isolated performance experiments.
 
-The [remote comparison](../testing_ai_workflows/comparisons/remote-mcp-pilot-20260905.md)
+The [remote comparison](../testing/ai_test_cases/comparisons/remote-mcp-pilot-20260905.md)
 saved a report in all thirteen cases and demonstrated ordinary terminal uploads
 without the helper. Across the eleven cases with local MCP baselines, total
 task time was about fifteen minutes on each side. Some remote cases were slower

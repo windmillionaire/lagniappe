@@ -1,8 +1,9 @@
-import { STYLES } from "styles";
-import { Modal, request } from "../../../shared";
-import { BaseForm } from "../../base/baseForm";
-import { buttons } from "../../buttons";
-import { primitives } from "../../primitives";
+import { FormController } from "../../../forms/controller.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { Modal } from "../../../shared/modal.mjs";
+import { request } from "../../../shared/request.mjs";
+import { buttons } from "../../buttons.mjs";
+import { primitives } from "../../primitives.mjs";
 
 /**
  * @testable true
@@ -125,7 +126,7 @@ class GenerateText {
 			explain,
 		].filter(Boolean);
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

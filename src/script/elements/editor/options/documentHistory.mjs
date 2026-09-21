@@ -1,7 +1,8 @@
-import { STYLES } from "styles";
-import { Modal, request } from "../../../shared";
-import { Dropdown } from "../../combobox/dropdown";
-import { createMenuButton } from "../dropdowns";
+import { STYLES } from "../../../generated/styles.mjs";
+import { Modal } from "../../../shared/modal.mjs";
+import { request } from "../../../shared/request.mjs";
+import { Dropdown } from "../../combobox/dropdown.mjs";
+import { createMenuButton } from "../dropdowns.mjs";
 
 /**
  * @testable true

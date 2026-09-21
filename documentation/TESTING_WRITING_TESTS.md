@@ -1,8 +1,65 @@
 # Testing Writing Tests
 
-Use this guide when adding or reshaping tests. For a systematic review of an
-existing test, also read [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md).
+For native Node cases, shared fixtures, and the step-by-step migration recipe,
+see [TESTING_JAVASCRIPT.md](TESTING_JAVASCRIPT.md).
+
+Use this guide when adding, reshaping, or reviewing tests.
 Commands and suite setup live in [TESTING.md](TESTING.md).
+
+## Basic Test Review Checklist
+
+Use these questions before adding a test and when reviewing an existing one.
+They adapt [Software Engineering at Google, chapter 12](https://abseil.io/resources/swe-book/html/ch12.html).
+
+- Does the test protect a meaningful behavior or policy worth maintaining?
+- Does the test name a behavior and the outcome that matters?
+- Does it exercise a stable entry point with the owned logic intact?
+- Does it check results, with a reason for any interaction requirements?
+- Are the relevant setup, action, and expectation apparent?
+- Are expected values independent of the implementation's calculations?
+- Do helpers remove distraction without hiding the scenario or its outcome?
+
+Name a plausible wrong result that should fail the test. A type check, import,
+nonempty result, or call count is sufficient only when that is the contract.
+Check the particular output being claimed: a correct stored date does not prove
+its filter timestamp or displayed date is correct. Do not derive an expected
+value from the production property whose output is under review.
+
+Keep useful data tables, focused assertion helpers, and multiple assertions
+that describe one behavior. Retry limits, transaction ordering, forbidden I/O,
+and command arguments can make interactions meaningful. A private function can
+be the appropriate boundary for a reusable utility. Avoid mechanical rules
+such as one assertion per test, no mocks, no loops, or no source-reading tests.
+
+For tooling, source files may be the actual input to a parser or architecture
+guard. Identify the policy first; exercise a prohibited example and a harmless
+example when the matching behavior needs verification. Preserve deliberate
+security allowlists and scope restrictions. Incidental source spelling or an
+unexplained repository-wide count usually needs a more precise contract.
+
+Keep good tests unchanged. Remove a test when it provides no meaningful
+behavioral or policy protection; explain why no replacement is needed. When
+deleting or combining useful coverage, identify the surviving assertions and
+scenarios, or establish that the contract is no longer supported. Matching tags
+or executed lines do not prove redundancy. Preserve meaningful distinctions
+such as absent versus empty data and allowed versus denied access.
+
+Incidental source spelling, entire warning sentences, and internal call
+sequences need an explicit contract to justify exact assertions. Protocol
+fields, command arguments, security allowlists, and essential diagnostic
+information can require precision. Do not turn a low-value check into a more
+elaborate test without first establishing what useful failure it detects.
+
+When a test exposes a possible product or tooling bug, record the scenario,
+expected and actual behavior, evidence, and uncertainty in the task's review
+record. Do not change expectations, weaken assertions, or remove meaningful
+coverage to fit suspected faulty behavior. Defer the dependent change when the
+contract is unclear; keep unrelated improvement work moving.
+
+Control time and other nondeterministic inputs at their boundary. Read the
+contract before choosing exact expectations: two input paths may intentionally
+normalize dates differently. Keep the conversion logic real and specify the
+expected instant, display value, and filter value independently where claimed.
 
 ## Start With the Smallest Faithful Layer
 
@@ -13,7 +70,7 @@ the behavior.
 | Layer | Use it for |
 | --- | --- |
 | Unit | Deterministic backend entities, properties, permissions, validation, retries, and service logic without a live app server. |
-| JavaScript | Frontend module behavior that can run in Node with small platform fakes and does not require a real DOM or server. |
+| JavaScript | Frontend module behavior in Node, including jsdom DOM operations and simulated persistence; no live browser/server. |
 | E2E | User workflows or browser lifecycle behavior that requires a real browser/server boundary, DOM, routing, storage, rendering, or multi-user interaction. |
 | Tooling | Setup/config smoke tests, repository health, reporters, and runner behavior. Tooling tests must not import `lagniappe.core` or `lagniappe.web`, or execute Node. |
 

@@ -65,6 +65,7 @@ def apply_ordinary_mutations(*, upserts=(), deletes=()):
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @matrix notifications : aggregate-count idempotency ordinary-create
+# @matrix notification-email notifications : failure-isolation idempotency
 def create_ordinary_notification(user, *, identifier, body, target=None):
     from ...definitions import Fetch
     from ...entities import Entities

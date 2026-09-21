@@ -87,6 +87,14 @@ Stored fields receive their backend value; absent fields remain unset. The
 submission's stored projection omits unset and blank values, so an empty
 submission removes `db["submission"]`.
 
+Browser submissions reject malformed nonempty Email, Time, Date, and Number
+values with a field-labeled `ValidationError`. Numbers must be finite; Email
+uses the existing address pattern against the entire value. Missing or blank
+optional values remain valid, and numeric zero remains an answer. Page and Task
+update routes return HTTP 422 without saving the submission on validation
+failure. This browser boundary does not change AI/import normalization policy
+or retroactively validate stored answers.
+
 Date fields accept calendar dates in the acting user's timezone and store UTC
 datetimes. DateMixin uses the property's explicit user when there is no browser
 session; table column fields inherit their table's user. AI values, form values
@@ -142,9 +150,9 @@ static content on generated Page forms, and static fields in additive report
 schema updates are rejected. Existing stored sidecars are not migrated; Form
 read projections apply the Form-content policy before browser `innerHTML` use.
 
-`tools/form_drafts.py` validates builder drafts and guards every ordinary Form
+`tools/forms/drafts.py` validates builder drafts and guards every ordinary Form
 save against removal or representation changes to saved fields, options, and
-table columns until migration support is available. Relabeling preserves IDs
+table columns outside the guarded change workflow. Relabeling preserves IDs
 and stored option values. Builder Save supplies the complete schema/HTML draft,
 an opaque saved baseline, and a request identity; a receipt recognizes a retry
 before its image uploads are consumed. Copy publishes an independent Form and
@@ -174,10 +182,32 @@ FormHistory is not directly viewable through generic entity or asset endpoints.
 An unavailable generation is reported explicitly without guessing from old
 content-version records or changing saved answers.
 
-The later transfer workflow will advance affected flat current submissions,
+The guarded change workflow advances affected flat current submissions,
 including completed Tasks, to the new generation while preserving their original
-completion envelopes and TaskHistory records. Step 1 keeps incompatible saves
-blocked; it does not implement that transfer engine.
+completion envelopes and TaskHistory records. See
+[BACKEND_JOBS.md](BACKEND_JOBS.md#form-changes) for preflight, application,
+publication, and recovery.
+
+Form evolution code lives in `tools/forms/`. Import the focused owner directly;
+the package initializer deliberately does not import or re-export workflows:
+
+| Owner | Responsibility |
+| --- | --- |
+| `contracts.py` | Persisted change keys, answer fields, JSON/size checks, and populated-value predicate. |
+| `conversions.py` | Schema differences and deterministic/AI-candidate value validation. |
+| `population.py` | The shared cursor query and loading boundary for attached Page/Task submissions. |
+| `definitions.py` | Current, pending, and historical generation readers, completion guards, and history projections. |
+| `drafts.py` | Draft validation, content staging, archives, and guarded publication. |
+| `schema_updates.py` | Schema operations, permission-checked impact previews, and candidate validation. |
+| `changes.py` | Change reservation, application, mutation guards, status, and recovery. |
+
+Contracts and conversions do not import publication or change workflows.
+Definition readers resolve pending and historical generations without importing
+those workflows; entity-registry access remains local to readers that need it.
+Previews and the deferred adapter use `population.py` directly. The local
+draft-save import of change orchestration remains intentional: Save delegates
+incompatible edits to that workflow, while ordinary publication reads only the
+shared persisted-state contract.
 
 `schema_format` records the storage format independently from the content
 fingerprint and submission generation. During a data update, readable rows remain projectable so

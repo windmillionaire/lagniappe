@@ -218,57 +218,11 @@ def test_deferred_jobs_cli_verifies_installation_before_provisioning(monkeypatch
     assert events == ["verify", "provision"]
 
 
-def test_security_cli_routes_to_security_configuration(monkeypatch):
-    from runner import gcloud as runner_gcloud
-
-    _isolate_cli_routing_prerequisites(monkeypatch)
-    events = []
-    security_module = types.ModuleType("installer.security")
-    security_module.configure_security = lambda: events.append("security") or 0
-    monkeypatch.setitem(sys.modules, "installer.security", security_module)
-    monkeypatch.setattr(
-        runner_gcloud,
-        "activate_repository_gcloud",
-        lambda **_kwargs: True,
-    )
-    monkeypatch.setattr(sys, "argv", ["-m installer", "security"])
-
-    setup_path = Path(__file__).resolve().parents[2] / "installer" / "__main__.py"
-    with pytest.raises(SystemExit) as exit_info:
-        runpy.run_path(setup_path, run_name="__main__")
-
-    assert exit_info.value.code == 0
-    assert events == ["security"]
-
-
-def test_development_cli_routes_to_development_setup(monkeypatch):
-    from runner import gcloud as runner_gcloud
-
-    _isolate_cli_routing_prerequisites(monkeypatch)
-    events = []
-    development_module = types.ModuleType("installer.development")
-    development_module.setup_development = lambda: events.append("development") or 0
-    monkeypatch.setitem(sys.modules, "installer.development", development_module)
-    monkeypatch.setattr(
-        runner_gcloud,
-        "activate_repository_gcloud",
-        lambda **_kwargs: True,
-    )
-    monkeypatch.setattr(sys, "argv", ["-m installer", "development"])
-
-    setup_path = Path(__file__).resolve().parents[2] / "installer" / "__main__.py"
-    with pytest.raises(SystemExit) as exit_info:
-        runpy.run_path(setup_path, run_name="__main__")
-
-    assert exit_info.value.code == 0
-    assert events == ["development"]
-
-
 # @matrix setup : authentication-email cli deploy gmail replacement smtp
 def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
     import config
     import installer as setup_pkg
-    from installer import auth_email, utils, verify
+    from installer import auth_email, deploy, verify
 
     events = []
     settings = _fake_settings(
@@ -293,7 +247,7 @@ def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
         lambda *, replace=False: events.append(("gmail", replace)) or True,
     )
     monkeypatch.setattr(
-        utils,
+        deploy,
         "deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
@@ -307,7 +261,7 @@ def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
 def test_email_cli_configures_and_optionally_deploys(monkeypatch):
     import config
     import installer as setup_pkg
-    from installer import auth_email, utils, verify
+    from installer import auth_email, deploy, verify
 
     events = []
     settings = _fake_settings(
@@ -328,7 +282,7 @@ def test_email_cli_configures_and_optionally_deploys(monkeypatch):
         lambda: events.append("configure") or True,
     )
     monkeypatch.setattr(
-        utils,
+        deploy,
         "deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
@@ -344,7 +298,7 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
     import installer as setup_pkg
     from installer import redis as redis_setup
     from installer import security
-    from installer import utils
+    from installer import deploy
 
     events = []
     settings = _fake_settings(
@@ -368,7 +322,7 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
         redis_setup, "_enable_redis_tls", lambda: events.append("enable") or True
     )
     monkeypatch.setattr(
-        utils,
+        deploy,
         "deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
@@ -463,7 +417,7 @@ def test_development_setup_is_additive_and_idempotent(monkeypatch):
     monkeypatch.setattr(development, "_missing_installation_files", lambda: [])
     monkeypatch.setattr(development, "NODE_CLI", "/tools/node")
     monkeypatch.setattr(development, "NPM_CLI", "/tools/npm")
-    monkeypatch.setattr(development, "_installed_node_version", lambda: "v26.5.0")
+    monkeypatch.setattr(development, "_installed_node_version", lambda: "v" + (development.APP_ROOT / ".nvmrc").read_text().strip())
     monkeypatch.setattr(
         development,
         "_run_command",
@@ -531,13 +485,16 @@ def test_development_setup_validates_node_range():
         node_version_supported,
     )
 
-    for supported in ("v22.18.0", "22.20.1", "24.11.0", "v26.5.0"):
+    pinned = (APP_ROOT / ".nvmrc").read_text(encoding="utf-8").strip()
+    major, minor, patch = map(int, pinned.split("."))
+    for supported in (pinned, f"v{pinned}", f"{major + 1}.0.0"):
         assert node_version_supported(supported)
     for unsupported in (
         "22.17.9",
         "v23.0.0",
         "24.10.9",
-        "24.11.0junk",
+        f"{major}.{minor}.{patch - 1}" if patch else f"{major - 1}.99.99",
+        pinned + "junk",
         "not-a-version",
     ):
         assert not node_version_supported(unsupported)
@@ -1119,6 +1076,7 @@ def test_redis_connection_uses_shared_tls_settings_and_exits_on_failure(
     monkeypatch.setattr(redis_pkg, "Redis", FailingRedis)
     with pytest.raises(ProviderError):
         redis_setup.test_redis_connection()
+    assert len(closed_clients) == 3
 
 
 # @matrix setup : certificate-validation failure-isolation redis-tls settings-save
@@ -2298,6 +2256,8 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     create_config_module = types.ModuleType("installer.create_config")
     gcloud_module = types.ModuleType("installer.gcloud")
     utils_module = types.ModuleType("installer.utils")
+    commands_module = types.ModuleType("installer.commands")
+    installer_deploy_module = types.ModuleType("installer.deploy")
     deploy_module = types.ModuleType("runner.deploy")
 
     create_config_module.update_config = lambda: (
@@ -2313,7 +2273,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     gcloud_module.setup_app_engine = lambda: events.append("app-engine-and-runtime-iam")
     gcloud_module.configure_storage_buckets = lambda: events.append("storage-buckets")
     gcloud_module.configure_data_protection = lambda: events.append("data-protection")
-    utils_module.deploy_to_app_engine = lambda **kwargs: events.append("deploy")
+    installer_deploy_module.deploy_to_app_engine = lambda **kwargs: events.append("deploy")
     deploy_module.verify_runtime_deploy_surface = lambda: events.append(
         "verify-runtime-deploy-surface"
     )
@@ -2328,6 +2288,8 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "installer.gcloud", gcloud_module)
     monkeypatch.setattr(setup_pkg, "gcloud", gcloud_module, raising=False)
     monkeypatch.setattr(setup_pkg, "utils", utils_module, raising=False)
+    monkeypatch.setattr(setup_pkg, "commands", commands_module, raising=False)
+    monkeypatch.setattr(setup_pkg, "deploy", installer_deploy_module, raising=False)
     monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
@@ -2374,9 +2336,11 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
         ("reload", "installer"),
         ("reload", "config"),
         ("reload", "config.constants"),
+        ("reload", "installer.commands"),
         ("reload", "installer.create_config"),
         ("reload", "installer.gcloud"),
         ("reload", "installer.utils"),
+        ("reload", "installer.deploy"),
         "update_config",
         ("verify_application_config", False),
         "verify-runtime-deploy-surface",
@@ -2683,14 +2647,23 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
 # @source config/deployment.py::normalize_deployment_settings
 # @matrix config : app-yaml deployment-settings memory-pressure
 def test_default_deployment_uses_three_memory_safe_workers():
+    from config.deployment import normalize_deployment_settings
+
     constants = _load_config_constants()
     assert constants.DEFAULT_DEPLOYMENT_SETTINGS["DEPLOY_WORKER_COUNT"] == "3"
+    assert normalize_deployment_settings({})["DEPLOY_WORKER_COUNT"] == "3"
 
 
 # @matrix config user-settings : app-yaml deployment-settings validation
 def test_deployment_settings_normalize_validation(monkeypatch):
-    class DeploymentSettingsError(Exception):
-        pass
+    real_import = builtins.__import__
+
+    def import_without_application(name, *args, **kwargs):
+        if name == "lagniappe" or name.startswith("lagniappe."):
+            pytest.fail("Deployment validation must not import application code")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_application)
 
     constants = types.SimpleNamespace(
         DEFAULT_DEPLOYMENT_SETTINGS={
@@ -2705,14 +2678,11 @@ def test_deployment_settings_normalize_validation(monkeypatch):
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
     )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=DeploymentSettingsError),
-    )
     _install_config_package(monkeypatch, constants)
 
-    from config.deployment import normalize_deployment_settings
+    from config.deployment import DeploymentSettingsError, normalize_deployment_settings
+
+    assert issubclass(DeploymentSettingsError, ValueError)
 
     assert normalize_deployment_settings(
         {
@@ -2731,7 +2701,9 @@ def test_deployment_settings_normalize_validation(monkeypatch):
         "DEPLOY_IDLE_TIMEOUT": "15m",
     }
 
-    with pytest.raises(DeploymentSettingsError):
+    with pytest.raises(
+        DeploymentSettingsError, match="^Scaling type must be automatic or basic\\.$"
+    ):
         normalize_deployment_settings({"DEPLOY_SCALING_TYPE": "manual"})
 
     with pytest.raises(DeploymentSettingsError):
@@ -2739,8 +2711,12 @@ def test_deployment_settings_normalize_validation(monkeypatch):
             {"DEPLOY_SCALING_TYPE": "automatic", "DEPLOY_INSTANCE_CLASS": "B2"}
         )
 
-    with pytest.raises(DeploymentSettingsError):
-        normalize_deployment_settings({"DEPLOY_WORKER_COUNT": "0"})
+    for value in ("0", "not-an-integer", None):
+        with pytest.raises(
+            DeploymentSettingsError,
+            match="^Worker count must be an integer greater than or equal to 1\\.$",
+        ):
+            normalize_deployment_settings({"DEPLOY_WORKER_COUNT": value})
 
     for instance_class in ("F2", "B2"):
         with pytest.raises(DeploymentSettingsError, match="at most 3 .*workers"):
@@ -2813,11 +2789,6 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
         SCALING_TYPES=("automatic", "basic"),
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=Exception),
     )
     _install_config_package(monkeypatch, constants)
 
@@ -2894,11 +2865,6 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
         SCALING_TYPES=("automatic", "basic"),
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=Exception),
     )
     _install_config_package(monkeypatch, constants)
 
@@ -3076,11 +3042,6 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
         SCALING_TYPES=("automatic", "basic"),
         AUTOMATIC_INSTANCE_CLASSES=("F1", "F2", "F4", "F4_1G"),
         BASIC_INSTANCE_CLASSES=("B1", "B2", "B4", "B4_1G", "B8"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "lagniappe.core.exceptions",
-        types.SimpleNamespace(DeploymentSettingsError=Exception),
     )
     _install_config_package(monkeypatch, constants, settings=settings)
 
@@ -4062,20 +4023,20 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
     ]
 
 
-# @matrix setup : deploy failure gcloud-command progress
+# @matrix setup : deploy failure gcloud-command post-deploy progress timeout
 def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     # Load the real summary dependency before replacing config with a small fake.
     importlib.import_module("installer.mcp")
     import installer as setup_pkg
-    from installer import utils
+    from installer import commands, deploy, monitoring, utils
     from installer.domain import gcp as domain_gcp
 
-    monkeypatch.setattr(utils, "GCLOUD_CLI", None)
+    monkeypatch.setattr(commands, "GCLOUD_CLI", None)
     with pytest.raises(SetupError):
-        utils.check_gcloud_cli()
+        commands.check_gcloud_cli()
 
-    monkeypatch.setattr(utils, "GCLOUD_CLI", "gcloud")
-    utils.check_gcloud_cli()
+    monkeypatch.setattr(commands, "GCLOUD_CLI", "gcloud")
+    commands.check_gcloud_cli()
 
     run_calls = []
 
@@ -4083,9 +4044,9 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         run_calls.append((command, kwargs))
         return completed_process(command, stdout="ok")
 
-    monkeypatch.setattr(utils.subprocess, "run", successful_run)
+    monkeypatch.setattr(commands.subprocess, "run", successful_run)
 
-    assert utils.run_gcloud_command(["config", "list"]).stdout == "ok"
+    assert commands.run_gcloud_command(["config", "list"]).stdout == "ok"
     assert run_calls == [
         (
             ["gcloud", "config", "list"],
@@ -4094,7 +4055,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
                 "stdin": subprocess.DEVNULL,
                 "text": True,
                 "check": True,
-                "timeout": utils.GCLOUD_TIMEOUT,
+                "timeout": commands.GCLOUD_TIMEOUT,
             },
         )
     ]
@@ -4103,14 +4064,25 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         2, ["gcloud", "bad"], output="", stderr="bad command"
     )
     monkeypatch.setattr(
-        utils.subprocess,
+        commands.subprocess,
         "run",
         lambda *args, **kwargs: (_ for _ in ()).throw(error),
     )
 
-    assert utils.run_gcloud_command(["bad"], check=False) is error
+    assert commands.run_gcloud_command(["bad"], check=False) is error
     with pytest.raises(ProviderError):
-        utils.run_gcloud_command(["bad"], check=True)
+        commands.run_gcloud_command(["bad"], check=True)
+
+    timeout_error = subprocess.TimeoutExpired(["gcloud", "slow"], 7)
+    monkeypatch.setattr(
+        commands.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(timeout_error),
+    )
+    for check in (True, False):
+        with pytest.raises(ProviderTimeout, match="gcloud slow timed out after 7 seconds") as caught:
+            commands.run_gcloud_command(["slow"], check=check, timeout=7)
+        assert caught.value.__cause__ is timeout_error
 
     deploy_commands = []
     monkeypatch.setitem(
@@ -4129,13 +4101,6 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
             AssertionError("deploy helper should not prompt")
         ),
     )
-    monkeypatch.setattr(
-        utils,
-        "run_gcloud_command",
-        lambda command, check=True: (
-            deploy_commands.append((command, check)) or completed_process(command)
-        ),
-    )
     deployment_spinner = SpinnerRecorder()
     deployment_progress = []
     initialized_formatter = _fake_formatter(deployment_spinner).initialize()
@@ -4148,9 +4113,14 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         types.SimpleNamespace(initialize=lambda: initialized_formatter),
     )
     monkeypatch.setattr(
-        utils,
+        deploy,
         "print_summary",
         lambda: deploy_commands.append("summary"),
+    )
+    monkeypatch.setattr(
+        monitoring,
+        "reconcile_memory_alert_after_deploy",
+        lambda: deploy_commands.append("monitoring"),
     )
     monkeypatch.setattr(
         domain_gcp,
@@ -4162,7 +4132,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
 
     capsys.readouterr()
-    utils.deploy_to_app_engine()
+    deploy.deploy_to_app_engine()
 
     assert capsys.readouterr().out == (
         "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
@@ -4183,12 +4153,14 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
                 "announce_completion": False,
             },
         ),
+        "monitoring",
         ("certificate", "app.example.com", {"announce_ready": False}),
         "summary",
     ]
 
     deploy_commands.clear()
     sys.modules["config"].SETTINGS.APP["MCP_RESOURCE"] = "https://mcp.example.test/mcp"
+    # An upgrade started on an older checkout still calls the reloaded utils.
     utils.deploy_to_app_engine(print_final_summary=False, first_install=True)
     assert capsys.readouterr().out == (
         "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
@@ -4196,13 +4168,15 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     )
     assert deploy_commands[-1] == ("certificate", "app.example.com", {"announce_ready": True})
 
+    deploy_commands.clear()
     deploy_module.deploy = lambda **kwargs: (_ for _ in ()).throw(
         RuntimeError("provider deployment failed")
     )
     with pytest.raises(RuntimeError, match="provider deployment failed"):
-        utils.deploy_to_app_engine(print_final_summary=False)
+        deploy.deploy_to_app_engine(print_final_summary=False)
     assert len(deployment_spinner.oks) == 2
     assert len(deployment_spinner.fails) == 1
+    assert deploy_commands == []
     assert "MCP server is ready" not in capsys.readouterr().out
 
 
@@ -5055,7 +5029,7 @@ def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
 def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     import config
     import installer as setup_package
-    from installer import admin, identity, utils, verify
+    from installer import admin, identity, deploy, verify
 
     settings = _fake_settings(
         app={
@@ -5093,7 +5067,7 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        utils,
+        deploy,
         "deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )

@@ -232,9 +232,7 @@ class Config:
             "assign",
             "create_pages",
         )
-        sentry_dsn = getattr(app_settings, "SENTRY_DSN", None)
-        if sentry_dsn and not getattr(self, "SENTRY_JS_DSN", None):
-            self.SENTRY_JS_DSN = sentry_dsn
+        self.SENTRY_JS_DSN = str(app_settings.get("SENTRY_JS_DSN") or "").strip()
 
         self._set_bucket_names()
 

@@ -1,10 +1,10 @@
-import { STYLES } from "styles";
-import { setIcon } from "../../../shared/icons";
+import { STYLES } from "../../../generated/styles.mjs";
+import { setIcon } from "../../../shared/icons.mjs";
 
 /**
  * @testable true
- * @tests tests_js/test_033_editor_menu_items.py::test_editor_menu_item_serializes_current_active_state
- * @tests tests_js/test_033_editor_menu_items.py::test_editor_inline_code_menu_item_toggles_from_local_active_state
+ * @tests tests_js/test_033_editor_menu_items.mjs::test_editor_menu_item_serializes_current_active_state
+ * @tests tests_js/test_033_editor_menu_items.mjs::test_editor_inline_code_menu_item_toggles_from_local_active_state
  * @tests tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists
  * @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
  * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection

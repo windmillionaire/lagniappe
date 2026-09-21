@@ -1,5 +1,5 @@
-import { STYLES } from "styles";
-import { setIcon } from "../shared/icons";
+import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.mjs";
 
 /**
  * @testable infrastructure

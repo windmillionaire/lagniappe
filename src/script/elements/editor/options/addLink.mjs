@@ -1,11 +1,12 @@
 import { getMarkRange } from "@tiptap/core";
-import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../../../shared";
-import { BaseForm } from "../../base/baseForm";
-import { buttons } from "../../buttons";
-import { RemoteQueryCombobox } from "../../combobox/remote";
-import { Results } from "../../combobox/results";
-import { primitives } from "../../primitives";
+import { FormController } from "../../../forms/controller.mjs";
+import { STYLES } from "../../../generated/styles.mjs";
+import { ENDPOINTS } from "../../../shared/endpoints.mjs";
+import { request } from "../../../shared/request.mjs";
+import { buttons } from "../../buttons.mjs";
+import { RemoteQueryCombobox } from "../../combobox/remote.mjs";
+import { Results } from "../../combobox/results.mjs";
+import { primitives } from "../../primitives.mjs";
 import { normalizeLinkAttributes } from "../extensions/linkAttributes.mjs";
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
@@ -144,7 +145,7 @@ class AddLink {
 		});
 		this.html = [this.link, submit];
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 		this.form.destroyables.push(this.combobox);
 		this.combobox.init();

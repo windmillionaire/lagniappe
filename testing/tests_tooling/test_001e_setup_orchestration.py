@@ -161,8 +161,13 @@ def _install_harness(
     _module(
         monkeypatch,
         setup_package,
-        "utils",
+        "commands",
         check_gcloud_cli=step("check_gcloud_cli"),
+    )
+    _module(
+        monkeypatch,
+        setup_package,
+        "deploy",
         deploy_to_app_engine=deploy_to_app_engine,
     )
     _module(monkeypatch, setup_package, "mcp", requested=mcp_module.requested)
@@ -378,7 +383,7 @@ def test_recovery_is_announced_before_dependency_or_provider_mutation(
         lambda: events.append(("pip", capsys.readouterr().out)),
     )
     monkeypatch.setattr(
-        "installer.utils.check_gcloud_cli",
+        "installer.commands.check_gcloud_cli",
         lambda: (_ for _ in ()).throw(RuntimeError("stop after announcement")),
     )
 
@@ -484,7 +489,7 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
 def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch):
     import config
     from installer import __main__ as setup_cli
-    from installer import optional, package_install, utils
+    from installer import commands, optional, package_install
     from runner import deploy, gcloud
 
     events = []
@@ -498,7 +503,7 @@ def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch)
         gcloud, "config_gcloud",
         lambda **kwargs: pytest.fail("the handler repeated gcloud activation"),
     )
-    monkeypatch.setattr(utils, "check_gcloud_cli", lambda: None)
+    monkeypatch.setattr(commands, "check_gcloud_cli", lambda: None)
     monkeypatch.setattr(config, "verify_generation_manifest", lambda: events.append("generation"))
     monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: events.append("deploy-surface"))
     monkeypatch.setattr(optional, "configure_ai_features", lambda: events.append("AI prompt") or False)
@@ -1436,7 +1441,11 @@ def test_settings_save_characterizes_each_local_write_failure(
 
     monkeypatch.setattr(config.File, "save", save)
     monkeypatch.setattr(config.File, "exists", lambda file_ref: True)
-    monkeypatch.setattr(config, "write_generation_manifest", lambda: None)
+    monkeypatch.setattr(
+        config,
+        "write_generation_manifest",
+        lambda: pytest.fail("a partial generated set must not be committed"),
+    )
 
     settings = object.__new__(config.Settings)
     settings.DEPLOY = {"runtime": "python314"}
@@ -1493,6 +1502,7 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     with SetupProcessLock(lock_path):
         with pytest.raises(SetupError, match="already running"):
             SetupProcessLock(lock_path).acquire()
+    assert not lock_path.exists()
 
     with pytest.raises(SetupError, match="interrupted"):
         with setup_operation(
@@ -1511,7 +1521,12 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
             raise KeyboardInterrupt
 
     journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert not lock_path.exists()
+    assert journal["schema"] == 1
+    assert journal["mode"] == "install"
     assert journal["status"] == "interrupted"
+    assert journal["error_category"] == "interrupted"
+    assert journal["resume_command"].endswith("setup.sh jobs")
     assert journal["last_step"] == "enable API"
     assert journal["mutations"] == [
         {

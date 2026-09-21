@@ -7,7 +7,11 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!lagniappe/web/static"]
+		"includes": [
+			"**",
+			"!lagniappe/web/static",
+			"!src/script/generated"
+		]
 	},
 	"formatter": {
 		"enabled": true,

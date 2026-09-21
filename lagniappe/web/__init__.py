@@ -144,6 +144,7 @@ def record_authenticated_site_activity(response):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
+# @tests tests_e2e/001_site/test_001b_login.py::test_google_button_styles_apply_before_first_paint
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
@@ -164,6 +165,17 @@ def add_lagniappe_headers(response):
         "Cache-Control": "no-store" if g.get("NO_CACHE") else "private, no-cache",
         "Content-Security-Policy": CSP,
     }
+
+    if google_style_nonce := g.get("google_style_nonce"):
+        # Authorize only this response's GIS button stylesheet; keep arbitrary
+        # inline style elements and scripts blocked by the existing policy.
+        for directive in ("style-src", "style-src-elem"):
+            headers["Content-Security-Policy"] = headers[
+                "Content-Security-Policy"
+            ].replace(
+                f"{directive} 'self'",
+                f"{directive} 'self' 'nonce-{google_style_nonce}'",
+            )
 
     if request.blueprint in {"oauth", "oauth_metadata"}:
         # Flask-WTF verifies the HTTPS same-origin Referer on consent POSTs.

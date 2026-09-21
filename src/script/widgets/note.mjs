@@ -1,4 +1,4 @@
-import { FormElement } from "../elements/form";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable true
@@ -8,7 +8,7 @@ import { FormElement } from "../elements/form";
  * @matrix notes : body-create combined-input photo-picker preview remove
  * @pair notes:photo
  */
-export class CreateNote extends FormElement {
+export class CreateNote extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
 		this.messages = {

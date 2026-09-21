@@ -1,8 +1,9 @@
-import { BaseUpload } from "../elements/base/baseUpload";
-import { sections } from "../elements/sections";
-import { UploadMenu, uploadElement } from "../elements/upload";
-import { request, withTransition } from "../shared";
-import { createIcon } from "../shared/icons";
+import { BaseUpload } from "../elements/base/baseUpload.mjs";
+import { sections } from "../elements/sections.mjs";
+import { UploadMenu, uploadElement } from "../elements/upload.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { request } from "../shared/index.mjs";
+import { withTransition } from "../shared/transitions.mjs";
 
 /**
  * @testable true

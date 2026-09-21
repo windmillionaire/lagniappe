@@ -1,12 +1,12 @@
-import { withTransition } from "../shared";
-import { setIcon } from "../shared/icons";
-import Entity from "./base/entity";
+import { setIcon } from "../shared/icons.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import Entity from "./base/entity.mjs";
 
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
- * @tests tests_js/test_038_startup_specializations.py::test_page_photo_initializes_only_when_selected_or_visible
+ * @tests tests_js/test_038_startup_specializations.mjs::test_page_photo_initializes_only_when_selected_or_visible
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_controls_toggle_and_remember_desktop_visibility
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_readonly_viewer_can_toggle_image_without_editing
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop
@@ -17,7 +17,7 @@ import Entity from "./base/entity";
 export default class Page extends Entity {
 	/**
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_page_task_collection_watches_task_form_changes
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_page_task_collection_watches_task_form_changes
 	 * @matrix polling tasks : channel refresh
 	 */
 	async reconcilePollingSubscriptions() {

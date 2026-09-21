@@ -27,7 +27,6 @@ PATCH_FIELDS = {
 # @tests tests_unit/test_032g_entity_patches.py::test_patch_rejects_completed_locked_invalid_and_unauthorized_targets
 # @tests tests_unit/test_032g_entity_patches.py::test_model_and_project_patches_preserve_defaults_and_validate_order
 # @tests tests_unit/test_032g_entity_patches.py::test_page_patch_preserves_omitted_membership
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_checks_completion_and_migrations_without_owner_guards
 # @tests tests_unit/test_032g_entity_patches.py::test_patch_validates_classification_assignee_and_explicit_clears
 # @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_is_detached_and_pending_checklist_stays_unchecked
 # @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_preserves_unloaded_category_forms

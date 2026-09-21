@@ -1,5 +1,5 @@
-import { STYLES } from "styles";
-import { createIcon, iconDefinition, setIcon } from "../shared/icons";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon, iconDefinition, setIcon } from "../shared/icons.mjs";
 
 const ROUTES = {
 	task: "pages",
@@ -53,8 +53,8 @@ const tel = (telValue) => {
  */
 /**
  * @testable true
- * @tests tests_js/test_023_entity_name_formatting.py::test_group_name_uses_canonical_user_index_url
- * @tests tests_js/test_023_entity_name_formatting.py::test_model_task_link_opens_in_progress_filter
+ * @tests tests_js/test_023_entity_name_formatting.mjs::test_group_name_uses_canonical_user_index_url
+ * @tests tests_js/test_023_entity_name_formatting.mjs::test_model_task_link_opens_in_progress_filter
  * @pair model-task:reference-links
  * @pair user-groups:query-route
  */
@@ -149,8 +149,8 @@ const iconLabel = ({
 
 /**
  * @testable true
- * @tests tests_js/test_023_entity_name_formatting.py::test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure
- * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
+ * @tests tests_js/test_023_entity_name_formatting.mjs::test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure
+ * @tests tests_js/test_023_entity_name_formatting.mjs::test_recent_combobox_results_reuse_shared_parent_name_formatting
  * @matrix entity-name : accessibility parent-separator wrapping
  */
 const name = (data) => {

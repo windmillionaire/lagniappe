@@ -1,4 +1,4 @@
-import { ConditionTarget } from "./base";
+import { ConditionTarget } from "./base.mjs";
 
 /**
  * @testable true

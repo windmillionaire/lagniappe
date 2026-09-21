@@ -1,6 +1,5 @@
 ---
 title: Initial Prompt
-manual_section: ai
 related:
 - ai_tools
 - external_ai

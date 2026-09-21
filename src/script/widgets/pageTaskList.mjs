@@ -1,5 +1,5 @@
-import { BaseList } from "../elements/base/baseList";
-import { withTransition } from "../shared";
+import { BaseList } from "../elements/base/baseList.mjs";
+import { withTransition } from "../shared/transitions.mjs";
 
 /**
  * @testable true
@@ -10,12 +10,12 @@ import { withTransition } from "../shared";
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
- * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
- * @tests tests_js/test_028_form_state_split.py::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
- * @tests tests_js/test_028_form_state_split.py::test_task_list_initial_reconciliation_publishes_list_visibility
+ * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_preserves_rows_with_local_form_state
+ * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
+ * @tests tests_js/test_028_form_state_split.mjs::test_task_list_initial_reconciliation_publishes_list_visibility
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
- * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
- * @tests tests_js/test_028_form_state_split.py::test_task_list_reconciliation_rejects_incomplete_structure
+ * @tests tests_js/test_028_form_state_split.mjs::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
+ * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconciliation_rejects_incomplete_structure
  * @matrix tasks : active-form-preservation completed-only create create-close dedupe detached-structure dirty-form-preservation empty-state refresh unsaved-marker
  * @matrix tasks : initial-render permission-gates readonly
  */
@@ -55,7 +55,7 @@ export class PageTaskList extends BaseList {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
-	 * @tests tests_js/test_028_form_state_split.py::test_task_completion_keeps_component_update_route_when_history_is_active
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_completion_keeps_component_update_route_when_history_is_active
 	 * @matrix tasks : active-widget complete route-override
 	 * @matrix task-completion : archive uncomplete
 	 */
@@ -119,8 +119,8 @@ export class PageTaskList extends BaseList {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_completion_replaces_closed_row_in_one_transition
-	 * @tests tests_js/test_028_form_state_split.py::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_completion_replaces_closed_row_in_one_transition
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
 	 * @matrix tasks : active-widget complete create dedupe refresh uncomplete
 	 */
 	_moveTaskIfNecessary(taskElt) {
@@ -245,7 +245,7 @@ export class PageTaskList extends BaseList {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_collection_manifests_include_hash_and_fingerprint
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_collection_manifests_include_hash_and_fingerprint
 	 * @matrix reconnect-refresh : manifest
 	 */
 	refreshDescriptor() {
@@ -424,7 +424,7 @@ export class PageTaskList extends BaseList {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_preserves_rows_with_local_form_state
 	 * @matrix tasks : active-form-preservation dirty-form-preservation stale-widget
 	 */
 	_hasPendingLocalFormState(component, replacement = null) {

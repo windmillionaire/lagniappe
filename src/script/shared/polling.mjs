@@ -1,6 +1,6 @@
-import { ENDPOINTS } from "./endpoints";
-import { captureError } from "./errors";
-import { request } from "./request";
+import { ENDPOINTS } from "./endpoints.mjs";
+import { captureError } from "./errors.mjs";
+import { request } from "./request.mjs";
 
 const POLL_PROTOCOL_VERSION = 1;
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
@@ -424,14 +424,14 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * One view-scoped scheduler for every server-state subscription.
  *
  * @testable true
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_batches_due_subscriptions_and_applies_results
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_limits_visible_blur_to_eligible_operations
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_schedules_modes_and_notification_seed
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_captures_and_isolates_contract_failures
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_temporarily_boosts_a_subscription
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement
- * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_treats_failed_transport_as_retryable
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_batches_due_subscriptions_and_applies_results
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_limits_visible_blur_to_eligible_operations
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_schedules_modes_and_notification_seed
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_captures_and_isolates_contract_failures
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_temporarily_boosts_a_subscription
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement
+ * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_treats_failed_transport_as_retryable
  * @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
  * @matrix polling : acknowledgement batching blur cadence coalescing diagnostics foreground freshness lifecycle presence protocol reentrancy requested-cycle revision scheduled-initial terminal-operation-order transport-error validation visibility
  * @pairs deferred-jobs:polling messaging:active-polling

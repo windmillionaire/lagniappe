@@ -96,13 +96,20 @@ def test_verify_identity_token_enforces_project_issuer_and_subject(monkeypatch):
     )
     assert calls == [("identity-token", adapter, "project-1")]
 
-    claims["iss"] = "https://securetoken.google.com/other-project"
-    with pytest.raises(ValueError, match="issuer"):
-        identity_platform.verify_identity_token(
-            "identity-token",
-            "project-1",
-            adapter,
-        )
+    for claim, invalid_value, message in (
+        ("iss", "https://securetoken.google.com/other-project", "issuer"),
+        ("aud", "other-project", "audience"),
+        ("sub", " ", "subject"),
+    ):
+        original_value = claims[claim]
+        claims[claim] = invalid_value
+        with pytest.raises(ValueError, match=message):
+            identity_platform.verify_identity_token(
+                "identity-token",
+                "project-1",
+                adapter,
+            )
+        claims[claim] = original_value
 
 
 # @matrix login : audience email-verification google-oauth token-verification
@@ -132,13 +139,20 @@ def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch
     )
     assert calls == [("google-token", adapter, "google-client-id")]
 
-    claims["email_verified"] = False
-    with pytest.raises(ValueError, match="not verified"):
-        identity_platform.verify_google_credential(
-            "google-token",
-            "google-client-id",
-            adapter,
-        )
+    for claim, invalid_value, message in (
+        ("sub", " ", "subject"),
+        ("email", "", "email is missing"),
+        ("email_verified", False, "not verified"),
+    ):
+        original_value = claims[claim]
+        claims[claim] = invalid_value
+        with pytest.raises(ValueError, match=message):
+            identity_platform.verify_google_credential(
+                "google-token",
+                "google-client-id",
+                adapter,
+            )
+        claims[claim] = original_value
 
 
 # @matrix login : google-oauth identity-platform provider-error-code token-exchange

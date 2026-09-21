@@ -22,7 +22,14 @@ When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are
 enabled.
 
-Installer deployment calls the same helper in publish-only mode. It uses the
+When MCP is enabled, `run.py deploy` prepares its cloud resources after the
+frontend build and before the App Engine confirmation prompt. It announces
+preparation before making provider calls and reports completion afterward.
+Slow provider lookups and retries can delay that prompt for several minutes;
+the MCP commands run non-interactively with captured output.
+
+`installer/deploy.py` owns the interactive deployment workflow and calls the
+same runner helper in publish-only mode. It uses the
 generated assets already present in the checkout and does not run npm or change
 the application version. The same manifest validation runs before any gcloud
 operation, so a missing, partial, corrupt, or stale prebuilt frontend is
@@ -37,6 +44,15 @@ connection details remain available in the app's external-AI instructions. Routi
 service-account reconciliation and individual restored-image filenames are
 silent; provider retries and restore warnings remain visible.
 
+The installer workflow also reconciles monitoring, verifies custom-domain TLS,
+and prints the requested completion summary and upgrade maintenance steps.
+Generic gcloud execution belongs to `installer/commands.py`; saved deployment
+settings remain in `installer/deployment.py`. Update/upgrade reloads the command
+module before its configuration/provider consumers and reloads the deployment
+workflow before offering deployment from the replaced checkout.
+The old `installer.utils.deploy_to_app_engine` entry point forwards lazily for
+upgrade processes that retain their old caller after replacing source.
+
 ## Release preparation
 
 Freeze the release tree, then create one canonical build:
@@ -50,12 +66,15 @@ venv/bin/python run.py release-check --base origin/main
 ```
 
 Review and commit the complete source and generated release output.
-`release-check`
-requires a `next/*` or `hotfix/*` candidate, rejects installation-local files,
+`release-check` validates the candidate tree independently of the current
+branch, including detached HEAD. It rejects installation-local files
 and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
 It computes source and artifact digests from the exact Git index, preventing an
 unstaged working-tree build from validating a different committed candidate.
+The release workflow enforces the `next/*` or `hotfix/*` branch requirement
+using the pull request/event context and verifies the exact candidate commit.
+Passing the local tree check alone does not establish release eligibility.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
@@ -68,7 +87,7 @@ cannot publish release attestation. See
 ## App Engine upload boundary
 
 `.gcloudignore` root-anchors local directories such as `/testing/`,
-`/installer/`, `/runner/`, `/testing_ai_workflows/`, and the MCP `/mcp/` source tree. Keep
+`/installer/`, `/runner/`, `/testing/ai_test_cases/`, and the MCP `/mcp/` source tree. Keep
 those patterns root-anchored so nested runtime packages are not excluded.
 `config/files/` is
 excluded, then only `lagniappe_settings.yaml` and optional `redis_ca.pem` are
@@ -266,7 +285,7 @@ catalog. See the [official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?
 
 The [implementation overview](EXTERNAL_AI_IMPLEMENTATION.md) records the
 development history and remaining verification boundary; the
-[remote comparison](../testing_ai_workflows/comparisons/remote-mcp-pilot-20260905.md)
+[remote comparison](../testing/ai_test_cases/comparisons/remote-mcp-pilot-20260905.md)
 preserves reviewed trial outcomes and measurements.
 
 ## Scaling and runtime settings

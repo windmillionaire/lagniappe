@@ -135,12 +135,6 @@ def _cache_payload(entity):
     return cache
 
 
-def _expected_cache_requires(entity):
-    if entity.entity_kind == "page" and entity.user:
-        return entity.user.required
-    return entity.required
-
-
 # @matrix active : property public-user
 def test_entity_active(get_test_entities):
     """Test that Active property returns correct boolean value.
@@ -223,7 +217,7 @@ def test_entity_to_ai_keeps_browser_urls_separate_from_hash_references(kind):
     values = entity.to_ai()
 
     assert values["hash"] == "hash:abc123def456"
-    assert values["url"] == f"/test/{entity.entity_kind}/abc123def456"
+    assert values["url"] == f"/test/{kind.lower()}/abc123def456"
 
 
 # @pair entity:key-validation
@@ -741,19 +735,16 @@ def test_entity_requires(get_test_entities):
     - PublicGroup/Ingress: [hash, "site"]
     """
     for entity in get_test_entities():
-        # The expected value comes from should_match in test_spec
-        # Compare as sets since some entities use set() which has unpredictable order
-        assert set(entity.test_spec.get("should_match", [])) == set(entity.required)
+        expected = set(entity.test_spec["should_match"])
+        expected_cache = set(entity.test_spec.get("cache_should_match", expected))
 
-        # property value
-        assert entity.properties.requires.value == entity.required
+        assert set(entity.required) == expected
+        assert set(entity.properties.requires.value) == expected
 
-        # CacheMixin - cache_value is comma-separated string
         if cache := _cache_payload(entity):
-            assert cache["requires"] == ",".join(_expected_cache_requires(entity))
+            assert set(cache["requires"].split(",")) == expected_cache
 
-        # DetailsMixin - details_value is the list
-        assert entity.details["requires"] == entity.required
+        assert set(entity.details["requires"]) == expected
 
 
 # @matrix hash : cache details filter property
@@ -802,37 +793,23 @@ def test_entity_name(get_test_entities):
     """Test Name property with all mixins: Cache, Column, Details, AI, Filter.
 
     Name has special behavior:
-    - sort_value/filter_value strip leading "The " and lowercase
+    - sort_value strips a leading "The " and lowercases; filter_value keeps the name
     - column_value returns entity.details (not just the name)
     - cache_value returns the name for search indexing
     - ai_key is usually {entity_kind}_name; File uses display_name
     """
     for entity in get_test_entities():
-        test_value = entity.test_spec.get("name")
-        # entity.db["name"] = test_value  # Set via db since name property is overridden
+        test_value = entity.test_spec["name"]
+        expected_sort = entity.test_spec["expected_sort"]
+        expected_ai_key = entity.test_spec["expected_ai_key"]
 
-        # property value
         assert entity.properties.name.value == test_value == entity.name
-
-        # sort_value - strips "The " prefix and lowercases
-        expected_sort = test_value.replace("The ", "").lower() if test_value else None
         assert entity.properties.name.sort_value == expected_sort
-
-        # DetailsMixin - details_value is the name, appears in entity.details
         assert entity.details["name"] == test_value
-
-        # FilterMixin - should NOT strip "The " or lowercase
         assert entity.to_filter_index()["name"] == test_value
-
-        # CacheMixin - cache_value returns the name.
         if cache := _cache_payload(entity):
             assert cache.get("name") == test_value
-
-        # AIMixin - the property owns its AI key.
-        ai_value = entity.to_ai().get(entity.properties.name.ai_key)
-        assert ai_value == test_value
-
-        # ColumnMixin - column_value returns entity.details dict
+        assert entity.to_ai()[expected_ai_key] == test_value
         assert entity.column("name").column_value == entity.details
 
 
@@ -959,34 +936,33 @@ def test_entity_modified(get_test_entities):
     We mock user_timezone() to test timezone conversion.
     """
     for entity in get_test_entities():
-        # Get timezone from test_spec (reusable for other date properties)
-        tz_name = entity.test_spec.get("timezone", "America/Chicago")
+        tz_name = entity.test_spec["timezone"]
         test_tz = ZoneInfo(tz_name)
+        stored = datetime.fromisoformat(entity.test_spec["stored"])
+        input_local = datetime.fromisoformat(
+            entity.test_spec["input_local"]
+        ).replace(tzinfo=test_tz)
+        entity.modified = stored
 
         with patch("lagniappe.core.tools.dates.user_timezone", return_value=test_tz):
-            # Get the UTC datetime that was set by the fixture
+            assert entity.modified == stored
             assert entity.modified.tzinfo == timezone.utc
+            assert entity.properties.modified.value == stored
+            # Datetime equality alone accepts the right instant in the wrong zone.
+            assert (
+                entity.column("modified").column_value.isoformat()
+                == entity.test_spec["expected_column"]
+            )
+            assert entity.to_filter_index()["modified"] == entity.test_spec["filter"]
 
-            # property value - stored in UTC
-            assert entity.properties.modified.value == entity.modified
+            entity.modified = input_local
 
-            # ColumnMixin - column_value converts to user timezone
-            column_val = entity.column("modified").column_value
-            assert column_val == entity.modified.astimezone(test_tz)
-
-            # FilterMixin - filter_value is Unix timestamp
-            filter_value = entity.to_filter_index().get("modified")
-            assert filter_value == entity.modified.timestamp()
-
-            # Test setting a datetime in user timezone - should convert to UTC
-            user_dt = datetime(2024, 6, 15, 14, 30, 0, tzinfo=test_tz)
-            entity.modified = user_dt
-
-            # Value should be stored in UTC
-            assert entity.modified == user_dt.astimezone(timezone.utc)
-
-            # column_value should convert back to user timezone
-            assert entity.column("modified").column_value == user_dt
+            assert entity.modified.isoformat() == entity.test_spec["expected_stored"]
+            assert entity.modified.tzinfo == timezone.utc
+            assert (
+                entity.column("modified").column_value.isoformat()
+                == input_local.isoformat()
+            )
 
 
 # @matrix created : initialized-once update
@@ -1117,16 +1093,13 @@ def test_entity_kind(get_test_entities):
     - cache_value returns details_value
     """
     for entity in get_test_entities():
-        # Kind reads from db["type"]
-        assert entity.kind == entity.properties.kind.value == entity.db["type"]
+        expected_kind = entity.test_spec["expected_kind"]
+        expected_details_kind = entity.test_spec.get(
+            "expected_details_kind", expected_kind
+        )
 
-        # PAGE with user is special - details_value returns "user" instead of "page"
-        is_user_page = entity.entity_kind == "page" and entity.user
-        expected_kind = "user" if is_user_page else entity.entity_kind
-
-        # DetailsMixin - details_value
-        assert entity.details["kind"] == expected_kind
-
-        # CacheMixin - cache_value returns details_value
+        assert entity.kind == entity.properties.kind.value == expected_kind
+        assert entity.db["type"] == expected_kind
+        assert entity.details["kind"] == expected_details_kind
         if cache := _cache_payload(entity):
-            assert cache["kind"] == expected_kind
+            assert cache["kind"] == expected_details_kind

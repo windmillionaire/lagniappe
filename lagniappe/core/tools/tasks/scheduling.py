@@ -29,7 +29,7 @@ def user_tomorrow_in_seconds():
 
 
 # @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
+# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
 # @matrix task-scheduling : durable-uncomplete timezone
 def scheduled_uncomplete_time():
     """Return the next user-local midnight as an absolute UTC timestamp."""
@@ -275,7 +275,6 @@ def due_in_home_task_window(due_date):
 
 
 # @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_near_term_schedule_uncompletes_immediately
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
 # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_and_retries
@@ -370,9 +369,11 @@ def get_next_periodic_date(starting_due_date, periodic):
 # @testable true
 # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
 # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_calendar_boundaries
-# @matrix task-scheduling : scheduled skipped
+# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today
+# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_preserves_earliest_due_date_baseline
+# @matrix task-scheduling : scheduled skipped exact-boundary timezone postponed
 def calculate_skipped_scheduled_tasks(task, scheduled):
-    """Calculate how many times a scheduled task should have been completed between the starting due date and today"""
+    """Count extra occurrences strictly after the baseline and before local today."""
     if _scheduled_rrule_args(scheduled) is None:
         return 0
 
@@ -386,8 +387,9 @@ def calculate_skipped_scheduled_tasks(task, scheduled):
     count = 0
 
     if mode == "daily":
-        delta = today - starting_due_date
-        return max(0, delta.days)
+        # Count local calendar days, excluding both the outstanding due date and
+        # today, regardless of the stored wall-clock time or a DST transition.
+        return max(0, (today.date() - starting_due_date.date()).days - 1)
 
     elif mode == "weekly":
         days = scheduled.get("days", [])
@@ -400,7 +402,7 @@ def calculate_skipped_scheduled_tasks(task, scheduled):
             current += timedelta(days=1)
 
     elif mode == "monthly":
-        current_month = starting_due_date.replace(day=1) + relativedelta(months=1)
+        current_month = starting_due_date.replace(day=1)
 
         while current_month < today:
             occurrence = calculate_monthly_occurrence_for_date(current_month, scheduled)
@@ -409,7 +411,7 @@ def calculate_skipped_scheduled_tasks(task, scheduled):
             current_month += relativedelta(months=1)
 
     elif mode == "yearly":
-        start_year = starting_due_date.year + 1
+        start_year = starting_due_date.year
         end_year = today.year
 
         for year in range(start_year, end_year + 1):

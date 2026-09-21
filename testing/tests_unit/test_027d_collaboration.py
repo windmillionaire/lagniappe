@@ -10,6 +10,7 @@ from lagniappe.core.entities.page import Page
 from lagniappe.core.entities.user import User
 from lagniappe.core.tools import collaboration
 from lagniappe.core.tools.cache import owner
+from lagniappe.core.tools.database import get as database_get
 from testing.utility.messaging_fakes import HashRedis, managed_user
 
 
@@ -18,6 +19,7 @@ pytestmark = pytest.mark.unit
 
 # @matrix mentions : document-view permission
 # @matrix messaging : managed-user owner-opt-in permission public-exclusion recipient-resolution self-exclusion
+# @matrix task-assignment : owner-opt-in permission self-assignment
 # @pair task-assignment:permission
 def test_collaboration_permissions_use_current_recipient_and_document_access(
     monkeypatch,
@@ -51,6 +53,17 @@ def test_collaboration_permissions_use_current_recipient_and_document_access(
         actor, owner_recipient, channel="message"
     )
 
+    assignee = managed_user("assignee", "Assignee")
+    assignee.requires = ["users", "assigned"]
+    assert collaboration.recipient_allowed(actor, assignee, channel="assign")
+    assert not collaboration.recipient_allowed(actor, recipient, channel="assign")
+    assert collaboration.recipient_allowed(actor, actor, channel="assign")
+    assert not collaboration.recipient_allowed(
+        actor, owner_recipient, channel="assign"
+    )
+    owner_recipient.allow_task_assignments = True
+    assert collaboration.recipient_allowed(actor, owner_recipient, channel="assign")
+
     viewers = []
     document = SimpleNamespace(
         allowed=lambda _action, user: viewers.append(user) or user is recipient
@@ -72,6 +85,8 @@ def test_collaboration_permissions_use_current_recipient_and_document_access(
     )
     assert collaboration.resolve_user("user") is stored_user
     assert collaboration.resolve_user("page") is stored_user
+
+
 # @matrix owner-projection : fail-closed normalization repair request-memo revision selector-shape
 def test_owner_projection_normalizes_and_round_trips(monkeypatch):
     redis = HashRedis()
@@ -93,6 +108,27 @@ def test_owner_projection_normalizes_and_round_trips(monkeypatch):
     result = owner.owner_search_result(loaded)
     assert result["details"]["recipient_key"] == user.urlsafe_key
     assert result["id"] == page_key.to_legacy_urlsafe().decode()
+
+    redis.values.clear()
+    owner.clear_request_owner_projection()
+    canonical_row = object()
+    lookups = []
+    monkeypatch.setattr(
+        database_get,
+        "user",
+        lambda email: lookups.append(email) or canonical_row,
+    )
+    monkeypatch.setattr(
+        collaboration.Entities,
+        "fetch_one",
+        lambda row, request: user if row is canonical_row else None,
+    )
+
+    repaired = owner.get_owner_projection()
+
+    assert lookups == [owner.CONFIG.ADMIN_EMAIL]
+    assert repaired["key"] == user.urlsafe_key
+    assert repaired["revision"] == 1
 
 
 # @matrix messaging : owner-search recipient-key self-exclusion
@@ -182,4 +218,3 @@ def test_collaboration_search_excludes_self_owner_and_stale_rows(monkeypatch):
         "allowed-page",
         "denied-page",
     ]
-

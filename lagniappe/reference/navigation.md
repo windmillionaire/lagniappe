@@ -1,6 +1,5 @@
 ---
 title: Home and Navigation
-manual_section: quickstart
 related:
 - page_info
 - search

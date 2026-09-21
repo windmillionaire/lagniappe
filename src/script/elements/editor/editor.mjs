@@ -10,7 +10,7 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { Typography } from "@tiptap/extension-typography";
 import { Youtube } from "@tiptap/extension-youtube";
 import { StarterKit } from "@tiptap/starter-kit";
-import { STYLES } from "styles";
+import { STYLES } from "../../generated/styles.mjs";
 import {
 	CustomImage,
 	CustomLink,
@@ -21,7 +21,7 @@ import {
 	SelectionHighlight,
 	TabCharacter,
 	TrackedRanges,
-} from "./extensions";
+} from "./extensions/index.mjs";
 
 /**
  * @testable infrastructure
@@ -50,6 +50,61 @@ const focusEditorOnSurfacePointerDown = (editor, target) => {
 /**
  * @testable infrastructure
  */
+const createFormattingExtensions = () => [
+	TaskList,
+	TaskItem.configure({
+		nested: true,
+	}),
+	CustomLink.configure({
+		openOnClick: false,
+		autolink: true,
+		defaultProtocol: "https",
+	}),
+	Typography,
+	TableKit.configure({
+		table: {
+			HTMLAttributes: {
+				class: "editor-table",
+			},
+			renderWrapper: true,
+		},
+	}),
+	Color,
+	TextStyle,
+	TextAlign.configure({
+		types: ["heading", "paragraph"],
+	}),
+	Superscript,
+	Subscript,
+	Youtube.configure({
+		nocookie: true,
+	}),
+	CustomImage.configure({
+		HTMLAttributes: {
+			class: "editor-image",
+		},
+	}),
+	FontFamily.configure({
+		types: ["textStyle"],
+	}),
+];
+
+/**
+ * @testable infrastructure
+ */
+const createEditingExtensions = () => [
+	TrackedRanges,
+	SelectionHighlight,
+	MarkdownSource.configure({
+		HTMLAttributes: { class: STYLES.editor.markdownSource },
+	}),
+	EditorPaste,
+	TabCharacter,
+];
+
+/**
+ * @testable infrastructure
+ */
 export const collaborativeEditor = (target, ydoc, editable = true) => {
 	const extensions = [
 		StarterKit.configure({
@@ -57,42 +112,7 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 			underline: true,
 			history: false,
 		}),
-		TaskList,
-		TaskItem.configure({
-			nested: true,
-		}),
-		CustomLink.configure({
-			openOnClick: false,
-			autolink: true,
-			defaultProtocol: "https",
-		}),
-		Typography,
-		TableKit.configure({
-			table: {
-				HTMLAttributes: {
-					class: "editor-table",
-				},
-				renderWrapper: true,
-			},
-		}),
-		Color,
-		TextStyle,
-		TextAlign.configure({
-			types: ["heading", "paragraph"],
-		}),
-		Superscript,
-		Subscript,
-		Youtube.configure({
-			nocookie: true,
-		}),
-		CustomImage.configure({
-			HTMLAttributes: {
-				class: "editor-image",
-			},
-		}),
-		FontFamily.configure({
-			types: ["textStyle"],
-		}),
+		...createFormattingExtensions(),
 		Collaboration.configure({
 			document: ydoc,
 			field: "default",
@@ -102,13 +122,7 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 			},
 		}),
 		FlashRemoteChanges,
-		TrackedRanges,
-		SelectionHighlight,
-		MarkdownSource.configure({
-			HTMLAttributes: { class: STYLES.editor.markdownSource },
-		}),
-		EditorPaste,
-		TabCharacter,
+		...createEditingExtensions(),
 		LagniappeMention,
 	];
 
@@ -135,49 +149,8 @@ export const independentEditor = (target, content = "") => {
 			underline: true,
 			history: true,
 		}),
-		TaskList,
-		TaskItem.configure({
-			nested: true,
-		}),
-		CustomLink.configure({
-			openOnClick: false,
-			autolink: true,
-			defaultProtocol: "https",
-		}),
-		Typography,
-		TableKit.configure({
-			table: {
-				HTMLAttributes: {
-					class: "editor-table",
-				},
-				renderWrapper: true,
-			},
-		}),
-		Color,
-		TextStyle,
-		TextAlign.configure({
-			types: ["heading", "paragraph"],
-		}),
-		Superscript,
-		Subscript,
-		Youtube.configure({
-			nocookie: true,
-		}),
-		CustomImage.configure({
-			HTMLAttributes: {
-				class: "editor-image",
-			},
-		}),
-		FontFamily.configure({
-			types: ["textStyle"],
-		}),
-		TrackedRanges,
-		SelectionHighlight,
-		MarkdownSource.configure({
-			HTMLAttributes: { class: STYLES.editor.markdownSource },
-		}),
-		EditorPaste,
-		TabCharacter,
+		...createFormattingExtensions(),
+		...createEditingExtensions(),
 	];
 
 	const editor = new Editor({

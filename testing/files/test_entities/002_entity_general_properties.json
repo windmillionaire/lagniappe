@@ -109,7 +109,8 @@
 						"hash": "upown12",
 						"groups": [{ "name": "User Page Group", "hash": "upgrp12" }]
 					},
-					"should_match": ["usrpg12", "users", "upgrp12", "models", "usrpcat"]
+					"should_match": ["usrpg12", "users", "upgrp12", "models", "usrpcat"],
+					"cache_should_match": ["users", "upgrp12"]
 				}
 			],
 			[
@@ -277,16 +278,77 @@
 	},
 	"test_entity_name": {
 		"entities": [
-			["PROJECT", { "name": "Simple Project" }],
-			["PROJECT", { "name": "The Great Project" }],
-			["PROJECT", { "name": "No Features" }],
-			["PAGE", { "name": "Page Name" }],
-			["TASK", { "name": "Task Name", "page": { "name": "Parent", "hash": "parent-page" } }],
-			["CATEGORY", { "name": "Category Name" }],
+			[
+				"PROJECT",
+				{
+					"name": "Simple Project",
+					"expected_sort": "simple project",
+					"expected_ai_key": "project_name"
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "The Great Project",
+					"expected_sort": "great project",
+					"expected_ai_key": "project_name"
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "Beneath The Surface",
+					"expected_sort": "beneath the surface",
+					"expected_ai_key": "project_name"
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "The The Band",
+					"expected_sort": "the band",
+					"expected_ai_key": "project_name"
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "No Features",
+					"expected_sort": "no features",
+					"expected_ai_key": "project_name"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page Name",
+					"expected_sort": "page name",
+					"expected_ai_key": "page_name"
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task Name",
+					"expected_sort": "task name",
+					"expected_ai_key": "task_name",
+					"page": { "name": "Parent", "hash": "parent-page" }
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Category Name",
+					"expected_sort": "category name",
+					"expected_ai_key": "category_name"
+				}
+			],
 			[
 				"USER",
 				{
 					"name": "User Name",
+					"expected_sort": "user name",
+					"expected_ai_key": "user_name",
 					"page": { "name": "User Page", "hash": "usrpg03" }
 				}
 			],
@@ -294,15 +356,33 @@
 				"MODEL_TASK",
 				{
 					"name": "Model Name",
+					"expected_sort": "model name",
+					"expected_ai_key": "model_name",
 					"project": { "name": "Model Project", "hash": "mdprj03" }
 				}
 			],
-			["FORM", { "name": "Form Name" }],
-			["FILE", { "name": "File Name" }],
+			[
+				"FORM",
+				{
+					"name": "Form Name",
+					"expected_sort": "form name",
+					"expected_ai_key": "form_name"
+				}
+			],
+			[
+				"FILE",
+				{
+					"name": "File Name",
+					"expected_sort": "file name",
+					"expected_ai_key": "display_name"
+				}
+			],
 			[
 				"FILTER",
 				{
 					"name": "Filter Name",
+					"expected_sort": "filter name",
+					"expected_ai_key": "filter_name",
 					"parent": {
 						"_type": "PROJECT",
 						"name": "Filtered",
@@ -315,46 +395,129 @@
 					}
 				}
 			],
-			["USER_GROUP", { "name": "Group Name" }],
-			["PUBLIC_GROUP", { "name": "Public Group Name" }],
-			["INGRESS", { "name": "Ingress Name" }]
+			[
+				"USER_GROUP",
+				{
+					"name": "Group Name",
+					"expected_sort": "group name",
+					"expected_ai_key": "group_name"
+				}
+			],
+			[
+				"PUBLIC_GROUP",
+				{
+					"name": "Public Group Name",
+					"expected_sort": "public group name",
+					"expected_ai_key": "public_group_name"
+				}
+			],
+			[
+				"INGRESS",
+				{
+					"name": "Ingress Name",
+					"expected_sort": "ingress name",
+					"expected_ai_key": "display_name"
+				}
+			]
 		]
 	},
 	"test_entity_modified": {
 		"entities": [
-			["PROJECT", { "name": "Chicago", "timezone": "America/Chicago" }],
-			["PAGE", { "name": "Tokyo", "timezone": "Asia/Tokyo" }],
-			["TASK", { "name": "London", "timezone": "Europe/London" }],
-			["CATEGORY", { "name": "NYC", "timezone": "America/New_York" }]
+			[
+				"PROJECT",
+				{
+					"name": "Chicago",
+					"timezone": "America/Chicago",
+					"stored": "2024-01-15T20:15:30+00:00",
+					"expected_column": "2024-01-15T14:15:30-06:00",
+					"filter": 1705349730.0,
+					"input_local": "2024-06-15T14:30:00",
+					"expected_stored": "2024-06-15T19:30:00+00:00"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Tokyo",
+					"timezone": "Asia/Tokyo",
+					"stored": "2024-01-15T20:15:30+00:00",
+					"expected_column": "2024-01-16T05:15:30+09:00",
+					"filter": 1705349730.0,
+					"input_local": "2024-06-15T14:30:00",
+					"expected_stored": "2024-06-15T05:30:00+00:00"
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "London",
+					"timezone": "Europe/London",
+					"stored": "2024-01-15T20:15:30+00:00",
+					"expected_column": "2024-01-15T20:15:30+00:00",
+					"filter": 1705349730.0,
+					"input_local": "2024-06-15T14:30:00",
+					"expected_stored": "2024-06-15T13:30:00+00:00"
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "NYC",
+					"timezone": "America/New_York",
+					"stored": "2024-01-15T20:15:30+00:00",
+					"expected_column": "2024-01-15T15:15:30-05:00",
+					"filter": 1705349730.0,
+					"input_local": "2024-06-15T14:30:00",
+					"expected_stored": "2024-06-15T18:30:00+00:00"
+				}
+			]
 		]
 	},
 	"test_entity_kind": {
 		"entities": [
-			["PROJECT", { "name": "Project" }],
-			["PAGE", { "name": "Page" }],
+			["PROJECT", { "name": "Project", "expected_kind": "project" }],
+			["PAGE", { "name": "Page", "expected_kind": "page" }],
 			[
 				"PAGE",
-				{ "name": "User Page", "user": { "name": "Owner", "hash": "owner12" } }
+				{
+					"name": "User Page",
+					"expected_kind": "page",
+					"expected_details_kind": "user",
+					"user": { "name": "Owner", "hash": "owner12" }
+				}
 			],
-			["TASK", { "name": "Task", "page": { "name": "Parent", "hash": "parent-page" } }],
-			["CATEGORY", { "name": "Category" }],
+			[
+				"TASK",
+				{
+					"name": "Task",
+					"expected_kind": "task",
+					"page": { "name": "Parent", "hash": "parent-page" }
+				}
+			],
+			["CATEGORY", { "name": "Category", "expected_kind": "category" }],
 			[
 				"USER",
-				{ "name": "User", "page": { "name": "User Page", "hash": "usrpg04" } }
+				{
+					"name": "User",
+					"expected_kind": "user",
+					"page": { "name": "User Page", "hash": "usrpg04" }
+				}
 			],
 			[
 				"MODEL_TASK",
 				{
 					"name": "Model",
+					"expected_kind": "model",
 					"project": { "name": "Model Project", "hash": "mdprj04" }
 				}
 			],
-			["FORM", { "name": "Form" }],
-			["FILE", { "name": "File" }],
+			["FORM", { "name": "Form", "expected_kind": "form" }],
+			["FILE", { "name": "File", "expected_kind": "file" }],
 			[
 				"FILTER",
 				{
 					"name": "Filter",
+					"expected_kind": "filter",
 					"parent": {
 						"_type": "PROJECT",
 						"name": "Filtered",
@@ -367,9 +530,12 @@
 					}
 				}
 			],
-			["USER_GROUP", { "name": "Group" }],
-			["PUBLIC_GROUP", { "name": "Public Group" }],
-			["INGRESS", { "name": "Ingress" }]
+			["USER_GROUP", { "name": "Group", "expected_kind": "group" }],
+			[
+				"PUBLIC_GROUP",
+				{ "name": "Public Group", "expected_kind": "public_group" }
+			],
+			["INGRESS", { "name": "Ingress", "expected_kind": "ingress" }]
 		]
 	}
 }

@@ -1,5 +1,4 @@
-{% from "help/macros.html" import manual_topic, manual_summary %}
-{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+{% from "manual/macros.html" import heading, card, concept, link, nav_buttons %}
 
 {% macro open_source() %}
   {{ heading("Open Source") }}
@@ -24,42 +23,29 @@
 <div class="space-y-6">
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
-      Lagniappe is a private, self-hosted workspace for structured records,
-      documents, tasks, files, search, and permissions. It is designed for
-      people who like keeping their operational data in infrastructure they
-      control rather than in a consumer SaaS account.
+      Lagniappe is a private web app for individuals and small organizations
+      that supports collaborative documents, files, structured records,
+      contextual tasks, permissions, and search. It runs in a Google Cloud
+      project and connects to a Redis Cloud database, both controlled by the
+      owner. Optional, user-invoked AI is limited to the invoking user's
+      existing permissions.
     </p>
     <p class="text-base-medium mb-3">
-      The closest comparison is a small internal system that borrows ideas from
-      Notion, Airtable, Evernote, Google Docs, and task trackers. The emphasis
-      is a little different: durability, ownership, access control, exportability, and
-      practical workflows come before polish or marketplace integrations.
+      The main unit of organization in Lagniappe is a page: a car, a job you're
+      trying to get, an apartment you manage — anything, really. A page can
+      have as much structure as you choose to give it, and its related tasks,
+      files, images, and notes are attached directly to that page. Structure
+      is defined by reusable forms that you build yourself or generate with
+      AI and attach to pages or tasks. Because those forms provide structure
+      without determining where something belongs, a page can cohesively
+      organize many different kinds of information.
     </p>
-    {% call callout("tip", False) %}
-      Lagniappe runs in your own Google Cloud project. Setup is guided, and day
-      to day use feels like any other web app, but it helps to be reasonably
-      comfortable running through a setup script and looking at the occasional
-      cloud setting.
-    {% endcall %}
-  {% endcall %}
-  {{ heading("Fast When Awake, Inexpensive When Idle", icon="offline", kind="page") }}
-  {% call card() %}
-    <p class="text-base-medium mb-3">
-      Lagniappe is designed to run economically without keeping an App Engine
-      server running around the clock. The default deployment can sleep when
-      nobody is using it, which can make a substantial difference to the
-      monthly hosting cost.
-    </p>
-    <p class="text-base-medium mb-3">
-      The first page after an idle period may take a little longer—usually less
-      than a minute—while the server starts. Owners who prefer an always-warm server
-      can switch to automatic scaling under <strong>Admin</strong>, <strong>Settings</strong>,
-      then <strong>Deployment</strong>, usually at a higher cost. See
-      {{ link(
-      url_for("manual.index", section="personalization"),
-      "Deployment Settings"
-      ) }}
-      for the complete steps.
+    <p class="text-base-medium">
+      Rather than a folder containing a collection of files, a page represents
+      a thing or a concept itself. Pieces of it can appear elsewhere — in
+      search, filters, or project-tracked task lists — but they remain attached
+      to that page. This is also convenient for AI features, because the
+      relevant context is already bundled together.
     </p>
   {% endcall %}
   {{ heading("Good Fit") }}
@@ -89,35 +75,31 @@
   {% endcall %}
   {{ heading("Core Concepts", icon="overview", kind="category") }}
   <div class="grid md:grid-cols-2 gap-4 mb-6">
-    {% call concept("Forms", icon="form") %}{{ manual_summary("create_form") }}{% endcall %}
-    {% call concept("Categories", icon="category") %}{{ manual_summary("create_category") }}{% endcall %}
-    {% call concept("Pages", icon="page") %}{{ manual_summary("page_info") }}{% endcall %}
-    {% call concept("Tasks", icon="tasks") %}{{ manual_summary("tasks") }}{% endcall %}
-    {% call concept("Projects", icon="project") %}{{ manual_summary("create_project") }}{% endcall %}
-    {% call concept("Files", icon="file") %}{{ manual_summary("upload_file") }}{% endcall %}
-  </div>
-  {{ heading("Connected Workspace", icon="sitemap", kind="page") }}
-  {% call card() %}
-    <p class="text-base-medium mb-3">
-      Lagniappe is more graph-like than a plain document folder. A page can be
-      a durable record, a document, a form submission, a task hub, and a file
-      cabinet at the same time. Categories, projects, forms, model tasks, links,
-      and attachments give those records shape without forcing everything into
-      one table or one outline.
-    </p>
-    <p class="text-base-medium mb-3">
-      That matters for operational memory. A contractor, property, repair,
-      invoice, inspection task, and uploaded photo can all stay connected while
-      still being useful on their own. Projects can gather work across many
-      pages, and model tasks can describe repeated patterns of work without
-      losing the page where each task actually belongs.
-    </p>
-    {% call callout("tip", False) %}
-      The goal is not to make a perfect knowledge graph. It is to keep ordinary
-      records close to the tasks, files, forms, and links that make them useful
-      later.
+    {% call concept("Forms", icon="form", kind="form") %}
+      Forms define structured fields: text, dates, selects, checkboxes, tables,
+      links, locations, signatures, and more. They also act as content types.
     {% endcall %}
-  {% endcall %}
+    {% call concept("Categories", icon="category", kind="category") %}
+      Categories group pages. A category can have a default form, and individual
+      pages can use different forms when a category contains several related types.
+    {% endcall %}
+    {% call concept("Pages", icon="page", kind="page") %}
+      Pages are the main records. A page can have a document, form data, tasks,
+      files, notes, and permissions.
+    {% endcall %}
+    {% call concept("Tasks", icon="tasks", kind="task") %}
+      Tasks live on pages. They can recur, collect form data, keep history, and
+      be assigned without losing the context of the page they belong to.
+    {% endcall %}
+    {% call concept("Projects", icon="project", kind="project") %}
+      Projects collect related work across many pages. They can define task
+      templates and provide an aggregated view of tasks that still live on pages.
+    {% endcall %}
+    {% call concept("Files", icon="file", kind="file") %}
+      Files are stored in your cloud storage bucket. They can be attached to
+      pages or tasks, extracted for search, summarized, or imported from CSV.
+    {% endcall %}
+  </div>
   {{ heading("Design Choices") }}
   {% call card() %}
     <ul class="text-base-medium space-y-2 mb-3">

@@ -8,6 +8,8 @@ from google.genai import types
 
 from lagniappe import CONFIG
 
+from .provider_policy import is_provider_transient_error, retry_http_options
+
 
 current_session = ContextVar("ai_provider_session", default=None)
 
@@ -15,7 +17,7 @@ current_session = ContextVar("ai_provider_session", default=None)
 # @testable true
 # @tests tests_unit/test_015c_provider_session.py::test_blocked_request_is_cancelled_and_closed
 # @tests tests_unit/test_015c_provider_session.py::test_transient_retry_preserves_request_and_uses_one_budget
-# @matrix ai : cancellation deadline retry-ownership
+# @matrix ai : cancellation deadline retry-ownership service-tier
 class ProviderSession:
     """Own the client and loop; never leave a blocked request in a worker thread."""
 
@@ -42,8 +44,6 @@ class ProviderSession:
             )
         while True:
             config = kwargs["config"].model_copy(deep=True)
-            from .core import retry_http_options, is_provider_transient_error
-
             headers = getattr(getattr(config, "http_options", None), "headers", None)
             config.http_options = retry_http_options(attempts=1, headers=headers)
             config.http_options.timeout = max(1, int(self.control.remaining_seconds * 1000))

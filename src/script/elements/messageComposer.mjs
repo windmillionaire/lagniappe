@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, Modal, request } from "../shared";
-import { createIcon } from "../shared/icons";
-import { FacetsBox } from "./combobox";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { ENDPOINTS, Modal, request } from "../shared/index.mjs";
+import { FacetsBox } from "./combobox/index.mjs";
 
 /**
  * @testable infrastructure
@@ -23,7 +23,7 @@ class ComposerModal extends Modal {
  * Shared modal used by the notification menu and messages page.
  *
  * @testable true
- * @tests tests_js/test_042_messaging_frontend.py::test_message_composer_prefills_peer_and_reuses_operation_on_submit
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_message_composer_prefills_peer_and_reuses_operation_on_submit
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @matrix messaging : compose-modal operation-id prefilled-peer selection-focus user-kind
  */

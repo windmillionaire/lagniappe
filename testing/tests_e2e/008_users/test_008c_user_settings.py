@@ -682,6 +682,26 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     assert {c.key for c in saved_page.categories} == category_keys
     assert {g.key for g in saved_page.groups} == {membership_group.entity.key}
 
+    # Exercise the newly composed controls again after authoritative replacement.
+    settings_panel.locator("input[name='admin']").check()
+    expect(settings_panel.locator("input[name='group-key']")).to_have_count(0)
+    with owner.page.expect_response("**/pages/*/update"):
+        shared_submit.click()
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
+    saved_page = Entities.fetch_one(user_page.key, request=Fetch.direct())
+    assert saved_page.properties.restricted_to.stored == ["admin"]
+    assert saved_page.form.key == form_key
+    assert {c.key for c in saved_page.categories} == category_keys
+    Select(settings_panel.locator(Page.PAGE_RESTRICT_GROUP_INPUT)).select_by_key(
+        membership_group.key, query=membership_group.definition.name
+    )
+    expect(settings_panel.locator("input[name='admin']")).not_to_be_checked()
+    with owner.page.expect_response("**/pages/*/update"):
+        shared_submit.click()
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
+    saved_page = Entities.fetch_one(user_page.key, request=Fetch.direct())
+    assert {g.key for g in saved_page.groups} == {membership_group.entity.key}
+
     affected_user = get_user(Users.ANONYMOUS)
     login_page = affected_user.go(SitePages.LOGIN_PAGE)
     login_url = login_page.login_url(updated_email)

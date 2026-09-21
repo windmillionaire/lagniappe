@@ -6,7 +6,7 @@ import json
 from ..definitions.fingerprints import restricted_fingerprint
 from ..exceptions import ValidationError
 from ..entities import Entities
-from ..tools.form_definitions import (
+from lagniappe.core.tools.forms.definitions import (
     definition_for,
     require_mutable_submission,
 )
@@ -21,8 +21,7 @@ from ..tools.auth.references import (
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_skips_keys_not_in_schema
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_multipart_keys_merge_under_field_id
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_drops_falsy_entries_in_lists
-# @tests tests_unit/test_004d_submitter.py::test_normalize_list_drops_numeric_zero_keeps_string_zero
-# @matrix submission : list-filtering multipart normalize unknown-keys zero
+# @matrix submission : list-filtering multipart normalize unknown-keys
 def normalize_submission_values(values, fields):
     updated = {}
 
@@ -135,7 +134,8 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit submit-boundary
+    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
+    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit preservation submit-boundary validation
     # @matrix form-migration : stale-generation direct-write
     def form_submission(self, values, *, actor=None):
         require_mutable_submission(self)
@@ -300,6 +300,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
+    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
     # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
     def import_submission(self, imported_submission, import_process):
         require_mutable_submission(self)
@@ -328,21 +329,21 @@ class SubmitterMixin:
         self.save_submission()
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::original_completion
+    # @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
     # @reason cache revision metadata remains independent from original-completion generation
     @property
     def schema_version(self):
         return self.db.get("schema_version")
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
     # @reason missing generation is the shared legacy baseline for flat submissions
     @property
     def generation(self):
         return self.db.get("generation", 0) or 0
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_definitions.py::definition_for
+    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
     # @reason shared read boundary delegates exact-version resolution
     @property
     def submission_definition(self):
@@ -379,11 +380,11 @@ class SubmitterMixin:
             self.description = submission_value["description"]
 
     # @testable false
-    # @covered-by lagniappe/core/tools/form_changes.py::notice_projection
+    # @covered-by lagniappe/core/tools/forms/changes.py::notice_projection
     # @reason shared Page and Task read-only template projection
     @property
     def migration_notice(self):
-        from ..tools.form_changes import notice_projection
+        from lagniappe.core.tools.forms.changes import notice_projection
         return notice_projection(self) if self.db.get("pre_migration") else []
 
     # @testable true

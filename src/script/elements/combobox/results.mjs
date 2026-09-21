@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { setIcon } from "../../shared/icons";
-import { localStore } from "../../shared/storage";
-import { formatting } from "../formatting";
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.mjs";
+import { localStore } from "../../shared/storage.mjs";
+import { formatting } from "../formatting.mjs";
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
 const SEARCH_ENTITIES = Object.freeze({
@@ -215,8 +215,8 @@ export class Results {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
-	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_search_snippets_allow_only_highlight_markup
+	 * @tests tests_js/test_023_entity_name_formatting.mjs::test_recent_combobox_results_reuse_shared_parent_name_formatting
+	 * @tests tests_js/test_023_entity_name_formatting.mjs::test_recent_search_snippets_allow_only_highlight_markup
 	 * @matrix combobox : parent-separator recent-results
 	 * @pairs entity-name:recent-results search:snippet-safety
 	 */

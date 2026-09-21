@@ -1,13 +1,16 @@
-import { STYLES } from "styles";
-import { captureError, ENDPOINTS, request, withTransition } from "../shared";
-import { setIcon } from "../shared/icons";
-import { areEqual } from "../shared/utilities";
-import { BaseElement } from "./base/baseElement";
-import { CheckboxElement } from "./checkbox";
-import { InputElement } from "./input";
-import { LinkElement } from "./link";
-import { getFormElement } from "./loader";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { ENDPOINTS } from "../shared/endpoints.mjs";
+import { captureError } from "../shared/errors.mjs";
+import { setIcon } from "../shared/icons.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { areEqual } from "../shared/utilities.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { CheckboxElement } from "./checkbox.mjs";
+import { InputElement } from "./input.mjs";
+import { LinkElement } from "./link.mjs";
+import { getFormElement } from "./loader.mjs";
+import { primitives } from "./primitives.mjs";
 
 const COMPACT_COLUMN_TYPES = new Set(["checkbox"]);
 const TABLE_CELL_ELEMENTS = {
@@ -31,8 +34,8 @@ const ACTIONS = [
  * @testable true
  * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_table_submission_row_actions
  * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_table_submission_mobile_row_action_gestures
- * @tests tests_js/test_027_table_element_frontend.py::test_table_validation_uses_form_key_for_detached_preview
- * @tests tests_js/test_027_table_element_frontend.py::test_table_touch_movement_threshold_distinguishes_tap_from_swipe
+ * @tests tests_js/test_027_table_element_frontend.mjs::test_table_validation_uses_form_key_for_detached_preview
+ * @tests tests_js/test_027_table_element_frontend.mjs::test_table_touch_movement_threshold_distinguishes_tap_from_swipe
  * @matrix form-table : delete detached-revision-preview edit mobile reload reorder row-actions touch-gesture validation-route
  */
 export class TableElement extends BaseElement {

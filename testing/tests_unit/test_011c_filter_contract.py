@@ -1,6 +1,7 @@
 """Typed, authorized filter-contract behavior."""
 
 import json
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -85,16 +86,25 @@ def test_parse_filter_request_distinguishes_malformed_and_semantic_errors():
     assert limited.value.status == 422
     assert limited.value.code == "limit"
 
+    parent, _ = _fixture()
+    unsupported = contract.parse_filter_request('{"version":2,"conditions":[]}', [])
+    with pytest.raises(contract.FilterContractError) as version:
+        contract.compile_filter_contract(parent, unsupported, object())
+    assert version.value.status == 400
+    assert version.value.code == "version"
+
 
 # @matrix filters : compatibility legacy saved-filter
 @pytest.mark.unit
-def test_legacy_definitions_discard_client_type_flags(monkeypatch):
+def test_legacy_definitions_discard_client_type_flags():
     parent, _category = _fixture()
     payload = contract.legacy_definitions_to_contract(
         [[parent.hash, "total", "string", "gt", "2.5", True]]
     )
 
+    original = deepcopy(payload)
     compiled = contract.compile_filter_contract(parent, payload, object())
+    assert payload == original
 
     assert compiled.definitions[0].field_type == FieldType.NUMBER
     assert compiled.definitions[0].is_entity_valued is False
@@ -191,3 +201,8 @@ def test_saved_filter_compiles_legacy_data_per_viewer():
     assert filter_entity.compile(viewer) is compiled
     assert filter_entity._conditions is None
     assert filter_entity.definitions == list(compiled.definitions)
+
+    with pytest.raises(contract.FilterContractError) as denied:
+        filter_entity.compile(object())
+    assert denied.value.code == "unavailable"
+    assert filter_entity.compile(viewer) is compiled

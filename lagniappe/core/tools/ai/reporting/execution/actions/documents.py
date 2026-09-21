@@ -42,7 +42,7 @@ def document_source_quote(report, timestamp):
 
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry conflict
+# @matrix ai-report editor : document append retry
 def prepare_document_append(action, report, user, created, record):
     page = _resolve_entity(
         _first_data_reference(_data(action), "page"), created, expected=Entities.PAGE
@@ -53,7 +53,7 @@ def prepare_document_append(action, report, user, created, record):
 
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry conflict
+# @matrix ai-report editor : document append retry
 # @matrix ai-report editor sync : document append browser-review persistence source-attribution
 def _append_page_document(action, report, user, created, context):
     record = context["action_record"]
@@ -69,6 +69,8 @@ def _append_page_document(action, report, user, created, context):
             record["idempotency_key"]
         )
         if receipt:
+            # This operation already committed. Later user edits are authoritative;
+            # retry must not restore or duplicate the originally appended content.
             return page, [], {"document_after": receipt["signature"]}
         batch = context["batch"]
         first_append = page.key not in batch.documents
@@ -97,7 +99,7 @@ def _append_page_document(action, report, user, created, context):
 
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry conflict
+# @matrix ai-report editor : document append retry
 def inspect_document_append(record, user):
     page = _load_result_entity((record.get("before") or {}).get("entity"))
     if page is None:
@@ -114,6 +116,7 @@ def inspect_document_append(record, user):
     if receipt["state"] != "applied":
         return "drifted"
     record["entity"] = _entity_result(page)
-    # Reconcile a crash after the document committed but before the Report did.
+    # The applied receipt is historical proof, not a guard on current content.
+    # Reconcile a lost Report checkpoint without treating later user edits as drift.
     record.setdefault("document_after", receipt["signature"])
     return "applied"

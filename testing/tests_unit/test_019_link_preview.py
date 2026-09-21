@@ -4,7 +4,8 @@ from google.cloud.datastore import Key
 import pytest
 
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.http import OutboundResult, OutboundStatus
+from lagniappe.core.definitions import Action
+from lagniappe.core.tools.http import HTML_METADATA_POLICY, OutboundResult, OutboundStatus
 from lagniappe.core.tools.links import preview as link_preview
 from lagniappe.core.tools.database import get as database_get
 from testing.utility.test_entities import TestUser as UtilityTestUser
@@ -12,6 +13,8 @@ from testing.utility.test_entities import TestUser as UtilityTestUser
 
 class PreviewEntity(SimpleNamespace):
     def allowed(self, action, user=None):
+        assert action is Action.VIEW
+        assert user is not None
         return self.is_allowed
 
 
@@ -120,6 +123,15 @@ def test_internal_status_preview_uses_project_permission(monkeypatch):
         "kind": "project",
         "internal": True,
     }
+    project.is_allowed = False
+    denied = link_preview.preview_for_url(
+        "https://lagniappe.site/projects/project-key/status/model-key?completed=true",
+        user=object(),
+        base_url="https://app.test/",
+    )
+    assert denied["title"] == "Access Restricted"
+    assert "Inspections" not in str(denied)
+    assert "Preview Target" not in str(denied)
 
 
 # @matrix editor link-preview : internal permissions
@@ -150,14 +162,19 @@ def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
 
 # @matrix editor link-preview : external metadata
 def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
-    monkeypatch.setattr(
-        link_preview,
-        "_external_metadata",
-        lambda url: {"name": "Example Title", "description": "Example summary"},
-    )
+    def fetch(url, policy, *, headers):
+        assert url == "https://example.com/articles/one"
+        assert policy is HTML_METADATA_POLICY
+        return OutboundResult(
+            OutboundStatus.OK,
+            body=b'<title>Example Title</title><meta name="description" content="Example summary">',
+            final_url=url,
+        )
+
+    monkeypatch.setattr(link_preview, "fetch_user_content", fetch)
 
     preview = link_preview.preview_for_url(
-        "https://example.com/articles/one",
+        "https://example.com/articles/one#section",
         user=object(),
         base_url="https://app.test/",
     )
@@ -167,16 +184,21 @@ def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
     assert preview["display_url"] == "example.com/articles/one"
     assert preview["kind"] == "external"
     assert preview["internal"] is False
+    assert preview["url"] == "https://example.com/articles/one"
 
-    monkeypatch.setattr(link_preview, "_external_metadata", lambda url: {})
-    fallback = link_preview.preview_for_url(
-        "https://www.example.org/",
-        user=object(),
-        base_url="https://app.test/",
-    )
+    for response in (
+        OutboundResult(OutboundStatus.OK, body=b"<html></html>"),
+        OutboundResult(OutboundStatus.TIMEOUT),
+    ):
+        monkeypatch.setattr(link_preview, "fetch_user_content", lambda *a, **kw: response)
+        fallback = link_preview.preview_for_url(
+            "https://www.example.org/",
+            user=object(),
+            base_url="https://app.test/",
+        )
 
-    assert fallback["title"] == "example.org"
-    assert fallback["description"] is None
+        assert fallback["title"] == "example.org"
+        assert fallback["description"] is None
 
 
 # @matrix editor link-preview : external url-safety

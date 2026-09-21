@@ -1,8 +1,13 @@
 import pytest
+import requests
 from playwright.sync_api import expect
 
-from testing.definitions import Pages, Submissions, Users
+from config import SETTINGS
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
+from testing.definitions import Categories, Pages, Submissions, Users
 from testing.elements import SpinnerButtons
+from testing.utility.network import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
@@ -51,6 +56,71 @@ def test_basic_input_submission(get_user):
     submission = Submissions.basic_inputs.get()
     page.set_submission(submission)
     page.submit_and_verify_submission(submission)
+
+
+# @matrix pages tasks : submission-validation
+# @pair request-errors:plain-validation
+@pytest.mark.parametrize("entity_kind", ["PAGE", "TASK"])
+def test_invalid_typed_submission_returns_error_without_saving(get_user, entity_kind):
+    user = get_user(Users.OWNER)
+    category = Categories.acl_create_allowed.get(user)
+    form = Entities.FORM.create({
+        "name": f"Typed validation {entity_kind}",
+        "form-type": entity_kind.lower(),
+        "schema": [
+            {"id": "note", "type": "input", "input": "text", "title": "Note"},
+            *[
+                {"id": kind, "type": "input", "input": kind, "title": kind.title()}
+                for kind in ("email", "time", "date", "number")
+            ],
+        ],
+    })
+    form.save()
+    page = Entities.PAGE.create({
+        "name": f"Typed validation page {entity_kind}",
+        "model": category.entity,
+        "categories": [],
+        **({"form": form} if entity_kind == "PAGE" else {}),
+    })
+    page.save()
+    entity = page if entity_kind == "PAGE" else Entities.TASK.create({
+        "name": "Typed validation task", "page": page, "form": form,
+    })
+    answers = {
+        "note": "Keep this", "email": "ada@example.com", "time": "09:30",
+        "date": "2026-09-19", "number": "0",
+    }
+    entity.form_submission(answers)
+    entity.save()
+
+    user.navigate(f"{SETTINGS.test_config['BASE_URL']}/pages/{page.urlsafe_key}")
+    cookies = {cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()}
+    headers = manual_mutation_headers(user.page.url, user.locate("#token").input_value())
+    before = Entities.fetch_one(entity.key, request=Fetch.root())
+    saved = dict(before.db)
+    assert saved["submission"]
+    payload = {
+        **answers, "note": "Do not save", "name": entity.name,
+        "category": category.key, "form": form.urlsafe_key,
+        "form-generation": str(form.generation), "active": "TaskForm",
+    }
+    route = "pages" if entity_kind == "PAGE" else "tasks"
+
+    # Bypass native input validation: the server must enforce the boundary too.
+    for field, invalid in (
+        ("email", "not-an-email"), ("time", "25:99"),
+        ("date", "2026-02-30"), ("number", "NaN"),
+    ):
+        response = requests.put(
+            f"{SETTINGS.test_config['BASE_URL']}/{route}/{entity.urlsafe_key}/update",
+            data={**payload, field: invalid}, cookies=cookies, headers=headers,
+            allow_redirects=False, timeout=10,
+        )
+        assert response.status_code == 422, (field, response.text)
+        assert response.headers["Content-Type"].startswith("text/plain")
+        assert field.title() in response.text
+        after = Entities.fetch_one(entity.key, request=Fetch.root())
+        assert after.db == saved
 
 
 # @matrix pages : read-mode selection-fields submission

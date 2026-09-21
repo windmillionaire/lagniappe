@@ -677,7 +677,8 @@ def configure_oauth():
     prepare_existing_installation()
 
     from config import SETTINGS
-    from installer import FORMATTER, utils
+    from installer import FORMATTER
+    from installer.deploy import deploy_to_app_engine
     from installer.identity import setup_google_provider
 
     f = FORMATTER.initialize()
@@ -701,7 +702,7 @@ def configure_oauth():
         format_prompt("Deploy the updated OAuth settings now? [Y/n]: ")
     )
     if consent.strip().casefold() != "n":
-        utils.deploy_to_app_engine(print_final_summary=False)
+        deploy_to_app_engine(print_final_summary=False)
         print(f.success(wrap_text("Google OAuth settings deployed.")))
     else:
         print(

@@ -33,7 +33,9 @@ def test_user_email(get_test_entities):
     - sort_value returns True if email exists, False otherwise
     - column_value returns the email string
     """
-    for user in get_test_entities():
+    users = get_test_entities()
+    assert users
+    for user in users:
         test_value = user.test_spec.get("email")
         user.email = test_value
 
@@ -56,7 +58,9 @@ def test_user_last_login(get_test_entities):
 
     LastLogin stores datetime in UTC but displays in user timezone.
     """
-    for user in get_test_entities():
+    users = get_test_entities()
+    assert users
+    for user in users:
         tz_name = user.test_spec.get("timezone", "America/Chicago")
         test_tz = ZoneInfo(tz_name)
 
@@ -71,7 +75,8 @@ def test_user_last_login(get_test_entities):
 
             # ColumnMixin - column_value converts to user timezone
             column_val = user.column("last_login").column_value
-            assert column_val == utc_dt.astimezone(test_tz)
+            assert column_val.isoformat() == user.test_spec["expected_column"]
+            assert user.db["last_login"].isoformat() == "2024-06-15T19:30:00+00:00"
 
 
 # @matrix cache user : invalidation test-user
@@ -81,7 +86,9 @@ def test_user_invalidate_cache(get_test_entities):
 
     Test users follow the same invalidation flag semantics as normal users.
     """
-    for user in get_test_entities():
+    users = get_test_entities()
+    assert users
+    for user in users:
         user.is_test_user = True
         user.invalidate_cache = True
         assert user.invalidate_cache is True
@@ -105,7 +112,9 @@ def test_user_is_public(get_test_entities):
 
     IsPublic stores boolean in db["public"].
     """
-    for user in get_test_entities():
+    users = get_test_entities()
+    assert users
+    for user in users:
         # Test setting to True
         user.is_public = True
         assert user.is_public is True
@@ -128,7 +137,9 @@ def test_user_is_owner(get_test_entities):
 
     IsOwner stores boolean in db["owner"].
     """
-    for user in get_test_entities():
+    users = get_test_entities()
+    assert users
+    for user in users:
         # Test setting to True
         user.is_owner = True
         assert user.is_owner is True
@@ -284,6 +295,9 @@ def test_user_groups_membership_changes_recalculate_permissions():
 def test_user_groups_reject_invalid_relation_inputs():
     user = User(testing=True)
     user.properties.permissions.create = MagicMock()
+    group = TestEntities.get("USER_GROUP", {"name": "Keep", "hash": "keep-group"})
+    user.groups = [group]
+    user.properties.permissions.create.reset_mock()
 
     with pytest.raises(TypeError, match="Value must be a list"):
         user.groups = {}
@@ -296,6 +310,10 @@ def test_user_groups_reject_invalid_relation_inputs():
 
     with pytest.raises(ValueError, match="Value must have a key"):
         user.properties.groups.remove(SimpleNamespace())
+
+    assert user.groups == [group]
+    assert user.db["groups"] == ["keep-group"]
+    user.properties.permissions.create.assert_not_called()
 
 
 # @matrix user-groups : public-group-only public-user sync

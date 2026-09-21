@@ -151,7 +151,7 @@ def test_restricted_page_is_not_listed_for_outsider_on_category_index(get_user):
 # @source lagniappe/web/routes/tasks/main.py::view
 # @template pages/restrictions.html::visible_to
 # @template pages/restrictions.html::restrict_access
-# @template pages/restrictions.html::restricted_group_list
+# @template forms/access_restrictions.html::fields
 def test_page_restrictions_save_drafts_and_show_each_source(get_user):
     owner = get_user(Users.OWNER)
     page_group = Groups.general_models_view_only.get(owner)

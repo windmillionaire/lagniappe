@@ -1,13 +1,14 @@
-import { BaseList } from "../elements/base/baseList";
-import { FormElement } from "../elements/form";
-import { InputElement } from "../elements/input";
-import { SectionToggle } from "../elements/sectionToggle";
-import { request, withTransition } from "../shared";
+import { BaseList } from "../elements/base/baseList.mjs";
+import { InputElement } from "../elements/input.mjs";
+import { SectionToggle } from "../elements/sectionToggle.mjs";
+import { request } from "../shared/index.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable infrastructure
  */
-class ModelTask extends FormElement {
+class ModelTask extends FormWidget {
 	get formSelectElement() {
 		const target = this.target.querySelector('[data-action="select-form"]');
 		if (!target) return null;

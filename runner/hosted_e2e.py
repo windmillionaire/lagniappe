@@ -1424,6 +1424,7 @@ def _update_job(infrastructure, state, *, environment="standard"):
         f"--service-account={job_service_account}",
         f"--set-env-vars={env_argument}",
         secret_argument,
+        "--args=",
         "--tasks=1",
         "--parallelism=1",
         "--max-retries=0",
@@ -2080,12 +2081,11 @@ def format_execute_summary(
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr
 # @matrix hosted-e2e : argument-injection cloud-run execution-name failure-recovery focused-execution local-dispatch override target-validation
 def execute(
     *,
-    suite="all",
     targets=(),
     import_results=True,
     progress=True,
@@ -2096,15 +2096,12 @@ def execute(
 
     selected = _environment(environment)
     targets = tuple(targets or ())
-    if suite == "focused":
+    if targets:
         try:
             targets = validate_focused_targets(targets)
         except RuntimeError as error:
             raise HostedE2EError(str(error)) from error
-    elif targets:
-        raise HostedE2EError("Focused targets require the hosted E2E focused suite.")
-    elif suite not in {"all", "full"}:
-        raise HostedE2EError(f"Unsupported hosted E2E suite {suite!r}.")
+    suite = "focused" if targets else "all"
 
     _activate(adc=import_results)
     infrastructure = _infrastructure()
@@ -2112,9 +2109,7 @@ def execute(
     # Cloud Run's execution override uses gcloud's UpdateAction parser, which
     # rejects repeated list entries such as separate ``--target`` tokens.
     # ``argparse`` accepts the equivalent equals form inside the container.
-    job_arguments = [f"--suite={suite}"]
-    for target in targets:
-        job_arguments.append(f"--target={target}")
+    job_arguments = [f"--target={target}" for target in targets]
     result = _gcloud(
         "run",
         "jobs",
@@ -2770,13 +2765,11 @@ def run_hosted_e2e_command(arguments):
     add_environment_argument(create_parser)
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
     add_environment_argument(execute_parser)
-    execute_scope = execute_parser.add_mutually_exclusive_group()
-    execute_scope.add_argument("--suite", choices=("all", "full"))
-    execute_scope.add_argument(
+    execute_parser.add_argument(
         "--target",
         action="append",
         dest="targets",
-        help="Run one existing E2E file/nodeid; repeat for additional targets.",
+        help="Run one test nodeid from any suite; repeat for more. Omit to run all complete suites.",
     )
     execute_parser.add_argument(
         "--no-import-results",
@@ -2835,9 +2828,7 @@ def run_hosted_e2e_command(arguments):
             payload = create(**create_options)
             print(f"Hosted E2E version ready: {payload['base_url']}")
         elif args.action == "execute":
-            suite = args.suite or ("focused" if args.targets else "all")
             execute_options = {
-                "suite": suite,
                 "targets": args.targets or (),
                 "import_results": not args.no_import_results,
             }

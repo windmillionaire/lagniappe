@@ -9,7 +9,11 @@ import {
 	frontendSourceIdentity,
 	publishFrontendBuild,
 } from "./publication.mjs";
-import { generateBuildId, updateConstantsBuildId } from "./utility.mjs";
+import {
+	generateBuildId,
+	generateStyleModules,
+	updateConstantsBuildId,
+} from "./utility.mjs";
 
 const modes = {
 	development: "rollup.dev.config.mjs",
@@ -33,6 +37,7 @@ if (!configName) {
 	const temporaryDirectory = mkdtempSync(join(tmpdir(), "lagniappe-frontend-"));
 	const artifactInventoryPath = join(temporaryDirectory, "artifacts.json");
 	const buildId = generateBuildId();
+	generateStyleModules();
 	const sourceIdentity = frontendSourceIdentity(repositoryRoot);
 
 	try {

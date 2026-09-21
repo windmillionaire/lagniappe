@@ -1,4 +1,3 @@
-{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
 <div class="space-y-6">
   {% call card() %}
@@ -13,15 +12,101 @@
     </p>
   {% endcall %}
 
+  {{ heading("Live Documents", icon="document", kind="page") }}
   {% call card() %}
-    {{ manual_topic("documents") }}
+    <p class="text-base-medium mb-3">
+      A page or project document can be edited by several people at once.
+      Changes appear as they are made, and each person's edits show in their
+      own color so it is clear who is writing where.
+    </p>
+    <p class="text-base-medium">
+      Concurrent edits merge rather than overwrite each other, so two people
+      typing in the same document do not clobber one another's work or need to
+      take turns.
+    </p>
   {% endcall %}
+
+  {{ heading("Shared Forms", icon="form", kind="form") }}
   {% call card() %}
-    {{ manual_topic("messages_notifications") }}
+    <p class="text-base-medium">
+      Structured forms use explicit saves rather than character-by-character
+      collaboration. After someone saves, the new values appear for other open
+      viewers without reloading the page. Unsaved typing stays local; if the
+      saved record changes elsewhere, Lagniappe protects the local draft for
+      review instead of silently replacing it.
+    </p>
   {% endcall %}
+
+  {{ heading("Presence", icon="users", kind="user") }}
   {% call card() %}
-    {{ manual_topic("offline") }}
+    <p class="text-base-medium">
+      When others are viewing the same collaborative document, you can see who
+      is there. That makes it easy to notice when a colleague is already working
+      in the document before you both start editing.
+    </p>
   {% endcall %}
+
+  {{ heading("Direct Messages and Mentions", icon="email", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe includes lightweight direct messages for short conversations
+      between users. The Messages view keeps each conversation together and
+      shows unread activity without replacing a different conversation you are
+      currently reading.
+    </p>
+    <p class="text-base-medium">
+      In a collaborative document, type <strong>@</strong> and choose a user to
+      mention them. The mention links to that user's page and creates a
+      notification, subject to the same document permissions and recipient
+      preferences as the rest of the workspace.
+    </p>
+  {% endcall %}
+
+  {{ heading("Notifications and Email", icon="email", kind="task") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Direct messages, document mentions, and task assignments create in-app
+      notifications. The notification menu keeps an unread count and links back
+      to the relevant conversation, document, or task.
+    </p>
+    <p class="text-base-medium mb-3">
+      On your own personal page, <strong>User Settings</strong> controls whether
+      notification email is disabled, sent after five minutes, or collected in
+      a daily digest at 8:00 AM local time. This preference changes email
+      delivery, not the in-app notification.
+    </p>
+    {% call callout("note", False) %}
+      The site owner chooses on their own personal page whether managed users
+      may send them messages or mentions and whether managed users may assign
+      tasks to them. These owner opt-ins do not widen anyone's access to other
+      records.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Offline and Installable") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Previously viewed pages remain readable while the server is waking or the
+      network is unavailable. If your connection drops mid-edit, document
+      changes and supported form submissions are queued on your device and
+      replayed when you come back online. Other actions wait until the server is
+      reachable.
+    </p>
+    <p class="text-base-medium mb-3">
+      Forms still need their submit button while offline. <strong>Queued Sync</strong>
+      confirms a supported submission is waiting in this browser; typing alone
+      does not save it. If another person's saved changes conflict with yours,
+      Lagniappe asks you to choose which values to keep. Keep browser storage
+      until your queued work has been sent.
+    </p>
+    <p class="text-base-medium">
+      It is also a progressive web app, so you can install it straight from the
+      browser and run it like a native app -- pinned to a phone or tablet home
+      screen, or opened from the desktop in its own window. Installed or not, it
+      caches what it needs to stay responsive between requests.
+    </p>
+  {% endcall %}
+
   {{ heading("How Updates Travel") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -35,6 +120,16 @@
       the tab becomes visible or reconnects. Updates may arrive a few seconds
       later than a persistent real-time connection.
     {% endcall %}
+  {% endcall %}
+
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Live document editing and presence work best for a handful of people, not large simultaneous crowds.</li>
+      <li>Offline edits are held on the device that made them; they replay from that device when it reconnects.</li>
+      <li>Visibility still comes from permissions -- collaboration never widens who can see a document or form.</li>
+      <li>Direct messages are intentionally lightweight and polling-based, not a full Slack-style real-time chat product.</li>
+    </ul>
   {% endcall %}
 
   {{ nav_buttons(

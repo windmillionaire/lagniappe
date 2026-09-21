@@ -1,6 +1,6 @@
-import { BaseForm } from "../../base/baseForm";
-import { buttons } from "../../buttons";
-import { primitives } from "../../primitives";
+import { FormController } from "../../../forms/controller.mjs";
+import { buttons } from "../../buttons.mjs";
+import { primitives } from "../../primitives.mjs";
 
 /**
  * @testable true
@@ -46,7 +46,7 @@ class AddYouTube {
 		});
 		this.html = [this.link, submit];
 
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		this.form.init();
 	}
 

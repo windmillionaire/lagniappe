@@ -1,5 +1,6 @@
-import { uploadElement } from "../upload";
-import { BaseForm } from "./baseForm";
+import { FormController } from "../../forms/controller.mjs";
+import { directUpload } from "../../shared/directUpload.mjs";
+import { uploadElement } from "../upload.mjs";
 
 const PASTE_ERROR =
 	"File detected in clipboard but not accessible. Try pressing Cmd+V (Mac) or Ctrl+V (Windows/Linux) to paste instead.";
@@ -46,7 +47,7 @@ const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
 
 /**
  * @testable true
- * @tests tests_js/test_014_direct_upload_retry.py::test_directory_drop_is_rejected_before_file_processing
+ * @tests tests_js/test_014_direct_upload_retry.mjs::test_directory_drop_is_rejected_before_file_processing
  * @matrix upload : directory-rejection drag-drop
  */
 async function containsDroppedDirectory(dataTransfer) {
@@ -147,7 +148,7 @@ export class BaseUpload {
 	}
 
 	async init() {
-		this.form = new BaseForm(this);
+		this.form = new FormController(this);
 		await this.form.init();
 
 		if (this.readonly) {
@@ -359,8 +360,8 @@ export class BaseUpload {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_014_direct_upload_retry.py::test_single_file_keeps_compatibility_multipart_fallback
-	 * @tests tests_js/test_014_direct_upload_retry.py::test_large_multi_file_retry_preserves_completed_direct_uploads
+	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_single_file_keeps_compatibility_multipart_fallback
+	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_large_multi_file_retry_preserves_completed_direct_uploads
 	 * @matrix direct-upload : aggregate-limit compatibility multipart-fallback partial-resume single-file
 	 */
 	async prepareSubmit({ route = null } = {}) {
@@ -402,12 +403,12 @@ export class BaseUpload {
 					completed.push(existing);
 					continue;
 				}
-				const session = await uploadElement.directUpload.createSession({
+				const session = await directUpload.createSession({
 					route: uploadRoute,
 					file,
 					inputName: this.inputName,
 				});
-				const metadata = await uploadElement.directUpload.upload({
+				const metadata = await directUpload.upload({
 					file,
 					sessionUrl: session.session_url,
 					chunkSize: session.chunk_size,

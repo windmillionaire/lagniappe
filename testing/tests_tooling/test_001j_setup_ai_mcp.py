@@ -68,7 +68,14 @@ def settings():
     }
 
 
-def service(target, resource="https://lagniappe-demo.run.app/mcp", *, enabled=True):
+def service(
+    target,
+    resource="https://lagniappe-demo.run.app/mcp",
+    *,
+    enabled=True,
+    env_resource=None,
+):
+    env_resource = resource if env_resource is None else env_resource
     return {
         "metadata": {"labels": {mcp.VERSION_LABEL: target.version, "managed-by": "lagniappe"}},
         "spec": {"template": {"spec": {
@@ -76,7 +83,7 @@ def service(target, resource="https://lagniappe-demo.run.app/mcp", *, enabled=Tr
             "containers": [{"image": target.image, "env": [
                 {"name": "LAGNIAPPE_MCP_ENABLED", "value": "true" if enabled else "false"},
                 {"name": "LAGNIAPPE_MCP_ISSUER", "value": target.issuer},
-                {"name": "LAGNIAPPE_MCP_RESOURCE", "value": resource},
+                {"name": "LAGNIAPPE_MCP_RESOURCE", "value": env_resource},
             ]}],
         }}},
         "status": {"url": resource.removesuffix("/mcp"),
@@ -178,8 +185,40 @@ class Cloud:
             output = self.service
             missing = output is None
         elif args[:2] == ["run", "deploy"]:
-            enabled = any("LAGNIAPPE_MCP_ENABLED=true" in arg for arg in arguments)
-            self.service = service(target, enabled=enabled and not self.fail_activation)
+            def flag(prefix):
+                return next(arg.split("=", 1)[1] for arg in arguments if arg.startswith(prefix))
+
+            variables = dict(
+                item.split("=", 1)
+                for item in flag("--update-env-vars=").split(",")
+            )
+            assert args[2] == mcp.SERVICE
+            assert flag("--region=") == target.region
+            assert flag("--image=") == target.image
+            assert flag("--service-account=") == target.runtime
+            labels = dict(
+                item.split("=", 1)
+                for item in flag("--update-labels=").split(",")
+            )
+            assert labels == {
+                "managed-by": "lagniappe",
+                mcp.VERSION_LABEL: target.version,
+            }
+            assert set(mcp.RUNTIME_ARGUMENTS).issubset(arguments)
+            assert variables["LAGNIAPPE_MCP_ISSUER"] == target.issuer
+            assert variables["LAGNIAPPE_MCP_ENABLED"] in {"true", "false"}
+            canonical_resource = "https://lagniappe-demo.run.app/mcp"
+            if self.service is not None:
+                canonical_resource = self.service["status"]["url"] + "/mcp"
+            self.service = service(
+                target,
+                canonical_resource,
+                enabled=(
+                    variables["LAGNIAPPE_MCP_ENABLED"] == "true"
+                    and not self.fail_activation
+                ),
+                env_resource=variables["LAGNIAPPE_MCP_RESOURCE"],
+            )
         elif args[:3] == ["run", "services", "update"]:
             self.service = service(target, enabled=False)
         elif args[:3] == ["run", "services", "update-traffic"]:
@@ -386,8 +425,7 @@ def test_mcp_install_keeps_app_runtime_and_build_accounts_separate(
     assert config["INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"] == internal_account
     assert cloud.service["spec"]["template"]["spec"]["serviceAccountName"] == target.runtime
     deploy_calls = [call for call in cloud.calls if call[:2] == ["run", "deploy"]]
-    if not saved_name or saved_name != runtime_name:
-        assert deploy_calls
+    assert bool(deploy_calls) is (not saved_name or saved_name != runtime_name)
     assert all(f"--service-account={target.runtime}" in call for call in deploy_calls)
     build_calls = [call for call in cloud.calls if call[:2] == ["builds", "submit"]]
     assert all(f"--service-account=projects/demo-project/serviceAccounts/{target.build_account}" in call for call in build_calls)
@@ -626,7 +664,7 @@ def test_mcp_handoff_uses_selected_accounts_and_scoped_resources(cloud, app_name
 
 # @matrix mcp-install : cli-routing retry confirmation
 def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
-    from installer import verify, utils
+    from installer import verify, deploy
     events = []
     monkeypatch.setattr(mcp.SETTINGS, "APP", settings())
     monkeypatch.setattr(verify, "prepare_existing_installation", lambda: events.append("prepare"))
@@ -635,7 +673,7 @@ def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
         lambda prompt: events.append(("confirm", prompt)) or "y",
     )
     monkeypatch.setattr(
-        utils,
+        deploy,
         "deploy_to_app_engine",
         lambda *, print_final_summary: events.append(("deploy", print_final_summary)),
     )
@@ -650,7 +688,7 @@ def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
 # @matrix mcp-install : confirmation default-no no-mutation
 @pytest.mark.parametrize("answer", ["", "n", "no", "not now"])
 def test_mcp_deployment_decline_preserves_configuration(monkeypatch, capsys, answer):
-    from installer import verify, utils
+    from installer import verify, deploy
 
     app = settings()
     original = deepcopy(app)
@@ -658,7 +696,7 @@ def test_mcp_deployment_decline_preserves_configuration(monkeypatch, capsys, ans
     monkeypatch.setattr(verify, "prepare_existing_installation", lambda: None)
     monkeypatch.setattr("builtins.input", lambda prompt: answer)
     monkeypatch.setattr(
-        utils, "deploy_to_app_engine",
+        deploy, "deploy_to_app_engine",
         lambda **kwargs: pytest.fail("App deployment started without confirmation"),
     )
     monkeypatch.setattr(

@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from lagniappe.core.mixins import SearchMixin
+from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.properties.form_table import Table
 from lagniappe.core.properties.base_submission import SubmissionProperty
 from testing.utility.test_entities import TestEntities
@@ -215,10 +216,10 @@ def test_submission_search_value_merges_table_column_labels(
         entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
         test_submission_values(entity)
         cache = entity.to_cache
-        assert "Headline" in cache["keys"]
-        assert "[Items] Note" in cache["keys"]
-        assert "Top story" in cache["values"]
-        assert "Row one" in cache["values"]
+        assert {
+            "keys": cache["keys"],
+            "values": cache["values"],
+        } == entity.test_spec["expected_search"]
 
 
 # @matrix form-table : multiple-rows search-value
@@ -264,15 +265,71 @@ def test_submission_search_value_omits_blank_search_fields():
     assert submission.search_value == {}
 
 
-# @matrix email-input : form-submission validation
+# @matrix date-input email-input number-input time-input : form-submission validation
+# @matrix submission : form-submit preservation validation
 @pytest.mark.unit
-def test_submission_email_form_accepts_non_matching_string(
-    get_test_entities, get_schema, test_submission_values
+@pytest.mark.parametrize("entity_kind", ["PAGE", "TASK"])
+@pytest.mark.parametrize("input_type, valid, invalid", [
+    ("email", "ada@example.com", "not-an-email"),
+    ("email", "ada@example.com", "ada@example.com trailing"),
+    ("time", "09:30", "25:99"),
+    ("time", "09:30", "not-a-time"),
+    ("date", "2026-09-19", "2026-02-30"),
+    ("date", "2026-09-19", "not-a-date"),
+    ("number", "0", "not-a-number"),
+    ("number", "0", "NaN"),
+    ("number", "0", "Infinity"),
+    ("number", "0", "1e309"),
+])
+def test_invalid_typed_browser_submission_preserves_saved_answers(
+    entity_kind, input_type, valid, invalid
 ):
-    """Form path uses base ``validate_submission``; regex validation is import/AI-only."""
-    for entity in get_test_entities():
-        entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
-        test_submission_values(entity)
+    spec = {
+        "name": "Typed answers",
+        "hash": "typed-answers",
+        "form": {"name": "Typed form", "hash": "typed-form"},
+    }
+    if entity_kind == "TASK":
+        spec["page"] = {"name": "Parent", "hash": "typed-parent"}
+    entity = TestEntities.get(entity_kind, spec)
+    entity.form.schema = [
+        {"id": "note", "type": "input", "input": "text", "title": "Note"},
+        {"id": "answer", "type": "input", "input": input_type, "title": "Answer"},
+    ]
+    entity.form_submission(WebFormSubmission({"note": "Keep this", "answer": valid}))
+    saved = entity.db["submission"]
+    field = entity.properties.submission.fields["answer"]
+    previous_value = field.db_value
+
+    with pytest.raises(ValidationError, match="Answer"):
+        entity.form_submission(WebFormSubmission({"note": "Do not save", "answer": invalid}))
+
+    assert entity.db["submission"] == saved
+    assert field.db_value == previous_value
+
+
+# @matrix date-input email-input number-input time-input : form-submission empty-value
+@pytest.mark.unit
+@pytest.mark.parametrize("input_type, valid", [
+    ("email", "Ada+notes@example.com"),
+    ("time", "09:30"),
+    ("date", "2026-09-19"),
+    ("number", "0"),
+])
+@pytest.mark.parametrize("blank", [None, ""])
+def test_typed_browser_submission_accepts_valid_and_blank(input_type, valid, blank):
+    entity = _submission_page("typed inputs")
+    entity.form.schema = [
+        {"id": "answer", "type": "input", "input": input_type, "title": "Answer"},
+    ]
+    entity.form_submission(WebFormSubmission({"answer": valid}))
+    field = entity.properties.submission.fields["answer"]
+    assert field.form_value == (0.0 if input_type == "number" else valid)
+
+    entity.form_submission(WebFormSubmission({} if blank is None else {"answer": blank}))
+
+    assert field.value is None
+    assert "submission" not in entity.db
 
 
 # @matrix number-input : form-submission zero
@@ -284,13 +341,3 @@ def test_submission_number_form_accepts_zero(
     for entity in get_test_entities():
         entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
         test_submission_values(entity)
-
-
-# @matrix time-input : form-submission validation
-@pytest.mark.unit
-def test_submission_time_form_invalid_format_raises(get_test_entities, get_schema):
-    """Bad ``HH:MM`` on form submit raises from ``strptime`` (not caught)."""
-    for entity in get_test_entities():
-        entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
-        with pytest.raises(ValueError):
-            entity.form_submission(WebFormSubmission({"input-timecd34": "25:99"}))

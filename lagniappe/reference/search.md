@@ -1,6 +1,5 @@
 ---
 title: Searching Lagniappe
-manual_section: search
 related:
 - filters
 - navigation

@@ -1,4 +1,4 @@
-import { withTransition } from "./utilities";
+import { withTransition } from "./transitions.mjs";
 
 /**
  * @testable false
@@ -24,7 +24,7 @@ function legacyCopy(url, documentRef) {
 
 /**
  * @testable true
- * @tests tests_js/test_047_public_sharing.py::test_public_share_uses_native_api_and_clipboard_fallbacks
+ * @tests tests_js/test_047_public_sharing.mjs::test_public_share_uses_native_api_and_clipboard_fallbacks
  * @matrix public-pages : clipboard fallback sharing
  */
 export async function copyPublicUrl(url, root = document) {
@@ -56,7 +56,7 @@ function updateShareLabel(label, text) {
 
 /**
  * @testable true
- * @tests tests_js/test_047_public_sharing.py::test_public_share_uses_native_api_and_clipboard_fallbacks
+ * @tests tests_js/test_047_public_sharing.mjs::test_public_share_uses_native_api_and_clipboard_fallbacks
  * @matrix public-pages : abort clipboard native-share selectable-url
  */
 export async function sharePublicPage(button, root = document) {
@@ -109,7 +109,7 @@ export async function sharePublicPage(button, root = document) {
 
 /**
  * @testable true
- * @tests tests_js/test_047_public_sharing.py::test_public_share_initialization_binds_one_click_handler
+ * @tests tests_js/test_047_public_sharing.mjs::test_public_share_initialization_binds_one_click_handler
  * @matrix public-pages : initialization sharing
  */
 export function initializePublicSharing(root = document) {

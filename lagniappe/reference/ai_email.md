@@ -1,6 +1,5 @@
 ---
 title: AI Email
-manual_section: ai
 related:
 - ai_tools
 - user_settings

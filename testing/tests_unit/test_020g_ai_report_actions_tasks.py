@@ -27,6 +27,49 @@ from testing.utility.ai_report_fakes import (
 )
 from testing.utility.test_entities import TestEntities
 
+
+# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
+# @source lagniappe/core/tools/ai/reporting/execution/actions/entities.py::_move_task
+# @matrix ai-report : action-capabilities permissions
+# @pair ai-report:moves
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "source_permission,target_permission,error",
+    [("EDIT", "EDIT", None), ("VIEW", "EDIT", "move this task"),
+     ("EDIT", "VIEW", "move tasks to this page")],
+)
+def test_task_move_catalog_preserves_exact_source_and_destination_permissions(
+    source_permission, target_permission, error
+):
+    from lagniappe.core.tools.ai.reporting.contracts.permissions import allowed_report_actions
+    from lagniappe.core.tools.ai.reporting.execution.actions.entities import _move_task
+    from testing.utility.ai_report_fakes import _permissioned_user
+    from testing.utility.mock_restrictions import MockRestrictions
+
+    user = _permissioned_user("move-editor", {
+        "page-source": source_permission, "page-target": target_permission,
+    })
+    source = TestEntities.get("PAGE", {"name": "Source", "hash": "page-source"})
+    target = TestEntities.get("PAGE", {"name": "Target", "hash": "page-target"})
+    task = TestEntities.get("TASK", {"name": "Move this work", "hash": "task-to-move"}, page=source)
+    action = {"type": "move_task", "data": {"task": "source_task", "to_page": "destination"}}
+    references = {"source_task": task, "destination": target}
+
+    with MockRestrictions().patch_cache():
+        assert "move_task" in allowed_report_actions(user)
+        if error:
+            with pytest.raises(exceptions.ValidationError, match=error):
+                _move_task(action, None, user, references)
+            assert task.page is source
+        else:
+            moved, writes, metadata = _move_task(action, None, user, references)
+            assert moved is task
+            assert task.page is target
+            assert writes == [task]
+            assert metadata["moved"]["from"]["id"] == source.urlsafe_key
+            assert metadata["moved"]["to"]["id"] == target.urlsafe_key
+
+
 # @matrix ai-report : created-task deterministic-run persistence submission-completion task-attachment
 # @matrix files tasks : task-attachment
 @pytest.mark.unit

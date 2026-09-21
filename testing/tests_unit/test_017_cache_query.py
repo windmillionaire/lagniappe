@@ -1152,11 +1152,13 @@ def test_cleanup_test_data_reraises_unexpected_drop_index_errors(monkeypatch):
 class _LeaseRedis:
     def __init__(self):
         self.values = {}
+        self.ttls = {}
 
     def set(self, key, value, *, nx=False, ex=None):
         if nx and key in self.values:
             return False
         self.values[key] = str(value)
+        self.ttls[key] = ex
         return True
 
     def get(self, key):
@@ -1167,8 +1169,10 @@ class _LeaseRedis:
         if self.values.get(key) != run_id:
             return 0
         if "expire" in script:
+            self.ttls[key] = arguments[0]
             return 1
         del self.values[key]
+        self.ttls.pop(key, None)
         return 1
 
 
@@ -1198,8 +1202,11 @@ def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
     contender = "contender_abcdefghijklmnopqrstuv"
 
     assert e2e_lease.acquire_e2e_lease(owner, client=client)
+    lease_key = e2e_lease.e2e_lease_key()
+    assert client.ttls[lease_key] == e2e_lease.DEFAULT_LEASE_SECONDS
     assert not e2e_lease.acquire_e2e_lease(contender, client=client)
     assert e2e_lease.heartbeat_e2e_lease(owner, client=client)
+    assert client.ttls[lease_key] == e2e_lease.DEFAULT_LEASE_SECONDS
     version = "e2e-abcdef1234567890"
     source = "b" * 40
     assert e2e_lease.bind_e2e_deployment(
@@ -1208,6 +1215,7 @@ def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
         source,
         client=client,
     )
+    assert e2e_lease.DEFAULT_DEPLOYMENT_BINDING_SECONDS in client.ttls.values()
     assert e2e_lease.e2e_deployment_lease_active(
         version,
         source,
@@ -1222,6 +1230,7 @@ def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
     )
     digest = "a" * 64
     assert e2e_lease.consume_e2e_bootstrap_token(digest, owner, client=client)
+    assert 10 * 60 in client.ttls.values()
     assert not e2e_lease.consume_e2e_bootstrap_token(digest, owner, client=client)
     assert not e2e_lease.release_e2e_lease(contender, client=client)
     assert e2e_lease.e2e_lease_active(owner, client=client)

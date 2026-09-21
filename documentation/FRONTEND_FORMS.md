@@ -1,21 +1,22 @@
 # Frontend Forms
 
-`FormElement` and `BaseForm` connect a widget's schema/submission to the
-Renderer and own form replacement, submit feedback, unsaved state, offline
-state, and committed-revision baselines.
+`FormWidget` owns the form's widget and revision lifecycle. It composes a
+`FormController`, which handles presentation, submit feedback, dirty/offline
+state, and reusable controls. Schema-driven forms additionally use
+`FormRenderer`; server-rendered forms use the same lifecycle and controller.
 
-## FormElement
+## FormWidget
 
-`elements/form.mjs` is the widget base used by PageInfo, TaskSettings,
+`widgets/base/formWidget.mjs` is the widget base used by PageInfo, TaskSettings,
 CreateUser, FileInfo, and similar forms. During `init()` it captures the
-server-rendered target, creates `BaseForm`, renders fields, and installs local
+server-rendered target, creates `FormController`, renders fields, and installs local
 read/edit and clear interactions.
 
 It implements the widget lifecycle:
 
 | Member | Purpose |
 | --- | --- |
-| `data` | Return `BaseForm.data`. |
+| `formData` | Return native form fields, with feature-specific serialization and optional direct-upload contributions. |
 | `showError()` | Delegate validation display. |
 | `created()` / `updated()` | Record authoritative response schema/submission. |
 | `prereconcile()` | Render a replacement form against a detached target. |
@@ -29,6 +30,20 @@ Migration notices and their modals belong to the same prepared state as the form
 Preparation leaves the current notice intact; committing adopts the replacement's
 notice, and discarding destroys only the prepared notice. A settings-only update
 retains the notice supplied by the server, while saving submission values clears it.
+
+Detached preparation isolates all widget assignments, including feature selector
+instances. Committing adopts them and switches their controller callbacks to the
+live widget. Replacement preparation is serialized; newer accepted HTML replaces
+superseded preparations before one synchronous commit. Failure and discard clean
+up prepared resources without destroying the live form. Each attempt starts from
+a clone of the authoritative markup, so retries do not reuse partially enhanced
+controls.
+
+An `lp-load` form without `loaded` is a shell with its entity/revision marker but
+without editable controls. It is initialized only after the focused route supplies
+complete HTML with `loaded`. A validated cached response
+can fill a cold shell; it does not rebuild an already initialized form. Dirty
+background revisions and explicit reset decisions belong to `EditReconciler`.
 
 Completed Tasks with a deleted attached form initially show a warning and
 **Load the archived version**. TaskForm fetches and renders that readonly view
@@ -52,17 +67,42 @@ reopening the draft. Selecting a project or a model without a form leaves the
 form selection alone. A user can choose a different form after selecting the
 model task.
 
-## BaseForm initialization
+## FormController initialization
 
-`elements/base/baseForm.mjs`:
+`forms/controller.mjs`:
 
 1. finds the submit group/button;
-2. creates the Renderer when a schema exists;
+2. creates the FormRenderer when a schema exists;
 3. appends extra HTML and orders Page default fields;
-4. removes persistence controls when readonly;
+4. excludes submit feedback when readonly;
 5. restores an `lp-edited-marker` displaced by rendering;
-6. configures submit text/icon slots; and
-7. watches editable input/change/reset events for unsaved state.
+6. initializes declared controls through `forms/controls/loader.mjs`;
+7. configures submit text/icon slots; and
+8. watches editable input/change/reset events for unsaved state.
+
+## Composed controls
+
+`data-form-control` on the form itself or a descendant declares a reusable
+control. The registry uses literal dynamic imports, so forms without these
+markers do not load the controls. Each control receives its root and
+`{ readonly, onChange }`, implements `init()` and `destroy()`, and belongs to the
+controller's destroyables before asynchronous initialization begins. Controls
+edit native fields; the enclosing form owns submission and revision state.
+
+- `permission-sections` enhances the HTML from `users/permissions.html`: facet
+  selection, new-row templates, removal, and conditional visibility. Hidden
+  sections retain their submitted values. Group/Public permission widgets extend
+  `FormWidget` directly and live in `widgets/userPermissions.mjs`.
+- `access-restrictions` enhances `forms/access_restrictions.html` in Page
+  Permissions, User Settings, and the Builder. It manages administrator/group
+  mutual exclusion and group rows. Each host keeps its own submission and summary
+  behavior. User Settings retains an explicit field allowlist to isolate these
+  settings from Page form values and categories.
+
+Permission GET/PUT responses contain complete HTML rather than separate section
+JSON. The Users index retains lazy shells; group creation supplies complete HTML
+immediately. Native name fields hold rename drafts, while the GroupPermissions
+widget updates saved navigation labels and preserves a name edited during a save.
 
 The submit icon occupies a fixed leading slot so unsaved, spinner, offline, and
 success states do not shift button text. Primary form actions are full width;
@@ -97,7 +137,7 @@ checkbox. An attached Form's restrictions remain independent.
 
 ## Committed baselines
 
-A marked FormElement retains an in-memory normalized snapshot of its form data.
+A marked FormWidget retains an in-memory normalized snapshot of its form data.
 The baseline is refreshed after initialization and authoritative replacement.
 Repeated values compare without order; Files compare by metadata; a widget may
 add state deliberately omitted from its HTTP payload.
@@ -106,6 +146,32 @@ The snapshot is not persisted or sent to the server. Entity fingerprints and
 `modified` remain the server authorities. On an external change, EditWatcher
 uses a detached focused response to compare the live draft with saved state.
 See [FRONTEND_VIEWS_RECONCILIATION.md](FRONTEND_VIEWS_RECONCILIATION.md).
+
+## Revision coordination
+
+`forms/revisions/` owns watched-form revision coordination:
+
+| Module | Responsibility |
+| --- | --- |
+| `watcher.mjs` | `EditWatcher`: entity/marker discovery, polling subscriptions, acknowledgements, and deferred-operation coordination. |
+| `reconciler.mjs` | `EditReconciler`: focused authoritative probes, draft/queued comparisons, and revision resolution. |
+| `modals.mjs` | `FormRevisionModal` and `WholeFormRevisionModal`: field or whole-form saved/local choices. |
+| `preview.mjs` | `loadRevisionPreview()`: detached form construction through the generic widget loader, using cloned response DOM. |
+
+Views obtain the service through `ensureEditWatcher()` and retain it as
+`view.EditWatcher`. The loader awaits the shared polling coordinator and loads
+the watcher dynamically. Revision coordination stays outside Core's static
+startup closure; there is no forms barrel or shared-facade re-export.
+
+`forms/representation.mjs` provides dependency-free `compatibleField()` and
+`incompatibleSchema()` comparisons to both FormWidget and revision UI. The
+widget continues to own snapshots, local-state capture/projection, and staged
+replacement; those operations do not import revision coordination.
+
+`forms/migrationNotice.mjs` independently installs the informational notice for
+values converted by a schema migration. Its banner/modal belong to FormWidget's
+prepared state, not the revision watcher or reconciler. Polling, offline replay,
+deferred operations, and collaborative documents keep their existing owners.
 
 ## Offline forms
 
@@ -117,10 +183,14 @@ After replay acceptance, OfflineQueue deletes the stored record and requests a
 fresh poll. EditWatcher then applies or reviews the current server form. This
 keeps storage hydration and queued metadata out of initial rendering.
 
-Structured Renderer values may be stored as queue metadata but are never added
+Structured FormRenderer values may be stored as queue metadata but are never added
 to an ordinary HTTP submit.
 
 ## Uploads
+
+`shared/directUpload.mjs` owns direct-upload sessions, resumable chunk transfer,
+retry recovery, and progress callbacks. `BaseUpload` and the Form Builder import
+that client directly. `elements/upload.mjs` owns upload controls and menus.
 
 `BaseUpload` prefers resumable browser-to-Storage upload and submits signed
 metadata after each object completes. The widget checkpoints successful files

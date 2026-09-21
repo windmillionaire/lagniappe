@@ -211,7 +211,7 @@ def _default_provider_checker(settings, project):
     from config import constants
     from installer.iam import inspect_operator_permissions
     from installer.recovery import verify_recovery_resources
-    from installer.utils import run_gcloud_command
+    from installer.commands import run_gcloud_command
 
     result = run_gcloud_command(
         ["projects", "describe", project, "--format=json"],
@@ -361,7 +361,7 @@ def run_doctor(
     identity_issues = []
     if settings and saved_gcloud:
         if gcloud_runner is None:
-            from installer.utils import run_gcloud_command
+            from installer.commands import run_gcloud_command
 
             gcloud_runner = run_gcloud_command
         active = _active_cli_identity(gcloud_runner)

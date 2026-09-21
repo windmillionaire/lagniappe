@@ -1,9 +1,9 @@
-import { STYLES } from "styles";
-import { ENDPOINTS, request } from "../shared";
-import { createIcon } from "../shared/icons";
-import { renderNotificationBadge } from "../shared/notificationState";
-import { withTransition } from "../shared/utilities";
-import { Dropdown } from "./combobox/dropdown";
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.mjs";
+import { ENDPOINTS, request } from "../shared/index.mjs";
+import { renderNotificationBadge } from "../shared/notificationState.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import { Dropdown } from "./combobox/dropdown.mjs";
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";
 
@@ -11,7 +11,7 @@ const CLEAR_ALL_KEY = "__clear_all_notifications__";
  * @testable true
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
- * @tests tests_js/test_042_messaging_frontend.py::test_notification_menu_keeps_authoritative_aggregate_count
+ * @tests tests_js/test_042_messaging_frontend.mjs::test_notification_menu_keeps_authoritative_aggregate_count
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
  * @matrix notifications : accessible-state bounded-page clear-all delete dropdown-refresh exact-count long-text-wrap menu-open message-ordering
@@ -122,7 +122,7 @@ export class Notifications {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
-	 * @tests tests_js/test_042_messaging_frontend.py::test_notification_refresh_waits_for_pending_connectivity
+	 * @tests tests_js/test_042_messaging_frontend.mjs::test_notification_refresh_waits_for_pending_connectivity
 	 * @matrix notifications : menu-open reconnect
 	 */
 	async refresh() {
@@ -213,7 +213,7 @@ export class Notifications {
 		const action = option?.dataset?.action;
 		if (action === "message-user") {
 			event?.preventDefault();
-			const { ensureMessageComposer } = await import("./messageComposer");
+			const { ensureMessageComposer } = await import("./messageComposer.mjs");
 			ensureMessageComposer(this.view).open();
 			return;
 		}

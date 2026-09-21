@@ -2,9 +2,9 @@
 
 import ast
 from pathlib import Path
-import re
 
 import pytest
+from jinja2 import Environment, nodes
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,13 +26,11 @@ STAMPED_PRODUCERS = {
     "sanitize_html",
     "sanitize_public_document_html",
 }
-JINJA_BLOCK = re.compile(r"{{.*?}}|{%.*?%}", re.DOTALL)
-SAFE_FILTER = re.compile(r"\|\s*safe(?![_A-Za-z0-9])")
-SAFE_HTML_FILTER = re.compile(r"\|\s*safe_html(?![_A-Za-z0-9])")
 
 
-def _template_filter_count(source, pattern):
-    return sum(len(pattern.findall(block)) for block in JINJA_BLOCK.findall(source))
+def _template_filter_count(source, name):
+    tree = Environment().parse(source)
+    return sum(node.name == name for node in tree.find_all(nodes.Filter))
 
 
 @pytest.mark.parametrize(
@@ -44,11 +42,17 @@ def _template_filter_count(source, pattern):
         ("{{ value | safe_html }}", 0, 1),
         ("Documentation may mention value|safe without executing it.", 0, 0),
         ("{{ safely_named }}", 0, 0),
+        ("{{ 'example: value | safe' }}", 0, 0),
+        ("{# {{ value | safe }} #}", 0, 0),
+        ("{% raw %}{{ value | safe_html }}{% endraw %}", 0, 0),
+        ("{{ value\n    | safe_html\n}}", 0, 1),
+        ("{{ value | safe_html | safe }}", 1, 1),
+        ("{{ value | safe_html_example }}", 0, 0),
     ],
 )
 def test_template_filter_scanner_fixtures(source, unsafe_count, safe_html_count):
-    assert _template_filter_count(source, SAFE_FILTER) == unsafe_count
-    assert _template_filter_count(source, SAFE_HTML_FILTER) == safe_html_count
+    assert _template_filter_count(source, "safe") == unsafe_count
+    assert _template_filter_count(source, "safe_html") == safe_html_count
 
 
 def test_application_templates_use_only_allowlisted_strict_html_sinks():
@@ -57,10 +61,10 @@ def test_application_templates_use_only_allowlisted_strict_html_sinks():
     for path in TEMPLATES.rglob("*.html"):
         relative = path.relative_to(ROOT).as_posix()
         source = path.read_text(encoding="utf-8")
-        unsafe_count = _template_filter_count(source, SAFE_FILTER)
+        unsafe_count = _template_filter_count(source, "safe")
         if unsafe_count:
             unsafe.append((relative, unsafe_count))
-        safe_html_count = _template_filter_count(source, SAFE_HTML_FILTER)
+        safe_html_count = _template_filter_count(source, "safe_html")
         if safe_html_count:
             actual_sinks[relative] = safe_html_count
 
@@ -177,9 +181,13 @@ def test_safe_html_and_markup_construction_stays_narrowly_allowlisted():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         visitor = _ConstructorVisitor()
         visitor.visit(tree)
-        safe_html_calls.extend((relative, *record) for record in visitor.safe_html_calls)
+        safe_html_calls.extend(
+            (relative, *record) for record in visitor.safe_html_calls
+        )
         stamp_calls.extend((relative, *record) for record in visitor.stamp_calls)
-        public_helpers.extend((relative, *record) for record in visitor.public_stamp_helpers)
+        public_helpers.extend(
+            (relative, *record) for record in visitor.public_stamp_helpers
+        )
         markup_calls.extend((relative, *record) for record in visitor.markup_calls)
         if visitor.markup_imported:
             markup_imports.add(relative)
@@ -188,16 +196,12 @@ def test_safe_html_and_markup_construction_stays_narrowly_allowlisted():
         ("lagniappe/core/tools/files/html.py", "_stamp_safe_html")
     ]
     assert public_helpers == []
-    assert {
-        (path, function) for path, function, _line in stamp_calls
-    } == {
+    assert {(path, function) for path, function, _line in stamp_calls} == {
         ("lagniappe/core/tools/files/html.py", function)
         for function in STAMPED_PRODUCERS
     }
     assert markup_imports == set(MARKUP_EMITTERS)
-    assert {
-        (path, function) for path, function, _line in markup_calls
-    } == {
+    assert {(path, function) for path, function, _line in markup_calls} == {
         (path, function)
         for path, functions in MARKUP_EMITTERS.items()
         for function in functions

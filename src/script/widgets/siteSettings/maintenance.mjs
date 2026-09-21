@@ -1,12 +1,9 @@
-import { STYLES } from "styles";
-import { buttons } from "../../elements/buttons";
-import {
-	clearRecentSearchResults,
-	Modal,
-	request,
-	withTransition,
-} from "../../shared";
-import { SiteSetting } from "./base";
+import { buttons } from "../../elements/buttons.mjs";
+import { STYLES } from "../../generated/styles.mjs";
+import { Modal, request } from "../../shared/index.mjs";
+import { clearRecentSearchResults } from "../../shared/storage.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { SiteSetting } from "./base.mjs";
 
 /**
  * @testable true
@@ -118,7 +115,7 @@ export class SiteMaintenance extends SiteSetting {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_cache_refresh_displays_linked_failures
+	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_settings_cache_refresh_displays_linked_failures
 	 * @matrix cache : failure-isolation actionable-links
 	 */
 	_renderCacheStatus(status) {
@@ -182,7 +179,7 @@ export class SiteMaintenance extends SiteSetting {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_migration_status_uses_generic_release_states
+	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_settings_migration_status_uses_generic_release_states
 	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repair-filtering repairs running version-history
 	 */
 	_renderMigrationStatus(status) {

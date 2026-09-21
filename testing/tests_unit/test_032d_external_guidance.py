@@ -158,7 +158,11 @@ def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
     )
     assert internal == external
     assert "same proposal" in internal["guidelines"]
-    assert "Return one complete executable proposal" in internal["guidelines"]
+    assert "uploaded or existing workspace files" in internal["guidelines"]
+    assert "Only report uploads belong" in internal["guidelines"]
+    assert "Every updates row" not in internal["guidelines"]
+    assert "data.changes.submission" in internal["guidelines"]
+    assert "Summary Generation Guidelines" not in internal["guidelines"]
     assert "No action contains submission-generation fields" not in internal["guidelines"]
     assert "server performs focused form completion afterward" not in internal["guidelines"]
     assert "/submit" not in internal["guidelines"]
@@ -171,6 +175,18 @@ def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
         "input_schema"
     ]
     assert set(inputs["properties"]) == {"task", "field_types", "actions"}
+
+    for external_dispatch in (False, True):
+        for action in ("update_task", "summarize_file"):
+            guidance, _ = functions.execute_registered_tool(
+                "get_guidelines", {"task": "report_actions", "actions": [action]},
+                actor, external=external_dispatch,
+            )
+            assert "Return one complete executable proposal" in guidance["guidelines"]
+            assert "File Organization" not in guidance["guidelines"]
+            assert ("Summary Generation Guidelines" in guidance["guidelines"]) is (
+                action == "summarize_file"
+            )
 
     internal_form, _ = functions.execute_registered_tool(
         "get_guidelines", {"task": "form_autofill"}, actor

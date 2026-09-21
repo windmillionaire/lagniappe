@@ -144,7 +144,7 @@ Recent selections are stored per index key as `recent-{index}` in localStorage, 
 
 Three rendering modes based on the `index`:
 
-| Index | Renderer | Used By |
+| Index | FormRenderer | Used By |
 |---|---|---|
 | `"search"` | `search()` | SearchBox -- shows icon, name, parent, form field matches, text snippets |
 | Any other string | `facet()` | FacetsBox -- shows icon, name, parent breadcrumb |
@@ -234,9 +234,10 @@ compact navigation/tools menus. It does not use `Submitter`.
 
 ## Test Boundary
 
-`testing/tests_js/test_016_combobox_frontend.py` and
-`test_046_async_query_lifecycle.py` execute the source in Node
-with small platform fakes. It covers the live-versus-explicit positioning
+`testing/tests_js/test_016_combobox_frontend.mjs` and
+`testing/tests_js/test_046_async_query_lifecycle.mjs` import the production
+modules in Node with jsdom and explicit Floating UI/browser or neighboring
+component boundaries. Together they cover the live-versus-explicit positioning
 reference contract, application of Floating UI results, ARIA state, keyboard
 navigation, pointer selection, dismissal, deferred response ordering, repeated
 query keys, cancellation, and teardown. This is enough to catch stale reference

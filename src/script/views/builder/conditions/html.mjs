@@ -1,6 +1,6 @@
-import { ENDPOINTS } from "../../../shared";
-import { DraftDocument } from "../draftDocument";
-import { Condition } from "./base";
+import { ENDPOINTS } from "../../../shared/endpoints.mjs";
+import { DraftDocument } from "../draftDocument.mjs";
+import { Condition } from "./base.mjs";
 
 /**
  * @testable true

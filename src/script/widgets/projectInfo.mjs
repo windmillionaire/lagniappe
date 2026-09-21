@@ -1,7 +1,7 @@
-import { FormElement } from "../elements/form";
-import { InputElement } from "../elements/input";
-import { sections } from "../elements/sections";
-import { TextareaElement } from "../elements/textarea";
+import { InputElement } from "../elements/input.mjs";
+import { sections } from "../elements/sections.mjs";
+import { TextareaElement } from "../elements/textarea.mjs";
+import { FormWidget } from "./base/formWidget.mjs";
 
 /**
  * @testable false
@@ -9,7 +9,7 @@ import { TextareaElement } from "../elements/textarea";
  * @covered-by src/script/widgets/projectInfo.mjs::ProjectInfo
  * @reason shared field construction is exercised through concrete project widgets
  */
-class ProjectForm extends FormElement {
+class ProjectForm extends FormWidget {
 	get nameElement() {
 		return new InputElement(
 			{

@@ -4,7 +4,7 @@ from .form_links import Link
 from .base_submission import SubmissionProperty
 from .base_db import DBProperty
 from .schema import SchemaFields
-from ..tools.form_definitions import require_mutable_submission
+from lagniappe.core.tools.forms.definitions import require_mutable_submission
 
 
 # @testable false

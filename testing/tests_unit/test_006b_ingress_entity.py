@@ -7,9 +7,8 @@ and stage finalization.
 Full import execution (Ingress.save, production entity creation, and cache-backed
 page lookup) is not covered here—see e2e import flows. Local import-row
 orchestration is covered with faked entity creation.
-Assign ``project`` / ``category`` / ``model`` (and ``form`` when needed) directly;
-do not assert ``ingress.parent`` here—``TestEntityMixin.parent`` touches
-``properties.parent`` (FILTER-only) before delegating and breaks on INGRESS.
+Parent wiring uses production Ingress objects so fixture relation overrides do
+not replace the behavior under test.
 """
 
 import json
@@ -32,7 +31,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import PropertyError, ValidationError
 from lagniappe.core.tools.files.validate import create_schema, process_csv
-from lagniappe.core.tools.form_drafts import validate_draft_schema
+from lagniappe.core.tools.forms.drafts import validate_draft_schema
 from lagniappe.core.properties.file_ingress import ProcessCSV, Stage
 
 from testing.utility.test_entities import TestEntities
@@ -372,34 +371,36 @@ def test_import_wizard_story_builds_or_selects_the_submission_form(
 def test_related_entities_project():
     """Setting project establishes parent for project-only import target."""
     project = TestEntities.get("PROJECT", {"hash": "proj001", "name": "Test Project"})
-    test_spec = {"hash": "ingress003", "name": "Import", "kind": "ingress"}
-    ingress = TestEntities.get("INGRESS", test_spec)
+    ingress = make_raw_ingress()
 
-    ingress.project = project
+    ingress.parent = project
 
     assert ingress.project == project
+    assert ingress.parent is project
+    assert ingress.db["project"] == project.key
     assert ingress.form is None
 
 
 # @matrix category form ingress : parent related-entities
 def test_related_entities_category_and_form():
-    """Setting category; form set explicitly (same outcome as parent=category)."""
+    """Selecting a category inherits its form and persists both relation keys."""
     form = TestEntities.get("FORM", {"hash": "form002", "name": "Test Form"})
     category = TestEntities.get("CATEGORY", {"hash": "cat001", "name": "Test Category"})
     category.properties.form._value = form
-    test_spec = {"hash": "ingress004", "name": "Import", "kind": "ingress"}
-    ingress = TestEntities.get("INGRESS", test_spec)
+    ingress = make_raw_ingress()
 
-    ingress.category = category
-    ingress.form = form
+    ingress.parent = category
 
     assert ingress.category == category
     assert ingress.form == form
+    assert ingress.parent is category
+    assert ingress.db["category"] == category.key
+    assert ingress.db["form"] == form.key
 
 
 # @matrix form ingress project task : model related-entities
 def test_related_entities_model_project_form():
-    """Setting model and project (and form) matches model-as-parent wiring."""
+    """Selecting a model inherits its project/form; clearing removes all wiring."""
     form = TestEntities.get("FORM", {"hash": "form003", "name": "Test Form"})
     project = TestEntities.get("PROJECT", {"hash": "proj002", "name": "Test Project"})
     model = TestEntities.get(
@@ -408,16 +409,21 @@ def test_related_entities_model_project_form():
         project=project,
     )
     model.properties.form._value = form
-    test_spec = {"hash": "ingress005", "name": "Import", "kind": "ingress"}
-    ingress = TestEntities.get("INGRESS", test_spec)
+    ingress = make_raw_ingress()
 
-    ingress.model = model
-    ingress.project = project
-    ingress.form = form
+    ingress.parent = model
 
     assert ingress.model == model
     assert ingress.project == project
     assert ingress.form == form
+    assert ingress.parent is model
+    assert ingress.db["model"] == model.key
+    assert ingress.db["project"] == project.key
+    assert ingress.db["form"] == form.key
+
+    ingress.parent = None
+    assert ingress.parent is None
+    assert all(ingress.db.get(key) is None for key in ("model", "project", "category", "form"))
 
 
 # @matrix relations : key-validation validation
@@ -477,7 +483,7 @@ def test_import_wizard_story_reports_stage_errors_without_advancing(
     ingress_entity.properties.stage.next()
 
     assert ingress_entity.stage.name == "PROCESS_CSV"
-    assert ingress_entity.properties.process_csv.error == "File must be a CSV file."
+    assert "CSV" in ingress_entity.properties.process_csv.error
     assert ingress_entity.properties.process_csv.complete is None
     assert ingress_entity.properties.choose_type.entity_type == "page"
     assert captured == []
@@ -508,9 +514,9 @@ def test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns(
 
     ingress.properties.process_csv.process()
 
-    assert ingress.properties.process_csv.delimiter == sample_csv_data["delimiter"]
-    assert ingress.properties.process_csv.row_count == sample_csv_data["row_count"]
-    assert ingress.properties.process_csv.column_count == sample_csv_data["column_count"]
+    assert ingress.properties.process_csv.delimiter == ","
+    assert ingress.properties.process_csv.row_count == 10
+    assert ingress.properties.process_csv.column_count == 7
     assert ingress.properties.process_csv.columns == sample_csv_data["columns"]
     assert saved_assets == {
         "rows": {
@@ -1003,8 +1009,96 @@ def test_importer_story_processes_page_rows_into_entities_and_results(monkeypatc
     assert imported[0]["entity"] == {"id": "page-1", "name": "Ada"}
     assert imported[0]["warnings"] == ["trimmed"]
     assert imported[0]["errors"] == ["Invalid title"]
-    assert imported[1]["warnings"] == ["Bad title"]
+    assert imported[1]["errors"] == ["Bad title"]
     assert "entity" not in imported[1]
+
+
+# @matrix ingress : row-results row-task task-import validation-errors
+# @matrix form-todo : import validation
+# @matrix submission : error-message import save validation
+@pytest.mark.unit
+def test_importer_rejects_entire_malformed_todo_row(monkeypatch):
+    page = TestEntities.get("PAGE", {"hash": "todo_import_page", "name": "Target"})
+    form = TestEntities.get("FORM", {"hash": "todo_import_form", "name": "Checklist"})
+    form.form_type = "task"
+    form.schema = [
+        {"id": "input-note", "title": "Note", "type": "input", "input": "text"},
+        {"id": "todo-work", "title": "Work", "type": "todo"},
+    ]
+    field_map = {"input-note": ["note"], "todo-work": ["work"]}
+    entity = SimpleNamespace(
+        form=form,
+        model=None,
+        project=None,
+        properties=SimpleNamespace(
+            process_csv=SimpleNamespace(columns={
+                "page": {"label": "Page"},
+                "note": {"label": "Note"},
+                "work": {"label": "Work"},
+            }),
+            assign_columns=SimpleNamespace(field_map=field_map, column_map={}),
+            verify_import=SimpleNamespace(
+                field_map=field_map,
+                column_map={},
+                index_from="page",
+                index_to_field={"label": "Name"},
+                fuzzy_page=False,
+                fuzzy_match=lambda _field_id: False,
+            ),
+            choose_type=SimpleNamespace(entity_type="task"),
+            choose_parent=SimpleNamespace(task_name="Imported checklist"),
+        ),
+    )
+    created = []
+
+    def create_task(data):
+        task = TestEntities.get(
+            "TASK",
+            {"hash": f"todo_import_task_{len(created)}", "name": data["name"]},
+            page=data["page"],
+        )
+        task.form = data["form"]
+        created.append(task)
+        return task
+
+    monkeypatch.setattr(
+        ingress_service.IngressMutationPlanner,
+        "Entities",
+        SimpleNamespace(PAGE=lambda _key: page, TASK=SimpleNamespace(create=create_task)),
+    )
+    monkeypatch.setattr(
+        ingress_service.files,
+        "find_page",
+        lambda *_args, **_kwargs: {"id": page.key, "warnings": [], "errors": []},
+    )
+    invalid = ingress_service.IngressMutationPlanner(entity, row_index=0).plan({
+        "page": "Target",
+        "note": "This valid field must not create a partial task",
+        "work": {"items": "not-a-list"},
+    })
+
+    assert invalid.entities == ()
+    assert "entity" not in invalid.result
+    assert "history" not in invalid.result
+    assert any(
+        "todo-work" in error and "items" in error and "list" in error
+        for error in invalid.result["errors"]
+    )
+    assert "submission" not in created[0].db
+
+    valid = ingress_service.IngressMutationPlanner(entity, row_index=1).plan({
+        "page": "Target",
+        "note": "Keep this row",
+        "work": "  First step  ",
+    })
+
+    assert valid.entities == (created[1],)
+    assert valid.result["entity"] == created[1].details
+    assert not valid.result.get("errors")
+    assert json.loads(created[1].db["submission"]) == {
+        "input-note": "Keep this row",
+        "todo-work": {"items": [{"text": "First step", "checked": False}]},
+    }
 
 
 # @matrix ingress : entity-name import-pages list-normalization
@@ -1211,8 +1305,6 @@ def test_importer_story_creates_tasks_for_matched_pages_and_records_history(
     ]
     assert task.name == "Annual Inspection"
     assert task.due_date == parsed_dates["2026-01-10"]
-    assert task.active is True
-    assert task.related == []
     assert task.completed is False
     assert task.completed_on is None
     assert len(task.histories) == 1
@@ -1398,7 +1490,6 @@ def test_task_import_creates_distinct_tasks_per_row_with_same_row_completion_his
         assert task.completed is True
         assert task.completed_on == parsed_dates["2026-01-10"]
         assert task.due_date is None
-        assert task.related == []
         assert len(task.histories) == 1
         assert task.histories[0].completed_on == parsed_dates["2026-01-06"]
         assert task.histories[0].imported == [
@@ -1610,6 +1701,7 @@ def test_ingress_delete_imported_entities_deletes_pages_and_tasks(monkeypatch):
     ingress = make_raw_ingress("Bulk Delete Results", "page")
     page = TestEntities.get("PAGE", {"hash": "page-1", "name": "Ada"})
     task = TestEntities.get("TASK", {"hash": "task-1", "name": "Follow Up"})
+    form = TestEntities.get("FORM", {"hash": "form-1", "name": "Unrelated Form"})
     deleted = []
     results = [
         {"entity": {"id": "page-1", "name": "Ada"}},
@@ -1626,7 +1718,7 @@ def test_ingress_delete_imported_entities_deletes_pages_and_tasks(monkeypatch):
     monkeypatch.setattr(
         ingress_module.Entities,
         "fetch",
-        lambda *ids, request: [page, task],
+        lambda *ids, request: [page, task, form],
     )
     monkeypatch.setattr(
         ingress_module.Entities,

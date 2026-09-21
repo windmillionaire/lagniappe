@@ -11,25 +11,35 @@ from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
 def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch):
     orphan = SimpleNamespace(has_references=False, db={})
     attached = SimpleNamespace(has_references=True)
+    shared_evidence = SimpleNamespace(
+        has_references=False,
+        db={"report_refs": ["current-report", "other-report"]},
+    )
     report = SimpleNamespace(
         available=True,
         origin="web",
         status="complete",
         deferred_job=None,
-        input_files=[orphan, attached],
+        input_files=[orphan, attached, shared_evidence],
         upload_manifest=[{"token": "upload"}],
         db={"status": "complete"},
+        urlsafe_key="current-report",
     )
     effects = []
     monkeypatch.setattr(
         report_history.DeferredJobs, "cancel", lambda job: effects.append("cancel")
     )
     monkeypatch.setattr(
-        report_history.ai,
+        report_history.report_uploads,
         "cleanup_report_upload_manifest",
         lambda report: effects.append("uploads"),
     )
     monkeypatch.setattr(Entities, "delete", lambda *entities: effects.append(entities))
+    monkeypatch.setattr(
+        Entities,
+        "fetch_one",
+        lambda reference, **_kwargs: object() if reference == "other-report" else None,
+    )
 
     for outcome in ("busy", "stale", "missing", "committed"):
         effects.clear()

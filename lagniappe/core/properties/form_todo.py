@@ -86,16 +86,17 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
         else:
             self.unset()
 
+    # @testable true
+    # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
+    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
+    # @matrix form-todo : import validation
     def validate_import(self, value):
-        try:
-            items = _todo_items(value, allow_scalar=True)
-            if items:
-                SchemaProperty.value.fset(self, {"items": items})
-            else:
-                self.unset()
-        except ValidationError as error:
+        """Raise on malformed input so the importer rejects the whole row."""
+        items = _todo_items(value, allow_scalar=True)
+        if items:
+            SchemaProperty.value.fset(self, {"items": items})
+        else:
             self.unset()
-            self.errors.append(str(error))
 
     @property
     def items(self):

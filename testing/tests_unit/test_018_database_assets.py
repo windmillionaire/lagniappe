@@ -897,6 +897,14 @@ def _direct_upload_token(**overrides):
     return assets._direct_upload_serializer().dumps(payload)
 
 
+# @source lagniappe/core/tools/database/assets.py::load_direct_upload_token
+# @matrix storage : direct-upload token validation expiry
+@pytest.mark.unit
+def test_direct_upload_token_expires():
+    with pytest.raises(assets.DirectUploadError, match="token expired"):
+        assets.load_direct_upload_token(_direct_upload_token(), max_age=-1)
+
+
 # @matrix storage : direct-upload object validation
 @pytest.mark.unit
 def test_verify_direct_upload_rejects_mismatched_size(monkeypatch):
@@ -915,6 +923,35 @@ def test_verify_direct_upload_rejects_mismatched_size(monkeypatch):
     monkeypatch.setattr(assets, "DATA", SimpleNamespace(bucket=lambda name: Bucket()))
 
     with pytest.raises(assets.DirectUploadError, match="size mismatch"):
+        assets.verify_direct_upload(
+            {
+                "token": _direct_upload_token(),
+                "input_name": "file-upload",
+                "path": "tmp/uploads/upload-1/file.txt",
+                "generation": "7",
+            }
+        )
+
+
+# @source lagniappe/core/tools/database/assets.py::verify_direct_upload
+# @matrix storage : direct-upload object validation
+@pytest.mark.unit
+def test_verify_direct_upload_rejects_mismatched_content_type(monkeypatch):
+    class Blob:
+        size = 10
+        content_type = "image/png"
+        generation = "7"
+
+        def reload(self):
+            pass
+
+    class Bucket:
+        def blob(self, path):
+            return Blob()
+
+    monkeypatch.setattr(assets, "DATA", SimpleNamespace(bucket=lambda name: Bucket()))
+
+    with pytest.raises(assets.DirectUploadError, match="content type mismatch"):
         assets.verify_direct_upload(
             {
                 "token": _direct_upload_token(),
@@ -1008,8 +1045,8 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
         def reload(self):
             pass
 
-        def delete(self):
-            calls.append("delete-source")
+        def delete(self, **options):
+            calls.append(("delete-source", options))
 
     class CopiedBlob:
         content_type = "text/plain"
@@ -1078,7 +1115,7 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
         ),
         ("patch-copy", {"if_generation_match": 11}),
     ]
-    assert calls[3:] == ["delete-source"]
+    assert calls[3:] == [("delete-source", {"if_generation_match": 7})]
 
     calls.clear()
     assets.copy_direct_upload_file(
@@ -1088,7 +1125,50 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
         content_type="application/pdf",
         delete_source=False,
     )
-    assert "delete-source" not in calls
+    assert all(call[0] != "delete-source" for call in calls)
+
+
+# @source lagniappe/core/tools/database/assets.py::copy_direct_upload_file
+# @matrix storage : direct-upload final-copy generation-conditional-cleanup idempotency
+@pytest.mark.unit
+@pytest.mark.parametrize("source_state", ["missing", "replaced", "unavailable"])
+def test_copy_direct_upload_cleanup_preserves_replacements_and_reports_failures(
+    monkeypatch, source_state
+):
+    deletions = []
+    cleanup_errors = {
+        "missing": assets.google_exceptions.NotFound("already removed"),
+        "replaced": assets.google_exceptions.PreconditionFailed("source replaced"),
+        "unavailable": assets.google_exceptions.ServiceUnavailable("storage unavailable"),
+    }
+
+    class SourceBlob:
+        generation = "7"
+
+        def delete(self, **options):
+            deletions.append(options)
+            raise cleanup_errors[source_state]
+
+    copied = SimpleNamespace(generation="11", content_type="text/plain")
+    bucket = SimpleNamespace(copy_blob=lambda *_args, **_kwargs: copied)
+    monkeypatch.setattr(
+        assets, "DATA", SimpleNamespace(bucket=lambda _visibility: bucket)
+    )
+    upload = SimpleNamespace(blob=SourceBlob(), visibility="private")
+
+    if source_state == "unavailable":
+        with pytest.raises(assets.google_exceptions.ServiceUnavailable):
+            assets.copy_direct_upload_file(upload, "entity_file.txt", "private")
+    else:
+        assert assets.copy_direct_upload_file(
+            upload, "entity_file.txt", "private"
+        ) is copied
+
+    assert deletions == [{"if_generation_match": 7}]
+    assert upload.lagniappe_saved_blob is copied
+    assert upload.lagniappe_saved_destination == {
+        "path": "entity_file.txt", "visibility": "private", "generation": "11"
+    }
 
 
 # @source lagniappe/core/tools/database/assets.py::copy_direct_upload_file

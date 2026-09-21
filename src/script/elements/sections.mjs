@@ -1,7 +1,7 @@
-import { withTransition } from "../shared";
-import { AutofillUpload } from "./autofill";
-import { buttons } from "./buttons";
-import { primitives } from "./primitives";
+import { withTransition } from "../shared/transitions.mjs";
+import { AutofillUpload } from "./autofill.mjs";
+import { buttons } from "./buttons.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable infrastructure

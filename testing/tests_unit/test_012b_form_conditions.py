@@ -8,7 +8,37 @@ Category/project surfaces that attach forms are covered in ``012`` /
 ``test_011_filters``.
 """
 
+import json
+
 import pytest
+
+from lagniappe.core.definitions import FilterDefinition
+from lagniappe.core.entities.condition import Condition
+from lagniappe.core.entities.filter import Filter
+from testing.utility.test_entities import TestEntities
+
+
+# @matrix filters : condition-definition number round-trip zero
+@pytest.mark.unit
+@pytest.mark.parametrize("comparator, serialized", [
+    ("EQUALS", "eq"), ("LESS_THAN", "lt"), ("GREATER_THAN", "gt"),
+])
+def test_zero_number_condition_survives_saved_filter_serialization(comparator, serialized):
+    form = TestEntities.get("FORM", {"name": "Amounts", "hash": "amount-form"})
+    form.schema = [{"id": "amount", "type": "input", "input": "number", "title": "Amount"}]
+    condition = Condition()
+    condition.entity = form
+    condition.field = "amount"
+    condition.set_value("0", default_comparator=comparator)
+    assert condition.value == 0.0
+
+    saved_filter = Filter(testing=True)
+    saved_filter.definitions = [condition.definition]
+    stored = json.loads(saved_filter.db["definitions"])
+    assert stored == [["amount-form", "amount", "number", serialized, 0.0]]
+    restored = Condition.create(FilterDefinition.load(stored[0]), {form.hash: form})
+    assert restored.value == 0.0
+    assert restored.comparator.value == serialized
 
 
 # @matrix filters : condition-definition string
@@ -34,19 +64,23 @@ def test_form_boolean_filters(get_test_entities, get_schema, test_condition_defi
 # @matrix filters : condition-definition timestamp
 @pytest.mark.unit
 def test_form_timestamp_filters(
-    get_test_entities, get_schema, test_condition_definition
+    get_test_entities, get_schema, test_condition_definition, monkeypatch
 ):
     """Test TIMESTAMP form fields (DateInput, TimeInput) with date comparators."""
-    from unittest.mock import patch
-    from zoneinfo import ZoneInfo
+    import time
 
-    with patch(
-        "lagniappe.core.tools.dates.user_timezone", return_value=ZoneInfo("UTC")
-    ):
-        entities = get_test_entities()
-        form = entities[0]
-        form.schema = get_schema(form.test_spec["schema"])
-        test_condition_definition(form)
+    # TimeInput uses naive datetime.timestamp(); isolate the process timezone.
+    # DateInput separately uses the shared fixture's fixed Chicago clock.
+    with monkeypatch.context() as environment:
+        environment.setenv("TZ", "UTC")
+        time.tzset()
+        try:
+            form = get_test_entities()[0]
+            form.schema = get_schema(form.test_spec["schema"])
+            test_condition_definition(form)
+        finally:
+            environment.undo()
+            time.tzset()
 
 
 # @matrix filters : condition-definition entity-valued
@@ -89,12 +123,14 @@ def test_form_categorical_filters(
 def test_form_status_filters(get_test_entities, get_schema):
     """Status fields are computed columns, not form-level filter conditions."""
     entities = get_test_entities()
+    assert entities
     for form in entities:
         form.schema = get_schema(form.test_spec["schema"])
         status_ids = [
             field["id"] for field in form.schema if field.get("type") == "status"
         ]
 
+        assert status_ids
         for status_id in status_ids:
             assert status_id not in form.properties.filters.fields
 
@@ -109,6 +145,7 @@ def test_form_status_filters(get_test_entities, get_schema):
 def test_form_select_filters(get_test_entities, get_schema, test_condition_definition):
     """Test Select form fields - single-select (STRING) and multi-select (LIST)."""
     entities = get_test_entities()
+    assert entities
     for form in entities:
         form.schema = get_schema(form.test_spec["schema"])
         test_condition_definition(form)

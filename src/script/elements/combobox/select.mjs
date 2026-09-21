@@ -1,6 +1,6 @@
-import { Combobox } from "./combobox";
-import { Results } from "./results";
-import { Submitter } from "./submitter";
+import { Combobox } from "./combobox.mjs";
+import { Results } from "./results.mjs";
+import { Submitter } from "./submitter.mjs";
 
 /**
  * @testable infrastructure

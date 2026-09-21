@@ -1,16 +1,17 @@
 # Testing Source Review
 
 Use this as the final traceability pass after adding, changing, or reviewing
-source code. The broad annotation pass is complete; going forward, source
-annotations should be maintained incrementally. For changed source symbols,
+source code. Maintain source annotations incrementally. For changed source symbols,
 check that behavior has an accurate `@testable` decision, that referenced tests
 or stubs represent the announced tags, and that helper code is either owned by a
 better source symbol or intentionally suppressed.
 
 Start with `documentation/TESTING_TRACEABILITY_TOOL.md` for the annotation contract.
 For general test-writing conventions, use `documentation/TESTING_WRITING_TESTS.md`.
-When starting from an existing test rather than a source symbol, use
-`documentation/TESTING_TEST_REVIEW.md`.
+When starting from an existing test, use the test-writing checklist and the
+traceability tool's `--test` reverse report to find its declared source owners.
+That filter is limited to configured `test_roots`; for excluded tooling
+meta-tests, inspect owners directly or use a deliberately scoped configuration.
 
 ## Goal
 

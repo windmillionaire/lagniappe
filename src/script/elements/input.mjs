@@ -1,7 +1,7 @@
-import { STYLES } from "styles";
-import { BaseElement } from "./base/baseElement";
-import { formatting } from "./formatting";
-import { primitives } from "./primitives";
+import { STYLES } from "../generated/styles.mjs";
+import { BaseElement } from "./base/baseElement.mjs";
+import { formatting } from "./formatting.mjs";
+import { primitives } from "./primitives.mjs";
 
 /**
  * @testable infrastructure

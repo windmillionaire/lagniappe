@@ -1,6 +1,5 @@
 ---
 title: Messages and Notifications
-manual_section: collaboration
 related:
 - user_settings
 - tasks

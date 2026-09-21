@@ -41,17 +41,22 @@ def test_submitted_reference_resolver_rejects_unavailable_targets():
         TestEntities.get("FILE", {"hash": "wrong-file", "name": "Wrong"}),
         True,
     )
+    blocked = _allowed(
+        TestEntities.get("PAGE", {"hash": "blocked-page", "name": "Blocked"}),
+        True,
+    )
     missing = TestEntities.get("PAGE", {"hash": "missing-page", "name": "Missing"})
     malformed = "not-a-datastore-key"
 
     with patch(
         "lagniappe.core.tools.auth.references.Entities.fetch",
-        return_value=[denied, wrong_kind],
+        return_value=[denied, wrong_kind, blocked],
     ):
         resolver = SubmittedReferenceResolver(
             actor,
             denied,
             wrong_kind,
+            blocked,
             missing,
             malformed,
         )
@@ -64,6 +69,15 @@ def test_submitted_reference_resolver_rejects_unavailable_targets():
                 action=Action.VIEW,
                 required=True,
             )
+
+    with pytest.raises(ValidationError, match=UNAVAILABLE_REFERENCE_ERROR):
+        resolver.one(
+            blocked,
+            expected=Entities.PAGE,
+            action=Action.VIEW,
+            predicate=lambda _entity: False,
+            required=True,
+        )
 
 
 # @matrix submitted-references : dedup existing order predicate

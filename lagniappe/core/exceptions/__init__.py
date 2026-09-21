@@ -5,6 +5,7 @@ from pprint import pformat
 import traceback
 import sys
 
+from config.deployment import DeploymentSettingsError as DeploymentSettingsError
 from lagniappe import CONFIG
 
 from .request import (
@@ -14,10 +15,6 @@ from .request import (
 )
 from .frames import extract_local_variables, extract_entity_from_frames
 from .utility import format_debug_context_for_template
-
-
-class DeploymentSettingsError(ValueError):
-    """Raised when saved deployment settings cannot be applied safely."""
 
 
 class AISettingsError(ValueError):

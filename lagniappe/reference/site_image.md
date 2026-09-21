@@ -1,6 +1,5 @@
 ---
 title: Site Image
-manual_section: personalization
 related:
 - site_settings
 - site_deployment

@@ -82,6 +82,60 @@ def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
     ]
 
 
+# @matrix deferred-jobs : compare-and-set maximum-age reconciliation terminal-delivery
+def test_reconciler_terminalizes_one_cas_claimed_expired_job(monkeypatch):
+    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    job = RunnerJob(attempt=3)
+    job.status = DeferredJobStatus.RUNNING.value
+    job.status_revision = 4
+    job.dispatch_state = "claimed"
+    job.created = now - timedelta(hours=4)
+    registry = DeferredJobService()
+    monkeypatch.setattr(registry, "_reconcile_candidates", lambda *, limit: [job])
+
+    def claim(key, revision, claimed_at, **kwargs):
+        assert (key, revision, claimed_at) == (job.key, 4, now)
+        assert kwargs["max_age_seconds"] > 0
+        assert kwargs["stale_updates"]["status"] == DeferredJobStatus.FAILED.value
+        assert kwargs["stale_updates"]["dispatch_state"] == "delivery_pending"
+        job.status = DeferredJobStatus.FAILED.value
+        job.status_revision = 5
+        job.dispatch_state = "delivery_pending"
+        return {"claimed": True, "action": "failed", "entity": job}
+
+    monkeypatch.setattr(
+        database_deferred_jobs,
+        "claim_deferred_job_recovery",
+        claim,
+    )
+    monkeypatch.setattr(Entities, "DEFERRED_JOB", lambda raw: raw)
+    monkeypatch.setattr(Entities, "fetch_one", lambda value, request: value)
+    monkeypatch.setattr(
+        registry,
+        "dispatch",
+        lambda *_args, **_kwargs: pytest.fail("expired work must not redispatch"),
+    )
+    delivered = []
+    monkeypatch.setattr(
+        registry,
+        "_finish_stale_delivery",
+        lambda current, *, error=None: delivered.append((current, error)),
+    )
+
+    result = registry.reconcile(now=now)
+
+    assert result == {
+        "examined": 1,
+        "redispatched": 0,
+        "failed": 1,
+        "delivered": 0,
+        "errors": 0,
+    }
+    assert len(delivered) == 1
+    assert delivered[0][0] is job
+    assert "automatic recovery" in str(delivered[0][1])
+
+
 # @matrix deferred-jobs : grace reconciliation terminal-delivery
 # @pair notifications:terminal-delivery
 def test_reconciler_resumes_stale_terminal_delivery_after_grace(monkeypatch):

@@ -5,6 +5,29 @@ permission-filtered context, files, and optional function declarations. The
 provider may choose which available read tools to call; application validation
 owns the safety of the final result.
 
+## Import boundaries
+
+The `tools.ai` package exposes only the explicit `initialize()` startup entry
+point. That call loads `core.ai_model` and initializes the same shared provider
+client used by generation modules. Importing the package itself does not load
+generation, report, upload, or provider-client workflows.
+
+Import feature operations from their owning modules: `autofill`, `dates`,
+`images`, `text`, `category`, `project`, `schema`, and `summarize` own their
+respective prompts and generation. `planner` owns report generation;
+`reporting/completion/files.py` owns input summaries, `reporting/uploads.py`
+owns upload manifests, `reporting/proposals/selection.py` owns action selection,
+and `reporting/execution/{ledger,runner}.py` own execution state and execution.
+Use module-qualified calls when a shared operation needs a replaceable test
+boundary, and patch that owner in tests. These operations are no longer
+re-exported from `tools.ai`.
+
+Shared policy and contract modules can now be imported without entering those
+workflows. This does not make every AI submodule independent: generation still
+loads its declared tool registry and entity dependencies, and Python still
+initializes the parent `lagniappe` configuration package. Preserve deliberate
+lazy imports and the single `core.ai_model` instance.
+
 ## Prompt contract
 
 `Prompt` contains more than the string returned by `build()`:
@@ -40,6 +63,12 @@ Retrieval stops at 16 rounds or three minutes remaining in the bounded attempt.
 Foreground calls use the normal SDK retry profile. Other deferred jobs use at most
 two SDK attempts so durable job backoff owns longer outages. See
 [BACKEND_JOBS.md](BACKEND_JOBS.md).
+
+`provider_policy.py` owns shared retry options, provider error details/messages,
+and quota/transient classification. `GenAI` and `ProviderSession` use that
+policy directly. The session manages request lifecycle and uses execution
+control's deadline and durable retry budget. Existing helper imports from
+`core.py` remain available as aliases.
 
 ## Function-tool loop
 
@@ -140,9 +169,17 @@ natural read into several dependent calls: each extra Gemini round sends another
 provider request and replays prior tool output. Tool count alone is not the useful
 measure; observe rounds, cumulative tokens, latency and provider errors.
 
-`get_guidelines(task="filing")` shares complete-proposal guidance across
-built-in Gemini and external clients. The current contract selects the allowed
-actions and file responsibilities. Native jobs prepare summaries/retrieval terms
+`get_guidelines(task="report_actions", actions=[...])` shares general proposal
+rules and the selected action schemas across built-in Gemini and external
+clients. `get_guidelines(task="filing")` supplies specialized organization rules
+only when filing uploads or reorganizing existing workspace files. Evidence-only
+questions do not need it. The initial report prompt never embeds the full filing
+bundle; upload classification instructions appear only when input files exist.
+Without uploads, native prompts and external contracts explicitly require
+`file_usage=[]`, even when the request concerns existing workspace files.
+
+The current contract selects the allowed actions and file responsibilities.
+Native jobs prepare summaries/retrieval terms
 before generation; external clients author `summarize_file` actions when their
 contract allows them. Both author final form values and requested task/document
 updates themselves. Native validation feeds precise errors back into the same
@@ -155,6 +192,13 @@ conditional requirements without changing Gemini's provider-compatible schema.
 The external `form_autofill` bundle permits grounded corrections and emits only
 selected field updates; built-in Autofill retains its blank-only completion
 policy and preserves non-empty partial values.
+
+Summary-writing policy comes with the selected `summarize_file` action or the
+`file_summary` bundle, not with general filing guidance. The native planner
+reuses server-prepared summaries. General proposal completeness, target reuse,
+and final-value requirements belong to `report_actions`, so requests without
+files receive them without loading filing policy. Answer-only provider access
+omits the planner's mutation and filing instructions.
 
 `get_category_pages` returns at most ten Pages per call. Its response separates
 the caller's `requested_limit`, the enforced `effective_limit`, and
@@ -221,3 +265,12 @@ requires a nonempty selection and returns exact selected schemas as well as
 rules. No router or full action-schema union is included in the initial prompt.
 The output's file_usage classifies each upload as evidence or organize; only
 the latter creates filing obligations. See [AI_WORKFLOWS.md](AI_WORKFLOWS.md).
+
+The model-facing permission context contains `allowed_actions` and action rules,
+without a second capability map. The action catalog derives its choices from
+internal create/update/delete hints; attachments, document appends, moves,
+renames, and submission changes use the ordinary edit permission model. These
+hints are computed on demand and are not stored in the Flask session. They do
+not grant access to an individual record: discovery, proposal preparation, and
+execution check the exact targets, including both sides of a move. Page editing
+also supplies the Task editing hint, matching Task permission inheritance.

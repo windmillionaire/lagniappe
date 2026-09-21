@@ -43,10 +43,11 @@ def test_generated_changes_patch_exact_identities_without_mutating_draft():
     assert draft == original
     assert result == raw
     assert proposal["operations"][:3] == result["operations"][:3]
-    assert proposal["operations"][3]["field"]["id"] == "additional"
+    assert proposal["operations"][3] == {
+        "op": "add_field",
+        "field": {"id": "additional", "type": "textarea", "title": "Extra"},
+    }
     assert proposal["html_fields"] == {"intro": "<p><strong>Updated</strong> content</p>"}
-    assert draft["schema"][0]["required"] is True
-    assert draft["schema"][1]["multiple"] is True
 
 
 # @matrix forms ai : draft-generation stable-identity validation no-side-effects
@@ -74,12 +75,15 @@ def test_generated_changes_patch_exact_identities_without_mutating_draft():
 def test_generated_changes_reject_entire_invalid_proposal(operation):
     draft = _draft()
     original = deepcopy(draft)
+    result = {"operations": [
+        {"op": "update_field", "field_id": "notes", "changes": {"title": "Would change"}},
+        operation,
+    ]}
+    raw = deepcopy(result)
     with pytest.raises((ValidationError, ValueError)):
-        prepare_generated_changes({"operations": [
-            {"op": "update_field", "field_id": "notes", "changes": {"title": "Would change"}},
-            operation,
-        ]}, draft, form_type="task")
+        prepare_generated_changes(result, draft, form_type="task")
     assert draft == original
+    assert result == raw
 
 
 # @matrix forms ai : draft-generation stable-identity validation no-side-effects

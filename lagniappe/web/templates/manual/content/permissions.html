@@ -1,4 +1,3 @@
-{% from "help/macros.html" import manual_topic, manual_summary %}
 {% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
 <div class="space-y-6">
   {% call card() %}
@@ -13,27 +12,48 @@
     </p>
   {% endcall %}
 
+  {{ heading("Basic Model", icon="permissions", kind="user") }}
   {% call card() %}
-    {{ manual_topic("permissions") }}
+    <ul class="text-base-medium space-y-2 mb-3">
+      <li><strong>Primary Owner:</strong> the single configured business identity. The Owner has full application access, governs the Administrator roster, protects the canonical Owner account, and can download secret-bearing installation configuration.</li>
+      <li><strong>Administrators:</strong> trusted managed users who can administer ordinary settings, users, groups, ingress, exports, and content. They cannot change the Owner or another Administrator, govern the Administrator roster, or retrieve installation secrets.</li>
+      <li><strong>Provider access is separate:</strong> promoting a user to Administrator does not enable Lagniappe-funded model calls. That entitlement is assigned independently; provider-free external-agent plans still follow normal permissions.</li>
+      <li><strong>Groups:</strong> users inherit permissions from every group they belong to.</li>
+      <li><strong>Most permissive wins:</strong> group and individual grants combine. If one group grants view and another grants edit, the user can edit, subject to applicable restrictions.</li>
+      <li><strong>Higher actions include lower actions:</strong> edit includes view; delete includes edit and view.</li>
+      <li><strong>Pages belong to categories:</strong> editing a category lets a user add pages to it. Create permissions are for making new containers such as categories or projects.</li>
+    </ul>
+    {% call callout("tip", False) %}
+      There is exactly one Lagniappe Owner. Add trusted application
+      Administrators for operational coverage and keep a separate recovery
+      plan for the underlying Google Cloud project. Lagniappe roles do not
+      grant Google Cloud IAM, and Google Cloud IAM does not create a Lagniappe
+      login or application role.
+    {% endcall %}
   {% endcall %}
+
+  {{ heading("Permission Layers") }}
   {% call card() %}
-    {{ manual_topic("restrictions") }}
+    <ol class="text-base-medium space-y-2">
+      <li><strong>Global permissions</strong> govern broad areas: models/content, forms, and users.</li>
+      <li><strong>Entity permissions</strong> grant access to specific categories, projects, pages, or groups.</li>
+      <li><strong>Form restrictions</strong> hide pages or tasks that use a restricted form.</li>
+      <li><strong>Page restrictions</strong> limit a single page to Administrators or selected groups.</li>
+    </ol>
+    <p class="text-base-medium mt-3">
+      The first two layers grant access; the last two only take it away. A form
+      or page restriction can hide something from people outside a chosen group,
+      but it never grants access on its own, so a restriction can only narrow
+      what someone already reaches, never widen it.
+    </p>
+    <p class="text-base-medium mt-3">
+      Ordinary users must satisfy every applicable restriction: if both a page
+      and its form name groups, they need membership in at least one group from
+      each list. Tasks and files can inherit those restrictions. Application
+      Administrators, including the Owner, bypass content restrictions.
+    </p>
   {% endcall %}
-  {% call card() %}
-    {{ manual_topic("user_groups") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("create_user_group") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("create_user") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("public_permissions") }}
-  {% endcall %}
-  {% call card() %}
-    {{ manual_topic("site_administrators") }}
-  {% endcall %}
+
   {{ heading("Why Form Restrictions Matter", icon="form", kind="form") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -55,6 +75,42 @@
       restrictions for a given record are set up intentionally rather than as
       an afterthought.
     </p>
+  {% endcall %}
+
+  {{ heading("Visibility") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      For a user without access, restricted content is left out of rendered
+      pages, search results, and filter results. Direct links enforce the same
+      permissions on the server; hiding a control in the browser is not the
+      access boundary.
+    </p>
+    <p class="text-base-medium">
+      Every page can show who is able to view it. That view is as clear as
+      your group and restriction setup, so a little care with naming groups
+      goes a long way.
+    </p>
+  {% endcall %}
+
+  {{ heading("Public Access") }}
+  {% call card() %}
+    <p class="text-base-medium">
+      Signed-in public accounts use a separate, limited public-permissions
+      policy. They are different from anonymous visitors reading a published
+      page document. Publishing a document shares that document, without
+      publishing the page's private form answers, tasks, notes, or uploads.
+    </p>
+  {% endcall %}
+
+  {{ heading("Helpful Habits") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Lean on groups for the heavy lifting and use page-level restrictions for genuine exceptions.</li>
+      <li>Keep group names readable; a small naming convention helps when groups start to overlap.</li>
+      <li>Remember that global permissions can grant access more broadly than an entity-specific rule.</li>
+      <li>Grant category edit when someone should maintain records in an existing category, and reserve model create for people who should create new categories or projects.</li>
+      <li>Walk through important flows once from a non-owner account to confirm what other people will actually see.</li>
+    </ul>
   {% endcall %}
 
   {{ nav_buttons(

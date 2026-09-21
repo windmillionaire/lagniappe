@@ -13,7 +13,8 @@ from lagniappe.core.definitions import (
     Fetch, FetchReason,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai
+from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
+from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai.function_definitions.preview_form_schema_update import execute_preview_form_schema_update
 from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
 from lagniappe.web import app
@@ -190,7 +191,7 @@ def _recoverable_failed_report(user):
                 ],
             },
             "result": {
-                "ledger_version": ai.REPORT_LEDGER_VERSION,
+                "ledger_version": report_ledger.REPORT_LEDGER_VERSION,
                 "proposal_fingerprint": "display-only-ledger",
                 "status": "failed",
                 "failed_at": 2,
@@ -1130,7 +1131,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     assert report.input_files == []
     assert len(report.upload_manifest) == 1
     assert report.upload_manifest[0]["filename"] == "sample_notes.txt"
-    finalized = ai.finalize_report_upload_manifest(report, _owner(user))
+    finalized = report_uploads.finalize_report_upload_manifest(report, _owner(user))
     assert [file.filename for file in finalized] == ["sample_notes.txt"]
     assert [file.filename for file in report.input_files] == ["sample_notes.txt"]
     assert report.upload_manifest is None
@@ -1200,7 +1201,7 @@ def test_report_list_item_delete_removes_report_only_file(get_user):
     user = get_user(Users.OWNER)
     item, report = _create_uploaded_report_item(user)
 
-    finalized = ai.finalize_report_upload_manifest(report, _owner(user))
+    finalized = report_uploads.finalize_report_upload_manifest(report, _owner(user))
     assert len(finalized) == 1
     uploaded_file = finalized[0]
 
@@ -1993,7 +1994,7 @@ def test_report_detail_skips_schema_section_and_dependent_submission_updates(get
 def test_incompatible_reports_render_and_delete_without_touching_workspace(get_user, malformed):
     user = get_user(Users.OWNER)
     _item, report = _create_uploaded_report_item(user)
-    file = ai.finalize_report_upload_manifest(report, _owner(user))[0]
+    file = report_uploads.finalize_report_upload_manifest(report, _owner(user))[0]
     page = Entities.fetch_one(_owner(user).page.urlsafe_key, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     # Keep the file in the workspace independently of its report ownership.
     file.page = page

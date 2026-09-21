@@ -1,4 +1,4 @@
-import { request } from "./request";
+import { request } from "./request.mjs";
 
 /**
  * @testable false
@@ -69,7 +69,7 @@ const viewData = (action) => {
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
- * @tests tests_js/test_009_request_csrf.py::test_analytics_skips_internal_requests
+ * @tests tests_js/test_009_request_csrf.mjs::test_analytics_skips_internal_requests
  * @pair analytics:page-load
  * @pair analytics:internal-request-exclusion
  */

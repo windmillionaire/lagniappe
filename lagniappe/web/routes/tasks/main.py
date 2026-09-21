@@ -15,9 +15,10 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
-from lagniappe.core.tools import ai, dates
+from lagniappe.core.tools import dates
+from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.properties.schema import SchemaFields
-from lagniappe.core.tools.form_definitions import history_groups, history_values_for
+from lagniappe.core.tools.forms.definitions import history_groups, history_values_for
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools import collaboration
 from lagniappe.core.tools.auth.references import (
@@ -613,7 +614,7 @@ def _autofill_data(task, request):
             )
         except FileConsumerLimitError as error:
             abort(422, description=str(error))
-    return ai.autofill_prompt_data(
+    return ai_autofill.autofill_prompt_data(
         task,
         current_user,
         user_context=request.form.get("autofill-description"),
@@ -641,6 +642,8 @@ def _should_submit_task_form(active, role, task):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
 # @tests tests_e2e/003_forms/test_003g_form_changes.py::test_completion_during_migration_returns_inline_error_without_saving
+# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
+# @pair tasks:submission-validation
 # @matrix tasks : assignee attached-form complete due-date empty-fields partial-submission permission-gates readonly submitted-reference
 # @matrix tasks : active-widget uncomplete update-state
 # @matrix form-migration : writer-fence completion-race
@@ -720,7 +723,7 @@ def update(key, **kwargs):
         require_ai_access(AI.CREATE)
         if explain == "autofill":
             try:
-                prompt = ai.form_autofill_prompt(**_autofill_data(task, request))
+                prompt = ai_autofill.form_autofill_prompt(**_autofill_data(task, request))
                 return responses.explain(prompt)
             finally:
                 direct_uploads.cleanup_direct_uploads(

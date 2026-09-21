@@ -1,10 +1,11 @@
-import { STYLES } from "styles";
-import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "../../config/editor";
-import { debounce, withTransition } from "../../shared";
-import { toolbarDropdown } from "./dropdowns";
-import { MarkdownPastePrompt } from "./options/markdownPaste";
-import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry";
-import { UserManager } from "./users";
+import { STYLES } from "../../generated/styles.mjs";
+import { withTransition } from "../../shared/transitions.mjs";
+import { debounce } from "../../shared/utilities.mjs";
+import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "./config.mjs";
+import { toolbarDropdown } from "./dropdowns.mjs";
+import { MarkdownPastePrompt } from "./options/markdownPaste.mjs";
+import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry.mjs";
+import { UserManager } from "./users.mjs";
 
 const DEBOUNCE_DELAY_MS = 100;
 
@@ -319,7 +320,7 @@ export class Toolbar {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.py::test_editor_teardown_releases_toolbar_before_editor_view
+	 * @tests tests_js/test_045_browser_persistence.mjs::test_editor_teardown_releases_toolbar_before_editor_view
 	 * @matrix editor html-field : listener-teardown builder-save
 	 */
 	destroy() {

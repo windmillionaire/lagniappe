@@ -311,9 +311,10 @@ def test_submission_values():
             "form_submission": {...},  # OR "ai_submission" OR "import_submission"
             "expected": {
                 "field_id": {
-                    "value": ...,           # or "value_date" for DateMixin fields
+                    "value": ...,           # or "value_utc" (ISO) for DateMixin
+                    "column_value": ...,    # ISO with offset for DateMixin
                     "form_value": ...,
-                    "filter_value": ...,    # if FilterMixin (not needed for DateMixin)
+                    "filter_value": ...,    # exact timestamp for DateMixin
                     "ai_value": ...,        # if AIMixin
                     "search_value": {...}   # if SearchMixin
                 }
@@ -329,17 +330,19 @@ def test_submission_values():
     DEFAULT_USER_TZ = ZoneInfo("America/Chicago")
 
     def _check_value(entity, field, field_id, expected):
-        """Check field.value - DateMixin verifies UTC timezone, others check exact or form_value."""
+        """Check exact stored values; DateMixin also retains its UTC contract."""
         from datetime import datetime, timezone
 
         if isinstance(field, mixins.DateMixin):
-            # DateMixin stores as UTC - just verify timezone
             assert field.value is not None, (
                 f"{entity.name}: {field_id}.value should not be None"
             )
             assert field.value.tzinfo == timezone.utc, (
                 f"{entity.name}: {field_id}.value should be UTC, "
                 f"got {field.value.tzinfo}"
+            )
+            assert field.value.isoformat() == expected["value_utc"], (
+                f"{entity.name}: {field_id}.value"
             )
         elif isinstance(field.value, datetime):
             # Non-DateMixin datetime (e.g., TimeInput) - compare via form_value
@@ -361,10 +364,12 @@ def test_submission_values():
         expected_col = expected.get("column_value", expected.get("value"))
 
         if isinstance(field, mixins.DateMixin):
-            # DateMixin column_value should be in user timezone
             assert column.column_value.tzinfo == user_tz, (
                 f"{entity.name}: {field_id}.column_value should be in user timezone "
                 f"{user_tz}, got {column.column_value.tzinfo}"
+            )
+            assert column.column_value.isoformat() == expected["column_value"], (
+                f"{entity.name}: {field_id}.column_value"
             )
         elif isinstance(column.column_value, datetime):
             # Non-DateMixin datetime (e.g., TimeInput) - compare via strftime
@@ -444,6 +449,17 @@ def test_submission_values():
                     f"{entity.name}: {field.filter_key} should be timestamp, "
                     f"got {type(filter_val).__name__}"
                 )
+                # TimeInput uses a naive 1900 datetime and the host timezone.
+                # Build that expected instant from fixture input, never field.value.
+                expected_filter = (
+                    expected["filter_value"]
+                    if isinstance(field, mixins.DateMixin)
+                    else datetime.strptime(expected["value"], "%H:%M").timestamp()
+                )
+                assert filter_val == expected_filter, (
+                    f"{entity.name}: {field.filter_key} = {filter_val!r}, "
+                    f"expected {expected_filter!r}"
+                )
             else:
                 filter_val = to_filter_index[field.filter_key]
                 assert filter_val == expected["filter_value"], (
@@ -459,6 +475,16 @@ def test_submission_values():
 
     def _test_submission_values(entity, user_tz=None):
         user_tz = user_tz or DEFAULT_USER_TZ
+        assert entity.test_spec["expected"], (
+            f"{entity.name}: submission scenario has no expectations"
+        )
+        input_kinds = [
+            name for name in ("form_submission", "ai_submission", "import_submission")
+            if name in entity.test_spec
+        ]
+        assert len(input_kinds) == 1, (
+            f"{entity.name}: expected exactly one submission input, got {input_kinds}"
+        )
 
         with patch("lagniappe.core.tools.dates.user_timezone", return_value=user_tz):
             submission = entity.properties.submission
@@ -536,6 +562,7 @@ def test_condition_definition():
     from unittest.mock import patch
     from zoneinfo import ZoneInfo
     from lagniappe.core.entities.condition import Condition
+    from datetime import datetime
 
     DEFAULT_USER_TZ = ZoneInfo("America/Chicago")
 
@@ -547,10 +574,15 @@ def test_condition_definition():
         # Build entity_map from provided map or empty
         entity_map = entity_map or {}
 
-        with patch(
-            "lagniappe.core.tools.dates.user_timezone", return_value=DEFAULT_USER_TZ
+        fields = entity.test_spec["fields"]
+        assert fields, "condition fixture must contain field cases"
+        with (
+            patch("lagniappe.core.tools.dates.user_timezone", return_value=DEFAULT_USER_TZ),
+            patch("lagniappe.core.tools.dates.datetime", wraps=datetime) as clock,
         ):
-            for field_case in entity.test_spec.get("fields", []):
+            # Date-only property inputs preserve the current local time.
+            clock.now.return_value = datetime(2025, 6, 15, 12, 30, tzinfo=DEFAULT_USER_TZ)
+            for field_case in fields:
                 condition = Condition()
                 condition.entity = entity
                 # Set entity_map before field/set_value to avoid database calls
@@ -594,47 +626,15 @@ def test_condition_definition():
                     f"expected {expected_is_entity_valued!r}"
                 )
 
-                # For timestamps, the value is dynamic - just check structure matches
-                if expected.get("type") == "timestamp":
-                    # Check that description prefix matches (entity, field, type, comparator)
-                    assert actual_desc[:4] == expected_desc[:4], (
-                        f"{field_id} ({comparator}): description prefix = {actual_desc[:4]!r}, "
-                        f"expected {expected_desc[:4]!r}"
-                    )
-                    # Verify value is numeric (or list of numerics for BETWEEN)
-                    if len(actual_desc) > 4:
-                        val = actual_desc[4]
-                        if isinstance(val, list):
-                            assert all(isinstance(v, (int, float)) for v in val), (
-                                f"{field_id} ({comparator}): BETWEEN values should be numeric"
-                            )
-                        else:
-                            assert isinstance(val, (int, float)), (
-                                f"{field_id} ({comparator}): timestamp value should be numeric, "
-                                f"got {type(val).__name__}"
-                            )
-                    if isinstance(definition.value, list):
-                        assert all(
-                            isinstance(v, (int, float)) for v in definition.value
-                        ), (
-                            f"{field_id} ({comparator}): definition timestamp "
-                            "values should be numeric"
-                        )
-                    else:
-                        assert isinstance(definition.value, (int, float)), (
-                            f"{field_id} ({comparator}): definition timestamp "
-                            f"value should be numeric, got {type(definition.value).__name__}"
-                        )
-                else:
-                    expected_value = expected_desc[4] if len(expected_desc) > 4 else None
-                    assert definition.value == expected_value, (
-                        f"{field_id} ({comparator}): value = {definition.value!r}, "
-                        f"expected {expected_value!r}"
-                    )
-                    assert actual_desc == expected_desc, (
-                        f"{field_id} ({comparator}): description = {actual_desc!r}, "
-                        f"expected {expected_desc!r}"
-                    )
+                expected_value = expected_desc[4] if len(expected_desc) > 4 else None
+                assert definition.value == expected_value, (
+                    f"{field_id} ({comparator}): value = {definition.value!r}, "
+                    f"expected {expected_value!r}"
+                )
+                assert actual_desc == expected_desc, (
+                    f"{field_id} ({comparator}): description = {actual_desc!r}, "
+                    f"expected {expected_desc!r}"
+                )
 
                 # Check details
                 details = condition.details

@@ -20,9 +20,9 @@ from installer.data_lifecycle.archive import _root_manifest, _write_bundle
 from installer.data_lifecycle.assets import AssetCollector
 from installer.data_lifecycle.backup import create_backup, delete_backup, list_backups
 from installer.data_lifecycle.html import OfflineHTMLBuilder, sanitize_stored_html
+from installer.data_lifecycle.import_planner import ImportPlanner
 from installer.data_lifecycle.portable import (
     DecodedEntity,
-    ImportPlanner,
     MissingReference,
     PortableReference,
     ShardWriter,
@@ -589,6 +589,7 @@ def _backup_context():
         bucket=bucket,
         starts=0,
         expected_snapshot=datetime(2026, 8, 23, 12, tzinfo=timezone.utc),
+        uploads=[],
         require_asset_generation_migration=lambda database: database == "(default)",
     )
 
@@ -622,6 +623,7 @@ def _backup_context():
     )
 
     def upload(name, payload):
+        context.uploads.append(name)
         blob = bucket.blob(name)
         blob.upload_from_string(json.dumps(payload))
         return blob
@@ -658,6 +660,7 @@ def test_backup_resumes_provider_operation_and_publishes_manifest_last(tmp_path)
     manifest = create_backup(context, backup_id=BACKUP_ID, checkpoint=checkpoint)
     assert manifest.backup_id == BACKUP_ID
     assert context.starts == 1
+    assert context.uploads[-1] == f"{BACKUP_ROOT_PREFIX}/{BACKUP_ID}/manifest.json"
     assert checkpoint.load() is None
     fresh = LifecycleCheckpoint(
         PROJECT_ID,
@@ -716,13 +719,29 @@ def test_backup_delete_requires_typed_confirmation_and_manifest_first():
         recovery_bucket=BUCKET,
         list_objects=lambda _prefix: [data_blob, manifest_blob],
     )
+    deletion_order = []
+    manifest_delete = manifest_blob.delete
+    data_delete = data_blob.delete
+
+    def delete_manifest(**kwargs):
+        deletion_order.append(manifest_blob.name)
+        manifest_delete(**kwargs)
+
+    def delete_data(**kwargs):
+        deletion_order.append(data_blob.name)
+        data_delete(**kwargs)
+
+    manifest_blob.delete = delete_manifest
+    data_blob.delete = delete_data
     with pytest.raises(DataLifecycleError, match="cancelled"):
         delete_backup(BACKUP_ID, context, confirm=lambda _prompt: "no")
+    assert deletion_order == []
     assert delete_backup(
         BACKUP_ID,
         context,
         confirm=lambda _prompt: "DELETE",
     )
+    assert deletion_order == [manifest_blob.name, data_blob.name]
     assert manifest_blob.deleted == [{"if_generation_match": 7}]
     assert data_blob.deleted == [{}]
 
@@ -826,6 +845,27 @@ def test_value_codec_round_trips_every_supported_value():
         "list": ["literal:already", "ref:literal"],
     }
     encoded = codec.encode(value)
+    assert encoded["datetime"] == {"$datetime": "2026-08-23T12:00:00Z"}
+    assert encoded["date"] == {"$date": "2026-08-23"}
+    assert encoded["bytes"] == {"$bytes": "AGFyY2hpdmU="}
+    assert encoded["point"] == {
+        "$geopoint": {"latitude": 1.25, "longitude": -2.5}
+    }
+    assert encoded["key"] == {"$ref": {"type": "user", "id": "userhash"}}
+    assert encoded["missing"] == {
+        "$missing_ref": {
+            "type": "file",
+            "digest": "f" * 64,
+            "warning_id": "missing-1",
+        }
+    }
+    assert encoded["entity"] == {
+        "$entity": {
+            "exclude_from_indexes": ["secret"],
+            "properties": {"value": 1},
+        }
+    }
+    assert encoded["list"] == ["literal:literal:already", "literal:ref:literal"]
     decoded = ValueCodec().decode(encoded)
     assert codec.encode(decoded) == encoded
     assert isinstance(decoded["entity"], DecodedEntity)
@@ -859,7 +899,7 @@ def test_import_planner_is_source_independent_and_resolves_two_pass_references(t
             "literal": {"literal:ref:user:userhash0001": True},
         },
     )
-    planned = ImportPlanner(target_prefix="test-").plan([user, page])
+    planned = ImportPlanner(target_prefix="test-").plan([page, user])
     assert planned["recipe"] == "lagniappe-target-key/v1"
     assert planned["identity_count"] == 2
     assert PROJECT_ID not in canonical_json(planned).decode()
@@ -867,8 +907,15 @@ def test_import_planner_is_source_independent_and_resolves_two_pass_references(t
     with pytest.raises(DataLifecycleError, match="unresolved"):
         ImportPlanner().plan([missing])
     bundle = tmp_path / "bundle"
-    _archive_bundle(bundle)
-    assert ImportPlanner(target_prefix="test-").plan_bundle(bundle)["identity_count"] == 1
+    manifest = _archive_bundle(bundle, records=[user, page])
+    planner = ImportPlanner(target_prefix="test-")
+    assert planner.plan_bundle(bundle) == planned
+    output = tmp_path / "bundle.zip"
+    archive_module._publish_zip(bundle, output, manifest)
+    assert planner.plan_bundle(output) == planned
+    (bundle / "README.md").write_text("changed")
+    with pytest.raises(DataLifecycleError, match="size mismatch|checksum mismatch"):
+        planner.plan_bundle(bundle)
 
 
 class _PageIterator:
@@ -1769,6 +1816,8 @@ def test_archive_validation_accepts_canonical_directory_and_zip(tmp_path):
     assert validate_archive(bundle)["entities"] == 1
     output = tmp_path / "bundle.zip"
     archive_module._publish_zip(bundle, output, manifest)
+    with zipfile.ZipFile(output) as published:
+        assert published.namelist()[-1] == "manifest.json"
     assert validate_archive(output)["archive_id"] == BACKUP_ID
 
 
@@ -2322,9 +2371,10 @@ def test_target_validation_requires_owner_and_reserved_models():
         )
 
 
-# @matrix data-lifecycle : confirmation in-place-merge progress queue-purge-audit remote-journal restore resume
+# @matrix data-lifecycle : cache-invalidation confirmation in-place-merge progress queue-purge-audit remote-journal restore resume
+@pytest.mark.parametrize("cache_failure", [False, True], ids=["success", "cache-retry"])
 def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
-    monkeypatch, tmp_path, capsys
+    monkeypatch, tmp_path, capsys, cache_failure
 ):
     """The released restore is resumable and has no automatic rollback path."""
     plan = {
@@ -2427,6 +2477,8 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
 
         def invalidate_cache(self):
             self.calls.append(("invalidate-cache",))
+            if cache_failure:
+                raise OSError("cache unavailable")
 
         def disable_database_delete_protection(self, database):
             self.calls.append(("unprotect", database))
@@ -2474,16 +2526,16 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
         "normalize_restored_database",
         lambda *_args, **_kwargs: {"entities_scanned": 4},
     )
-    monkeypatch.setattr(
-        restore_in_place,
-        "validate_restored_database",
-        lambda *_args, **_kwargs: {"owners": 1, "reserved_models": 2},
-    )
-    monkeypatch.setattr(
-        restore_in_place,
-        "reconcile_scheduled_uncomplete_tasks",
-        lambda *_args, **_kwargs: {"queued": 1, "backfilled": 0},
-    )
+    def validate(*_args, **_kwargs):
+        context.calls.append(("validate",))
+        return {"owners": 1, "reserved_models": 2}
+
+    def reconcile(*_args, **_kwargs):
+        context.calls.append(("reconcile-tasks",))
+        return {"queued": 1, "backfilled": 0}
+
+    monkeypatch.setattr(restore_in_place, "validate_restored_database", validate)
+    monkeypatch.setattr(restore_in_place, "reconcile_scheduled_uncomplete_tasks", reconcile)
     checkpoint = LifecycleCheckpoint(
         PROJECT_ID, ["restore", BACKUP_ID], state_root=tmp_path / "restore-state"
     )
@@ -2497,6 +2549,28 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     assert context.calls == []
 
     confirmation_prompts = []
+    if cache_failure:
+        with pytest.raises(OSError, match="cache unavailable"):
+            restore_module.restore_backup(
+                BACKUP_ID,
+                context=context,
+                checkpoint=checkpoint,
+                confirmation=lambda prompt: confirmation_prompts.append(prompt) or "RESTORE",
+            )
+        state = checkpoint.load()
+        assert state["target_validated"] is True
+        assert not state.get("cache_invalidated")
+        assert not state.get("scheduled_tasks_reconciled")
+        assert not state.get("traffic_restored")
+        assert not state.get("queue_resumed")
+        assert ("reconcile-tasks",) not in context.calls
+        assert ("traffic", plan["original_traffic"], "random") not in context.calls
+        assert ("resume-queue", "lagniappe-tasks", "us-central1") not in context.calls
+        assert ("delete", "lag-safety-test") not in context.calls
+        assert confirmation_prompts == ["? Confirm restore [Type RESTORE to continue] "]
+        confirmation_prompts.clear()
+        cache_failure = False
+
     restored = restore_module.restore_backup(
         BACKUP_ID,
         context=context,
@@ -2510,7 +2584,16 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     assert ("import", plan["export_output_prefix"], "(default)") in context.calls
     assert ("resume-queue", "lagniappe-tasks", "us-central1") in context.calls
     assert ("invalidate-cache",) in context.calls
+    assert (
+        context.calls.index(("validate",))
+        < context.calls.index(("invalidate-cache",))
+        < context.calls.index(("reconcile-tasks",))
+        < context.calls.index(("traffic", plan["original_traffic"], "random"))
+        < context.calls.index(("resume-queue", "lagniappe-tasks", "us-central1"))
+    )
     assert ("delete", "lag-safety-test") in context.calls
+    assert context.calls.count(("validate",)) == 1
+    assert context.calls.count(("import", plan["export_output_prefix"], "(default)")) == 1
     assert not hasattr(restore_module, "rollback_restore")
     assert "rollback_restore" not in restore_module.__all__
 

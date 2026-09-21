@@ -26,6 +26,15 @@ The application version in build metadata comes from `package.json`, even when
 local generated settings still describe an earlier release. Production bundle
 version replacements and Sentry releases use that same package version.
 
+`build/rollup.shared.mjs` owns the common login, monitoring, and main bundle
+construction: registry-derived inputs, output names, browser resolution,
+warning handling, chunk versioning, and artifact recording. It creates fresh
+plugins for each standalone entry. `rollup.dev.config.mjs` and
+`rollup.config.mjs` keep their ordered mode-specific plugins and version values
+explicit, including CSS transforms, minification, source maps, startup budgets,
+Sentry uploads, and visualizer options. Publication still runs through
+`build/run-rollup.mjs` and `build/publication.mjs`.
+
 ## Output
 
 ```text
@@ -56,7 +65,9 @@ Python style/icon registries. `config/constants.py` receives the same build ID
 for template URLs and ETags. Local application settings must not define
 `BUILD_ID`.
 
-The build wrapper removes the previous completion marker before Rollup starts.
+The build wrapper generates the tracked JavaScript/Python registries before
+recording the source digest, then removes the previous completion marker before
+Rollup starts.
 It publishes `BUILD_ID` and a new `build.json` only after every Rollup entry,
 optional Sentry upload, and output check succeeds, and only if the authored
 source digest is unchanged. A failed or interrupted build therefore leaves no
@@ -89,6 +100,9 @@ The main startup path has four measured closures:
 fails when a closure exceeds its budget. It also prevents heavy interactive
 systems such as sync, edit reconciliation, modals, notifications, and combobox
 from entering every Core view's static closure.
+The edit-reconciliation guard covers the whole `forms/revisions/` directory,
+including the watcher, reconciler, review modals, and preview adapter. These
+modules remain available through the lazy `ensureEditWatcher()` service.
 
 ## Production behavior
 
@@ -136,9 +150,10 @@ The custom plugins in `build/utility.mjs` enforce one artifact contract:
 - `emitFonts()` emits vendored text and icon WOFF2 files under filenames
   derived from their digests and removes obsolete published fonts.
 - `resolveFonts()` rewrites stable authored font URLs to those generated
-  assets. `buildStyles()` emits their matching Jinja preload URL map.
-- `buildStyles()` validates the semantic style and icon registries and emits
-  their JavaScript and Python representations. See
+  assets. Registry generation emits their matching Jinja preload URL map.
+- `generateStyleModules()` validates and writes matching JavaScript and Python
+  registries. `buildStyles()` invokes the same idempotent step for direct Rollup
+  callers. See
   [INFRA_BUILD_STYLES.md](INFRA_BUILD_STYLES.md).
 
 Both Rollup configurations suppress dependency warnings for `eval` inside

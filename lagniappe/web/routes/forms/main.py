@@ -8,8 +8,8 @@ from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
-from lagniappe.core.tools import ai
-from lagniappe.core.tools import form_drafts
+from lagniappe.core.tools.ai import schema as ai_schema
+from lagniappe.core.tools.forms import drafts as form_drafts
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import permission, require_ai_access
@@ -126,7 +126,7 @@ def rows():
 def view(key, **kwargs):
     form = kwargs["entity"]
 
-    from lagniappe.core.tools import form_changes, form_conversions
+    from lagniappe.core.tools.forms import changes as form_changes, conversions as form_conversions
     draft = form_drafts.builder_draft(form)
     if form.db.get(form_changes.PENDING):
         result = form_changes.change_response(form, current_user)
@@ -141,7 +141,7 @@ def view(key, **kwargs):
 @forms.route("/<key>/change", methods=["GET", "POST"])
 @permission(Resource.FORM, Action.EDIT, no_store=True)
 def form_change(key, **kwargs):
-    from lagniappe.core.tools import form_changes
+    from lagniappe.core.tools.forms import changes as form_changes
     try:
         result = (form_changes.change_response(kwargs["entity"], current_user) if request.method == "GET"
                   else form_changes.recover_change(kwargs["entity"], current_user,
@@ -358,11 +358,11 @@ def create_schema():
         if not isinstance(request_id, str) or not form_drafts.IMAGE_ID.fullmatch(request_id) or revision < 0:
             raise exceptions.ValidationError("Generation needs a valid draft request identity.")
         draft = {"schema": schema, "html_fields": html_fields}
-        prompt = ai.form_generation_prompt(form.form_type, description=description, draft=draft)
+        prompt = ai_schema.form_generation_prompt(form.form_type, description=description, draft=draft)
         if request.form.get("explain"):
             return responses.explain(prompt)
         sources = _draft_image_sources(form, html_fields)
-        result = ai.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
+        result = ai_schema.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
             value, draft, form_type=form.form_type, image_sources=sources,
         ))
         current = Entities.fetch_one(form.key, request=Fetch.direct())

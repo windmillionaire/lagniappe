@@ -1,7 +1,7 @@
-import { createIcon, setIcon } from "../shared/icons";
-import { request } from "../shared/request";
-import { withTransition } from "../shared/utilities";
-import Core from "./base/core";
+import { createIcon, setIcon } from "../shared/icons.mjs";
+import { request } from "../shared/request.mjs";
+import { withTransition } from "../shared/transitions.mjs";
+import Core from "./base/core.mjs";
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
@@ -39,19 +39,19 @@ export default class Report extends Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_038_startup_specializations.py::test_report_loads_base_form_only_for_present_forms_and_in_parallel
+	 * @tests tests_js/test_038_startup_specializations.mjs::test_report_loads_base_form_only_for_present_forms_and_in_parallel
 	 * @matrix ai-report : concurrent-form-init lazy-form-runtime
 	 */
 	ensureReportForms() {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
-		const pending = import("../elements/base/baseForm")
-			.then(async ({ BaseForm }) => {
+		const pending = import("../forms/controller.mjs")
+			.then(async ({ FormController }) => {
 				if (this._destroyed) return null;
 				await Promise.all([
-					this._initRunReportForm(BaseForm),
-					this._initReviseReportForm(BaseForm),
+					this._initRunReportForm(FormController),
+					this._initReviseReportForm(FormController),
 				]);
 				if (this._destroyed) return null;
 				this._reportFormsReady = true;
@@ -98,14 +98,14 @@ export default class Report extends Core {
 		this._reportFormBootstrap = null;
 	}
 
-	async _initRunReportForm(BaseForm) {
+	async _initRunReportForm(FormController) {
 		const target = this.elt.querySelector(
 			"[data-role='run-report-form'], [data-role='retry-report-form']",
 		);
 		if (!target) return;
 		const retrying = target.dataset.role === "retry-report-form";
 
-		this.RunReportForm = new BaseForm({
+		this.RunReportForm = new FormController({
 			target,
 			view: this,
 			messages: {
@@ -119,11 +119,11 @@ export default class Report extends Core {
 		target.addEventListener("submit", this._runReport.bind(this));
 	}
 
-	async _initReviseReportForm(BaseForm) {
+	async _initReviseReportForm(FormController) {
 		const target = this.elt.querySelector("[data-role='revise-report-form']");
 		if (!target) return;
 
-		this.ReviseReportForm = new BaseForm({
+		this.ReviseReportForm = new FormController({
 			target,
 			view: this,
 			messages: {

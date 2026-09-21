@@ -348,15 +348,18 @@
 						"schema": "table_resources_link"
 					},
 					"mock_link_attributes": { "name": "Fetched Example" },
+					"expected_link_lookup": "https://example.com",
 					"row_submission": {
 						"table_id": "resources",
 						"values": {
-							"website:url": "https://example.com",
-							"website:title": "Example"
+							"website:url": "https://example.com"
 						}
 					},
 					"expected_row": {
-						"website": { "url": "https://example.com", "title": "Example" }
+						"website": {
+							"url": "https://example.com",
+							"title": "Fetched Example"
+						}
 					}
 				}
 			]

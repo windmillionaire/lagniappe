@@ -401,8 +401,10 @@ class DeferredJobRunner:
         self._persist_claimed(job, lease_token, **values)
 
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
+    # @testable true
+    # @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
+    # @tests tests_unit/test_023h_deferred_job_control.py::test_claim_loss_stops_checks_and_prevents_heartbeat_renewal
+    # @matrix deferred-jobs : heartbeat lease-loss
     def _renew_claim(self, job, lease_token):
         """Renew without mutating shared entity caches from the guard thread."""
         now = _utc()
@@ -415,21 +417,18 @@ class DeferredJobRunner:
         )
 
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
+    # @tests tests_unit/test_023h_deferred_job_control.py::test_claim_loss_stops_checks_and_prevents_heartbeat_renewal
+    # @tests tests_unit/test_023h_deferred_job_control.py::test_activity_lookup_failure_is_an_infrastructure_error
+    # @matrix deferred-jobs : cancellation heartbeat lease-loss read-path
     def _claim_active(self, job, lease_token):
-        """Check lease ownership at cancellation boundaries."""
+        """Read durable ownership at cancellation boundaries; never renew it."""
         try:
-            now = _utc()
-            lease_expires = now + timedelta(seconds=DEFERRED_JOB_LEASE_SECONDS)
-            active = database_deferred_jobs.update_claimed_deferred_job(
+            return database_deferred_jobs.owns_deferred_job_claim(
                 job.key,
                 lease_token,
-                {"lease_expires": lease_expires},
-                now,
             )
-            if active:
-                job.lease_expires = lease_expires
-            return active
         except Exception as error:
             raise DeferredJobInfrastructureError(
                 "Deferred job activity could not be verified."

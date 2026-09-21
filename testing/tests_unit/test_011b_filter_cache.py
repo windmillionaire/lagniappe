@@ -209,6 +209,10 @@ class _FakeQuery:
 @pytest.mark.unit
 def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters():
     parent = _parent("project")
+    active = SimpleNamespace(
+        hash="active-hash",
+        to_filter_index=lambda: {"id": "active-task-key", "name": "Active", "completed": False},
+    )
     task = SimpleNamespace(
         hash="task-hash",
         to_filter_index=lambda: {
@@ -227,7 +231,7 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
             ) as datastore_key:
                 with patch(
                     "lagniappe.core.tools.filters.cache.Entities.fetch",
-                    return_value=[task],
+                    return_value=[active, task],
                 ) as load:
                     cache = FilterCache(parent, user=_user(task=["restricted"]))
                     cache._load_project_tasks()
@@ -247,6 +251,7 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
     ]
     assert query.orders == ["-modified"]
     assert cache._to_cache == {
+        "active-hash": {"id": "active-task-key", "name": "Active", "completed": False},
         "task-hash": {
             "id": "task-key",
             "name": "Task",
