@@ -89,14 +89,13 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
         "Activate the temporary account, run setup, verify the deployment, "
         "and return access."
     )
-    for checklist in owner.locator("ol").all():
-        expect(checklist).not_to_be_visible()
+    expect(owner.locator("ol")).to_have_count(3)
+    expect(owner.locator("ol:visible")).to_have_count(0)
     expect(installer.locator("ol")).not_to_be_visible()
 
     owner.locator("summary").click()
     expect(owner).to_have_attribute("open", "")
-    for checklist in owner.locator("ol").all():
-        expect(checklist).to_be_visible()
+    expect(owner.locator("ol:visible")).to_have_count(3)
     expect(installer.locator("ol")).not_to_be_visible()
     expect(owner).to_contain_text(
         "Apps / Additional Google services / Google Cloud Platform / "
@@ -147,8 +146,7 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
 
     owner.locator("summary").click()
     installer.locator("summary").click()
-    for checklist in owner.locator("ol").all():
-        expect(checklist).not_to_be_visible()
+    expect(owner.locator("ol:visible")).to_have_count(0)
     expect(installer).to_have_attribute("open", "")
     expect(installer.locator("ol")).to_be_visible()
     expect(installer).to_contain_text("separate browser profile")
