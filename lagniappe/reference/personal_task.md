@@ -1,6 +1,5 @@
 ---
 title: Personal Tasks
-manual_section: tasks
 related:
 - tasks
 - task_scheduling

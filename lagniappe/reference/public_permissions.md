@@ -1,6 +1,5 @@
 ---
 title: Public Permissions
-manual_section: permissions
 related:
 - permissions
 - user_groups

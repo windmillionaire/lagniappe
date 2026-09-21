@@ -1,6 +1,5 @@
 ---
 title: Converting and Deleting Form Elements
-manual_section: forms
 related:
 - form_builder
 - form_settings

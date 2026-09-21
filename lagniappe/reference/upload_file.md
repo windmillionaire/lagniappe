@@ -1,6 +1,5 @@
 ---
 title: Uploading Files
-manual_section: quickstart
 related:
 - ai_tools
 - import_data

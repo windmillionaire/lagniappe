@@ -1,6 +1,5 @@
 ---
 title: Model Tasks
-manual_section: tasks
 related:
 - create_project
 - tasks

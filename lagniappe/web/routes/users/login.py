@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+import secrets
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from flask import (
     abort,
+    g,
     jsonify,
     make_response,
     redirect,
@@ -334,6 +336,8 @@ def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
 # @tests tests_e2e/001_site/test_001b_login.py::test_disabled_google_error_returns_to_method_chooser
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_hides_google_when_provider_is_disabled
 # @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_setting_disables_ui_and_callback
+# @tests tests_e2e/001_site/test_001b_login.py::test_google_button_styles_apply_before_first_paint
+# @pair login:first-paint
 # @matrix login : auth-method authorization-error cookie-hardening disabled-account disabled-provider form-state google-oauth operator-intent owner-bootstrap page-load safe-error session test-user
 @users.route("/login", methods=["GET"])
 def login():
@@ -394,6 +398,9 @@ def login():
             )
             # A control-plane read failure should not disable a working login method.
             google = True
+    if google:
+        # GIS copies the script nonce onto its injected button stylesheet.
+        g.google_style_nonce = secrets.token_urlsafe(32)
     auth_error = {
         "google-not-registered": (
             "That Google account does not have access to this site. "

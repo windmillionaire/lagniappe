@@ -1,6 +1,5 @@
 ---
 title: Maintenance
-manual_section: personalization
 related:
 - site_configuration
 - site_deployment

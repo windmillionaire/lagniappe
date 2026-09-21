@@ -1,6 +1,5 @@
 ---
 title: Offline Work and Reconnecting
-manual_section: collaboration
 related:
 - documents
 - navigation

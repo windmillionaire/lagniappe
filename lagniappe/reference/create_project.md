@@ -1,6 +1,5 @@
 ---
 title: Creating Projects
-manual_section: quickstart
 related:
 - model_tasks
 - tasks

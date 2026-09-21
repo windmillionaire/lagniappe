@@ -1,6 +1,5 @@
 ---
 title: Tasks
-manual_section: tasks
 related:
 - task_scheduling
 - task_history

@@ -1,6 +1,5 @@
 ---
 title: Permissions
-manual_section: permissions
 related:
 - restrictions
 - user_groups

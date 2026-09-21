@@ -91,16 +91,18 @@ def test_topic_lookup_rejects_aliases_and_paths(topic_id):
 
 
 # @pair help:rendering
-def test_topic_rendering_preserves_safety_and_manual_links(monkeypatch):
-    source = b'---\ntitle: One\nmanual_section: forms\n---\nA summary.\n\n## Details\n\n[More](/help/one)\n\n<script>secret()</script>'
+def test_topic_rendering_preserves_safety_and_links(monkeypatch):
+    source = b'---\ntitle: One\n---\nA summary.\n\n## Details\n\n[More](/help/one) and [Installation](/manual/installation)\n\n<script>secret()</script>'
     monkeypatch.setattr(reference, '_sources', lambda: (('one', source),))
     article = reference.topic_html('one')
-    embedded = reference.topic_html('one', embedded=True, manual=True)
+    embedded = reference.topic_html('one', embedded=True)
     assert isinstance(article, SafeHTML) and isinstance(embedded, SafeHTML)
     assert '<h2>Details</h2>' in article
     assert '<h3>Details</h3>' in embedded
-    assert 'href="/manual/forms#one"' in embedded
-    assert 'script' not in article and 'secret()' not in article
+    for html in (article, embedded):
+        assert 'href="/help/one"' in html
+        assert 'href="/manual/installation"' in html
+        assert 'script' not in html and 'secret()' not in html
     introduction, details = reference.topic_sections('one')
     assert isinstance(introduction, SafeHTML) and isinstance(details, SafeHTML)
     assert BeautifulSoup(introduction, 'html.parser').get_text() == 'A summary.'

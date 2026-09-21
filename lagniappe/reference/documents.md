@@ -1,6 +1,5 @@
 ---
 title: Documents, Saving, and Collaboration
-manual_section: collaboration
 related:
 - offline
 - document_settings

@@ -1,6 +1,5 @@
 ---
 title: Creating Users
-manual_section: permissions
 related:
 - user_settings
 - user_groups

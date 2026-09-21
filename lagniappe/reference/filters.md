@@ -1,6 +1,5 @@
 ---
 title: Category and Project Filters
-manual_section: search
 related:
 - search
 - create_category

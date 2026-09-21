@@ -1,6 +1,5 @@
 ---
 title: Page and Form Restrictions
-manual_section: permissions
 related:
 - permissions
 - user_groups

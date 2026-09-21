@@ -119,7 +119,7 @@ shared entity patch service and saves changed models together.
 Help articles use `ShellView` directly through the shared view registry. Their
 server-rendered article has no entity polling or Report state. The report-style
 header's Close link returns Home; Markdown body rendering is shared with the
-reference modal and manual.
+reference modal. The manual has independently authored introductory chapters.
 
 The Form Builder owns an unsaved local schema and does not extend Core. It still
 implements the shared connectivity `sync()` lifecycle. See

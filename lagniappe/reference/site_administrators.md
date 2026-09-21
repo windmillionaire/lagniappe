@@ -1,6 +1,5 @@
 ---
 title: Administrators
-manual_section: permissions
 related:
 - permissions
 - create_user

@@ -1,6 +1,5 @@
 ---
 title: Creating Pages
-manual_section: quickstart
 related:
 - page_info
 - create_category

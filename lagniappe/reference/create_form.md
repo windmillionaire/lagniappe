@@ -1,6 +1,5 @@
 ---
 title: Creating Forms
-manual_section: forms
 related:
 - form_builder
 - form_components

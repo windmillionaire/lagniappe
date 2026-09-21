@@ -236,153 +236,307 @@
         </span>
       </summary>
       <div class="border-t border-base-light/40 px-5 py-5">
-        <ol class="text-base-medium space-y-4 list-decimal ml-5">
-        <li>
-          Choose one permanent, business-controlled Google account to be both
-          the <strong>Lagniappe primary Owner</strong> and a
-          <strong>Google Cloud Project Owner</strong>. These are separate roles,
-          but the same durable business identity should hold both.
-        </li>
-        <li>
-          In Google Admin Console, open <strong>Directory / Users / Add new
-          user</strong>. Create a dedicated temporary installer account, enter a
-          secondary delivery email, and assign it no Workspace administrator
-          role. Give its initial sign-in information only to the installer and
-          ask them to change the temporary password and enroll in 2-Step
-          Verification. Follow Google's
-          {{ link("https://support.google.com/a/answer/33310", "user-creation instructions") }}.
-        </li>
-        <li>
-          As a Workspace administrator, open <strong>Apps / Additional Google
-          services / Google Cloud Platform / Service status</strong>. First
-          select <strong>All users in this account</strong>. If the service is
-          <strong>ON for everyone</strong>, the temporary installer already
-          inherits access; leave the setting unchanged and close or cancel the
-          page. Otherwise, select the organizational unit containing the
-          temporary installer. If its status is <strong>Inherited: On</strong>
-          or <strong>On</strong>, no change is needed. If it is off, select
-          <strong>On</strong>, then <strong>Override</strong> or
-          <strong>Save</strong>. Google's
-          {{ link("https://support.google.com/a/users/answer/2655363?hl=en", "service-settings instructions") }}
-          explain inherited and overridden organizational-unit settings.
-          Changes usually apply quickly but can take up to 24 hours. This does
-          not make the installer a Workspace administrator or grant access to
-          a Cloud project. The installer does not need permission to create
-          projects because the business creates the empty project below.
-        </li>
-        <li>
-          In the permanent Owner's browser profile, open Google's
-          {{ link("https://console.developers.google.com/terms/cloud", "Google Cloud service-terms page") }}
-          and complete any agreement it presents for that account. Also open
-          the
-          {{ link("https://console.developers.google.com/terms/maps", "Google Maps Platform terms page") }}
-          and accept those separate terms. Lagniappe uses the Places API for
-          address autocomplete and location verification. Explicitly authorize
-          the installer to acknowledge the same agreement later with the
-          temporary, business-controlled Workspace account. Google records
-          acceptance against the account that runs API activation, so this
-          second acknowledgement is technically required; setup will enable
-          Places API itself. Then open
-          the {{ link("https://console.cloud.google.com/", "Google Cloud console") }}.
-          A Google Workspace subscription does not automatically create a
-          Google Cloud billing account. Follow Google's
-          {{ link("https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects", "create-project instructions") }}:
-          open <strong>Manage Resources / Create Project</strong>, select the
-          business organization, name the project, and select
-          <strong>Create</strong>. When creation finishes, select the new
-          project in the project picker. On its <strong>Dashboard</strong>, use
-          the <strong>Project info</strong> card to confirm the project name,
-          project number, and project ID, and record the exact
-          <strong>Project ID</strong> for the installer. If project creation is blocked, ask the
-          business's Workspace administrator to create it inside the business
-          organization. With that project selected, open
-          <strong>Navigation menu / Billing</strong>. If no Cloud Billing account
-          exists, choose <strong>Manage billing accounts / Create account</strong>
-          and add the business's payment details. Link that billing account to
-          the project and confirm on the Billing page that billing is enabled
-          <strong>before</strong> the installer runs setup. Google's
-          {{ link("https://docs.cloud.google.com/billing/docs/how-to/verify-billing-enabled", "billing-status instructions") }}
-          show the same check.
-        </li>
-        <li>
-          With the new project still selected, use the search box at the top of
-          Google Cloud console to search for <strong>IAM</strong>, then open the
-          <strong>IAM</strong> page under <strong>IAM &amp; Admin</strong>. If it
-          does not appear in search, use
-          <strong>Navigation menu / IAM &amp; Admin / IAM</strong>. In
-          <strong>View by principals</strong>, find the permanent Owner's email
-          and confirm it has <strong>Basic / Owner</strong> on this project
-          directly, with no inherited source or condition. The table can show
-          several roles for one person on separate lines: an inherited
-          organization role is fine, but the <strong>Owner</strong> line itself
-          must have no entry in <strong>Inheritance</strong>. If it does not,
-          select <strong>Grant access</strong>, add the permanent Owner, assign
-          <strong>Basic / Owner</strong>, and select <strong>Save</strong>.
-          Then select <strong>Grant access</strong> again.
-          Enter the temporary Workspace email under
-          <strong>New principals</strong>, choose
-          <strong>Basic / Owner</strong> under <strong>Assign roles</strong>, and
-          select <strong>Save</strong>. This is broad access, but it is temporary
-          and confined to a new, empty project. Google's
-          {{ link("https://docs.cloud.google.com/iam/docs/granting-changing-revoking-access", "grant and revoke instructions") }}
-          cover both adding and later removing the binding.
-        </li>
-        <li>
-          Keep billing, the authentication-email mailbox, Redis, Cloudflare or
-          domain control, and recovery ownership in permanent business accounts.
-          Invite the installer only where a setup step truly requires it. Give
-          the installer the exact Cloud <strong>Project ID</strong> and the
-          permanent Lagniappe Owner's exact Google account email.
-          <strong>Never give the installer the Owner's Google password.</strong>
-        </li>
-        <li>
-          After deployment, sign in as the permanent Owner and download a
-          secure configuration backup from <strong>Admin / Site Settings /
-          Maintenance / Configuration</strong>. Remove the installer's
-          Lagniappe Administrator role and confirm the in-app
-          <strong>Remove Administrator</strong> dialog, or permanently delete
-          the installer's application account from Users. Then ask the
-          installer to complete the handoff command; if the installer is
-          unavailable, the permanent Owner may run it instead. The normal path
-          is for the installer to run <code>./setup.sh handoff</code>, or
-          <code>.\setup.cmd handoff</code> in Windows PowerShell, from the
-          existing installation working copy. An Owner preparing a separate
-          computer must first follow <strong>Recover an Existing
-          Installation</strong> below with the downloaded
-          <code>lagniappe_settings.yaml</code>, complete recovery setup while
-          authenticated as the permanent Owner, then run the same handoff
-          command. Handoff accepts either the saved Installer or permanent
-          Owner identity; it never requires the installer's password.
-        </li>
-        <li>
-          After handoff succeeds, open <strong>Admin / Site Settings /
-          Installation Access</strong>. Confirm it reports
-          <strong>Application handoff configured</strong>, then use its
-          <strong>Review project IAM</strong> link to verify that the installer
-          is absent from project IAM. The application state cannot prove that
-          external cleanup finished. Revoke provider invitations and temporary
-          access tokens, and confirm the installer removed local credentials
-          and settings from their machine.
-        </li>
-        <li>
-          Review the authentication-email dependency shown under
-          <strong>Installation Access</strong>. If it says to keep the installer
-          mailbox active, first run <code>./setup.sh email</code> from the
-          installation working copy with a durable business-controlled sender
-          and deploy the change. Without a custom application domain, this
-          command opens Google App Passwords, defaults to the permanent Owner's
-          Gmail or Workspace address, tests the replacement before saving, and
-          then offers to deploy. With a custom domain it guides the configured
-          SMTP-provider path instead. Also remove the installer’s account access
-          from billing, Redis Cloud, Cloudflare or DNS, Resend, and any other
-          provider where it was invited. Securely transfer or delete any
-          installer-held copy of a configuration backup or exported archive
-          stored outside Lagniappe’s managed Google Cloud buckets. Only then
-          suspend and ultimately delete the temporary Workspace user. Rotate
-          any provider secret that could not remain under direct business
-          control during installation.
-        </li>
-        </ol>
+        <p class="mb-5 text-base-medium">
+          Complete steps 1–8 before the installer begins. Return to steps 9–13
+          after the app is deployed to take over and close temporary access.
+          You will need help from your Workspace administrator for steps 2–3
+          if you do not manage the business's Google accounts yourself.
+        </p>
+        <section class="space-y-4">
+          {{ subheading("Before the installer starts") }}
+          <ol class="text-base-medium space-y-6 list-decimal ml-5 marker:font-semibold">
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Choose the permanent Owner account</h4>
+              <p>
+                Choose one permanent, business-controlled Google account to be
+                both the <strong>Lagniappe primary Owner</strong> and a
+                <strong>Google Cloud Project Owner</strong>. These are separate
+                roles, but the same durable business identity should hold both.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Create a temporary account for the installer</h4>
+              <p class="mb-2">
+                In <strong>Google Admin Console / Directory / Users / Add new
+                user</strong>, create a dedicated temporary installer account.
+              </p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>Enter a secondary delivery email and assign no Workspace administrator role.</li>
+                <li>Give the initial sign-in information only to the installer.</li>
+                <li>Ask them to change the temporary password and enroll in 2-Step Verification.</li>
+              </ul>
+              <p class="mt-2 text-sm">
+                See Google's {{ link("https://support.google.com/a/answer/33310", "user-creation instructions") }}.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Allow the installer account to use Google Cloud</h4>
+              <p class="mb-2">
+                As a Workspace administrator, open <strong>Apps / Additional
+                Google services / Google Cloud Platform / Service status</strong>.
+                Select <strong>All users in this account</strong>, then check:
+              </p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  <strong>ON for everyone:</strong> the installer already
+                  inherits access. Leave the setting unchanged and close or
+                  cancel the page.
+                </li>
+                <li>
+                  <strong>Otherwise:</strong> select the organizational unit
+                  containing the installer. <strong>Inherited: On</strong> or
+                  <strong>On</strong> needs no change. If it is off, select
+                  <strong>On</strong>, then <strong>Override</strong> or <strong>Save</strong>.
+                </li>
+              </ul>
+              <p class="mt-2 text-sm">
+                Changes usually apply quickly but can take up to 24 hours.
+                Google's {{ link("https://support.google.com/a/users/answer/2655363?hl=en", "service-settings instructions") }}
+                explain inherited and overridden settings. This does not grant
+                Workspace administrator or Cloud project access. The installer
+                does not need permission to create projects; the business
+                creates the empty project in step 5.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Accept the Google Cloud and Maps terms</h4>
+              <p class="mb-2">Use the permanent Owner's browser profile for both pages:</p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  Open the {{ link("https://console.developers.google.com/terms/cloud", "Google Cloud service-terms page") }}
+                  and complete any agreement it presents for that account.
+                </li>
+                <li>
+                  Open the {{ link("https://console.developers.google.com/terms/maps", "Google Maps Platform terms page") }}
+                  and accept those separate terms. Explicitly authorize the
+                  installer to acknowledge the same agreement later with the
+                  temporary, business-controlled Workspace account.
+                </li>
+              </ul>
+              <p class="mt-2 text-sm">
+                Lagniappe uses Places for address autocomplete and location
+                verification. Google records acceptance against the account
+                that activates the API, so the installer's second acknowledgement
+                is required; setup will enable Places API itself.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Create an empty project and record its ID</h4>
+              <p class="mb-2">
+                In the Owner's browser profile, open the
+                {{ link("https://console.cloud.google.com/", "Google Cloud console") }}.
+              </p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  Open <strong>Manage Resources / Create Project</strong>, select
+                  the business organization, name the project, and select <strong>Create</strong>.
+                </li>
+                <li>
+                  Select the new project in the project picker. On its
+                  <strong>Dashboard</strong>, use <strong>Project info</strong>
+                  to confirm the name, project number, and project ID. Then
+                  record the exact <strong>Project ID</strong> for the installer.
+                </li>
+              </ul>
+              <p class="mt-2 text-sm">
+                If creation is blocked, ask the business's Workspace
+                administrator to create the project inside the business
+                organization. Google's
+                {{ link("https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects", "create-project instructions") }}
+                show these screens.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Enable billing on the new project</h4>
+              <p class="mb-2">
+                With that project selected, open <strong>Navigation menu / Billing</strong>.
+                A Workspace subscription does not automatically create a Cloud Billing account.
+              </p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  If no Cloud Billing account exists, choose
+                  <strong>Manage billing accounts / Create account</strong> and
+                  add the business's payment details.
+                </li>
+                <li>
+                  Link the billing account to the project and confirm on the
+                  Billing page that billing is enabled <strong>before</strong>
+                  the installer runs setup.
+                </li>
+              </ul>
+              <p class="mt-2 text-sm">
+                See Google's {{ link("https://docs.cloud.google.com/billing/docs/how-to/verify-billing-enabled", "billing-status instructions") }}.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Give both accounts direct Project Owner access</h4>
+              <p class="mb-2">
+                With the new project still selected, use the search box at the
+                top of Google Cloud console to search for <strong>IAM</strong>.
+                Open <strong>IAM</strong> under <strong>IAM &amp; Admin</strong>.
+                If search does not find it, use <strong>Navigation menu /
+                IAM &amp; Admin / IAM</strong>.
+              </p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  <strong>Permanent Owner:</strong> in <strong>View by principals</strong>,
+                  find the Owner's email. Confirm it has <strong>Basic / Owner</strong>
+                  on this project directly, with no inherited source or condition.
+                  An inherited organization role on another line is fine, but
+                  the <strong>Owner</strong> line itself must have no entry in
+                  <strong>Inheritance</strong>. If needed, select <strong>Grant
+                  access</strong>, add the permanent Owner, assign <strong>Basic /
+                  Owner</strong>, and <strong>Save</strong>.
+                </li>
+                <li>
+                  <strong>Temporary installer:</strong> select <strong>Grant
+                  access</strong>. Enter the temporary Workspace email under
+                  <strong>New principals</strong>, choose <strong>Basic / Owner</strong>
+                  under <strong>Assign roles</strong>, and <strong>Save</strong>.
+                </li>
+              </ul>
+              <p class="mt-2 text-sm">
+                This gives the installer broad access, confined to the new,
+                empty project and removed at handoff. Google's
+                {{ link("https://docs.cloud.google.com/iam/docs/granting-changing-revoking-access", "grant and revoke instructions") }}
+                cover adding and removing these roles.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Send the installer the project and Owner details</h4>
+              <p class="mb-2">
+                Give them the exact Cloud <strong>Project ID</strong> and the
+                permanent Lagniappe Owner's exact <strong>Google account email</strong>.
+                <strong>Never give the installer the Owner's Google password.</strong>
+              </p>
+              <p>
+                Keep billing, the authentication-email mailbox, Redis,
+                Cloudflare or domain control, and recovery ownership in
+                permanent business accounts. Invite the installer only where
+                a setup step requires it.
+              </p>
+            </li>
+          </ol>
+        </section>
+        <section class="mt-6 border-t border-base-light/40 pt-5 space-y-4">
+          {{ subheading("After the app is deployed") }}
+          <ol start="9" class="text-base-medium space-y-6 list-decimal ml-5 marker:font-semibold">
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Save your configuration and remove in-app installer access</h4>
+              <p class="mb-2">Sign in to Lagniappe as the permanent Owner:</p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  Download a secure configuration backup from <strong>Admin /
+                  Site Settings / Maintenance / Configuration</strong>.
+                </li>
+                <li>
+                  Remove the installer's Lagniappe Administrator role and
+                  confirm the <strong>Remove Administrator</strong> dialog, or
+                  permanently delete their application account from <strong>Users</strong>.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Have the installer complete the handoff</h4>
+              <p class="mb-3">
+                Ask the installer to run the handoff command from the existing
+                installation working copy:
+              </p>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold mb-1">macOS / Linux</p>
+                  {{ code("./setup.sh handoff") }}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold mb-1">Windows PowerShell</p>
+                  {{ code(".\\setup.cmd handoff") }}
+                </div>
+              </div>
+              <p class="mt-3">
+                <strong>If the installer is unavailable:</strong> the permanent
+                Owner can run handoff instead. On a separate computer, first
+                follow <strong>Recover an Existing Installation</strong> below
+                with the downloaded <code>lagniappe_settings.yaml</code>.
+                Complete recovery setup while authenticated as the permanent
+                Owner, then run the same handoff command.
+              </p>
+              <p class="mt-2 text-sm">
+                Handoff accepts either the saved Installer or permanent Owner
+                identity; it never requires the installer's password.
+              </p>
+            </li>
+          </ol>
+        </section>
+        <section class="mt-6 border-t border-base-light/40 pt-5 space-y-4">
+          {{ subheading("After handoff succeeds") }}
+          <ol start="11" class="text-base-medium space-y-6 list-decimal ml-5 marker:font-semibold">
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Verify the handoff and project access</h4>
+              <p class="mb-2">Open <strong>Admin / Site Settings / Installation Access</strong>:</p>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>Confirm it reports <strong>Application handoff configured</strong>.</li>
+                <li>
+                  Use <strong>Review project IAM</strong> to verify that the
+                  installer is absent from project IAM. The application's
+                  saved state cannot prove that external cleanup finished.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Check whether email still uses the installer mailbox</h4>
+              <p class="mb-2">
+                Review the authentication-email dependency under
+                <strong>Installation Access</strong>. If email already uses a
+                permanent business account, continue to step 13.
+              </p>
+              <p class="mb-3">
+                <strong>If it says to keep the installer mailbox active:</strong>
+                replace that sender before suspending or deleting the Workspace
+                account. Run the email command from the installation working
+                copy, choose a durable business-controlled sender, and deploy
+                the change:
+              </p>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold mb-1">macOS / Linux</p>
+                  {{ code("./setup.sh email") }}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold mb-1">Windows PowerShell</p>
+                  {{ code(".\\setup.cmd email") }}
+                </div>
+              </div>
+              <p class="mt-3 text-sm">
+                Without a custom application domain, this opens Google App
+                Passwords and defaults to the permanent Owner's Gmail or
+                Workspace address. It tests the replacement before saving and
+                offers to deploy. With a custom domain, it guides the configured
+                SMTP-provider path instead.
+              </p>
+            </li>
+            <li>
+              <h4 class="font-semibold text-base-dark mb-2">Remove remaining access and retire the temporary account</h4>
+              <ul class="list-disc ml-5 space-y-2">
+                <li>
+                  Remove the installer's account access and invitations from
+                  billing, Redis Cloud, Cloudflare or DNS, Resend, and any
+                  other provider where they were invited. Revoke temporary access tokens.
+                </li>
+                <li>Confirm the installer removed local credentials and settings from their machine.</li>
+                <li>
+                  Securely transfer or delete installer-held configuration
+                  backups and exported archives stored outside Lagniappe's
+                  managed Google Cloud buckets.
+                </li>
+                <li>Rotate any provider secret that could not stay under direct business control during installation.</li>
+                <li>
+                  <strong>Only after email and access cleanup:</strong> suspend
+                  and ultimately delete the temporary Workspace user.
+                </li>
+              </ul>
+            </li>
+          </ol>
+        </section>
         {% call callout("warning", False) %}
           The business remains responsible for Workspace users, billing IAM,
           organization-level access, and provider accounts. The handoff command

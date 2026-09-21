@@ -498,27 +498,27 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
         user.page.locator("button[data-section='forms']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
     expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("Creating Forms")
+    expect(content.get_by_role("heading", name="What Forms Are For", exact=True)).to_be_visible()
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.locator("button[data-section='tasks']").first.click()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
     expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("Tasks track work on a page")
+    expect(content.get_by_role("heading", name="Tasks Live on Pages", exact=True)).to_be_visible()
     assert user.page.evaluate("window.__manualNavigationToken") == "preserved"
 
     with user.page.expect_response("**/manual/section/forms"):
         user.page.go_back()
     expect(user.page).to_have_url(re.compile(r".*/manual/forms$"))
     expect(user.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("Creating Forms")
+    expect(content.get_by_role("heading", name="What Forms Are For", exact=True)).to_be_visible()
 
     with user.page.expect_response("**/manual/section/tasks"):
         user.page.go_forward()
     expect(user.page).to_have_url(re.compile(r".*/manual/tasks$"))
     expect(user.page).to_have_title(f"Tasks — {CONFIG.APP_NAME} Manual")
-    expect(content).to_contain_text("Tasks track work on a page")
+    expect(content.get_by_role("heading", name="Tasks Live on Pages", exact=True)).to_be_visible()
 
 
 # @pair manual:section-navigation
@@ -606,20 +606,22 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     )
     assert dimensions["scrollWidth"] > dimensions["clientWidth"]
 
+    anonymous.locate("[data-role='delegated-owner-checklist'] summary").click()
     command_shells = anonymous.locate("[data-role='manual-command-shell']")
     shell_bounds = command_shells.evaluate_all(
         """elements => elements.map((element) => {
                 const shell = element.getBoundingClientRect();
-                const card = element.closest("[data-role='manual-card']");
-                const cardBounds = card.getBoundingClientRect();
-                const cardStyle = getComputedStyle(card);
+                const container = element.closest("[data-role='manual-card']")
+                    || element.closest("details").querySelector(":scope > div");
+                const containerBounds = container.getBoundingClientRect();
+                const containerStyle = getComputedStyle(container);
                 return {
                     shellLeft: shell.left,
                     shellRight: shell.right,
                     contentLeft:
-                        cardBounds.left + parseFloat(cardStyle.paddingLeft),
+                        containerBounds.left + parseFloat(containerStyle.paddingLeft),
                     contentRight:
-                        cardBounds.right - parseFloat(cardStyle.paddingRight),
+                        containerBounds.right - parseFloat(containerStyle.paddingRight),
                 };
             })"""
     )
@@ -683,12 +685,15 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     assert response.ok
     content = anonymous.locate("[data-role='manual-content']")
     expect(content).to_contain_text("AI Email")
-    public_description = content.locator("[data-role='help-body'][data-topic='ai_email']")
+    public_description = content.locator("[data-role='ai-email-description']")
     expect(public_description).to_be_visible()
     expect(public_description).to_contain_text(
-        "unified AI address"
+        "single AI address"
     )
-    expect(content.locator("[data-role='help-context']")).to_have_count(0)
+    expect(content.locator("[data-role='ai-email-account-details']")).to_have_count(0)
+    expect(content.locator("[data-role='external-ai-account-details']")).to_have_count(0)
+    content.locator("[data-role='external-ai-help'] > summary").click()
+    expect(content.locator("[data-role='external-ai-generic-details']")).to_be_visible()
     expect(public_description).not_to_contain_text("@")
 
     ajax = anonymous.page.evaluate(
@@ -703,8 +708,9 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     )
     assert ajax["ok"] is True
     assert ajax["status"] == 200
-    assert 'data-topic="ai_email"' in ajax["text"]
-    assert 'data-role="help-context"' not in ajax["text"]
+    assert 'data-role="ai-email-description"' in ajax["text"]
+    assert 'data-role="ai-email-account-details"' not in ajax["text"]
+    assert 'data-role="external-ai-account-details"' not in ajax["text"]
     assert "@" not in ajax["text"]
     assert auth_bootstrap_paths == []
 
@@ -716,12 +722,12 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
 
     assert response.ok
     content = owner.locate("[data-role='manual-content']")
-    account_details = content.locator("[data-role='help-context']")
+    account_details = content.locator("[data-role='ai-email-account-details']")
     if CONFIG.AI_EMAIL_PUBLIC["enabled"]:
         expect(account_details).to_be_visible()
         expect(account_details).to_contain_text(CONFIG.AI_EMAIL_PUBLIC["addresses"]["ai"])
     else:
         expect(account_details).to_have_count(0)
-    expect(content.locator("[data-role='help-body'][data-topic='ai_email']")).to_contain_text(
+    expect(content.locator("[data-role='ai-email-description']")).to_contain_text(
         "single AI address"
     )

@@ -1,6 +1,5 @@
 ---
 title: AI Models
-manual_section: personalization
 related:
 - ai_tools
 - site_settings

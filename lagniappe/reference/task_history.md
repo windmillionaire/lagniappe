@@ -1,6 +1,5 @@
 ---
 title: Task Completion and History
-manual_section: tasks
 related:
 - tasks
 - task_scheduling

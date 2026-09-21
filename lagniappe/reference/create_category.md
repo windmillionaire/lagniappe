@@ -1,6 +1,5 @@
 ---
 title: Creating Categories
-manual_section: quickstart
 related:
 - create_page
 - filters

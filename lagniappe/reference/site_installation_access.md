@@ -1,6 +1,5 @@
 ---
 title: Installation Access and Handoff
-manual_section: personalization
 related:
 - site_administrators
 - site_configuration

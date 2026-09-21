@@ -1,6 +1,5 @@
 ---
 title: Configuration and Recovery Settings
-manual_section: personalization
 related:
 - site_maintenance
 - site_installation_access
