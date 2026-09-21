@@ -98,11 +98,11 @@ the prompt explicitly calls for that interaction.
 ## Evaluation folders
 
 The tracked reusable library is
-[`testing_ai_workflows/`](../testing_ai_workflows/README.md). Keep one shared
+[`testing/ai_test_cases/`](../testing/ai_test_cases/README.md). Keep one shared
 prompt/fixture set per case, a concise rubric, and local-only raw captures:
 
 ```text
-testing_ai_workflows/
+testing/ai_test_cases/
   latest_results.json
   comparisons/
   cases/
@@ -122,7 +122,7 @@ Historical cases with a revised natural prompt are reference evidence until
 they get a current matching baseline.
 
 The library also tracks the existing Codex
-[Export Chat skill and helper](../testing_ai_workflows/skills/export-chat/SKILL.md).
+[Export Chat skill and helper](../testing/ai_test_cases/skills/export-chat/SKILL.md).
 It preserves the native JSONL/session-summary format; existing installations
 need no update. Load it only for the post-task export, not as part of the measured
 request. Pi sessions continue to use their own archive skill.

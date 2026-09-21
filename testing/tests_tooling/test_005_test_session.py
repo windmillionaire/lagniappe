@@ -1,5 +1,6 @@
 """Fail-closed ownership tests for local E2E and managed test sessions."""
 
+import hashlib
 from pathlib import Path
 import os
 import subprocess
@@ -264,8 +265,12 @@ def test_capture_process_identity_uses_portable_ps_fingerprint(monkeypatch):
     assert identity["pid"] == 4321
     assert identity["pgid"] == 4300
     assert identity["started"] == values[(4321, "lstart")]
-    assert len(identity["boot_id"]) == 64
-    assert len(identity["command_sha256"]) == 64
+    assert identity["boot_id"] == hashlib.sha256(
+        values[(1, "lstart")].encode()
+    ).hexdigest()
+    assert identity["command_sha256"] == hashlib.sha256(
+        values[(4321, "command")].encode()
+    ).hexdigest()
 
 
 # @matrix test-session : cross-platform fail-closed port-ownership
@@ -464,6 +469,8 @@ def test_browser_attachment_is_exclusive_and_detaches(
     with pytest.raises(RuntimeError, match="already attached"):
         testing.attach_browser_review(["browser-review", "capture", "second"])
 
+    assert testing.detach_browser_review("different-attachment") is False
+    assert test_session.load_session_state()["attachment"] == attached
     assert testing.detach_browser_review(attachment_id) is True
     assert test_session.load_session_state()["attachment"] is None
 
@@ -493,6 +500,11 @@ def test_recovery_is_idempotent_without_state(monkeypatch, tmp_path):
     pid_path = tmp_path / "test-server.pid"
     monkeypatch.setattr(test_session, "load_session_state", lambda: None)
     monkeypatch.setattr(testing, "_server_port_in_use", lambda base_url: False)
+    monkeypatch.setattr(
+        testing,
+        "_configure_test_gcloud",
+        lambda: pytest.fail("no-state recovery must not access provider configuration"),
+    )
     monkeypatch.setattr(
         testing,
         "File",

@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import json
 from urllib.parse import urlsplit
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -96,12 +97,21 @@ def expect_offline_sync_replay(
 
     def record_replay(response):
         request = response.request
+        if request.method != "POST" or urlsplit(response.url).path != "/l/sync":
+            return
         body = request.post_data or ""
-        if (
-            request.method == "POST"
-            and urlsplit(response.url).path == "/l/sync"
-            and sync_id in body
-            and all(marker in body for marker in markers)
+        try:
+            payload = json.loads(body)
+        except (TypeError, ValueError):
+            return
+        updates = payload.get("updates") if isinstance(payload, dict) else None
+        if not isinstance(updates, list):
+            return
+        if any(
+            isinstance(update, dict)
+            and update.get("sync_id") == sync_id
+            and all(marker in json.dumps(update, ensure_ascii=False) for marker in markers)
+            for update in updates
         ):
             responses.append(response)
 

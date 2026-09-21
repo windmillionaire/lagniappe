@@ -615,6 +615,10 @@ def run_version_command(command_args: list[str]) -> int:
         print(f"BUILD_ID: {build_id}")
         return 0
 
+    version = args.version if args.version is not None else _current_version()
+    if not RELEASE_VERSION_PATTERN.fullmatch(version):
+        parser.error("version must use stable X.Y.Z form (for example, 1.2.3)")
+
     if args.action == "set":
         from config import File, SETTINGS
         from runner.deploy import update_package_lock_version
@@ -630,7 +634,6 @@ def run_version_command(command_args: list[str]) -> int:
         return 0
 
     if args.action == "note":
-        version = args.version or _current_version()
         path = _append_version_note(version, args.message)
         print(f"Added version note to {path}")
         return 0

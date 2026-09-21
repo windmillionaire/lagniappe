@@ -20,7 +20,7 @@ Other cases retain their existing baseline/current evidence from the
 ## Layout
 
 ```text
-testing_ai_workflows/
+testing/ai_test_cases/
   README.md
   ROUND_3.md
   latest_results.json          # latest reviewed attempt for each case/arm
@@ -104,7 +104,7 @@ Your installed Export Chat skill still works; no change is needed for the pilot.
 The tracked copy is not automatically installed. To use it directly, ask the
 agent **after the measured task finishes**:
 
-> Use the export skill at /absolute/path/to/lagniappe/testing_ai_workflows/skills/export-chat/SKILL.md to export this chat to /absolute/path/to/lagniappe/testing_ai_workflows/cases/<case>/artifacts/current.
+> Use the export skill at /absolute/path/to/lagniappe/testing/ai_test_cases/skills/export-chat/SKILL.md to export this chat to /absolute/path/to/lagniappe/testing/ai_test_cases/cases/<case>/artifacts/current.
 
 Keep the session in its neutral fixtures directory and supply the destination
 explicitly. The helper otherwise defaults to the working directory and replaces

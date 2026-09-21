@@ -60,12 +60,15 @@ venv/bin/python run.py release-check --base origin/main
 ```
 
 Review and commit the complete source and generated release output.
-`release-check`
-requires a `next/*` or `hotfix/*` candidate, rejects installation-local files,
+`release-check` validates the candidate tree independently of the current
+branch, including detached HEAD. It rejects installation-local files
 and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
 It computes source and artifact digests from the exact Git index, preventing an
 unstaged working-tree build from validating a different committed candidate.
+The release workflow enforces the `next/*` or `hotfix/*` branch requirement
+using the pull request/event context and verifies the exact candidate commit.
+Passing the local tree check alone does not establish release eligibility.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
@@ -78,7 +81,7 @@ cannot publish release attestation. See
 ## App Engine upload boundary
 
 `.gcloudignore` root-anchors local directories such as `/testing/`,
-`/installer/`, `/runner/`, `/testing_ai_workflows/`, and the MCP `/mcp/` source tree. Keep
+`/installer/`, `/runner/`, `/testing/ai_test_cases/`, and the MCP `/mcp/` source tree. Keep
 those patterns root-anchored so nested runtime packages are not excluded.
 `config/files/` is
 excluded, then only `lagniappe_settings.yaml` and optional `redis_ca.pem` are
@@ -276,7 +279,7 @@ catalog. See the [official MCP guide](https://learn.chatgpt.com/docs/extend/mcp?
 
 The [implementation overview](EXTERNAL_AI_IMPLEMENTATION.md) records the
 development history and remaining verification boundary; the
-[remote comparison](../testing_ai_workflows/comparisons/remote-mcp-pilot-20260905.md)
+[remote comparison](../testing/ai_test_cases/comparisons/remote-mcp-pilot-20260905.md)
 preserves reviewed trial outcomes and measurements.
 
 ## Scaling and runtime settings

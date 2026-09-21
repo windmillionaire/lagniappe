@@ -176,6 +176,10 @@ generated application settings, the matching release note, and the applicable
 version in the error-reporting privacy notice. It does not change that notice's
 effective date unless its substance changes.
 
+Both `version set` and `version note` require the same stable `X.Y.Z` form as
+`release-check`. Invalid values, including an invalid current version used by
+`version note`, are rejected before writing settings or release files.
+
 `run.py upgrade-dependencies` updates Node, npm, and the direct Python requirement
 sets to their latest releases, including major versions. Python resolution
 includes `build/font-requirements.txt` alongside installer, runtime, and
@@ -214,6 +218,17 @@ the former maintainer command name `run.py upgrade` is no longer accepted.
 official Material Symbols subset from semantic IDs in `src/style/icons.yaml`.
 Normal builds use the vendored WOFF2 and do not contact Google Fonts. Reusing an
 existing semantic icon needs no refresh.
+
+Refresh validates the complete canonical icon registry before any download,
+including when called with `rebuild=False`. The font response must have the
+WOFF2 signature; metadata records its SHA-256 digest. Both outputs are staged
+before publication. If a file replacement fails, the previous files are
+restored; an incomplete restoration reports retained recovery-file locations.
+This recovery handles reported write failures, not an atomic two-file commit
+across a process or machine crash.
+
+After successful publication, a frontend rebuild failure returns failure and
+reports that the refreshed font and metadata remain available for inspection.
 
 ## Adding runner behavior
 

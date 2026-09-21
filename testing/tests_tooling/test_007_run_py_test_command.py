@@ -1391,6 +1391,36 @@ def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     with pytest.raises(RuntimeError, match="inconsistent test evidence"):
         run._merge_mcp_test_evidence(result_path, ["run.py", "test"], 0, 0)
 
+    unexpected = {
+        "exit_status": 0,
+        "outcomes": {
+            "tests_unit/test_unrelated.py::test_unrelated": {
+                "outcome": "passed",
+                "duration": 0.01,
+            }
+        },
+    }
+    result_path.write_text(json.dumps(unexpected), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unexpected test evidence"):
+        run._merge_mcp_test_evidence(result_path, ["run.py", "test"], 0, 0)
+
+    duplicate = {
+        "exit_status": 0,
+        "outcomes": {
+            "tests_unit/test_033_mcp_adapter.py::test_catalog": {
+                "outcome": "passed",
+                "duration": 0.01,
+            },
+            "../testing/tests_unit/test_033_mcp_adapter.py::test_catalog": {
+                "outcome": "passed",
+                "duration": 0.01,
+            },
+        },
+    }
+    result_path.write_text(json.dumps(duplicate), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unexpected test evidence"):
+        run._merge_mcp_test_evidence(result_path, ["run.py", "test"], 0, 0)
+
 
 def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
     monkeypatch.setattr(
@@ -1425,13 +1455,15 @@ def test_configure_test_environment_only_sets_import_environment(monkeypatch):
     testing_module.hosted_e2e_enabled = lambda: False
     monkeypatch.setitem(sys.modules, "config", config_module)
     monkeypatch.setitem(sys.modules, "runner.testing", testing_module)
+    monkeypatch.setenv("FLASK_ENV", "development")
 
     run.configure_test_environment(includes_e2e=False)
+    assert os.environ["FLASK_ENV"] == "testing"
     assert calls == []
 
+    monkeypatch.setenv("FLASK_ENV", "production")
     run.configure_test_environment(includes_e2e=True)
-    run.configure_test_environment(includes_e2e=True)
-
+    assert os.environ["FLASK_ENV"] == "testing"
     assert calls == []
 
 
@@ -3027,14 +3059,63 @@ def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path
 
     assert (
         run.run_version_command(
-            ["note", "Fixed category ownership sync", "--version", "1.25"]
+            ["note", "Fixed category ownership sync", "--version", "1.25.0"]
         )
         == 0
     )
 
-    path = tmp_path / "documentation" / "releases" / "1.25.md"
-    assert path.read_text() == "# Version 1.25\n\n- Fixed category ownership sync\n"
+    path = tmp_path / "documentation" / "releases" / "1.25.0.md"
+    assert path.read_text() == "# Version 1.25.0\n\n- Fixed category ownership sync\n"
     assert "Added version note" in capsys.readouterr().out
+
+
+# @pair version:cli-routing
+# @source run.py::run_version_command
+@pytest.mark.parametrize("version", ["", "1.25", "1.2.3-rc1", "../outside", "01.2.3"])
+@pytest.mark.parametrize("action", ["set", "explicit-note", "current-note"])
+def test_run_py_version_rejects_invalid_values_before_mutation(
+    monkeypatch, tmp_path, capsys, version, action
+):
+    releases = tmp_path / "releases"
+    monkeypatch.setattr(run, "RELEASES_DIR", releases)
+    settings = types.SimpleNamespace(
+        NODE={"version": version if action == "current-note" else "1.24.0"},
+        APP={"VERSION": "1.24.0", "BUILD_ID": "b1234567"},
+        save=lambda *args: pytest.fail("invalid version reached configuration save"),
+    )
+    original_node = dict(settings.NODE)
+    original_app = dict(settings.APP)
+    config_module = types.ModuleType("config")
+    config_module.SETTINGS = settings
+    config_module.File = types.SimpleNamespace(
+        PACKAGE_JSON=object(), APP_SETTINGS_YAML=object()
+    )
+    deploy_module = types.ModuleType("runner.deploy")
+    deploy_module.update_package_lock_version = lambda *args: pytest.fail(
+        "invalid version reached lockfile update"
+    )
+    monkeypatch.setitem(sys.modules, "config", config_module)
+    monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
+    monkeypatch.setattr(
+        run, "_update_reporting_privacy_version",
+        lambda *args: pytest.fail("invalid version reached privacy notice update"),
+    )
+    # A missing package value falls back to settings for implicit notes.
+    if action == "current-note" and not version:
+        settings.APP["VERSION"] = version
+        original_app = dict(settings.APP)
+    arguments = ["set", version] if action == "set" else ["note", "A release detail"]
+    if action == "explicit-note":
+        arguments.extend(["--version", version])
+
+    with pytest.raises(SystemExit) as error:
+        run.run_version_command(arguments)
+
+    assert error.value.code == 2
+    assert "X.Y.Z" in capsys.readouterr().err
+    assert settings.NODE == original_node
+    assert settings.APP == original_app
+    assert not list(tmp_path.iterdir())
 
 
 # @pair version:cli-routing
@@ -3042,10 +3123,10 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
-    release_note = tmp_path / "documentation" / "releases" / "1.25.md"
+    release_note = tmp_path / "documentation" / "releases" / "1.25.0.md"
     release_note.parent.mkdir(parents=True)
     release_note.write_text(
-        "# Version 1.24\n\n- Existing release detail\n",
+        "# Version 1.24.0\n\n- Existing release detail\n",
         encoding="utf-8",
     )
     reporting_markdown = tmp_path / "ERROR_REPORTING_PRIVACY.md"
@@ -3055,13 +3136,13 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
     reporting_template.parent.mkdir(parents=True)
     reporting_markdown.write_text(
         "# Notice\n\n"
-        "**Applies to:** Lagniappe 1.24  \n"
+        "**Applies to:** Lagniappe 1.24.0  \n"
         "**Effective date:** July 26, 2026  \n",
         encoding="utf-8",
     )
     reporting_template.write_text(
         "<p>\n"
-        "  Applies to: Lagniappe 1.24\n"
+        "  Applies to: Lagniappe 1.24.0\n"
         "  <br>\n"
         "  Effective date: July 26, 2026\n"
         "</p>\n",
@@ -3070,8 +3151,8 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch.setattr(run, "REPORTING_PRIVACY_MARKDOWN_PATH", reporting_markdown)
     monkeypatch.setattr(run, "REPORTING_PRIVACY_TEMPLATE_PATH", reporting_template)
     settings = types.SimpleNamespace(
-        NODE={"version": "1.24"},
-        APP={"VERSION": "1.24", "BUILD_ID": "build1234"},
+        NODE={"version": "1.24.0"},
+        APP={"VERSION": "1.24.0", "BUILD_ID": "build1234"},
     )
     saved = {}
 
@@ -3102,21 +3183,21 @@ def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch.setitem(sys.modules, "config", config_module)
     monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
 
-    assert run.run_version_command(["set", "1.25"]) == 0
+    assert run.run_version_command(["set", "1.25.0"]) == 0
 
-    assert settings.NODE["version"] == "1.25"
-    assert settings.APP["VERSION"] == "1.25"
+    assert settings.NODE["version"] == "1.25.0"
+    assert settings.APP["VERSION"] == "1.25.0"
     assert "BUILD_ID" not in settings.APP
     assert saved == {
-        "package": {"version": "1.25"},
-        "settings": {"VERSION": "1.25"},
+        "package": {"version": "1.25.0"},
+        "settings": {"VERSION": "1.25.0"},
     }
-    assert lock_versions == ["1.25"]
+    assert lock_versions == ["1.25.0"]
     assert release_note.read_text() == (
-        "# Version 1.25\n\n- Existing release detail\n"
+        "# Version 1.25.0\n\n- Existing release detail\n"
     )
-    assert "**Applies to:** Lagniappe 1.25  " in reporting_markdown.read_text()
+    assert "**Applies to:** Lagniappe 1.25.0  " in reporting_markdown.read_text()
     assert "**Effective date:** July 26, 2026  " in reporting_markdown.read_text()
-    assert "  Applies to: Lagniappe 1.25\n" in reporting_template.read_text()
+    assert "  Applies to: Lagniappe 1.25.0\n" in reporting_template.read_text()
     assert "  Effective date: July 26, 2026\n" in reporting_template.read_text()
-    assert "VERSION set to 1.25" in capsys.readouterr().out
+    assert "VERSION set to 1.25.0" in capsys.readouterr().out

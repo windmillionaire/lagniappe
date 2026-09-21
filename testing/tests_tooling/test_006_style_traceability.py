@@ -521,7 +521,17 @@ unused:
         "unknown-style-reference",
         "unused-style-definition",
     }
-    assert payload["findings"][0]["severity"] == "error"
+    severities = {
+        finding["kind"]: finding["severity"] for finding in payload["findings"]
+    }
+    assert severities == {
+        "unknown-style-reference": "error",
+        "unused-style-definition": "warning",
+    }
+
+    finding_ids = payload["finding_ids"]
+    report.provenance = {"generated_at": "later"}
+    assert style_traceability.report_payload(report)["finding_ids"] == finding_ids
 
 
 def test_style_manifest_links_explicit_test_evidence(tmp_path):

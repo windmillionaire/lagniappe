@@ -144,7 +144,7 @@
           "execution_verified": false,
           "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
           "archive_sha256": "a0fdf6c5cc80114a89916dcd6151beacdb23b9b43d1e089ffa53fd699bb33ae8",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/01-ask-known-page/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
         },
         "on-site": {
           "run_id": "unified-ai-20260916",
@@ -216,7 +216,7 @@
           "artifacts": "cases/02-ask-books-filter/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "09fc0b58008d4ca4192b57b6e6852492975b760c6fdbd53825fbfe60d1020cb5",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/baseline/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/02-ask-books-filter/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -276,7 +276,7 @@
           "artifacts": "cases/02-ask-books-filter/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "c637488cccf17eb9b326f7ae6a6c4468df0219b4a590d25e9c0d85ed420f292d",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/02-ask-books-filter/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -479,7 +479,7 @@
           "execution_verified": false,
           "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
           "archive_sha256": "97cc51cc8ddcb322cc67ae884118c9f1f1847498e161084d25a2132ed8c6215a",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/03-create-personal-task/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/03-create-personal-task/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
         },
         "on-site": {
           "run_id": "unified-ai-cleanup-20260917",
@@ -673,7 +673,7 @@
           "artifacts": "cases/04-create-related-records/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "1b668f68633b09dae66da0183ad0f5a9d66626c65c1f20d8b3ee53d8c49d19b5",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/04-create-related-records/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/04-create-related-records/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -818,7 +818,7 @@
           "artifacts": "cases/05-revise-ready-create-plan/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "fd16f2fe55566c435d2016c0ce4f7d700452664fd626691a9da779cbf4871f1b",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/05-revise-ready-create-plan/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/05-revise-ready-create-plan/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -974,7 +974,7 @@
           "artifacts": "cases/06-organize-vcard/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "b3848f43efbbfe86486b8a1046ef156e43e1abca7c48d04c4c8c52eae3457e71",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/06-organize-vcard/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/06-organize-vcard/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -1129,7 +1129,7 @@
           "artifacts": "cases/07-organize-bug-screenshot/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "f55d25dcae2b0bcd6b5ce6ca4392cdd987ab19b5f0d3cf08b1f2dd46800996fc",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/07-organize-bug-screenshot/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/07-organize-bug-screenshot/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -1384,7 +1384,7 @@
           "execution_verified": false,
           "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
           "archive_sha256": "b95bf917e47fbc9b4c98aa715e4df89d5b9f7678d4d835766b80c4a61b55ac02",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/08-organize-mixed-files/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
         },
         "on-site": {
           "run_id": "unified-ai-cleanup-20260917",
@@ -1570,7 +1570,7 @@
           "artifacts": "cases/09-create-project/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "9e882e9a9f33b4c25ccdffc3153b38493ac03a2d9e3d49125b42e08cff7dd723",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/baseline/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/09-create-project/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -1625,7 +1625,7 @@
           "artifacts": "cases/09-create-project/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "3bc6f46358732d90d9bbf7adf9657b39efd5e87a40438cda5b4d1243ae6c8af2",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/09-create-project/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -1772,7 +1772,7 @@
           "artifacts": "cases/10-create-recurring-reminder/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "fc58bc2ada6eb1d95aa9ba6fdc965acb8964e9b4b0d54aa3237c8a584e15c28a",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/10-create-recurring-reminder/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/10-create-recurring-reminder/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -1870,7 +1870,7 @@
           "artifacts": "cases/11-ask-approximate-issue/artifacts/baseline",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "77088608e3601ea3a7a2795d7ceef0fb495187dd76eadadc95aecb1ba2b485cd",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/baseline/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/11-ask-approximate-issue/artifacts/baseline/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/mcp-round-3.md",
           "client": "Codex",
           "client_version": "0.153.2",
@@ -1925,7 +1925,7 @@
           "artifacts": "cases/11-ask-approximate-issue/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "e2171de84986dad57e8afea46473819110373688b56dce4d870305a82e38a365",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/11-ask-approximate-issue/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -2096,7 +2096,7 @@
           "artifacts": "cases/12-create-page-from-documents/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "b85c63f2206ad8963f2beaa974c41a0a4ad9a8c0c241fff6bf7f95a0b727beac",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/12-create-page-from-documents/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/12-create-page-from-documents/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -2251,7 +2251,7 @@
           "artifacts": "cases/13-create-one-task-from-note/artifacts/current",
           "archive_file": "CODEX_ARCHIVE.jsonl",
           "archive_sha256": "6482d8805f63bb7d038a9fbdb1baa29d0275fbe278fa4ef4362726bc1becf656",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/13-create-one-task-from-note/artifacts/current/CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/13-create-one-task-from-note/artifacts/current/CODEX_ARCHIVE.jsonl",
           "comparison": "comparisons/remote-mcp-pilot-20260905.md",
           "client": "Codex",
           "client_version": "0.153.4",
@@ -2408,7 +2408,7 @@
           "execution_verified": false,
           "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
           "archive_sha256": "43dcb81c5c704da7bf04c762b8496b2d65a632fa3be81c8eee3e255d89e5001d",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/U1-existing-files-new-tasks/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/U1-existing-files-new-tasks/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
         },
         "on-site": {
           "run_id": "unified-ai-20260916",
@@ -2537,7 +2537,7 @@
           "execution_verified": false,
           "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
           "archive_sha256": "5fac10e80a9211803a4839f915c2bcaf894935d837c70f4c5bebe57e0f015913",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/U2-evidence-only-answer/artifacts/current/mcp__CODEX_ARCHIVE.jsonl",
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/U2-evidence-only-answer/artifacts/current/mcp__CODEX_ARCHIVE.jsonl",
           "run_date_local": "2026-09-16"
         },
         "on-site": {
@@ -2664,7 +2664,7 @@
           "execution_verified": false,
           "archive_file": "mcp__CODEX_ARCHIVE.jsonl",
           "archive_sha256": "927057c7acbfe36fcbbd3b0f0b563dba6f4251c8260d5f4a7f02977c465c5eb0",
-          "source_local": "/home/swifty/lagniappe/testing_ai_workflows/cases/U2-evidence-only-answer/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
+          "source_local": "/home/swifty/lagniappe/testing/ai_test_cases/cases/U2-evidence-only-answer/artifacts/baseline/mcp__CODEX_ARCHIVE.jsonl"
         }
       }
     }

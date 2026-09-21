@@ -49,11 +49,11 @@ Launch under `/home/swifty/Desktop/lagniappe-mcp-trial/<case>/fixtures/`.
 When finished, ask “Export this chat to …” with the appropriate destination:
 
 ```text
-/home/swifty/lagniappe/testing_ai_workflows/cases/01-ask-known-page/artifacts/current/mcp
-/home/swifty/lagniappe/testing_ai_workflows/cases/02-ask-books-filter/artifacts/current/mcp
-/home/swifty/lagniappe/testing_ai_workflows/cases/08-organize-mixed-files/artifacts/current/mcp
-/home/swifty/lagniappe/testing_ai_workflows/cases/09-create-project/artifacts/current/mcp
-/home/swifty/lagniappe/testing_ai_workflows/cases/11-ask-approximate-issue/artifacts/current/mcp
+/home/swifty/lagniappe/testing/ai_test_cases/cases/01-ask-known-page/artifacts/current/mcp
+/home/swifty/lagniappe/testing/ai_test_cases/cases/02-ask-books-filter/artifacts/current/mcp
+/home/swifty/lagniappe/testing/ai_test_cases/cases/08-organize-mixed-files/artifacts/current/mcp
+/home/swifty/lagniappe/testing/ai_test_cases/cases/09-create-project/artifacts/current/mcp
+/home/swifty/lagniappe/testing/ai_test_cases/cases/11-ask-approximate-issue/artifacts/current/mcp
 ```
 
 The existing installed Export Chat skill is unchanged. A reusable copy, including

@@ -44,6 +44,23 @@ def test_failure_capture_does_not_mask_screenshot_errors(monkeypatch, tmp_path):
     assert not list(tmp_path.iterdir())
 
 
+def test_test_results_writes_one_escaped_report(monkeypatch, tmp_path):
+    monkeypatch.setattr(test_reporting, "REPORTS_DIR", tmp_path)
+    results = test_reporting.TestResults("unsafe test/name")
+    results.record("prompt <label>", "<script>alert('unsafe')</script>")
+
+    report_path = Path(results.finalize())
+    html = report_path.read_text(encoding="utf-8")
+
+    assert report_path.parent == tmp_path
+    assert report_path.name.startswith("unsafe_test_name_")
+    assert "prompt &lt;label&gt;" in html
+    assert "&lt;script&gt;alert(&#x27;unsafe&#x27;)&lt;/script&gt;" in html
+    assert "<script>alert('unsafe')</script>" not in html
+    assert results.finalize() is None
+    assert list(tmp_path.iterdir()) == [report_path]
+
+
 def test_browser_review_dir_is_timestamped_folder(tmp_path):
     review_dir = browser_review.create_review_dir(
         "Home First Load",
@@ -120,6 +137,8 @@ def test_browser_review_capture_cleans_failed_folder(
     monkeypatch, tmp_path, keep_failed, exists_after_failure
 ):
     review_dir = tmp_path / "failed-review"
+    monkeypatch.setenv("FLASK_ENV", "tooling-test")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "isolated-home")
 
     def fake_create_review_dir(name):
         (review_dir / "screenshots").mkdir(parents=True)

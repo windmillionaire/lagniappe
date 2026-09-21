@@ -12,6 +12,9 @@ from testing.utility import (
 )
 
 
+pytestmark = pytest.mark.tooling
+
+
 @pytest.fixture
 def native_inventory(tmp_path, monkeypatch):
     path = tmp_path / "testing/tests_js/test_example.mjs"
@@ -207,13 +210,24 @@ def test_native_reporter_requires_one_result_and_rejects_late_failures():
     assert (
         native_js.interpret_result(json.dumps(passed), "", 0, "test_example") == passed
     )
-    for output in (
-        "",
-        "invalid json",
-        json.dumps(passed) + "\n" + json.dumps(passed),
-        json.dumps(passed)
-        + "\n"
-        + json.dumps({"type": "test:fail", "name": "file", "error": "late failure"}),
+    for output, diagnostic in (
+        ("", "matching results 0"),
+        ("invalid json", "Invalid Node reporter output"),
+        (json.dumps(passed) + "\n" + json.dumps(passed), "matching results 2"),
+        (
+            json.dumps(passed)
+            + "\n"
+            + json.dumps(
+                {"type": "test:fail", "name": "file", "error": "late failure"}
+            ),
+            "late failure",
+        ),
     ):
-        with pytest.raises(native_js.JavaScriptFailure):
+        with pytest.raises(native_js.JavaScriptFailure) as error:
             native_js.interpret_result(output, "", 0, "test_example")
+        assert diagnostic in str(error.value)
+
+    with pytest.raises(native_js.JavaScriptFailure, match="exit 1"):
+        native_js.interpret_result(
+            json.dumps(passed), "process exited unexpectedly", 1, "test_example"
+        )

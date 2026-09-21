@@ -27,7 +27,7 @@ begin in the [README](../README.md).
 | [AI_EMAIL.md](AI_EMAIL.md) | Inbound email webhooks, attachment retrieval, reports, review, and feedback. |
 | [AI_EXTERNAL_API.md](AI_EXTERNAL_API.md) | REST API keys, the remote MCP service, and permission-bounded external plans. |
 | [EXTERNAL_AI_IMPLEMENTATION.md](EXTERNAL_AI_IMPLEMENTATION.md) | API-to-skill-to-MCP development history, trial findings and the retained design. |
-| [Reusable workflow cases](../testing_ai_workflows/README.md) | Natural prompts, fixtures, rubrics, latest live results and targeted comparisons. |
+| [Reusable workflow cases](../testing/ai_test_cases/README.md) | Natural prompts, fixtures, rubrics, latest live results and targeted comparisons. |
 
 ## Backend
 
