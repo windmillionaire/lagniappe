@@ -79,7 +79,12 @@ export class TaskForm extends FormWidget {
 	}
 
 	get historyFillEnabled() {
-		return Boolean(!this.readonly && this.hasHistory && this.historyFillRoute);
+		return Boolean(
+			!this.revisionPreview &&
+				!this.readonly &&
+				this.hasHistory &&
+				this.historyFillRoute,
+		);
 	}
 
 	/**

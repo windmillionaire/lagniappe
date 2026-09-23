@@ -1,2 +1,32 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="e0447bcd-7052-4b68-86a9-d081589291ee",e._sentryDebugIdIdentifier="sentry-dbid-e0447bcd-7052-4b68-86a9-d081589291ee");}catch(e){}}();import{F as i}from"./formWidget.js?v=bd8b0f99";import"./controller.js?v=bd8b0f99";import"./primitives.js?v=bd8b0f99";import"./styles.js?v=bd8b0f99";import"./icons.js?v=bd8b0f99";import"./foundation.js?v=bd8b0f99";import"./upstreamUnavailable.js?v=bd8b0f99";import"./connectivity.js?v=bd8b0f99";import"./loader.js?v=bd8b0f99";import"./modal.js?v=bd8b0f99";import"./representation.js?v=bd8b0f99";class s extends i{constructor(t){super(t),this.messages={submit:"Save Restrictions",submitting:"Saving Restrictions",submitted:"Restrictions Saved"}}}export{s as PagePermissions};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormWidget } from './formWidget.js?v=b6b75cd2';
+import './controller.js?v=b6b75cd2';
+import './primitives.js?v=b6b75cd2';
+import './styles.js?v=b6b75cd2';
+import './icons.js?v=b6b75cd2';
+import './foundation.js?v=b6b75cd2';
+import './upstreamUnavailable.js?v=b6b75cd2';
+import './connectivity.js?v=b6b75cd2';
+import './loader.js?v=b6b75cd2';
+import './modal.js?v=b6b75cd2';
+import './reviewBar.js?v=b6b75cd2';
+import './representation.js?v=b6b75cd2';
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
+ * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restrictions_save_drafts_and_show_each_source
+ * @matrix pages : permission-gates permissions-panel access-restrictions explicit-submit group-restricted owner-restricted source-summary
+ */
+class PagePermissions extends FormWidget {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Save Restrictions",
+			submitting: "Saving Restrictions",
+			submitted: "Restrictions Saved",
+		};
+	}
+}
+
+export { PagePermissions };

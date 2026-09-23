@@ -1,2 +1,76 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="5a547d97-9594-4f63-aa84-265c731b34a6",e._sentryDebugIdIdentifier="sentry-dbid-5a547d97-9594-4f63-aa84-265c731b34a6");}catch(e){}}();import{a as i}from"./base2.js?v=bd8b0f99";import"./styles.js?v=bd8b0f99";import"./icons.js?v=bd8b0f99";import"./foundation.js?v=bd8b0f99";import"./upstreamUnavailable.js?v=bd8b0f99";import"./connectivity.js?v=bd8b0f99";import"./primitives.js?v=bd8b0f99";import"./select2.js?v=bd8b0f99";import"./combobox.js?v=bd8b0f99";import"./results.js?v=bd8b0f99";import"./storage.js?v=bd8b0f99";import"./formatting.js?v=bd8b0f99";import"./submitter.js?v=bd8b0f99";import"./controller.js?v=bd8b0f99";import"./loader.js?v=bd8b0f99";class e extends i{constructor(t){super(t),this.key="visibility",this.targetSelectTitle="Show this element when",this.messages={submit:"Add Visibility Condition"}}init(){this.index!==-1?(this.setTitle("Edit Visibility Condition"),this.messages.submit="Update Visibility Condition",this.setting={...this.element.schema.visibility?.[this.index]}):(this.setTitle("Create Visibility Condition"),this.setting={}),super.init(),this.builder.getEligibleConditionTargets().length===0?this.form.showError("Visibility cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting the visibility of this element."):super.addTargetSelect(),this.showProgress()}showProgress(){const t=this.builder.elements.get(this.setting.id);t&&(t.schema.type==="checkbox"?(this.addCheckboxTarget(),this.complete=!0):(this.addChooseValue(),this.setting.value&&(this.complete=!0)),super.showProgress())}}export{e as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { a as ConditionTarget } from './base2.js?v=b6b75cd2';
+import './styles.js?v=b6b75cd2';
+import './icons.js?v=b6b75cd2';
+import './foundation.js?v=b6b75cd2';
+import './upstreamUnavailable.js?v=b6b75cd2';
+import './connectivity.js?v=b6b75cd2';
+import './primitives.js?v=b6b75cd2';
+import './select2.js?v=b6b75cd2';
+import './combobox.js?v=b6b75cd2';
+import './results.js?v=b6b75cd2';
+import './storage.js?v=b6b75cd2';
+import './formatting.js?v=b6b75cd2';
+import './submitter.js?v=b6b75cd2';
+import './controller.js?v=b6b75cd2';
+import './loader.js?v=b6b75cd2';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility_select_multiple_values
+ * @matrix forms : builder-field-visibility select-or-values
+ */
+class Visibility extends ConditionTarget {
+	constructor(builder) {
+		super(builder);
+		this.key = "visibility";
+		this.targetSelectTitle = "Show this element when";
+		this.messages = {
+			submit: "Add Visibility Condition",
+		};
+	}
+
+	init() {
+		if (this.index !== -1) {
+			this.setTitle("Edit Visibility Condition");
+			this.messages.submit = "Update Visibility Condition";
+			this.setting = { ...this.element.schema.visibility?.[this.index] };
+		} else {
+			this.setTitle("Create Visibility Condition");
+			this.setting = {};
+		}
+
+		super.init();
+
+		const targets = this.builder.getEligibleConditionTargets();
+		if (targets.length === 0) {
+			this.form.showError(
+				"Visibility cannot be set using available components. " +
+					"Please add a radio button, checkbox, or select menu to the form before " +
+					"setting the visibility of this element.",
+			);
+		} else {
+			super.addTargetSelect();
+		}
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		const target = this.builder.elements.get(this.setting.id);
+		if (!target) return;
+
+		if (target.schema.type === "checkbox") {
+			this.addCheckboxTarget();
+			this.complete = true;
+		} else {
+			this.addChooseValue();
+			if (this.setting.value) this.complete = true;
+		}
+
+		super.showProgress();
+	}
+}
+
+export { Visibility as default };

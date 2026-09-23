@@ -5,6 +5,7 @@ import { areEqual } from "../../shared/utilities.mjs";
 import { incompatibleSchema } from "../representation.mjs";
 import { FormRevisionModal, WholeFormRevisionModal } from "./modals.mjs";
 import { loadRevisionPreview } from "./preview.mjs";
+import { renderReviewBar } from "../reviewBar.mjs";
 
 /**
  * Per-marker authoritative revision probing, comparison, and resolution for
@@ -95,6 +96,7 @@ export class EditReconciler {
 		}
 		const copy = marker.querySelector("[data-role='edited-message']");
 		if (copy && message) copy.textContent = message;
+		if (button) button.hidden = false;
 	}
 
 	_hide(marker) {
@@ -109,6 +111,8 @@ export class EditReconciler {
 		state.schemaChanged = false;
 		state.submissionChoice = false;
 		this._setAction(marker, "reset");
+		const widget = marker.closest?.("form[data-widget]")?._lp_widget;
+		if (widget?.target?.dataset?.formState) renderReviewBar(widget);
 	}
 
 	_show(marker) {
@@ -182,6 +186,20 @@ export class EditReconciler {
 	) {
 		const state = this._state(marker);
 		record ??= state.record;
+		if (response.form_state) {
+			// A new candidate is not acknowledgement of a new answer baseline.
+			widget.reviewState = {
+				...response.form_state,
+				revision: widget.reviewState?.revision ?? response.form_state.revision,
+			};
+			renderReviewBar(widget);
+		}
+		const explicitReview = Boolean(
+			response.form_state?.migration ||
+				response.form_state?.reviews?.some(
+					(review) => !widget._reviewedOperations?.has(review.operation),
+				),
+		);
 		const token = state.token;
 		const anchor = marker.closest?.("[lp-entity]");
 		const baselineFingerprint =
@@ -225,12 +243,15 @@ export class EditReconciler {
 		const active =
 			widget.component?.active === widget && widget.visible === true;
 		const ownedDeferredCompletion =
-			!unsaved && !queued ? this.ownedDeferredCompletion(marker, widget) : null;
+			!unsaved && !queued && widget.reviewState?.operation?.type !== "autofill"
+				? this.ownedDeferredCompletion(marker, widget)
+				: null;
 		// A page image (or other metadata) can advance the entity revision without
 		// changing this form. Keep its DOM, focus, and draft; the probe still records
 		// the checked revision, and real value/schema changes follow normal review.
 		if (
 			!queued &&
+			!explicitReview &&
 			!ownedDeferredCompletion &&
 			!schemaChanged &&
 			remoteSnapshot === widget.revisionBaseline
@@ -239,7 +260,10 @@ export class EditReconciler {
 			return;
 		}
 		const protectedRevision =
-			unsaved || queued || (!ownedDeferredCompletion && (active || focused));
+			explicitReview ||
+			unsaved ||
+			queued ||
+			(!ownedDeferredCompletion && (active || focused));
 		if (!protectedRevision) {
 			const commitRevision = await this._prepareRevision(widget, response);
 			await withTransition(
@@ -277,7 +301,8 @@ export class EditReconciler {
 		);
 		// Projection drops incompatible local values. A matching projection cannot
 		// acknowledge their loss while an unsaved or queued draft still owns them.
-		const requiresReview = (unsaved || queued) && incompatible;
+		const requiresReview =
+			explicitReview || ((unsaved || queued) && incompatible);
 
 		if (
 			!requiresReview &&
@@ -298,6 +323,7 @@ export class EditReconciler {
 		}
 
 		if (
+			(explicitReview && rendererCapable) ||
 			(rendererValuesDiffer && !schemaOnlyRevision) ||
 			(rendererCapable && incompatible)
 		) {
@@ -314,9 +340,10 @@ export class EditReconciler {
 				"review",
 				schemaChanged
 					? "The form fields and saved values changed elsewhere."
-					: "Saved values changed elsewhere.",
+					: "Another user has edited this form.",
 			);
 			this._show(marker);
+			if (widget.target?.dataset?.formState) renderReviewBar(widget);
 			return;
 		}
 
@@ -488,7 +515,8 @@ export class EditReconciler {
 			const widget = form?._lp_widget;
 			const completion = this.ownedDeferredCompletion(marker, widget);
 			if (response?.unchanged) {
-				this._hide(marker);
+				// A conditional response does not dismiss a still-unresolved review.
+				if (!state.response) this._hide(marker);
 				this.recordMarkerRevision(marker, { fingerprint, modified });
 				this.forgetDeferredCompletion(completion);
 				return;
@@ -519,9 +547,9 @@ export class EditReconciler {
 
 	async stageConflict(widget, { record, response } = {}) {
 		const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
-		if (!marker || !record || !response) return false;
+		if (!marker || !response) return false;
 		const revision = (response.entities || []).find(
-			(entity) => entity.key === record.target_key,
+			(entity) => entity.key === (record?.target_key ?? widget.key),
 		);
 		const state = this._state(marker);
 		const reconcile = (async () => {
@@ -557,7 +585,8 @@ export class EditReconciler {
 		const fieldSelection =
 			choice && typeof choice === "object" ? (choice.selections ?? {}) : null;
 		const localSelected = fieldSelection
-			? Object.values(fieldSelection).some((source) => source === "local")
+			? Object.values(fieldSelection).some((source) => source !== "server") ||
+				(!!choice.selectedSubmission && !state.record)
 			: choice === "local";
 
 		if (!localSelected) {
@@ -570,8 +599,8 @@ export class EditReconciler {
 				label: "edit-reconcile:resolve-server",
 			});
 		} else {
-			let selectedSubmission;
-			if (fieldSelection) {
+			let selectedSubmission = choice?.selectedSubmission;
+			if (fieldSelection && selectedSubmission === undefined) {
 				selectedSubmission = structuredClone(state.response.submission ?? {});
 				const localSubmission = choice.localResponse?.submission ?? {};
 				for (const [id, source] of Object.entries(fieldSelection)) {
@@ -610,6 +639,19 @@ export class EditReconciler {
 
 		const currentMarker =
 			widget.target?.querySelector("[lp-edited-marker]") ?? marker;
+		if (
+			!state.record &&
+			(state.response.form_state?.reviews?.length ||
+				state.response.form_state?.migration)
+		) {
+			widget._reviewedOperations ??= new Set();
+			for (const review of state.response.form_state?.reviews ?? [])
+				widget._reviewedOperations.add(review.operation);
+			widget._reviewedMigration = JSON.stringify(
+				state.response.form_state?.migration ?? null,
+			);
+			widget.markUnsavedState?.();
+		}
 		this._hide(currentMarker);
 		return true;
 	}
@@ -630,13 +672,30 @@ export class EditReconciler {
 			return;
 		}
 		const widget = marker.closest("form[data-widget]")?._lp_widget;
-		if (!widget || !state.response) {
-			this.fallback(marker);
-			return;
-		}
-
 		button.disabled = true;
 		try {
+			await state.probePromise;
+			await state.conflictPromise;
+			if (widget?.target?.dataset?.formState && !state.record) {
+				// Completion can arrive before the revision probe finishes. Refresh on
+				// opening, including cold loads with no staged response yet.
+				const response = await request.get(marker.dataset.editedRoute, null, {
+					acknowledgeEntities: false,
+					replaceErrorPage: false,
+				});
+				if (!response?.ok)
+					throw new Error(
+						"Could not load the latest form values. Please try Review again.",
+					);
+				if (!response.unchanged) {
+					state.token = {};
+					await this._stageRevision(marker, widget, response);
+				}
+			}
+			if (!widget || !state.response) {
+				this.fallback(marker);
+				return;
+			}
 			if (state.mode === "review") {
 				const modal = new FormRevisionModal(this, marker, widget, state);
 				const shown = await modal.init();

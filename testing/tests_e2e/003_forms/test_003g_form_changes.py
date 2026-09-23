@@ -482,7 +482,7 @@ def test_offline_submission_survives_schema_migration_until_review(
         expect(modal.get_by_text("unfinished", exact=True)).to_be_visible()
         local = modal.locator("[data-revision-source='local']")
         expect(local).to_be_disabled()
-        modal.get_by_role("button", name="Update values", exact=True).click()
+        modal.get_by_role("button", name="Use selected values", exact=True).click()
         expect(modal).not_to_be_attached()
         wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
         expect(submit).not_to_contain_text("Queued Sync")
@@ -852,6 +852,7 @@ def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_user):
     ] == [{"decision": "true"}, {"decision": "false"}]
 
 
+# @source src/script/forms/revisions/modals.mjs::FormRevisionModal
 # @matrix form-migration : modify-panel no-submission-read draft-undo saved-job progress reload recovery informational-notice readonly-modal
 # @matrix task-completion : original-view readonly permission-gates
 # @style radio.fieldset.column
@@ -992,18 +993,20 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
     task_resource.entity = converted[1]
     user.go(task_resource)
     task_form = task_resource.task_form
-    task_form.get_by_role("button", name="View changes", exact=True).click()
+    expect(task_form.locator("[data-role='edited-message']")).to_contain_text("fields have changed")
+    task_form.get_by_role("button", name="Review values", exact=True).click()
     modal = user.locate("#modal")
     expect(modal).to_contain_text("unknown")
     invalid = modal.get_by_text("Value not able to be converted", exact=True)
     expect(invalid).to_be_visible()
     expect(invalid).to_have_attribute("data-kind", "error")
     expect(invalid).to_have_css("font-style", "italic")
-    expect(modal).not_to_contain_text("Not provided")
-    expect(modal.get_by_role("radio")).to_have_count(0)
+    expect(modal.get_by_role("radio")).to_have_count(3)
+    expect(modal.get_by_role("radio", name="Before the schema change for Quantity", exact=True)).to_be_disabled()
+    expect(modal.get_by_label("Revise these values with AI")).to_be_visible()
     expect(modal.locator("header").get_by_role("button", name="Close", exact=True)).to_be_visible()
-    before = modal.get_by_role("heading", name="Before", exact=True)
-    after = modal.get_by_role("heading", name="After", exact=True)
+    before = modal.get_by_role("radio", name="Value in this tab for Quantity", exact=True)
+    after = modal.get_by_role("radio", name="Latest saved value for Quantity", exact=True)
     assert abs(before.bounding_box()["y"] - after.bounding_box()["y"]) < 2
     user.page.screenshot(path=tmp_path / "migration-modal-desktop.png")
     viewport = user.page.viewport_size
@@ -1035,8 +1038,8 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
     assert saved.description == "Settings updated after migration"
     assert saved.db.get("pre_migration") == saved_notice
     task_form = task_resource.task_form
-    expect(task_form.locator("[data-role='migration-notice']")).to_have_count(1)
-    task_form.get_by_role("button", name="View changes", exact=True).click()
+    expect(task_form.locator("[data-role='edited-message']")).to_contain_text("fields have changed")
+    task_form.get_by_role("button", name="Review values", exact=True).click()
     expect(modal.locator("#modal-content")).to_have_text(before_settings, use_inner_text=True)
     modal.get_by_role("button", name="Close", exact=True).click()
 
@@ -1048,7 +1051,7 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
     updated = Entities.fetch_one(tasks[1].key, request=Fetch.root())
     assert updated.properties.submission.value == {"notes": 8}
     assert not updated.db.get("pre_migration")
-    expect(task_resource.task_form.locator("[data-role='migration-notice']")).to_have_count(0)
+    expect(task_resource.task_form.locator("[lp-edited-marker]")).to_have_attribute("data-visible", "false")
 
     # Fresh tasks must adopt the newly published generation too.
     fresh = Entities.TASK.create(

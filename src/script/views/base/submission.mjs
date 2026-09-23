@@ -124,12 +124,32 @@ export class SubmissionManager {
 
 	successfulResponse(response, component) {
 		if (!response) return false;
+		if (response.already_running) {
+			component.active?.lockDeferredOperation?.(response);
+			void this.view
+				.ensureDeferredOperations?.()
+				.then((manager) =>
+					manager?.track(response.operation, {
+						node: component.active?.target,
+					}),
+				);
+			component?.showError?.(
+				response.message || "Autofill is already running. Your draft was kept.",
+			);
+			this._clearActiveSubmitter();
+			return false;
+		}
+		if (response.conflict) return false;
 
 		if (response.reload) {
 			window.location.reload();
 			return false;
-		} else if (response.error) {
-			component?.showError?.(response.error);
+		} else if (response.error || response.ok === false) {
+			component?.showError?.(
+				response.error ||
+					response.message ||
+					"The update was not saved. Please try again.",
+			);
 			this._clearActiveSubmitter();
 			return false;
 		} else if (response.modal) {
@@ -163,13 +183,67 @@ export class SubmissionManager {
 			return;
 		}
 
+		const submittedWidget = component.active;
+		const submittedSnapshot = submittedWidget?.revisionSnapshot?.();
+		const submittedValues =
+			submittedWidget?.captureFormState?.().renderer_submission;
 		const response = await request.put(route, data);
+		if (
+			component.active !== submittedWidget ||
+			submittedWidget?.target?.isConnected === false
+		) {
+			// The request still belongs to its original form after navigation.
+			if (response?.deferred && response.operation) {
+				const operations = await this.view.ensureDeferredOperations?.();
+				operations?.track(response.operation, {
+					status: response.status,
+					revision: response.revision,
+				});
+			}
+			this._clearActiveSubmitter();
+			return;
+		}
+		if (response?.conflict) {
+			const watcher = await this.view.ensureEditWatcher?.();
+			await watcher?.stageConflict?.(submittedWidget, { response });
+			this._clearActiveSubmitter();
+			return;
+		}
 		if (!this.successfulResponse(response, component)) return;
-		component.active?.form?.clearUnsavedState?.();
+		const changedDuringSave =
+			submittedSnapshot !== submittedWidget?.revisionSnapshot?.();
 		if (response.deferred) {
+			if (response.form_revision && submittedWidget) {
+				submittedWidget.reviewState =
+					response.form_state ?? submittedWidget.reviewState ?? {};
+				submittedWidget.reviewState.revision = response.form_revision;
+				if (submittedWidget.initialTarget) {
+					submittedWidget.initialTarget.dataset.formState = JSON.stringify(
+						submittedWidget.reviewState,
+					);
+					submittedWidget.initialTarget.dataset.submission = JSON.stringify(
+						response.submission ?? submittedValues,
+					);
+					submittedWidget.initialTarget.dataset.name = response.name ?? "";
+					submittedWidget.initialTarget.dataset.description =
+						response.description ?? "";
+				}
+				submittedWidget.submission = response.submission ?? submittedValues;
+				submittedWidget._revisionBaseline = submittedSnapshot;
+				submittedWidget._baselineSubmission = submittedValues;
+				delete submittedWidget._autofillRetry;
+			}
+			if (!changedDuringSave) submittedWidget?.form?.clearUnsavedState?.();
 			await this._deferredUpdated(response, component);
 			return;
 		}
+		if (changedDuringSave) {
+			const watcher = await this.view.ensureEditWatcher?.();
+			await watcher?.stageConflict?.(submittedWidget, { response });
+			this._clearActiveSubmitter();
+			return;
+		}
+		submittedWidget?.form?.clearUnsavedState?.();
 
 		try {
 			await component.updated(response);
@@ -259,6 +333,14 @@ export class SubmissionManager {
 	 * @matrix pages : autofill deferred form-schema refresh
 	 */
 	async _deferredUpdated(response, component) {
+		if (response.scope === "form-autofill" && !response.already_running) {
+			const subform = component.active?.form?._subForm;
+			if (subform) {
+				subform.target.dataset.visible = "false";
+				subform.reset?.();
+				component.active.form.toggleSubForm();
+			}
+		}
 		if (response.locked) {
 			component.active?.lockDeferredOperation?.(response);
 		}
@@ -268,6 +350,8 @@ export class SubmissionManager {
 		]);
 		operations?.track(response.operation, {
 			node: component.active?.target,
+			status: response.status,
+			revision: response.revision,
 		});
 		if (response.notification) {
 			notifications?.upsertNotification?.(response.notification);
@@ -284,6 +368,7 @@ export class SubmissionManager {
 
 		await withTransition(() => {
 			if (
+				response.scope !== "form-autofill" &&
 				!component.active?.target?.querySelector(
 					"[data-role='deferred-progress']",
 				)

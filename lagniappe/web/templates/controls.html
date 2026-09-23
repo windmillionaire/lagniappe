@@ -176,18 +176,26 @@
   </button>
 {% endmacro %}
 
-{% macro edited_marker(route) %}
+{% macro edited_marker(route, state={}) %}
+  {% set operation = state.operation %}
+  {% set has_review = state.reviews or state.migration %}
   <div lp-edited-marker
        data-edited-route="{{ route }}"
-       data-visible="false"
+       data-visible="{{ (has_review or operation)|yesno }}"
        aria-live="polite"
        class="{{ styles.message }} flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <span data-role="edited-message">This form changed elsewhere.</span>
+    <span data-role="edited-message">{% if state.reviews %}Autofill is complete.{% elif state.migration %}This form's fields have changed.{% elif operation %}Autofill is {{ operation.status }}.{% else %}Another user has edited this form.{% endif %}</span>
+    <span data-role="form-operation" {% if not operation %}hidden{% endif %}></span>
     <button type="button"
             data-role="edited-reset"
+            {% if operation and not has_review %}hidden{% endif %}
             class="font-semibold text-kind-default hover:text-kind-dark focus-visible:outline-none focus-visible:underline">
       Review update
     </button>
+    <button type="button" data-role="autofill-cancel" {% if not operation or not operation.can_cancel %}hidden{% endif %}
+            class="font-semibold text-kind-default hover:text-kind-dark">Cancel autofill</button>
+    <button type="button" data-role="autofill-retry" {% if not state.retry_operation %}hidden{% endif %}
+            class="font-semibold text-kind-default hover:text-kind-dark">Retry autofill</button>
   </div>
 {% endmacro %}
 

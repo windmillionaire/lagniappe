@@ -89,36 +89,49 @@ MCP service together.
 
 ## Autofill
 
-Autofill is a direct mutation for one Page or Task form. Its prompt includes:
+Autofill proposes selected-field updates for one Page or Task form. Its sealed
+launch input includes:
 
-- target name, description, schema, and partial submission;
+- target name, description, schema, and current typed submission;
 - compact parent Page and Category context for Tasks;
-- the target document where applicable; and
-- readable Files attached directly to the target.
+- references for optional Page/Category context through `get_entity`; and
+- compact readable target File references and any supplied original File.
 
 Existing answers use the same exact field-ID projection as `get_schema`, including
 typed table cells. Labels are context, never submission keys. Autofill validates
 the response against the target's effective schema using the same detached field
 validator as report planning. Unknown IDs and invalid values enter the shared conversation
 correction loop (at most two corrections); generation is marked validated only
-after this check succeeds. Existing nonempty answers, including false and zero,
-remain authoritative. Guarded apply validates all new values before mutation and
-preserves existing stored answers without converting them through AI text again.
+after this check succeeds. Populated fields may be corrected, and table/todo
+collections may grow. The model emits only changed fields; omission is not a
+clear. Field-type guidance is filtered to the schema, including table columns.
 
 It excludes Task history, sibling Tasks, completed Page Tasks, parent-Page Files,
-and general workspace lookup. Google Search may supply focused public facts.
+and eager general workspace lookup. Google Search may supply focused public facts.
 `get_file` appears only when a stored target attachment exists and is capped at
 two rounds.
 
-Autofill waits for enabled attachment summaries. A pending dependency reschedules
-without consuming provider retry; a failed summary stops with an actionable
-message. One-off prompt uploads are copied to a deterministically keyed File
-only after successful guarded apply and are cleaned up on any terminal result.
+Autofill never waits for summaries. A supplied original is read directly; other
+attachments are available via tools. Accepted starts atomically save current
+answers, the uploaded File attachment, the job and its reservation. Cancellation
+or failure retains the answers and File. Automatic retries reuse the sealed
+snapshot. Explicit Retry reuses the original prompt/file with the current draft.
 
-Page/Task Autofill acquires a durable `form-autofill` lock. Submit, quick-edit,
-and default-field routes reject conflicting mutations until terminal cleanup.
-The worker checks current authorization, active lock ownership, and a
-form-specific revision immediately before apply.
+The durable `form-autofill` lock prevents duplicate AI operations, not editing.
+Apply compares launch/current/proposed values under target, lease and reservation
+guards, committing an application receipt atomically. Concurrent human changes
+are preserved, with alternatives retained for review. Changed populated context
+or schema makes proposals review-only. Collections are whole-field alternatives,
+not guessed row-by-row merges. Old queued jobs without snapshots retain their
+strict revision guard.
+
+The common form review bar/modal also handles remote edits and schema changes.
+Prompt-only refinement stores an actor-private candidate; acceptance updates the
+open draft and ordinary Update saves it. Latest shared/per-actor candidates are
+referenced on the target, and unresolved referenced jobs are excluded from
+diagnostic deletion. Autofill uses a cancellable provider session with a
+120-second total budget and one transient retry within it, without nested SDK
+retry loops or delayed outer backoff. Model thinking configuration is unchanged.
 
 Multi-file Page upload summary is a separate synchronous route path. It checks
 `AI.CREATE`, runs the shared report summary prepass, then saves the Files.

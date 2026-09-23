@@ -24,8 +24,136 @@ async function setupSubmissionManager(t) {
 			"../../src/script/shared/transitions.mjs": { withTransition },
 		},
 	);
-	return { capturedErrors, SubmissionManager };
+	return { capturedErrors, SubmissionManager, request };
 }
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @pair submit:active-widget
+ */
+test("test_duplicate_autofill_start_keeps_draft_dirty", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	const messages = [];
+	const widget = {
+		target: document.body.appendChild(document.createElement("form")),
+		revisionSnapshot: () => "draft",
+		form: {
+			clearUnsavedState() {
+				assert.fail("Rejected start cleared the draft");
+			},
+		},
+		lockDeferredOperation() {},
+	};
+	const component = {
+		active: widget,
+		showError: (message) => messages.push(message),
+	};
+	const tracked = [];
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		ensureDeferredOperations: async () => ({
+			track: (key) => tracked.push(key),
+		}),
+	});
+	request.put.mock.mockImplementation(async () => ({
+		ok: false,
+		already_running: true,
+		deferred: true,
+		operation: "existing",
+		message: "Already running",
+	}));
+	await manager.update(component, new FormData(), "/task/update");
+	await new Promise(setImmediate);
+	assert.deepEqual(messages, ["Already running"]);
+	assert.deepEqual(tracked, ["existing"]);
+});
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @pair submit:active-widget
+ */
+test("test_autofill_ack_preserves_edits_made_during_request", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	const form = document.body.appendChild(document.createElement("form"));
+	let value = "Submitted";
+	const widget = {
+		target: form,
+		initialTarget: form.cloneNode(true),
+		revisionSnapshot: () => value,
+		captureFormState: () => ({ renderer_submission: { title: value } }),
+		form: {
+			clearUnsavedState() {
+				assert.fail("A newer edit must remain dirty");
+			},
+		},
+		lockDeferredOperation() {},
+	};
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		ensureDeferredOperations: async () => ({ track() {} }),
+	});
+	request.put.mock.mockImplementation(async () => {
+		value = "Typed while waiting";
+		return {
+			ok: true,
+			deferred: true,
+			operation: "job",
+			scope: "form-autofill",
+			locked: true,
+			form_revision: "saved",
+			submission: { title: "Submitted" },
+		};
+	});
+	await manager.update({ active: widget }, new FormData(), "/task/update");
+	assert.equal(value, "Typed while waiting");
+	assert.equal(widget.reviewState.revision, "saved");
+	assert.deepEqual(widget._baselineSubmission, { title: "Submitted" });
+	assert.equal(widget._revisionBaseline, "Submitted");
+});
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @pair submit:active-widget
+ */
+test("test_autofill_ack_does_not_decorate_new_active_widget", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	const form = document.body.appendChild(document.createElement("form"));
+	const widget = { target: form, revisionSnapshot: () => "submitted" };
+	const replacement = {
+		lockDeferredOperation() {
+			assert.fail("Decorated another form");
+		},
+		form: {
+			clearUnsavedState() {
+				assert.fail("Cleared another draft");
+			},
+		},
+	};
+	const component = { active: widget };
+	const tracked = [];
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		ensureDeferredOperations: async () => ({
+			track: (...args) => tracked.push(args),
+		}),
+	});
+	request.put.mock.mockImplementation(async () => {
+		component.active = replacement;
+		return {
+			ok: true,
+			deferred: true,
+			operation: "job",
+			scope: "form-autofill",
+			locked: true,
+		};
+	});
+	await manager.update(component, new FormData(), "/task/update");
+	assert.equal(tracked[0][0], "job");
+	assert.equal(tracked[0][1].node, undefined);
+});
 
 function createComponentElement(component) {
 	return {

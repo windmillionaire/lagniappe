@@ -54,6 +54,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "schema_version",
                 "assignment_revision",
                 "scheduled_uncomplete_token",
+                "deferred_job",
+                "autofill_reviews",
             }
         )
 
@@ -130,6 +132,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "scheduled": task_scheduling.Scheduled,
                 "periodic": task_scheduling.Periodic,
                 "submission": form_submission.FormSubmission,
+                "deferred_job": common_entity.DeferredJobReference,
             }
         )
         return properties

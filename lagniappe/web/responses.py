@@ -290,6 +290,7 @@ def document_image(url):
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::entity_response
 def page_task(task, **extra):
+    from lagniappe.web.deferred_autofill import form_state
     submission = task.properties.submission.form_value
     template = get_template_attribute("pages/tasks.html", "task")
     schema = task.submission_schema
@@ -301,6 +302,7 @@ def page_task(task, **extra):
                     "schema": schema,
                     "submission": submission,
                     "schema_error": task.submission_schema_error,
+                    "form_state": form_state(task),
                     **extra,
                 }
             ),
@@ -471,6 +473,7 @@ def new_file_upload(file, page):
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::entity_response
 def page_info(page, **extra):
+    from lagniappe.web.deferred_autofill import form_state
     template = get_template_attribute("pages/info.html", "info_form")
     schema = page.submission_schema if page.form else None
     submission = page.properties.submission.form_value if page.form else None
@@ -481,6 +484,7 @@ def page_info(page, **extra):
                     "html": template(page),
                     "schema": schema,
                     "submission": submission,
+                    "form_state": form_state(page),
                     **extra,
                 }
             ),

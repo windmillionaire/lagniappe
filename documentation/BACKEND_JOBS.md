@@ -93,8 +93,17 @@ proposal revisions. The report adapter rechecks that entitlement before provider
 preparation and publication. External corrective proposals and their approved
 execution remain independent of site provider access.
 
-Autofill uses a form-specific revision and active lock, so unrelated target
-settings do not cause false drift. Other mutation adapters use their declared
+Autofill snapshots launch answers/schema/context, saves accepted uploads at
+start, and reserves one AI run without locking ordinary editing. Guarded apply
+three-way merges whole fields and retains conflicts as review candidates; schema
+or populated-context drift requires review. Its atomic application receipt
+arbitrates cancellation versus a completed answer write. A resumed worker with
+that receipt completes delivery without rerunning generation or apply, including
+after the generation deadline or deletion of the original target. Unresolved candidates
+pin their terminal jobs against diagnostic deletion. Legacy jobs without a
+snapshot still use the original strict revision guard. Autofill has a cancellable
+120-second lifetime with one in-session transient retry and no outer backoff.
+Other mutation adapters use their declared
 target fingerprint. Report execution also checks the report's active operation
 and proposal fingerprint.
 

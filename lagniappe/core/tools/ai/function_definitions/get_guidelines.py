@@ -401,24 +401,9 @@ def _selected_values(value, allowed, field):
 # @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
 # @reason field-type section routing is asserted through filtered public guidance
 def _schema_type_guidance(field_types):
-    preamble, marker, remainder = SCHEMA_TYPE_GUIDELINES.partition("\n#### `input`")
-    if not marker:
-        return SCHEMA_TYPE_GUIDELINES
-    chunks = (marker + remainder).split("\n#### ")
-    selected = [preamble.strip()]
-    wanted = set(field_types)
-    for chunk in chunks:
-        if not chunk.strip():
-            continue
-        heading = chunk.splitlines()[0].casefold()
-        applies = {
-            field_type
-            for field_type in SCHEMA_FIELD_TYPES
-            if f"`{field_type}`" in heading
-        }
-        if applies & wanted:
-            selected.append(f"#### {chunk.strip()}")
-    return "\n\n".join(selected)
+    from ..guidelines.field_types import schema_type_guidance
+
+    return schema_type_guidance(field_types)
 
 
 # @testable false

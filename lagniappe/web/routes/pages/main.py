@@ -19,6 +19,7 @@ from lagniappe.core.tools.auth.references import (
 )
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.core.tools.polling.projections import page_tasks_revision
+from lagniappe.core.tools.forms import review as form_review
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -68,7 +69,7 @@ def _load_page_settings_relations(page, *, restrictions=False):
 # @matrix pages : document-tab load permission-gates readonly tabs
 # @matrix pages : access-restrictions source-summary
 @pages.route("<key>", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def view(key, **kwargs):
     page = _load_page_settings_relations(
         kwargs["entity"],
@@ -82,7 +83,7 @@ def view(key, **kwargs):
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def info(key, **kwargs):
     page = kwargs["entity"]
     return responses.page_info(page)
@@ -124,7 +125,7 @@ def document_settings(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @matrix tasks : basic create
 @pages.route("<key>/tasks", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW, fingerprint=page_tasks_revision)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.page_tasks_fingerprint)
 def tasks(key, **kwargs):
     page = kwargs["entity"]
 
@@ -314,7 +315,7 @@ def _is_offline_replay(form):
 # @pair pages:submission-validation
 # @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def update(key, **kwargs):
     page = kwargs["entity"]
 
@@ -342,6 +343,8 @@ def update(key, **kwargs):
 
     role = request.form.get("role")
     if role != "user-settings":
+        if not form_review.stage_submission_guard(page, request.form):
+            return deferred_autofill.conflict_response(page)
         locked = deferred_autofill.locked_response(page, request.form)
         if locked:
             return locked
@@ -395,7 +398,6 @@ def update(key, **kwargs):
                     request.form, input_name="autofill-file"
                 )
 
-        page.save()
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 page,
@@ -412,7 +414,11 @@ def update(key, **kwargs):
         except exceptions.ValidationError as error:
             return responses.error(str(error))
 
-    page.save()
+    form_review.acknowledge_reviews(page, current_user, request.form.getlist("reviewed-operation"))
+    try:
+        page.save()
+    except exceptions.MutationConflict:
+        return deferred_autofill.conflict_response(page)
     if _is_offline_replay(request.form):
         _offline_update_notification(page)
         return responses.entity_response(
@@ -437,7 +443,7 @@ def update_direct(key, **kwargs):
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
-    locked = deferred_autofill.locked_response(kwargs["entity"], request.form)
+    locked = deferred_autofill.locked_response(kwargs["entity"], upload_data)
     if locked:
         return locked
     return direct_uploads.direct_upload_response()

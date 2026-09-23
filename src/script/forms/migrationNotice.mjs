@@ -3,8 +3,8 @@ import { Modal } from "../shared/modal.mjs";
 
 /**
  * @testable true
- * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
- * @matrix form-migration : informational-notice readonly-modal
+ * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
+ * @matrix form-migration : informational-notice
  */
 export function installMigrationNotice(widget) {
 	widget._migrationNotice?.destroy();

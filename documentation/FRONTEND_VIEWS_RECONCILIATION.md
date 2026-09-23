@@ -24,8 +24,9 @@ routes continue to own HTML and full data.
 The watcher, reconciler, review modals, and detached preview adapter live in
 `forms/revisions/`. Core loads the watcher through `ensureEditWatcher()`;
 the other modules remain internal to that service. Pure schema compatibility
-comparisons live below them in `forms/representation.mjs`. Migration notices
-are separate FormWidget-owned UI in `forms/migrationNotice.mjs`.
+comparisons live below them in `forms/representation.mjs`. Page/Task migration,
+remote-edit, and autofill notices share the FormWidget-owned `forms/reviewBar.mjs`;
+`forms/migrationNotice.mjs` remains a fallback for forms without review state.
 
 A server-rendered entity anchor carries `data-key`, `data-fingerprint`, and,
 for Page/Task forms, `data-modified`. An `lp-edited-marker` inside a form points
@@ -163,9 +164,15 @@ deferred manager starts, so its initial DOM scan uses the correct progress text:
 form changes show
 **Schema migration in progress**, while autofill keeps its own queued message.
 Subsequent operation responses supply the current phase.
-The terminal result may replace an active form automatically only
-when the operation matches its durable lock and the form has no unsaved or
-queued state. Otherwise normal form reconciliation protects the draft.
+Autofill uses `forms/reviewBar.mjs` inside the existing edited marker, without
+disabling inputs or removing Submit. Only schema migration sets `deferredLock`.
+`data-form-state` seeds the answer revision, current operation, typed migration
+values and authorized AI candidates; `data-operation-bootstrap` seeds polling.
+An autofill completion never automatically replaces an actively viewed form,
+even when it is clean. The normal revision modal offers compatible values from
+the tab, saved form, pre-migration schema and AI candidates. Stale modal choices
+must be reopened before application. Prompt-only refinement is private until
+the user chooses values and performs an ordinary save.
 For a Task job owned by its parent Page, an unchanged Task entity poll still
 checks the matching operation lock. This installs completion even if an earlier
 poll already staged the saved values for review.

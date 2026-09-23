@@ -1,2 +1,886 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.2.2"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1b2b048d-0b85-408f-987e-2336b2cfe90d",e._sentryDebugIdIdentifier="sentry-dbid-1b2b048d-0b85-408f-987e-2336b2cfe90d");}catch(e){}}();import{F as S}from"./controller.js?v=bd8b0f99";import{STYLES as p}from"./styles.js?v=bd8b0f99";import{Modal as R}from"./modal.js?v=bd8b0f99";import{c as E}from"./representation.js?v=bd8b0f99";import{w as N}from"./foundation.js?v=bd8b0f99";function C(d){if(d._migrationNotice?.destroy(),d.target?.dataset.completed==="true")return;const e=JSON.parse(d.target?.dataset.migrationNotice||"[]");if(!e.length)return;const i=document.createElement("p");i.dataset.role="migration-notice",i.className="rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-900 ring-1 ring-amber-400",i.textContent="This form was updated \u2014 ";const s=i.appendChild(document.createElement("button"));s.type="button",s.className="font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2",s.textContent="View changes",d.target.prepend(i);const a=new R(d.view,s);d._migrationNotice={destroy:()=>{a.destroy(),i.remove()}},s.addEventListener("click",async()=>{const t=document.createElement("div");t.id="modal",t.className=p.modal.wrapper,t.dataset.kind=d.kind||d.component?.kind||d.view.kind||"default";const r=t.appendChild(document.createElement("section"));r.id="modal-content",r.className=`${p.modal.content} w-full sm:max-w-3xl`,r.setAttribute("role","dialog"),r.setAttribute("aria-modal","true"),r.setAttribute("aria-label","Form changes");const n=r.appendChild(document.createElement("header"));n.className=p.modal.header;const o=n.appendChild(document.createElement("h2"));o.className="text-lg font-bold text-base-dark",o.textContent="Form changes";const c=n.appendChild(document.createElement("button"));c.type="button",c.setAttribute("lp-control","close"),c.className=p.button.close,c.textContent="Close";const u=r.appendChild(document.createElement("div"));u.className="space-y-4 p-4 sm:p-6";const l=u.appendChild(document.createElement("p"));l.className="text-sm text-base-medium",l.textContent="These values changed when the form was updated. The notice clears when this submission is next saved or completed.";const h=u.appendChild(document.createElement("div"));h.className="space-y-4";for(const f of e){const g=h.appendChild(document.createElement("section"));g.className="rounded-md border border-base-light/50 bg-base-bg p-3";const v=g.appendChild(document.createElement("h3"));v.className="mb-2 font-semibold text-base-dark",v.textContent=f.label;const y=g.appendChild(document.createElement("div"));y.className="grid gap-2 sm:grid-cols-2";for(const _ of["before","after"]){const b=y.appendChild(document.createElement("div"));b.className="min-w-0 rounded-md border border-base-light/50 bg-white p-3";const w=b.appendChild(document.createElement("h4"));w.className="mb-2 text-xs font-semibold text-base-medium",w.textContent=_==="before"?"Before":"After";const m=b.appendChild(document.createElement("p"));m.className="whitespace-pre-wrap break-words text-sm",_==="after"&&f.reason==="invalid"?(m.dataset.kind="error",m.className+=" italic text-kind-default",m.textContent="Value not able to be converted"):m.textContent=f[_]}}await a.attach(t,d.component),c.focus()})}class x{constructor(e){Object.assign(this,e),this.destroyables=[],this.messages={},this.schema=e.schema||null,this.submission=e.submission||null,this.form=null,this.initialTarget=this.target?this.target.cloneNode(!0):null,this.initialized=!1,this.unsavedState=!1,this._revisionBaseline=null,this._created=!1,this._updated=!1,this._success=!1,this._preparedReset=null,this._preparingReset=null,this._preparingState=null,this._resetEpoch=0,this._replacementVersion=0,this._replacementPromise=null,this._replacementInert=null,this._migrationNotice=null,this._deferredOperation=this.target?.dataset?.operation||null,this._click=this._click.bind(this)}get deferredLocked(){return!!(this._deferredOperation&&this.target?.dataset?.deferredLock)}lockDeferredOperation(e={}){const i=e.operation||e.key;if(!i)return!1;this._deferredOperation=i;for(const s of[this.target,this.initialTarget])s&&(s.dataset.operation=i,s.dataset.operationRevision=String(e.revision??0),s.dataset.operationScope=e.scope||"",s.dataset.deferredLock="form");return this.clearUnsavedState(),!0}get showEmptyFields(){return this.readonly&&this.component?.showEmptyFields===!0}get formData(){const e=this.target instanceof HTMLFormElement?new FormData(this.target):new FormData;return this.form?._subForm?.applyDirectUploads?.(e)??e}get revisionEntries(){return[]}get revisionBaseline(){return this._revisionBaseline}revisionSnapshot(){const e=new Map,i=[...this.formData.entries(),...this.revisionEntries];for(const[s,a]of i){let t=a;if(typeof File<"u"&&a instanceof File){if(!a.name&&a.size===0)continue;t=JSON.stringify({name:a.name,size:a.size,type:a.type,lastModified:a.lastModified})}const r=e.get(s)??[];r.push(String(t)),e.set(s,r)}return JSON.stringify(Array.from(e.entries()).sort(([s],[a])=>s.localeCompare(a)).map(([s,a])=>[s,a.sort()]))}commitRevisionBaseline({clearUnsaved:e=!1}={}){return this._revisionBaseline=this.revisionSnapshot(),e&&this.clearUnsavedState(),this._revisionBaseline}revisionCanReset(e){return!!(e&&e.name===this.name)}captureFormState(){const e=[],i=[];for(const[a,t]of this.formData.entries())typeof File<"u"&&t instanceof File?t.name&&t.size>0&&i.push({name:a,file:t,filename:t.name,type:t.type}):e.push([a,t]);const s=Array.from(this.target?.querySelectorAll?.("[data-combobox-id]")||[]).filter(a=>!a.closest?.(".form-element")).map(a=>{const t=a._lp_combobox;return t?.name?{name:t.name,options:(t.options||[]).filter(r=>t.values?.has(r.id))}:null}).filter(Boolean);return{fields:e,files:i,form_controls:s,renderer_submission:this.form?.renderer?._packageSubmission?.()??null}}buildLocalRevision(e,i=this.captureFormState()){const s=e.schema??[],a=new Set(s.map(l=>l?.id).filter(Boolean)),t=new Set((this.schema??[]).map(l=>l?.id).filter(Boolean)),r=e.submission??{},n=structuredClone(r),o=i.renderer_submission??{};for(const l of t)!a.has(l)||!Object.hasOwn(o,l)||!E(this.schema.find(h=>h.id===l),s.find(h=>h.id===l))||(n[l]=structuredClone(o[l]));const c=e.html?.cloneNode(!0)??null,u=c?.querySelector(`[data-widget='${this.name}']`);return this._applyQueuedFields(u,i),{state:i,response:{...e,html:c,schema:s,submission:n}}}async prepareRevision(e){return await this.updated(e),this._success=!1,await this.prereconcile(),()=>{this.postreconcile(),this.commitRevisionBaseline({clearUnsaved:!0})}}async applyRevision(e){(await this.prepareRevision(e))()}async prepareLocalRevision(e,{remoteSnapshot:i=null,markUnsaved:s=!1,selectedSubmission:a=void 0}={}){const t=this.unsavedState===!0,r=this.form?._queued===!0,n=this.buildLocalRevision(e);return a!==void 0&&(n.response.submission=a),await this.updated(n.response),this._success=!1,await this.prereconcile(),()=>{this._skipQueuedRestore=!0;try{this.postreconcile(),this._restoreQueuedFiles(n.state)}finally{this._skipQueuedRestore=!1}return i!==null&&(this._revisionBaseline=i),r?this.form?.queued():t||s?this.markUnsavedState():this.commitRevisionBaseline({clearUnsaved:!0}),n}}async applyLocalRevision(e,i={}){return(await this.prepareLocalRevision(e,i))()}async prepareSubmit(e){return this.deferredLocked?!1:await this.form?._subForm?.prepareSubmit?.(e)??!0}markUnsavedState(){this.readonly||this.headless||(this.unsavedState=!0,this.form?.syncOfflineState?.())}clearUnsavedState(){this.unsavedState=!1}async init(){this.target?.hasAttribute("lp-load")&&!this.target.hasAttribute("loaded")||(await this._initForm(),this.commitRevisionBaseline(),this.initialized=!0,this.target.setAttribute("initialized",""))}async stageOfflineConflict(e=this._offlineConflict){return e?(this.view?.EditWatcher||await this.view?.ensureEditWatcher?.())?.stageConflict?.(this,e):void 0}_applyQueuedFields(e,i){if(!e)return;const s=new Map;for(const[t,r]of i.fields||[]){const n=s.get(t)||[];n.push(String(r)),s.set(t,n)}for(const t of["name","description"])s.has(t)&&(e.dataset[t]=s.get(t)[0]||"");for(const t of e.querySelectorAll("[name]")){const r=s.get(t.name)||[];if(t instanceof HTMLInputElement)if(["checkbox","radio"].includes(t.type)){const n=r.includes(t.value);t.checked=n,t.defaultChecked=n,t.toggleAttribute("checked",n);const o=t.closest("[data-role='attribute']");o&&(o.dataset.selected=n.toString())}else t.type!=="file"&&r.length>0&&(t.value=r[0],t.defaultValue=r[0],t.setAttribute("value",r[0]));else if(t instanceof HTMLTextAreaElement)t.value=r[0]||"",t.defaultValue=t.value,t.textContent=t.value;else if(t instanceof HTMLSelectElement)for(const n of t.options){const o=r.includes(n.value);n.selected=o,n.defaultSelected=o,n.toggleAttribute("selected",o)}}const a=Array.from(e.querySelectorAll("[name], [data-index]"));for(const t of i.form_controls||[]){const r=a.find(c=>c.getAttribute("name")===t.name||c.dataset.index===t.name);if(!r)continue;const n=r.closest("[lp-select]")||r,o=JSON.stringify(t.options||[]);r.dataset.preload=o,n.dataset.preload=o}}_restoreQueuedFiles(e){if(typeof DataTransfer>"u")return;const i=new Map;for(const s of e.files||[]){const a=i.get(s.name)||[];a.push(s.file),i.set(s.name,a)}for(const s of this.target.querySelectorAll("input[type='file'][name]")){const a=i.get(s.name);if(a?.length)try{const t=new DataTransfer;for(const r of a)t.items.add(r);s.files=t.files}catch{}}}async _initForm({replace:e=!0}={}){if(e&&this.initialTarget){const s=this.target?.dataset.visible;s!==void 0&&(this.initialTarget.dataset.visible=s),this.target.replaceWith(this.initialTarget),this.target=this.initialTarget,this.initialTarget=this.target.cloneNode(!0)}else this.initialTarget||(this.initialTarget=this.target.cloneNode(!0));if(this.target._lp_widget=this,this.form=new S(this),await this.form.init(),this.target.dataset.migrationNotice&&this.target.dataset.migrationNotice!=="[]"&&C(this),this.target.dataset.formGeneration!==void 0){const s=document.createElement("input");s.type="hidden",s.name="form-generation",s.value=this.target.dataset.formGeneration,this.target.append(s)}this.target.addEventListener("click",this._click),(this.target.matches?.("[data-operation]")||this.target.querySelector?.("[data-operation]"))&&(await this.view?.ensureDeferredOperations?.())?.scan(this.target),this.initialized=!0,this.loaded=this.target.hasAttribute("loaded"),this.target.setAttribute("initialized","")}_click(e){if(this.readonly)return;const i=e.target.closest(".form-element"),s=e.target.closest("[data-role]")?.dataset.role;s!=="edit"&&s!=="clear"||(e.preventDefault(),e.stopPropagation(),s==="edit"?N(()=>{i.dataset.mode="edit"},{label:"form:edit-field"}):s==="clear"&&(i?._lp_element??this.form.renderer?.elements.get(i.id))?.clear?.())}get header(){return this.target?.querySelector("[data-role='header']")}get submitGroup(){return this.target?.querySelector("[data-role='submit-group']")}get submitButton(){return this.target?.querySelector('button[type="submit"]:not([data-role])')}async prepareReset(e={}){if(this._preparingReset)return this._preparingReset;if(this._preparedReset)return;const i=this._prepareReset(e);this._preparingReset=i;try{await i}finally{this._preparingReset===i&&(this._preparingReset=null)}}async _prepareReset({nextTarget:e=(this.initialTarget||this.target).cloneNode(!0),staged:i={},beforeInit:s=null,afterInit:a=null}={}){if(this._preparedReset)return;const t=this._resetEpoch,r=this.target?.dataset.visible;r!==void 0&&(e.dataset.visible=r);const n={target:e,initialTarget:null,form:null,initialized:!1,loaded:this.loaded,destroyables:[],_migrationNotice:null,...i};let o=!1;const c=new Proxy(this,{get(u,l,h){return!o&&Object.hasOwn(n,l)?n[l]:Reflect.get(u,l,h)},set(u,l,h){return o?Reflect.set(u,l,h):(n[l]=h,!0)}});this._preparingState=n;try{if(await s?.(c),t!==this._resetEpoch||(await c._initForm({replace:!1}),t!==this._resetEpoch)||(await a?.(c),t!==this._resetEpoch))return;this._preparedReset={adopt:Object.keys(n),state:n,revisionBaseline:c.revisionSnapshot(),activate:()=>{o=!0}}}finally{this._preparedReset?.state!==n&&this._destroyFormState(n),this._preparingState===n&&(this._preparingState=null)}}commitReset(){if(!this._preparedReset)return!1;const{adopt:e,state:i,revisionBaseline:s,activate:a}=this._preparedReset;this._preparedReset=null;const t=this.target,r=this._replacementInert,n=t?.dataset.visible;n!==void 0&&(i.target.dataset.visible=n),this.clearUnsavedState(),this.destroy(),t!==i.target&&t.replaceWith(i.target);for(const o of e)this[o]=i[o];return r!=null&&(this.target.inert=r),a?.(),this.target._lp_widget=this,this._revisionBaseline=s,!0}discardPreparedReset(){this._resetEpoch=(this._resetEpoch||0)+1,this._preparingState&&this._destroyFormState(this._preparingState),this._preparedReset&&this._destroyFormState(this._preparedReset.state),this._preparedReset=null}_destroyFormState(e){e._migrationNotice?.destroy(),e._migrationNotice=null,e.form?.destroy?.(),e.destroyables?.forEach(i=>{i.destroy?.()}),e.destroyables=[]}async reset(){await this.prepareReset(),this.commitReset()}setEntityMetadata(){if(this.revisionPreview)return;const e=document.querySelector("[data-nav='view'] [data-role='title']"),i=document.querySelector("[data-role='description']"),s=this.target.querySelector("[name='name']")?.value||this.target.dataset.name||"",a=this.target.querySelector("[name='description']")?.value||this.target.dataset.description||"";e&&e.textContent!==s&&(e.textContent=s),i&&i.textContent!==a&&(i.textContent=a)}created(){this._created=!0}success(){this._success=!0}updated(e){const i=e.html?.querySelector(`[data-widget='${this.name}']`),s=!i||[i,this.target,this.initialTarget].some(a=>a?.hasAttribute?.("data-schema")||a?.hasAttribute?.("data-submission"));i&&(this.initialTarget=i,this._deferredOperation=i.dataset.operation||null,this._updated=!0,this._replacementVersion=(this._replacementVersion||0)+1),s&&Object.hasOwn(e,"schema")&&(this.schema=e.schema),s&&Object.hasOwn(e,"submission")&&(this.submission=e.submission),s&&Object.hasOwn(e,"generation")&&this.initialTarget&&(this.initialTarget.dataset.formGeneration=String(e.generation)),s&&Object.hasOwn(e,"migration_notice")&&this.initialTarget&&(this.initialTarget.dataset.migrationNotice=JSON.stringify(e.migration_notice))}async prereconcile(){if(this._replacementPromise)return this._replacementPromise;if(!this._updated||this._preparedReset?.version===this._replacementVersion)return;this._replacementInert??=!!this.target.inert,this.target.inert=!0;const e=(async()=>{let i;do i=this._replacementVersion,this.discardPreparedReset(),await this.prepareReset(),this._preparedReset&&(this._preparedReset.version=i);while(i!==this._replacementVersion)})();this._replacementPromise=e;try{await e}catch(i){throw this._restoreInteractivity(),i}finally{this._replacementPromise===e&&(this._replacementPromise=null)}}_restoreInteractivity(){this._replacementInert!=null&&(this.target.inert=this._replacementInert,this._replacementInert=null)}postreconcile(){const e=this._updated;if(!(!this._created&&!e)){if(e&&(this._replacementPromise||this._preparedReset?.version!==void 0&&this._preparedReset.version!==this._replacementVersion)){this.modified=!0;return}this._created=!1,this._updated=!1,e&&(this.commitReset(),this._restoreInteractivity(),this.visible&&(this.target.dataset.visible="true")),this._success&&(this.form?.success(),this._success=!1)}}destroy(){this.discardPreparedReset(),this._restoreInteractivity(),this._migrationNotice?.destroy(),this._migrationNotice=null,this.form?.destroy(),this.destroyables.forEach(e=>{e.destroy&&e.destroy()}),this.destroyables=[],this.form=null}showError(e){this.form?.showError(e)}}export{x as F};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormController } from './controller.js?v=b6b75cd2';
+import { STYLES } from './styles.js?v=b6b75cd2';
+import { Modal } from './modal.js?v=b6b75cd2';
+import { r as renderReviewBar, i as installReviewBar } from './reviewBar.js?v=b6b75cd2';
+import { c as compatibleField } from './representation.js?v=b6b75cd2';
+import { w as withTransition } from './foundation.js?v=b6b75cd2';
+
+/**
+ * @testable true
+ * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
+ * @matrix form-migration : informational-notice
+ */
+function installMigrationNotice(widget) {
+	widget._migrationNotice?.destroy();
+	if (widget.target?.dataset.completed === "true") return;
+	const values = JSON.parse(widget.target?.dataset.migrationNotice || "[]");
+	if (!values.length) return;
+	const banner = document.createElement("p");
+	banner.dataset.role = "migration-notice";
+	banner.className =
+		"rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-900 ring-1 ring-amber-400";
+	banner.textContent = "This form was updated — ";
+	const trigger = banner.appendChild(document.createElement("button"));
+	trigger.type = "button";
+	trigger.className =
+		"font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2";
+	trigger.textContent = "View changes";
+	widget.target.prepend(banner);
+	const modal = new Modal(widget.view, trigger);
+	widget._migrationNotice = {
+		destroy: () => {
+			modal.destroy();
+			banner.remove();
+		},
+	};
+	trigger.addEventListener("click", async () => {
+		const root = document.createElement("div");
+		root.id = "modal";
+		root.className = STYLES.modal.wrapper;
+		root.dataset.kind =
+			widget.kind || widget.component?.kind || widget.view.kind || "default";
+		const content = root.appendChild(document.createElement("section"));
+		content.id = "modal-content";
+		content.className = `${STYLES.modal.content} w-full sm:max-w-3xl`;
+		content.setAttribute("role", "dialog");
+		content.setAttribute("aria-modal", "true");
+		content.setAttribute("aria-label", "Form changes");
+		const header = content.appendChild(document.createElement("header"));
+		header.className = STYLES.modal.header;
+		const heading = header.appendChild(document.createElement("h2"));
+		heading.className = "text-lg font-bold text-base-dark";
+		heading.textContent = "Form changes";
+		const close = header.appendChild(document.createElement("button"));
+		close.type = "button";
+		close.setAttribute("lp-control", "close");
+		close.className = STYLES.button.close;
+		close.textContent = "Close";
+		const body = content.appendChild(document.createElement("div"));
+		body.className = "space-y-4 p-4 sm:p-6";
+		const intro = body.appendChild(document.createElement("p"));
+		intro.className = "text-sm text-base-medium";
+		intro.textContent =
+			"These values changed when the form was updated. The notice clears when this submission is next saved or completed.";
+		const fields = body.appendChild(document.createElement("div"));
+		fields.className = "space-y-4";
+		for (const value of values) {
+			const row = fields.appendChild(document.createElement("section"));
+			row.className = "rounded-md border border-base-light/50 bg-base-bg p-3";
+			const title = row.appendChild(document.createElement("h3"));
+			title.className = "mb-2 font-semibold text-base-dark";
+			title.textContent = value.label;
+			const cells = row.appendChild(document.createElement("div"));
+			cells.className = "grid gap-2 sm:grid-cols-2";
+			for (const key of ["before", "after"]) {
+				const cell = cells.appendChild(document.createElement("div"));
+				cell.className =
+					"min-w-0 rounded-md border border-base-light/50 bg-white p-3";
+				const label = cell.appendChild(document.createElement("h4"));
+				label.className = "mb-2 text-xs font-semibold text-base-medium";
+				label.textContent = key === "before" ? "Before" : "After";
+				const content = cell.appendChild(document.createElement("p"));
+				content.className = "whitespace-pre-wrap break-words text-sm";
+				if (key === "after" && value.reason === "invalid") {
+					content.dataset.kind = "error";
+					content.className += " italic text-kind-default";
+					content.textContent = "Value not able to be converted";
+				} else {
+					content.textContent = value[key];
+				}
+			}
+		}
+		await modal.attach(root, widget.component);
+		close.focus();
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_024_edit_watcher.mjs::test_form_revision_snapshot_is_canonical_and_memory_only
+ * @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state
+ * @tests tests_js/test_048_form_controls.mjs::test_form_shell_waits_for_html_and_visibility_does_not_rebuild
+ * @tests tests_js/test_048_form_controls.mjs::test_form_replacements_serialize_and_adopt_only_latest_controls
+ * @tests tests_js/test_048_form_controls.mjs::test_form_discard_and_failure_leave_live_controls_intact
+ * @tests tests_js/test_048_form_controls.mjs::test_explicit_revision_reset_can_replace_dirty_form
+ * @matrix forms user-groups : initialization conditional-response single-reconciliation rebuild-serialization
+ * @matrix forms : teardown reset unsaved-preservation
+ * @matrix user-groups : background-update unsaved-preservation reset
+ * @tests tests_js/test_048_form_controls.mjs::test_queued_commit_waits_for_newer_replacement
+ */
+class FormWidget {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.destroyables = [];
+		this.messages = {};
+		this.schema = attributes.schema || null;
+		this.submission = attributes.submission || null;
+		this.form = null;
+		this.initialTarget = this.target ? this.target.cloneNode(true) : null;
+		this.initialized = false;
+		this.unsavedState = false;
+		this._revisionBaseline = null;
+
+		this._created = false;
+		this._updated = false;
+		this._success = false;
+		this._preparedReset = null;
+		this._preparingReset = null;
+		this._preparingState = null;
+		this._resetEpoch = 0;
+		this._replacementVersion = 0;
+		this._replacementPromise = null;
+		this._replacementInert = null;
+		this._migrationNotice = null;
+
+		this._deferredOperation = this.target?.dataset?.operation || null;
+
+		this._click = this._click.bind(this);
+	}
+
+	get deferredLocked() {
+		return Boolean(
+			this._deferredOperation && this.target?.dataset?.deferredLock,
+		);
+	}
+
+	lockDeferredOperation(descriptor = {}) {
+		const operation = descriptor.operation || descriptor.key;
+		if (!operation) return false;
+		this._deferredOperation = operation;
+		for (const target of [this.target, this.initialTarget]) {
+			if (!target) continue;
+			target.dataset.operation = operation;
+			target.dataset.operationRevision = String(descriptor.revision ?? 0);
+			target.dataset.operationScope = descriptor.scope || "";
+			if (descriptor.blocks_edit === true || descriptor.scope === "form-change")
+				target.dataset.deferredLock = "form";
+			else delete target.dataset.deferredLock;
+		}
+		if (descriptor.status && typeof descriptor.status === "object")
+			renderReviewBar(this, descriptor.status);
+		return true;
+	}
+
+	get showEmptyFields() {
+		return this.readonly && this.component?.showEmptyFields === true;
+	}
+	get formData() {
+		const data =
+			this.target instanceof HTMLFormElement
+				? new FormData(this.target)
+				: new FormData();
+		const state =
+			this.reviewState ?? JSON.parse(this.target?.dataset?.formState || "{}");
+		if (state.revision) data.set("form-revision", state.revision);
+		for (const operation of this._reviewedOperations ?? [])
+			data.append("reviewed-operation", operation);
+		if (this._autofillRetry) data.set("autofill-retry", this._autofillRetry);
+		return this.form?._subForm?.applyDirectUploads?.(data) ?? data;
+	}
+
+	get revisionEntries() {
+		return [];
+	}
+
+	get revisionBaseline() {
+		return this._revisionBaseline;
+	}
+
+	revisionSnapshot() {
+		const grouped = new Map();
+		const entries = [...this.formData.entries(), ...this.revisionEntries];
+		for (const [name, rawValue] of entries) {
+			if (
+				["form-revision", "reviewed-operation", "autofill-retry"].includes(name)
+			)
+				continue;
+			let value = rawValue;
+			if (typeof File !== "undefined" && rawValue instanceof File) {
+				if (!rawValue.name && rawValue.size === 0) continue;
+				value = JSON.stringify({
+					name: rawValue.name,
+					size: rawValue.size,
+					type: rawValue.type,
+					lastModified: rawValue.lastModified,
+				});
+			}
+			const values = grouped.get(name) ?? [];
+			values.push(String(value));
+			grouped.set(name, values);
+		}
+
+		return JSON.stringify(
+			Array.from(grouped.entries())
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([name, values]) => [name, values.sort()]),
+		);
+	}
+
+	commitRevisionBaseline({ clearUnsaved = false } = {}) {
+		this._revisionBaseline = this.revisionSnapshot();
+		this._baselineSubmission = structuredClone(
+			this.form?.renderer?._packageSubmission?.() ?? this.submission ?? {},
+		);
+		if (clearUnsaved) this.clearUnsavedState();
+		return this._revisionBaseline;
+	}
+
+	revisionCanReset(preview) {
+		return Boolean(preview && preview.name === this.name);
+	}
+
+	captureFormState() {
+		const fields = [];
+		const files = [];
+		for (const [name, value] of this.formData.entries()) {
+			if (typeof File !== "undefined" && value instanceof File) {
+				if (value.name && value.size > 0) {
+					files.push({
+						name,
+						file: value,
+						filename: value.name,
+						type: value.type,
+					});
+				}
+			} else {
+				fields.push([name, value]);
+			}
+		}
+
+		const formControls = Array.from(
+			this.target?.querySelectorAll?.("[data-combobox-id]") || [],
+		)
+			.filter((control) => !control.closest?.(".form-element"))
+			.map((control) => {
+				const combobox = control._lp_combobox;
+				if (!combobox?.name) return null;
+				return {
+					name: combobox.name,
+					options: (combobox.options || []).filter((option) =>
+						combobox.values?.has(option.id),
+					),
+				};
+			})
+			.filter(Boolean);
+
+		return {
+			fields,
+			files,
+			form_controls: formControls,
+			renderer_submission: this.form?.renderer?._packageSubmission?.() ?? null,
+		};
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.mjs::test_local_revision_uses_latest_schema_and_merges_submission_values
+	 * @matrix edited-entity-notice form-schema forms : latest-schema local-values no-schema-version-choice remote-added-values
+	 */
+	buildLocalRevision(response, state = this.captureFormState()) {
+		const latestSchema = response.schema ?? [];
+		const latestIds = new Set(
+			latestSchema.map((field) => field?.id).filter(Boolean),
+		);
+		const localIds = new Set(
+			(this.schema ?? []).map((field) => field?.id).filter(Boolean),
+		);
+		const remoteSubmission = response.submission ?? {};
+		const mergedSubmission = structuredClone(remoteSubmission);
+		const localSubmission = state.renderer_submission ?? {};
+		for (const id of localIds) {
+			if (
+				!latestIds.has(id) ||
+				!Object.hasOwn(localSubmission, id) ||
+				!compatibleField(
+					this.schema.find((field) => field.id === id),
+					latestSchema.find((field) => field.id === id),
+				)
+			)
+				continue;
+			mergedSubmission[id] = structuredClone(localSubmission[id]);
+		}
+
+		const html = response.html?.cloneNode(true) ?? null;
+		const target = html?.querySelector(`[data-widget='${this.name}']`);
+		this._applyQueuedFields(target, state);
+		return {
+			state,
+			response: {
+				...response,
+				html,
+				schema: latestSchema,
+				submission: mergedSubmission,
+			},
+		};
+	}
+
+	async prepareRevision(response) {
+		await this.updated(response);
+		this._success = false;
+		await this.prereconcile();
+		return () => {
+			this.postreconcile();
+			this.commitRevisionBaseline({ clearUnsaved: true });
+		};
+	}
+
+	async applyRevision(response) {
+		const commit = await this.prepareRevision(response);
+		commit();
+	}
+
+	async prepareLocalRevision(
+		response,
+		{
+			remoteSnapshot = null,
+			markUnsaved = false,
+			selectedSubmission = undefined,
+		} = {},
+	) {
+		const wasUnsaved = this.unsavedState === true;
+		const wasQueued = this.form?._queued === true;
+		const local = this.buildLocalRevision(response);
+		if (selectedSubmission !== undefined) {
+			local.response.submission = selectedSubmission;
+		}
+		await this.updated(local.response);
+		this._success = false;
+		await this.prereconcile();
+
+		return () => {
+			this._skipQueuedRestore = true;
+			try {
+				this.postreconcile();
+				this._restoreQueuedFiles(local.state);
+			} finally {
+				this._skipQueuedRestore = false;
+			}
+
+			if (remoteSnapshot !== null) this._revisionBaseline = remoteSnapshot;
+			this._baselineSubmission = structuredClone(response.submission ?? {});
+			if (wasQueued) {
+				this.form?.queued();
+			} else if (wasUnsaved || markUnsaved) {
+				this.markUnsavedState();
+			} else {
+				this.commitRevisionBaseline({ clearUnsaved: true });
+			}
+			return local;
+		};
+	}
+
+	async applyLocalRevision(response, options = {}) {
+		const commit = await this.prepareLocalRevision(response, options);
+		return commit();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_blocked_by_schema_migration_but_not_autofill
+	 * @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
+	 */
+	async prepareSubmit(options) {
+		if (this.deferredLocked) return false;
+		return (await this.form?._subForm?.prepareSubmit?.(options)) ?? true;
+	}
+
+	markUnsavedState() {
+		if (this.readonly || this.headless) return;
+
+		this.unsavedState = true;
+		this.form?.syncOfflineState?.();
+	}
+
+	clearUnsavedState() {
+		this.unsavedState = false;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.mjs::test_offline_queue_does_not_block_initial_form_render
+	 * @pair forms:queue-independent-initial-render
+	 */
+	async init() {
+		if (
+			this.target?.hasAttribute("lp-load") &&
+			!this.target.hasAttribute("loaded")
+		)
+			return;
+		await this._initForm();
+		this.commitRevisionBaseline();
+		this.initialized = true;
+		this.target.setAttribute("initialized", "");
+	}
+
+	/** @testable infrastructure */
+	async stageOfflineConflict(conflict = this._offlineConflict) {
+		if (!conflict) return;
+		const watcher =
+			this.view?.EditWatcher || (await this.view?.ensureEditWatcher?.());
+		return watcher?.stageConflict?.(this, conflict);
+	}
+
+	_applyQueuedFields(target, record) {
+		if (!target) return;
+
+		const fields = new Map();
+		for (const [name, value] of record.fields || []) {
+			const values = fields.get(name) || [];
+			values.push(String(value));
+			fields.set(name, values);
+		}
+
+		for (const name of ["name", "description"]) {
+			if (fields.has(name)) target.dataset[name] = fields.get(name)[0] || "";
+		}
+
+		for (const control of target.querySelectorAll("[name]")) {
+			if (
+				["form-generation", "form-revision", "reviewed-operation"].includes(
+					control.name,
+				)
+			)
+				continue;
+			const values = fields.get(control.name) || [];
+			if (control instanceof HTMLInputElement) {
+				if (["checkbox", "radio"].includes(control.type)) {
+					const checked = values.includes(control.value);
+					control.checked = checked;
+					control.defaultChecked = checked;
+					control.toggleAttribute("checked", checked);
+					const attribute = control.closest("[data-role='attribute']");
+					if (attribute) attribute.dataset.selected = checked.toString();
+				} else if (control.type !== "file" && values.length > 0) {
+					control.value = values[0];
+					control.defaultValue = values[0];
+					control.setAttribute("value", values[0]);
+				}
+			} else if (control instanceof HTMLTextAreaElement) {
+				control.value = values[0] || "";
+				control.defaultValue = control.value;
+				control.textContent = control.value;
+			} else if (control instanceof HTMLSelectElement) {
+				for (const option of control.options) {
+					const selected = values.includes(option.value);
+					option.selected = selected;
+					option.defaultSelected = selected;
+					option.toggleAttribute("selected", selected);
+				}
+			}
+		}
+
+		const preloadSources = Array.from(
+			target.querySelectorAll("[name], [data-index]"),
+		);
+		for (const state of record.form_controls || []) {
+			const source = preloadSources.find(
+				(element) =>
+					element.getAttribute("name") === state.name ||
+					element.dataset.index === state.name,
+			);
+			if (!source) continue;
+			const root = source.closest("[lp-select]") || source;
+			const preload = JSON.stringify(state.options || []);
+			source.dataset.preload = preload;
+			root.dataset.preload = preload;
+		}
+	}
+
+	_restoreQueuedFiles(record) {
+		if (typeof DataTransfer === "undefined") return;
+
+		const files = new Map();
+		for (const entry of record.files || []) {
+			const values = files.get(entry.name) || [];
+			values.push(entry.file);
+			files.set(entry.name, values);
+		}
+
+		for (const input of this.target.querySelectorAll(
+			"input[type='file'][name]",
+		)) {
+			const saved = files.get(input.name);
+			if (!saved?.length) continue;
+			try {
+				const transfer = new DataTransfer();
+				for (const file of saved) transfer.items.add(file);
+				input.files = transfer.files;
+			} catch {
+				// Some browsers do not allow programmatic file-input restoration.
+			}
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.mjs::test_active_deferred_form_waits_for_root_operation_scan
+	 * @matrix deferred-jobs : form-lock reload
+	 */
+	async _initForm({ replace = true } = {}) {
+		if (replace && this.initialTarget) {
+			const visible = this.target?.dataset.visible;
+			if (visible !== undefined) {
+				this.initialTarget.dataset.visible = visible;
+			}
+			this.target.replaceWith(this.initialTarget);
+			this.target = this.initialTarget;
+			this.initialTarget = this.target.cloneNode(true);
+		} else if (!this.initialTarget) {
+			this.initialTarget = this.target.cloneNode(true);
+		}
+		this.target._lp_widget = this;
+		this.form = new FormController(this);
+		await this.form.init();
+		if (this.target.dataset.formState) installReviewBar(this);
+		else if (
+			this.target.dataset.migrationNotice &&
+			this.target.dataset.migrationNotice !== "[]"
+		)
+			installMigrationNotice(this);
+		if (this.target.dataset.formGeneration !== undefined) {
+			const generation = document.createElement("input");
+			generation.type = "hidden";
+			generation.name = "form-generation";
+			generation.value = this.target.dataset.formGeneration;
+			this.target.append(generation);
+		}
+		this.target.addEventListener("click", this._click);
+		const hasDeferredOperation =
+			this.target.matches?.("[data-operation]") ||
+			this.target.querySelector?.("[data-operation]");
+		if (hasDeferredOperation) {
+			const manager = await this.view?.ensureDeferredOperations?.();
+			manager?.scan(this.target);
+		}
+		this.initialized = true;
+		this.loaded = this.target.hasAttribute("loaded");
+		this.target.setAttribute("initialized", "");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
+	 * @matrix forms : clear direct-fields
+	 */
+	_click(e) {
+		if (this.readonly) return;
+
+		const element = e.target.closest(".form-element");
+		const role = e.target.closest("[data-role]")?.dataset.role;
+		if (role !== "edit" && role !== "clear") return;
+
+		e.preventDefault();
+		e.stopPropagation();
+
+		if (role === "edit") {
+			void withTransition(
+				() => {
+					element.dataset.mode = "edit";
+				},
+				{ label: "form:edit-field" },
+			);
+		} else if (role === "clear") {
+			const field =
+				element?._lp_element ?? this.form.renderer?.elements.get(element.id);
+			field?.clear?.();
+		}
+	}
+
+	get header() {
+		return this.target?.querySelector("[data-role='header']");
+	}
+
+	get submitGroup() {
+		return this.target?.querySelector("[data-role='submit-group']");
+	}
+
+	get submitButton() {
+		return this.target?.querySelector('button[type="submit"]:not([data-role])');
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
+	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
+	 * @matrix form-migration : informational-notice
+	 */
+	async prepareReset(options = {}) {
+		if (this._preparingReset) return this._preparingReset;
+		if (this._preparedReset) return;
+		const pending = this._prepareReset(options);
+		this._preparingReset = pending;
+		try {
+			await pending;
+		} finally {
+			if (this._preparingReset === pending) this._preparingReset = null;
+		}
+	}
+
+	async _prepareReset({
+		nextTarget = (this.initialTarget || this.target).cloneNode(true),
+		staged = {},
+		beforeInit = null,
+		afterInit = null,
+	} = {}) {
+		if (this._preparedReset) return;
+		const epoch = this._resetEpoch;
+
+		const visible = this.target?.dataset.visible;
+		if (visible !== undefined) nextTarget.dataset.visible = visible;
+
+		const stagedState = {
+			target: nextTarget,
+			initialTarget: null,
+			form: null,
+			initialized: false,
+			loaded: this.loaded,
+			destroyables: [],
+			_migrationNotice: null,
+			...staged,
+		};
+		let adopted = false;
+		const stagedWidget = new Proxy(this, {
+			get(target, property, receiver) {
+				if (!adopted && Object.hasOwn(stagedState, property)) {
+					return stagedState[property];
+				}
+				return Reflect.get(target, property, receiver);
+			},
+			set(target, property, value) {
+				if (!adopted) {
+					stagedState[property] = value;
+					return true;
+				}
+				return Reflect.set(target, property, value);
+			},
+		});
+		this._preparingState = stagedState;
+		try {
+			await beforeInit?.(stagedWidget);
+			if (epoch !== this._resetEpoch) return;
+			await stagedWidget._initForm({ replace: false });
+			if (epoch !== this._resetEpoch) return;
+			await afterInit?.(stagedWidget);
+			if (epoch !== this._resetEpoch) return;
+			this._preparedReset = {
+				adopt: Object.keys(stagedState),
+				state: stagedState,
+				revisionBaseline: stagedWidget.revisionSnapshot(),
+				activate: () => {
+					adopted = true;
+				},
+			};
+		} finally {
+			if (this._preparedReset?.state !== stagedState)
+				this._destroyFormState(stagedState);
+			if (this._preparingState === stagedState) this._preparingState = null;
+		}
+	}
+
+	commitReset() {
+		if (!this._preparedReset) return false;
+		const { adopt, state, revisionBaseline, activate } = this._preparedReset;
+		this._preparedReset = null;
+		const previousTarget = this.target;
+		const previousInert = this._replacementInert;
+		const visible = previousTarget?.dataset.visible;
+		if (visible !== undefined) state.target.dataset.visible = visible;
+
+		this.clearUnsavedState();
+		this.destroy();
+		if (previousTarget !== state.target)
+			previousTarget.replaceWith(state.target);
+		for (const property of adopt) this[property] = state[property];
+		if (previousInert != null) this.target.inert = previousInert;
+		activate?.();
+		this.target._lp_widget = this;
+		this._revisionBaseline = revisionBaseline;
+		return true;
+	}
+
+	discardPreparedReset() {
+		this._resetEpoch = (this._resetEpoch || 0) + 1;
+		if (this._preparingState) this._destroyFormState(this._preparingState);
+		if (this._preparedReset) this._destroyFormState(this._preparedReset.state);
+		this._preparedReset = null;
+	}
+
+	_destroyFormState(state) {
+		state._migrationNotice?.destroy();
+		state._migrationNotice = null;
+		state.form?.destroy?.();
+		state.destroyables?.forEach((destroyable) => {
+			destroyable.destroy?.();
+		});
+		state.destroyables = [];
+	}
+
+	async reset() {
+		await this.prepareReset();
+		this.commitReset();
+	}
+
+	setEntityMetadata() {
+		if (this.revisionPreview) return;
+		const pageTitle = document.querySelector(
+			"[data-nav='view'] [data-role='title']",
+		);
+		const pageDescription = document.querySelector("[data-role='description']");
+
+		const name =
+			this.target.querySelector("[name='name']")?.value ||
+			this.target.dataset.name ||
+			"";
+		const description =
+			this.target.querySelector("[name='description']")?.value ||
+			this.target.dataset.description ||
+			"";
+
+		if (pageTitle && pageTitle.textContent !== name)
+			pageTitle.textContent = name;
+		if (pageDescription && pageDescription.textContent !== description)
+			pageDescription.textContent = description;
+	}
+
+	created() {
+		this._created = true;
+	}
+
+	success() {
+		this._success = true;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_form_response_metadata_stays_with_renderer_widget
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_adding_form_from_task_settings_preserves_widget_identity
+	 * @matrix forms : schema-ownership sibling-widgets
+	 * @matrix tasks : attach-form merged-submission widget-identity
+	 */
+	updated(response) {
+		const updatedTarget = response.html?.querySelector(
+			`[data-widget='${this.name}']`,
+		);
+		const ownsRendererState =
+			!updatedTarget ||
+			[updatedTarget, this.target, this.initialTarget].some(
+				(target) =>
+					target?.hasAttribute?.("data-schema") ||
+					target?.hasAttribute?.("data-submission"),
+			);
+		if (updatedTarget) {
+			this.initialTarget = updatedTarget;
+			this._deferredOperation = updatedTarget.dataset.operation || null;
+			this._updated = true;
+			this._replacementVersion = (this._replacementVersion || 0) + 1;
+		}
+		if (ownsRendererState && Object.hasOwn(response, "schema")) {
+			this.schema = response.schema;
+		}
+		if (ownsRendererState && Object.hasOwn(response, "submission")) {
+			this.submission = response.submission;
+		}
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "form_state") &&
+			this.initialTarget
+		)
+			this.initialTarget.dataset.formState = JSON.stringify(
+				response.form_state,
+			);
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "generation") &&
+			this.initialTarget
+		)
+			this.initialTarget.dataset.formGeneration = String(response.generation);
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "migration_notice") &&
+			this.initialTarget
+		)
+			this.initialTarget.dataset.migrationNotice = JSON.stringify(
+				response.migration_notice,
+			);
+	}
+
+	async prereconcile() {
+		if (this._replacementPromise) return this._replacementPromise;
+		if (!this._updated) return;
+		if (this._preparedReset?.version === this._replacementVersion) return;
+		this._replacementInert ??= Boolean(this.target.inert);
+		this.target.inert = true;
+		const pending = (async () => {
+			let preparedVersion;
+			do {
+				preparedVersion = this._replacementVersion;
+				this.discardPreparedReset();
+				await this.prepareReset();
+				if (this._preparedReset) this._preparedReset.version = preparedVersion;
+			} while (preparedVersion !== this._replacementVersion);
+		})();
+		this._replacementPromise = pending;
+		try {
+			await pending;
+		} catch (error) {
+			this._restoreInteractivity();
+			throw error;
+		} finally {
+			if (this._replacementPromise === pending) this._replacementPromise = null;
+		}
+	}
+
+	_restoreInteractivity() {
+		if (this._replacementInert == null) return;
+		this.target.inert = this._replacementInert;
+		this._replacementInert = null;
+	}
+
+	postreconcile() {
+		const updated = this._updated;
+		if (!this._created && !updated) return;
+		if (
+			updated &&
+			(this._replacementPromise ||
+				(this._preparedReset?.version !== undefined &&
+					this._preparedReset.version !== this._replacementVersion))
+		) {
+			this.modified = true;
+			return;
+		}
+
+		this._created = false;
+		this._updated = false;
+
+		if (updated) {
+			this.commitReset();
+			this._restoreInteractivity();
+			if (this.visible) this.target.dataset.visible = "true";
+		}
+
+		if (this._success) {
+			this.form?.success();
+			this._success = false;
+		}
+	}
+
+	destroy() {
+		this.discardPreparedReset();
+		this._restoreInteractivity();
+		this._migrationNotice?.destroy();
+		this._migrationNotice = null;
+		this.form?.destroy();
+		this.destroyables.forEach((destroyable) => {
+			if (destroyable.destroy) destroyable.destroy();
+		});
+		this.destroyables = [];
+		this.form = null;
+	}
+
+	showError(error) {
+		this.form?.showError(error);
+	}
+}
+
+export { FormWidget as F };

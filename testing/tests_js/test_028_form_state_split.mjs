@@ -244,7 +244,7 @@ test("test_offline_database_upgrade_discards_legacy_activity_records", async (t)
 });
 
 /** @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync */
-test("test_form_submit_is_guarded_only_by_durable_autofill_lock", async (t) => {
+test("test_form_submit_is_blocked_by_schema_migration_but_not_autofill", async (t) => {
 	createBrowser(t);
 	const { FormWidget } = await loadFormWidget();
 	const target = document.createElement("div");
@@ -286,7 +286,7 @@ test("test_form_submit_is_guarded_only_by_durable_autofill_lock", async (t) => {
 	};
 	assert.equal(formWidget.formData.directUploadApplied, true);
 	widget.lockDeferredOperation({ operation: "operation-1", revision: 3 });
-	assert.equal(await widget.prepareSubmit(), false);
+	assert.equal(await widget.prepareSubmit(), true);
 	widget.lockDeferredOperation({
 		operation: "migration-1",
 		revision: 0,
@@ -295,6 +295,7 @@ test("test_form_submit_is_guarded_only_by_durable_autofill_lock", async (t) => {
 	for (const node of [widget.target, widget.initialTarget]) {
 		assert.equal(node.dataset.operationScope, "form-change");
 	}
+	assert.equal(await widget.prepareSubmit(), false);
 });
 
 /** @matrix deferred-jobs : form-lock reload */

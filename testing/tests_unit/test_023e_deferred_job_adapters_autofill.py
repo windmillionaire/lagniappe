@@ -216,7 +216,7 @@ def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
 
 
 # @matrix ai deferred-jobs files : autofill failed pending summary-dependency
-def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
+def test_autofill_prepare_does_not_wait_for_attached_file_summaries(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     phases = []
     context = SimpleNamespace(
@@ -228,45 +228,18 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
     monkeypatch.setattr(
         autofill_adapters.ai_autofill,
         "autofill_summary_dependencies",
-        lambda *_args: {
-            "complete": [SimpleNamespace()],
-            "pending": [SimpleNamespace()],
-            "failed": [],
-        },
+        lambda *_args: pytest.fail("Autofill must not check summary readiness"),
     )
     monkeypatch.setattr(
         autofill_adapters.ai_autofill,
         "generate_autofilled_submission",
-        lambda _prompt: (_ for _ in ()).throw(
-            AssertionError("Gemini must not run before summaries complete")
-        ),
+        lambda _prompt, **kwargs: {"title": "Read original evidence"},
     )
 
-    with pytest.raises(
-        DeferredJobDependencyPendingError,
-        match="still processing",
-    ):
-        adapter.prepare(context)
-
-    assert phases[-1] == (
-        DeferredJobPhase.SUMMARIZING,
-        {"completed": 1, "total": 2},
-    )
-
-    monkeypatch.setattr(
-        autofill_adapters.ai_autofill,
-        "autofill_summary_dependencies",
-        lambda *_args: {
-            "complete": [],
-            "pending": [],
-            "failed": [SimpleNamespace()],
-        },
-    )
-    with pytest.raises(
-        DeferredJobDependencyFailedError,
-        match="summary failed",
-    ):
-        adapter.prepare(context)
+    monkeypatch.setattr(autofill_adapters.ai_autofill, "autofill_prompt_data", lambda *args, **kwargs: {})
+    monkeypatch.setattr(autofill_adapters.ai_autofill, "form_autofill_prompt", lambda **kwargs: object())
+    assert adapter.prepare(context) == {"submission": {"title": "Read original evidence"}}
+    assert phases[-1] == (DeferredJobPhase.GENERATING, {})
 
 
 # @matrix ai deferred-jobs files : autofill checkpoint resume upload

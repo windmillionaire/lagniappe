@@ -279,6 +279,7 @@
 {% endmacro %}
 
 {% macro info_form(page) %}
+  {% set review_state = form_state(page) %}
   <form lp-update
         lp-offline
         lp-deferred
@@ -289,8 +290,12 @@
         data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
         data-deferred-route="{{ url_for('pages.info', key=page.urlsafe_key) }}"
         data-destination="info:PageInfo"
-        {% if page.deferred_job %}
-          data-operation="{{ page.deferred_job.key }}" data-operation-revision="{{ page.deferred_job.revision|default(0, true) }}" data-deferred-lock="form"
+        data-form-state='{{ review_state|tojson }}'
+        {% if review_state.operation %}
+          data-operation="{{ review_state.operation.key }}" data-operation-revision="{{ review_state.operation.revision }}"
+          data-operation-bootstrap='{{ review_state.operation|tojson }}'
+          data-operation-scope="{{ review_state.operation.scope|default('form-autofill') }}"
+          {% if review_state.operation.blocks_edit %}data-deferred-lock="form"{% endif %}
         {% endif %}
         {% if page.description %}data-description="{{ page.description }}"{% endif %}
         {% if page.form %}data-schema='{{ page.submission_schema|tojson }}'{% endif %}
@@ -335,7 +340,7 @@
                 class="{{ styles.select.button }}"></button>
       </div>
     {% endif %}
-    {{ controls.edited_marker(url_for('pages.info', key=page.urlsafe_key)) }}
+    {{ controls.edited_marker(url_for('pages.info', key=page.urlsafe_key), review_state) }}
     {% if page.allowed(Action.EDIT) %}{{ autofill(enabled=current_user.access(AI.CREATE)) }}{% endif %}
   </form>
 {% endmacro %}

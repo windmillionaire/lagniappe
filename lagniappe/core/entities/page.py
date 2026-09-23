@@ -41,6 +41,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             "assets",
             "schema_version",
             "deferred_job",
+            "autofill_reviews",
             "public_settings",
         }
         return frozenset(exclude)

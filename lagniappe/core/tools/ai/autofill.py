@@ -8,10 +8,8 @@ from ...definitions import Action
 from .core import ai_model
 from .guidelines import (
     FILE_CONTEXT,
-    FORM_AUTOFILL_RULES,
-    SCHEMA_TYPE_GUIDELINES,
-    SUBMISSION_OUTPUT_REQUIREMENTS,
 )
+from .guidelines.field_types import schema_guidance
 from .prompt import Prompt
 from .submission_values import values_by_id
 from ...properties.schema import SchemaFields
@@ -20,6 +18,40 @@ citations = re.compile(r"\. \[.*?\]")
 
 GENERIC_MESSAGE = "Generation failed. Please try again. "
 AUTOFILL_MAX_TOOL_ITERATIONS = 2
+
+AUTOFILL_RULES = """
+### Grounded form updates
+
+- Propose updates for this one form using exact field IDs. Omitted fields stay unchanged.
+- Preserve useful existing answers. You may enrich or correct populated answers
+  when requested or supported by the supplied evidence; do not invent facts or
+  silently choose between conflicting sources.
+- You may add table rows and todo items to populated fields. Return the complete
+  proposed value for a changed collection, retaining existing rows/items, order,
+  and checked states unless the user asks to change them. New todos are unchecked.
+- Respect explicit user instructions first, then supplied files and existing
+  answers. Use focused public web research for missing public facts, including
+  when only a title/name was supplied. Do not search for private workspace facts.
+- Do not invent personal opinions, ratings, signatures, or user-action answers.
+  Creative content is appropriate only when the field or request calls for it.
+- The supplied original file is ready to use: do not wait for a summary. Other
+  listed files can be read with get_file(include_original=true) when needed.
+- Optional page/category context is available through get_entity using the listed
+  references. Read it only if relevant answers need that context; do not explore
+  unrelated entities, sibling tasks, or task history. Batch independent reads.
+- Once you have enough evidence, return the proposed updates. Unsupported fields
+  can be omitted without blocking the rest of the form.
+"""
+
+AUTOFILL_OUTPUT_REQUIREMENTS = """
+### Submission Output Requirements
+
+Return a JSON object keyed by exact schema field IDs, containing only proposed
+updates. Do not wrap it in submission/answers, include labels as keys, or add
+commentary. A changed table/todo value contains its complete proposed rows/items.
+Use null only for an intentional clearing requested by the user. Omission means
+unchanged, not empty. Static HTML, status, and signatures cannot be generated.
+"""
 
 
 # @testable true
@@ -64,8 +96,15 @@ def _readable_autofill_files(entity, user):
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
 # @matrix ai files : attached-files entity-specific
 def autofill_attached_files(entity, user):
-    """Return readable projections for files attached directly to ``entity``."""
-    return [file.to_ai(user) for file in _readable_autofill_files(entity, user)]
+    """List directly attached evidence without eagerly injecting its summaries."""
+    return [
+        {key: value for key, value in {
+            "hash": f"hash:{file.hash}",
+            "filename": file.filename,
+            "mimetype": file.mimetype,
+        }.items() if value}
+        for file in _readable_autofill_files(entity, user)
+    ]
 
 
 # @testable true
@@ -114,7 +153,6 @@ def autofill_prompt_data(
     if task and page:
         parent_page = {
             "name": getattr(page, "name", None),
-            "description": getattr(page, "description", None),
         }
         parent_page = {
             key: value for key, value in parent_page.items() if value is not None
@@ -125,7 +163,6 @@ def autofill_prompt_data(
     if category and category.allowed(Action.VIEW, user=user):
         category_context = {
             "name": getattr(category, "name", None),
-            "description": getattr(category, "description", None),
         }
         category_context = {
             key: value
@@ -135,23 +172,24 @@ def autofill_prompt_data(
 
     form = getattr(entity, "form", None)
     submission = None
-    if form:
+    if getattr(entity, "properties", None):
         submission_property = entity.properties.submission
         submission_property.user = user
         submission = values_by_id(submission_property.fields, user)
 
-    document = None
-    if page and page.properties.document:
-        document = page.properties.document.ai_value
+    references = {}
+    for label, source in (("page", page), ("category", category)):
+        if source and getattr(source, "hash", None) and source.allowed(Action.VIEW, user=user):
+            references[label] = f"hash:{source.hash}"
 
     return {
         "file": file,
         "user": user,
         "user_context": user_context,
         "mimetype": mimetype,
-        "document": document,
+        "context_references": references,
         "submission": submission,
-        "schema": entity.submission_schema if form else None,
+        "schema": entity.submission_schema,
         "form_name": form.name if form else None,
         "target": target,
         "parent_page": parent_page,
@@ -164,13 +202,16 @@ def autofill_prompt_data(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @matrix ai : citations validation
-def validate_submission(submission, *, entity=None, user=None):
+def validate_submission(submission, *, entity=None, user=None, schema=None):
     """Validate exact target fields without mutation and clean text citations."""
     if not isinstance(submission, dict):
         raise exceptions.AIException("Submission must be a JSON object keyed by exact field ids.")
     submission = dict(submission)
     if entity is not None:
-        fields = entity.properties.submission.fields
+        fields = (
+            {field["id"]: field for field in schema}
+            if schema is not None else entity.properties.submission.fields
+        )
         unknown = set(submission) - set(fields)
         if unknown:
             raise exceptions.AIException(
@@ -178,14 +219,10 @@ def validate_submission(submission, *, entity=None, user=None):
                 f"Use only these exact field ids: {', '.join(fields)}. "
                 "Field titles are not keys; return the submission object without a wrapper."
             )
-        # Autofill owns blank fields only. Existing answers remain authoritative
-        # even when the model omits or rewrites them.
-        submission.update({
-            key: value for key, value in values_by_id(fields, user).items()
-            if value not in (None, "", [], {})
-        })
         for field_id, value in submission.items():
             try:
+                if fields[field_id].get("type") in {"signature", "html", "status"}:
+                    raise exceptions.ValidationError("This field cannot be generated.")
                 SchemaFields.prepare_ai_field(fields[field_id], value, entity, user=user)
             except (ValueError, TypeError, AttributeError, exceptions.ValidationError) as error:
                 raise exceptions.AIException(f"Submission field {field_id}: {error}") from error
@@ -207,12 +244,12 @@ def validate_submission(submission, *, entity=None, user=None):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
 # @matrix ai : error-context terminal-capture validation repair
-def generate_autofilled_submission(prompt, *, entity, user):
+def generate_autofilled_submission(prompt, *, entity, user, schema=None):
     """Generate and validate an autofilled form submission from a Prompt."""
     try:
         return ai_model.generate_content(
             prompt,
-            validator=partial(validate_submission, entity=entity, user=user),
+            validator=partial(validate_submission, entity=entity, user=user, schema=schema),
             validation_retries=2,
         )
     except Exception as e:
@@ -229,7 +266,7 @@ def generate_autofilled_submission(prompt, *, entity, user):
 def form_autofill_prompt(**kwargs):
     """Build the AI prompt for form autofilling based on existing data"""
 
-    intro = """You complete one structured page or task form submission. Preserve existing values and fill only fields supported by the supplied context or focused public web research."""
+    intro = "Propose grounded updates to one page or task form, using its current answers, supplied evidence, and focused public research when useful."
     prompt = Prompt(intro, user=kwargs.get("user"), type="autofill")
     prompt.enable_search()
 
@@ -242,8 +279,13 @@ def form_autofill_prompt(**kwargs):
     file = kwargs.get("file")
     attached_files = kwargs.get("attached_files") or []
 
-    if attached_files and kwargs.get("user"):
-        prompt.enable_tools("get_file")
+    tool_names = []
+    if attached_files:
+        tool_names.append("get_file")
+    if kwargs.get("context_references"):
+        tool_names.append("get_entity")
+    if tool_names and kwargs.get("user"):
+        prompt.enable_tools(*tool_names)
         prompt.set_max_tool_iterations(AUTOFILL_MAX_TOOL_ITERATIONS)
 
     prompt.add_context("target_record", kwargs.get("target"))
@@ -253,17 +295,25 @@ def form_autofill_prompt(**kwargs):
     prompt.add_context("form_schema", form_schema)
     prompt.add_context("existing_submission", kwargs.get("submission"))
     prompt.add_context("user_provided_context", kwargs.get("user_context"))
-    prompt.add_context("page_document", kwargs.get("document"))
+    prompt.add_context("optional_context_references", kwargs.get("context_references"))
+    prompt.add_context("review_context", kwargs.get("review_context"))
     prompt.add_context("attached_files", attached_files)
     if file:
         mimetype = file.content_type or kwargs.get("mimetype")
         prompt.add_bytes(file, mimetype)
+        if not prompt.bytes:
+            raise exceptions.ValidationError("This file type cannot be read directly by autofill.")
+    for source in kwargs.get("original_files") or ():
+        before = len(prompt.files)
+        prompt.add_file(source, user=kwargs.get("user"))
+        if len(prompt.files) == before:
+            raise exceptions.ValidationError("The supplied file is no longer available for autofill.")
 
-    if prompt.bytes:
+    if prompt.bytes or prompt.files:
         prompt.add_context("file_data", FILE_CONTEXT.strip())
 
-    prompt.add_instructions(FORM_AUTOFILL_RULES)
-    prompt.add_instructions(SCHEMA_TYPE_GUIDELINES)
-    prompt.set_output_format("JSON", description=SUBMISSION_OUTPUT_REQUIREMENTS)
+    prompt.add_instructions(AUTOFILL_RULES)
+    prompt.add_instructions(schema_guidance(form_schema))
+    prompt.set_output_format("JSON", description=AUTOFILL_OUTPUT_REQUIREMENTS)
 
     return prompt

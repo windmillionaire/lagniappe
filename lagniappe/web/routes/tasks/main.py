@@ -41,6 +41,7 @@ from lagniappe.web.auth import (
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web import deferred_autofill
+from lagniappe.core.tools.forms import review as form_review
 
 from ..pages.main import _load_page_settings_relations
 from . import tasks
@@ -93,7 +94,7 @@ def rows():
 # @matrix tasks : create readonly
 # @pair ai:completion-refresh
 @tasks.route("/<key>/replace", methods=["GET"])
-@permission(Resource.TASK, Action.VIEW)
+@permission(Resource.TASK, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def get(key, **kwargs):
     task = Entities.fetch_one(
         kwargs["entity"],
@@ -124,7 +125,7 @@ def settings(key, **kwargs):
 # @matrix tasks : assignee attached-form empty-fields focus page-task permission-gates readonly row-link
 # @pair permissions:resource-gates
 @tasks.route("<key>", methods=["GET"])
-@permission(Resource.TASK, Action.VIEW)
+@permission(Resource.TASK, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def view(key, **kwargs):
     task = kwargs["entity"]
     page = Entities.fetch_one(task.page, request=Fetch.direct())
@@ -663,11 +664,17 @@ def update(key, **kwargs):
     role = request.form.get("role")
     explain = request.form.get("explain")
 
-    if (
+    submitting_answers = (
         _should_submit_task_form(active, role, task)
         or role == "autofill-submit"
         or explain == "autofill"
-    ):
+    )
+    # Settings/completion also save the task row. Fence their loaded state so a
+    # simultaneous AI commit cannot be replaced by that older row.
+    baseline = request.form if submitting_answers else {"form-revision": task.autofill_revision}
+    if not form_review.stage_submission_guard(task, baseline):
+        return deferred_autofill.conflict_response(task)
+    if submitting_answers:
         locked = deferred_autofill.locked_response(task, request.form)
         if locked:
             return locked
@@ -730,10 +737,6 @@ def update(key, **kwargs):
                     request.form, input_name="autofill-file"
                 )
 
-        try:
-            task.save()
-        except exceptions.ValidationError as error:
-            return responses.error(str(error))
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 task,
@@ -746,7 +749,10 @@ def update(key, **kwargs):
         )
 
     try:
+        form_review.acknowledge_reviews(task, current_user, request.form.getlist("reviewed-operation"))
         task.save()
+    except exceptions.MutationConflict:
+        return deferred_autofill.conflict_response(task)
     except exceptions.ValidationError as error:
         return responses.error(str(error))
 
@@ -762,7 +768,7 @@ def update_direct(key, **kwargs):
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
-    locked = deferred_autofill.locked_response(kwargs["entity"], request.form)
+    locked = deferred_autofill.locked_response(kwargs["entity"], upload_data)
     if locked:
         return locked
     return direct_uploads.direct_upload_response()

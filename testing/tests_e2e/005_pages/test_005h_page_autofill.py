@@ -74,24 +74,17 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     payload = response_info.value.json()
     job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
     assert job.status == DeferredJobStatus.QUEUED.value
-    progress = form.locator("[data-role='deferred-progress']")
+    progress = form.locator("[data-role='form-operation']")
     expect(progress).to_be_visible()
-    expect(progress.locator("[data-role='deferred-phase']")).not_to_have_text("")
-    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
-    expect(form).to_have_css("opacity", "0.5")
-
-    with expect_poll_result(
-        user.page,
-        subscription_id=f"lock:{page.key}",
-        timeout=25_000,
-    ):
-        user.page.reload()
+    expect(progress).to_contain_text("running")
+    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_enabled()
+    initial = user.page.reload()
+    assert payload["operation"] in initial.text()
     form = user.page.locator("[data-widget='PageInfo']")
     expect(form).to_have_attribute("initialized", "")
     expect(form).to_have_attribute("data-operation", payload["operation"])
-    expect(form.locator("[data-role='deferred-progress']")).to_be_visible()
-    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
-    expect(form).to_have_css("opacity", "0.5")
+    expect(form.locator("[data-role='form-operation']")).to_be_visible()
+    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_enabled()
 
     update_path = f"/pages/{page.entity.urlsafe_key}/update"
     original_name = page.entity.name
@@ -100,6 +93,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
             """async ({path, name}) => {
                 const body = new FormData();
                 body.set("name", name);
+                body.set("role", "autofill-submit");
                 const response = await fetch(path, {
                     method: "PUT",
                     credentials: "include",
@@ -143,8 +137,11 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
                 result = DeferredJobs.run(job.urlsafe_key)
         assert result.success is True
 
+    expect(form.locator("[data-role='edited-message']")).to_contain_text("Autofill is complete")
+    form.locator("[data-role='edited-reset']").click()
+    user.page.get_by_role("button", name="Use selected values", exact=True).click()
     expect(form.locator(f"[name='{FIELD_ID}']")).to_have_value(EXPECTED_VALUE)
-    expect(form.locator("[data-role='deferred-progress']")).not_to_be_attached()
+    expect(form.locator("[data-role='form-operation']")).to_be_hidden()
     expect(form.locator("[data-role='submit-group']")).to_be_attached()
     expect(form.locator("[data-role='autofill']")).to_be_attached()
     expect(form).to_have_css("opacity", "1")

@@ -1,6 +1,7 @@
 import { captureError } from "./errors.mjs";
 import { createIcon } from "./icons.mjs";
 import { withTransition } from "./transitions.mjs";
+import { renderReviewBar } from "../forms/reviewBar.mjs";
 
 /**
  * @testable false
@@ -83,21 +84,23 @@ export class DeferredOperationManager {
 		const scannedKeys = new Set();
 		for (const node of nodes) {
 			const revision = operationRevision(node.dataset.operationRevision);
-			const status = node.dataset.operationStatus
-				? {
-						key: node.dataset.operation,
-						revision,
-						status: node.dataset.operationStatus,
-						phase: node.dataset.operationPhase || "unknown",
-						phase_label: node.dataset.operationPhaseLabel || "Working",
-						elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
-						recovering: node.dataset.operationRecovering === "true",
-						terminal: node.dataset.operationTerminal === "true",
-						...(node.dataset.operationError
-							? { error: node.dataset.operationError }
-							: {}),
-					}
-				: null;
+			const status = node.dataset.operationBootstrap
+				? JSON.parse(node.dataset.operationBootstrap)
+				: node.dataset.operationStatus
+					? {
+							key: node.dataset.operation,
+							revision,
+							status: node.dataset.operationStatus,
+							phase: node.dataset.operationPhase || "unknown",
+							phase_label: node.dataset.operationPhaseLabel || "Working",
+							elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
+							recovering: node.dataset.operationRecovering === "true",
+							terminal: node.dataset.operationTerminal === "true",
+							...(node.dataset.operationError
+								? { error: node.dataset.operationError }
+								: {}),
+						}
+					: null;
 			const tracked = this.track(node.dataset.operation, {
 				revision,
 				node,
@@ -222,6 +225,13 @@ export class DeferredOperationManager {
 	decorate(node, key) {
 		if (!node || !key) return;
 		node.dataset.operation = key;
+		if (
+			node.dataset.formState &&
+			node.dataset.operationScope !== "form-change"
+		) {
+			if (node._lp_widget) renderReviewBar(node._lp_widget);
+			return;
+		}
 		const formLocked = node.dataset.deferredLock === "form";
 		if (formLocked) {
 			node.setAttribute("aria-busy", "true");
@@ -355,6 +365,13 @@ export class DeferredOperationManager {
 
 	_render(status, elapsedSeconds = status.elapsed_seconds) {
 		for (const node of operationNodes(status.key)) {
+			if (status.type === "autofill" && node._lp_widget) {
+				renderReviewBar(node._lp_widget, {
+					...status,
+					elapsed_seconds: elapsedSeconds,
+				});
+			}
+			delete node.dataset.operationBootstrap;
 			node.dataset.operationRevision = String(status.revision);
 			node.dataset.operationStatus = status.status || "unknown";
 			node.dataset.operationPhase = status.phase || "unknown";

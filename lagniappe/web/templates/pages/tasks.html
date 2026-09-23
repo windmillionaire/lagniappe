@@ -183,6 +183,7 @@
 {% endmacro %}
 
 {% macro task_form(t, page) %}
+  {% set review_state = form_state(t) %}
   <form data-widget="TaskForm"
         lp-update
         lp-offline
@@ -197,6 +198,13 @@
         data-history="{{ t.hash }}:TaskHistory"
         data-deferred-route="{{ url_for('tasks.get', key=t.urlsafe_key) }}"
         data-destination="{{ t.hash }}:TaskForm"
+        data-form-state='{{ review_state|tojson }}'
+        {% if review_state.operation %}
+          data-operation="{{ review_state.operation.key }}" data-operation-revision="{{ review_state.operation.revision }}"
+          data-operation-bootstrap='{{ review_state.operation|tojson }}'
+          data-operation-scope="{{ review_state.operation.scope|default('form-autofill') }}"
+          {% if review_state.operation.blocks_edit %}data-deferred-lock="form"{% endif %}
+        {% endif %}
         data-schema='{{ t.submission_schema|tojson }}'
         {% if not t.completed %}data-migration-notice='{{ t.migration_notice|tojson }}'{% endif %}
         data-form-generation="{{ t.generation }}"
@@ -251,7 +259,7 @@
         <div data-role="original-completion-detail" hidden></div>
       </section>
     {% endif %}
-    {% if not t.completed %}{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}{% endif %}
+    {% if not t.completed %}{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key), review_state) }}{% endif %}
   </form>
 {% endmacro %}
 

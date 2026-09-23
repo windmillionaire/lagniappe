@@ -153,7 +153,7 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     marker = current_form.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
     expect(marker.locator("[data-role='edited-message']")).to_contain_text(
-        "Saved values changed elsewhere"
+        "Another user has edited this form"
     )
     marker.locator("[data-role='edited-reset']").click()
     modal = owner.page.locator("#modal")
@@ -163,7 +163,7 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
         has_text=updated_submission
     )
     expect(saved_choice).to_have_attribute("aria-checked", "true")
-    modal.get_by_role("button", name="Update values").click()
+    modal.get_by_role("button", name="Use selected values").click()
     expect(modal).not_to_be_attached()
     expect(current_form.locator("input[name='sync-text']")).to_have_value(
         updated_submission
@@ -227,7 +227,7 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
     marker = info.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
     expect(marker.locator("[data-role='edited-message']")).to_contain_text(
-        "Saved values changed elsewhere"
+        "Another user has edited this form"
     )
     wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
@@ -240,7 +240,7 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
         has_text=saved_value
     )
     expect(saved_choice).to_have_attribute("aria-checked", "true")
-    modal.get_by_role("button", name="Update values").click()
+    modal.get_by_role("button", name="Use selected values").click()
 
     expect(modal).not_to_be_attached()
     wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)

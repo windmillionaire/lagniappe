@@ -459,6 +459,10 @@ def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypat
             status=DeferredJobStatus.CANCELLED.value,
             dispatch_state=DeferredJobStatus.CANCELLED.value,
         ),
+        Record("review-pinned", created=now - timedelta(days=12), status="succeeded", dispatch_state="complete",
+               autofill_receipt="{}", inputs='{"target":{"id":"review-target"}}'),
+        Record("review-acknowledged", created=now - timedelta(days=12), status="succeeded", dispatch_state="complete",
+               autofill_receipt="{}", inputs='{"target":{"id":"review-target"}}'),
     ]
 
     class Query:
@@ -477,7 +481,10 @@ def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypat
     datastore = SimpleNamespace(
         query=lambda **_kwargs: query,
         delete_multi=lambda keys: deleted_batches.append(list(keys)),
+        get=lambda key: {"autofill_reviews": '{"shared":"review-pinned"}'},
     )
+    monkeypatch.setattr(deferred_database, "_deferred_job_key", lambda key: key)
+    monkeypatch.setattr(deferred_database, "encode_urlsafe_key", lambda key: key)
     monkeypatch.setattr(
         deferred_database,
         "DATA",
@@ -489,8 +496,8 @@ def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypat
         batch_size=1,
     )
 
-    assert deleted == 2
-    assert deleted_batches == [["completed"], ["replaced"]]
+    assert deleted == 3
+    assert deleted_batches == [["completed"], ["replaced"], ["review-acknowledged"]]
     assert query.order == ["created"]
     assert len(query.filters) == 1
 

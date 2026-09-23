@@ -1,5 +1,6 @@
 import { FormController } from "../../forms/controller.mjs";
 import { installMigrationNotice } from "../../forms/migrationNotice.mjs";
+import { installReviewBar, renderReviewBar } from "../../forms/reviewBar.mjs";
 import { compatibleField } from "../../forms/representation.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
@@ -61,9 +62,12 @@ export class FormWidget {
 			target.dataset.operation = operation;
 			target.dataset.operationRevision = String(descriptor.revision ?? 0);
 			target.dataset.operationScope = descriptor.scope || "";
-			target.dataset.deferredLock = "form";
+			if (descriptor.blocks_edit === true || descriptor.scope === "form-change")
+				target.dataset.deferredLock = "form";
+			else delete target.dataset.deferredLock;
 		}
-		this.clearUnsavedState();
+		if (descriptor.status && typeof descriptor.status === "object")
+			renderReviewBar(this, descriptor.status);
 		return true;
 	}
 
@@ -75,6 +79,12 @@ export class FormWidget {
 			this.target instanceof HTMLFormElement
 				? new FormData(this.target)
 				: new FormData();
+		const state =
+			this.reviewState ?? JSON.parse(this.target?.dataset?.formState || "{}");
+		if (state.revision) data.set("form-revision", state.revision);
+		for (const operation of this._reviewedOperations ?? [])
+			data.append("reviewed-operation", operation);
+		if (this._autofillRetry) data.set("autofill-retry", this._autofillRetry);
 		return this.form?._subForm?.applyDirectUploads?.(data) ?? data;
 	}
 
@@ -90,6 +100,10 @@ export class FormWidget {
 		const grouped = new Map();
 		const entries = [...this.formData.entries(), ...this.revisionEntries];
 		for (const [name, rawValue] of entries) {
+			if (
+				["form-revision", "reviewed-operation", "autofill-retry"].includes(name)
+			)
+				continue;
 			let value = rawValue;
 			if (typeof File !== "undefined" && rawValue instanceof File) {
 				if (!rawValue.name && rawValue.size === 0) continue;
@@ -114,6 +128,9 @@ export class FormWidget {
 
 	commitRevisionBaseline({ clearUnsaved = false } = {}) {
 		this._revisionBaseline = this.revisionSnapshot();
+		this._baselineSubmission = structuredClone(
+			this.form?.renderer?._packageSubmission?.() ?? this.submission ?? {},
+		);
 		if (clearUnsaved) this.clearUnsavedState();
 		return this._revisionBaseline;
 	}
@@ -250,6 +267,7 @@ export class FormWidget {
 			}
 
 			if (remoteSnapshot !== null) this._revisionBaseline = remoteSnapshot;
+			this._baselineSubmission = structuredClone(response.submission ?? {});
 			if (wasQueued) {
 				this.form?.queued();
 			} else if (wasUnsaved || markUnsaved) {
@@ -268,7 +286,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_guarded_only_by_durable_autofill_lock
+	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_blocked_by_schema_migration_but_not_autofill
 	 * @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
 	 */
 	async prepareSubmit(options) {
@@ -327,6 +345,12 @@ export class FormWidget {
 		}
 
 		for (const control of target.querySelectorAll("[name]")) {
+			if (
+				["form-generation", "form-revision", "reviewed-operation"].includes(
+					control.name,
+				)
+			)
+				continue;
 			const values = fields.get(control.name) || [];
 			if (control instanceof HTMLInputElement) {
 				if (["checkbox", "radio"].includes(control.type)) {
@@ -417,7 +441,8 @@ export class FormWidget {
 		this.target._lp_widget = this;
 		this.form = new FormController(this);
 		await this.form.init();
-		if (
+		if (this.target.dataset.formState) installReviewBar(this);
+		else if (
 			this.target.dataset.migrationNotice &&
 			this.target.dataset.migrationNotice !== "[]"
 		)
@@ -665,6 +690,14 @@ export class FormWidget {
 		if (ownsRendererState && Object.hasOwn(response, "submission")) {
 			this.submission = response.submission;
 		}
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "form_state") &&
+			this.initialTarget
+		)
+			this.initialTarget.dataset.formState = JSON.stringify(
+				response.form_state,
+			);
 		if (
 			ownsRendererState &&
 			Object.hasOwn(response, "generation") &&

@@ -146,8 +146,9 @@ def status_projection(job, *, now):
         "phase_label": phase_label,
         "attempt": int(getattr(job, "attempt", 0) or 0),
         "remaining_seconds": (
-            max(600 - elapsed_seconds(getattr(job, "created", None), now), 0)
-            if getattr(job, "job_type", None) == DeferredJobType.REPORT_AI.value and not terminal
+            max((120 if getattr(job, "job_type", None) == "autofill" else 600)
+                - elapsed_seconds(getattr(job, "created", None), now), 0)
+            if getattr(job, "job_type", None) in {"autofill", DeferredJobType.REPORT_AI.value} and not terminal
             else None
         ),
         "last_progress_at": progress.get("updated_at"),
@@ -177,6 +178,12 @@ def status_projection(job, *, now):
         "destination": client.get("destination"),
         "entity_key": client.get("key"),
     }
+    if getattr(job, "job_type", None) == "autofill":
+        result.update({
+            "target_key": ((getattr(job, "inputs", None) or {}).get("target") or {}).get("id"),
+            "operation_id": getattr(job, "idempotency_key", None),
+            "snapshot_revision": ((getattr(job, "parameters", None) or {}).get("snapshot") or {}).get("revision"),
+        })
     if result["terminal"] and error.get("message"):
         result["error"] = str(error["message"])[:500]
     return result

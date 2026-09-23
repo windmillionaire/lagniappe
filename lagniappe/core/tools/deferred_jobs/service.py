@@ -567,6 +567,10 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             if not owner and not self.adapter(job.job_type).can_view_status(job, actor):
                 continue
             projection = _status_projection(job, now=_utc(now))
+            if job.job_type == "autofill":
+                projection["can_cancel"] = not projection["terminal"] and (
+                    owner or (job.parameters or {}).get("mode") != "revise"
+                )
             if not owner:
                 projection.pop("error", None)
             statuses.append(projection)
