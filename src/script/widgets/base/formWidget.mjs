@@ -84,6 +84,8 @@ export class FormWidget {
 		if (state.revision) data.set("form-revision", state.revision);
 		for (const operation of this._reviewedOperations ?? [])
 			data.append("reviewed-operation", operation);
+		for (const operation of this._usedAutofillOperations ?? [])
+			data.append("used-autofill-operation", operation);
 		if (this._autofillRetry) data.set("autofill-retry", this._autofillRetry);
 		return this.form?._subForm?.applyDirectUploads?.(data) ?? data;
 	}
@@ -101,7 +103,7 @@ export class FormWidget {
 		const entries = [...this.formData.entries(), ...this.revisionEntries];
 		for (const [name, rawValue] of entries) {
 			if (
-				["form-revision", "reviewed-operation", "autofill-retry"].includes(name)
+				["form-revision", "reviewed-operation", "used-autofill-operation", "autofill-retry"].includes(name)
 			)
 				continue;
 			let value = rawValue;
@@ -239,6 +241,10 @@ export class FormWidget {
 		commit();
 	}
 
+	/**
+	 * @testable true
+	 * @pair forms:autofill-review
+	 */
 	async prepareLocalRevision(
 		response,
 		{
@@ -320,6 +326,19 @@ export class FormWidget {
 		this.commitRevisionBaseline();
 		this.initialized = true;
 		this.target.setAttribute("initialized", "");
+		const queue = this.view?.offlineQueue;
+		if (
+			typeof queue?.presentFor === "function" &&
+			typeof this.handleOfflineQueue === "function"
+		) {
+			void queue.presentFor(this).catch((error) => {
+				this.view?.reportStartupError?.(
+					error,
+					this.target,
+					"offline-conflict-restore",
+				);
+			});
+		}
 	}
 
 	/** @testable infrastructure */

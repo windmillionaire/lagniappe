@@ -48,7 +48,6 @@ const STYLES = {
   },
   "button": {
     "submit": "grid w-full grow place-items-center rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm action-button",
-    "explain": "inline-flex items-center gap-1 text-sm font-semibold justify-center",
     "close": "ml-2 text-center text-base rounded-md px-2.5 py-1 font-semibold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 hover:outline-2 hover:outline-offset-2 text-white bg-delete-default hover:bg-delete-dark outline-delete-default hover:outline-delete-dark",
     "group": "flex flex-col sm:flex-row gap-3",
     "cancel": "ml-auto grid size-6 translate-x-1 place-items-center rounded-md text-delete-default hover:outline-2 hover:outline-delete-default focus-visible:outline-2 focus-visible:outline-delete-default hover:bg-delete-bg focus-visible:bg-delete-bg transition-colors duration-100"
@@ -352,7 +351,7 @@ const STYLES = {
   "modal": {
     "wrapper": "fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100",
     "content": "bg-white rounded-lg shadow-xl max-w-4xl mx-4 max-h-[90vh] overflow-y-auto relative",
-    "header": "sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center",
+    "header": "sticky top-0 z-50 bg-white border-b px-6 py-4 flex justify-between items-center",
     "actions": "flex flex-row gap-3"
   },
   "nav": {

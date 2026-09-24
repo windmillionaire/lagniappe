@@ -497,7 +497,7 @@ def test_autofill_upload_is_validated_before_job_start(monkeypatch):
     )
     monkeypatch.setattr(
         autofill_jobs.storage_assets,
-        "direct_upload_file",
+        "verify_direct_upload",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
     )
     monkeypatch.setattr(

@@ -12,11 +12,13 @@ from .provider_policy import is_provider_transient_error, retry_http_options
 
 
 current_session = ContextVar("ai_provider_session", default=None)
+MIN_PROVIDER_RETRY_SECONDS = 30
 
 
 # @testable true
 # @tests tests_unit/test_015c_provider_session.py::test_blocked_request_is_cancelled_and_closed
 # @tests tests_unit/test_015c_provider_session.py::test_transient_retry_preserves_request_and_uses_one_budget
+# @tests tests_unit/test_015c_provider_session.py::test_transient_error_does_not_retry_with_too_little_time
 # @matrix ai : cancellation deadline retry-ownership service-tier
 class ProviderSession:
     """Own the client and loop; never leave a blocked request in a worker thread."""
@@ -57,7 +59,11 @@ class ProviderSession:
                 return task.result()
             except Exception as error:
                 self.control.ensure_active()
-                if not is_provider_transient_error(error) or not self.control.claim_provider_retry():
+                if (
+                    not is_provider_transient_error(error)
+                    or self.control.remaining_seconds < MIN_PROVIDER_RETRY_SECONDS
+                    or not self.control.claim_provider_retry()
+                ):
                     raise
             finally:
                 if not task.done():

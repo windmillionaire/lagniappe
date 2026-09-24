@@ -103,6 +103,9 @@ The view awaits `component.activate()` and `prepareRender()`, then calls
 `component.render()` inside `withTransition()`. A trigger for an unloaded
 `lp-load` or `lp-prefetch` widget carries `data-loading` and `aria-busy` until
 preparation finishes.
+After a user-triggered open commits, the view emits `component-opened` with the
+component and original trigger. Widgets can respond to the completed action
+without installing another click handler for the same control.
 
 At concrete view publication, components marked `lp-prefetch` start loading
 their child widget targets marked the same way. The response is held for later

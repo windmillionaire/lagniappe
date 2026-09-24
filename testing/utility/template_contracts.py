@@ -2181,7 +2181,6 @@ def format_contract_details(attrs: list[ContractAttribute], indent: str = "  ") 
             "data-if-empty",
             "data-entity",
             "data-toggle",
-            "data-explain",
         },
     )
     lines = [f"{indent}contract:"]
@@ -2357,7 +2356,6 @@ def markdown_contract_details(attrs: list[ContractAttribute]) -> list[str]:
             "data-if-empty",
             "data-entity",
             "data-toggle",
-            "data-explain",
         },
     )
     if data_attrs:

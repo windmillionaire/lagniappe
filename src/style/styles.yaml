@@ -148,10 +148,6 @@ button:
     surfaces: [server, frontend]
     hooks: [action-button]
     css: [src/style/buttons.css]
-  explain:
-    classes: inline-flex items-center gap-1 text-sm font-semibold justify-center
-    intent: prompt explanation control with icon and text centered on a shared axis
-    surfaces: [server, frontend]
   close:
     classes: ml-2 text-center text-base rounded-md px-2.5 py-1 font-semibold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 hover:outline-2 hover:outline-offset-2 text-white bg-delete-default hover:bg-delete-dark outline-delete-default hover:outline-delete-dark
     intent: close presentation within button
@@ -1137,7 +1133,7 @@ modal:
     intent: content presentation within modal
     surfaces: [server, frontend]
   header:
-    classes: sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center
+    classes: sticky top-0 z-50 bg-white border-b px-6 py-4 flex justify-between items-center
     intent: header presentation within modal
     surfaces: [server, frontend]
   actions:

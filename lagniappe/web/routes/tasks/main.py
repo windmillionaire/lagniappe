@@ -9,17 +9,15 @@ from lagniappe.core.definitions import (
     Action,
     Fetch,
     FetchReason,
-    FileConsumer,
     FileConsumerLimitError,
     Resource,
-    enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import dates
-from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools.forms.definitions import history_groups, history_values_for
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools import collaboration
 from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
@@ -53,8 +51,7 @@ from . import tasks
 def _ai_schedule_requested(form):
     schedule_type = form.get("schedule-type")
     return bool(
-        form.get("explain") == "schedule"
-        or form.get("periodic")
+        form.get("periodic")
         or schedule_type in {"monthly", "yearly"}
         or (form.get("scheduled") and schedule_type not in {"daily", "weekly"})
     )
@@ -599,31 +596,6 @@ def upload_file_direct(key, **kwargs):
     return direct_uploads.direct_upload_response()
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tasks/main.py::update
-# @reason autofill prompt data assembly is part of task update request flow
-def _autofill_data(task, request):
-    file = request.files.get("autofill-file") or direct_uploads.direct_upload_file(
-        "autofill-file", consumer=FileConsumer.AI_INLINE
-    )
-    if file:
-        try:
-            enforce_file_consumer(
-                file,
-                FileConsumer.AI_INLINE,
-                filename=getattr(file, "filename", None),
-            )
-        except FileConsumerLimitError as error:
-            abort(422, description=str(error))
-    return ai_autofill.autofill_prompt_data(
-        task,
-        current_user,
-        user_context=request.form.get("autofill-description"),
-        file=file,
-        mimetype=request.form.get("mimetype"),
-    )
-
-
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
 # @matrix tasks : complete partial-submission readonly
@@ -662,12 +634,12 @@ def update(key, **kwargs):
 
     active = request.form.getlist("active")
     role = request.form.get("role")
-    explain = request.form.get("explain")
+    if role == "explain" or request.form.get("explain"):
+        return responses.error("Initial Prompt is no longer available.")
 
     submitting_answers = (
         _should_submit_task_form(active, role, task)
         or role == "autofill-submit"
-        or explain == "autofill"
     )
     # Settings/completion also save the task row. Fence their loaded state so a
     # simultaneous AI commit cannot be replaced by that older row.
@@ -691,7 +663,14 @@ def update(key, **kwargs):
         except exceptions.ValidationError as error:
             return responses.error(str(error))
 
-    if _should_submit_task_form(active, role, task):
+    autofill_requested = role == "autofill-submit"
+    draft = None
+    if autofill_requested:
+        try:
+            draft = task.preview_form_submission(request, actor=current_user)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+    elif _should_submit_task_form(active, role, task):
         try:
             task.form_submission(request, actor=current_user)
         except exceptions.ValidationError as error:
@@ -707,9 +686,7 @@ def update(key, **kwargs):
             require_ai_access(AI.CREATE)
 
         schedule = task.properties.schedule.update(request.form)
-        if schedule and schedule.generate and explain == "schedule":
-            return responses.explain(schedule.prompt)
-        elif schedule and schedule.generate:
+        if schedule and schedule.generate:
             schedule.create()
 
         if schedule and schedule.error:
@@ -726,35 +703,41 @@ def update(key, **kwargs):
         except (exceptions.TaskCompletionError, exceptions.ValidationError) as e:
             return responses.error(str(e))
 
-    if role in ["autofill-submit"] or explain == "autofill":
+    if role == "autofill-submit":
         require_ai_access(AI.CREATE)
-        if explain == "autofill":
-            try:
-                prompt = ai_autofill.form_autofill_prompt(**_autofill_data(task, request))
-                return responses.explain(prompt)
-            finally:
-                direct_uploads.cleanup_direct_uploads(
-                    request.form, input_name="autofill-file"
-                )
-
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 task,
                 current_user,
                 request.form,
                 multipart_file=bool(request.files.get("autofill-file")),
+                submission=draft["values"],
+                prompt_submission=draft["ai_values"],
             ),
             task,
             task.page,
         )
 
+    staged_file = None
     try:
+        staged_file, staged_cleanup = deferred_autofill.staged_upload_for_update(
+            task, current_user, request.form,
+        )
         form_review.acknowledge_reviews(task, current_user, request.form.getlist("reviewed-operation"))
-        task.save()
+        if staged_file:
+            Entities.save(staged_file, task)
+        else:
+            task.save()
     except exceptions.MutationConflict:
+        if staged_file:
+            storage_assets.cleanup_rejected_attempt(staged_file)
         return deferred_autofill.conflict_response(task)
-    except exceptions.ValidationError as error:
+    except (exceptions.ValidationError, storage_assets.DirectUploadError, FileConsumerLimitError) as error:
+        if staged_file:
+            storage_assets.cleanup_rejected_attempt(staged_file)
         return responses.error(str(error))
+
+    deferred_autofill.cleanup_staged_uploads(staged_cleanup)
 
     return responses.page_task(task)
 
@@ -788,15 +771,14 @@ def create(key, **kwargs):
     except exceptions.ValidationError as e:
         return responses.error(str(e))
 
-    explain = request.form.get("explain")
+    if request.form.get("explain") or request.form.get("role") == "explain":
+        return responses.error("Initial Prompt is no longer available.")
 
     if _ai_schedule_requested(request.form):
         require_ai_access(AI.CREATE)
 
     schedule = task.properties.schedule.update(request.form)
-    if schedule and schedule.generate and explain == "schedule":
-        return responses.explain(schedule.prompt)
-    elif schedule and schedule.generate:
+    if schedule and schedule.generate:
         schedule.create()
 
     if schedule and schedule.error:

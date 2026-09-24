@@ -159,6 +159,31 @@ def test_html_field_is_ignored_by_form_submission(get_schema):
     assert "html-instructqr" not in entity.assets
 
 
+# @matrix submission ai : autofill draft snapshot no-save
+@pytest.mark.unit
+def test_autofill_preview_validates_draft_without_saving_or_changing_cached_fields():
+    entity = _submission_page("draft snapshot", "Saved title")
+    entity.form.schema = [
+        {"id": "subject", "type": "input", "input": "text", "title": "Subject"},
+        {"id": "quantity", "type": "input", "input": "number", "title": "Quantity"},
+    ]
+    entity.properties.submission.value = {"subject": "Saved answer"}
+    before = dict(entity.db)
+    saved_field = entity.properties.submission.fields["subject"]
+
+    preview = entity.preview_form_submission(
+        WebFormSubmission({"subject": "Draft answer", "quantity": "42"}),
+        actor=SimpleNamespace(),
+    )
+
+    assert preview["answers"] == {"subject": "Draft answer", "quantity": 42.0}
+    assert preview["values"]["subject"] == "Draft answer"
+    assert preview["ai_values"]["subject"] == "Draft answer"
+    assert entity.db == before
+    assert entity.properties.submission.fields["subject"] is saved_field
+    assert saved_field.db_value == "Saved answer"
+
+
 # @matrix cache : cache-deduplication default-fields
 @pytest.mark.unit
 def test_default_entity_fields_are_not_duplicated_in_submission_search_cache():

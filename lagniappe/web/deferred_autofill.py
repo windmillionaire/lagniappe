@@ -8,13 +8,15 @@ from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
-    AI, Action, Fetch, FileConsumerLimitError,
+    AI, Action, Fetch, FileConsumer, FileConsumerLimitError,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.forms import review
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.tools.deferred_jobs.autofill import start_autofill_job
 from lagniappe.core.tools.database.assets import DirectUploadError
+from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.errors import DeferredJobLockedError
 from lagniappe.core.tools.deferred_jobs.locks import (
     AUTOFILL_FORM_LOCK_SCOPE,
@@ -101,10 +103,16 @@ def form_state(entity, user=None):
     status = statuses[0] if statuses else None
     if status and descriptor:
         status.update(scope=descriptor["scope"], blocks_edit=descriptor.get("blocks_edit", False))
+    reviews = review.review_projection(entity, user)
+    # The entity retains its last job key after an ordinary save acknowledges
+    # the review. A consumed success is history, not an active form operation.
+    if (status and status["type"] == "autofill" and status["status"] == "succeeded"
+            and not any(candidate["operation"] == key for candidate in reviews)):
+        status = None
     result = {
         "revision": entity.autofill_revision,
         "operation": status,
-        "reviews": review.review_projection(entity, user),
+        "reviews": reviews,
         "migration": review.migration_review(entity),
         "refine_url": url_for("tools.refine_autofill", key=entity.urlsafe_key) if user.access(AI.CREATE) else None,
     }
@@ -154,6 +162,85 @@ def conflict_response(entity):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
+# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_autofill_start_snapshots_draft_and_stages_file_without_saving_them
+# @pair ai:autofill
+def staged_upload_for_update(entity, actor, form):
+    """Prepare an accepted AI upload; defer deletion until the form save commits."""
+    reviewed = set(form.getlist("reviewed-operation"))
+    used = set(form.getlist("used-autofill-operation"))
+    if not used.issubset(reviewed):
+        raise exceptions.ValidationError("Review the autofill values before saving its file.")
+    references = set(review.review_references(entity).values())
+    if not used.issubset(references):
+        raise exceptions.ValidationError("This autofill review is no longer available.")
+
+    candidates = set(reviewed & references)
+    current_key = (entity.deferred_job or {}).get("key")
+    if current_key:
+        candidates.add(current_key)
+    jobs = Entities.fetch(*candidates, request=Fetch.direct()) if candidates else ()
+    file = None
+    cleanup = []
+    for job in jobs:
+        if (not isinstance(job, Entities.DEFERRED_JOB)
+                or job.job_type != "autofill"
+                or ((job.inputs or {}).get("target") or {}).get("id") != entity.urlsafe_key):
+            continue
+        record = (job.parameters or {}).get("upload_record")
+        if not record:
+            continue
+        # Private prompt-only refinements build on the shared suggestion. A
+        # selected refinement still uses the original evidence from that review.
+        accepted = job.urlsafe_key in reviewed and bool(used) and job.status == "succeeded"
+        discarded = job.urlsafe_key in reviewed and not accepted
+        abandoned = (job.urlsafe_key == current_key and job.status in {"failed", "cancelled"}
+                     and job.actor.key == actor.key)
+        if not (accepted or discarded or abandoned):
+            continue
+        if accepted:
+            if file is not None:
+                raise exceptions.ValidationError("Save one autofill attachment at a time.")
+            upload = storage_assets.verify_direct_upload(
+                record, max_age=None, consumer=FileConsumer.AI_INLINE,
+            )
+            file_key = database_utility.create_named_key(
+                "file", f"autofill-{hashlib.sha256(job.urlsafe_key.encode()).hexdigest()}",
+            )
+            file = Entities.fetch_one(file_key, request=Fetch.direct())
+            if file is None:
+                upload.lagniappe_preserve_source = True
+                file = Entities.FILE.create(
+                    upload=upload,
+                    data={"name": upload.filename, "filename": upload.filename,
+                          "mimetype": upload.content_type},
+                    key=file_key,
+                )
+                file.move_to(entity)
+            elif not isinstance(file, Entities.FILE) or getattr(file.owner, "key", None) != entity.key:
+                raise exceptions.ValidationError("This autofill attachment belongs to another form.")
+        cleanup.append(record)
+    if current_key:
+        current = next((job for job in jobs if job.urlsafe_key == current_key), None)
+        if current_key in reviewed or (
+            current and current.status in {"failed", "cancelled"}
+            and current.actor.key == actor.key
+        ):
+            entity.deferred_job = None
+    return file, cleanup
+
+
+# @testable infrastructure
+def cleanup_staged_uploads(records):
+    for record in records:
+        if not storage_assets.delete_direct_upload(record):
+            exceptions.capture(
+                exceptions.ValidationError("Staged autofill upload cleanup was incomplete."),
+                context={"operation": "autofill_upload_cleanup"}, level="warning",
+            )
+
+
+# @testable true
+# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @matrix ai notifications pages tasks : autofill deferred
@@ -179,6 +266,8 @@ def start_deferred_autofill(
     upload_records = direct_uploads.direct_upload_records(
         form, input_name="autofill-file"
     )
+    upload_record = upload_records[0] if upload_records else None
+    trusted_retry_upload = False
     try:
         retry = form.get("autofill-retry")
         if retry:
@@ -190,11 +279,15 @@ def start_deferred_autofill(
             form = dict(form)
             form["autofill-description"] = (previous.parameters or {}).get("user_context")
             options["file_key"] = (previous.parameters or {}).get("file_key")
+            if not upload_record:
+                upload_record = (previous.parameters or {}).get("upload_record")
+                trusted_retry_upload = bool(upload_record)
         job, notification = start_autofill_job(
             entity,
             user,
             form,
-            upload_record=upload_records[0] if upload_records else None,
+            upload_record=upload_record,
+            trusted_retry_upload=trusted_retry_upload,
             key=key,
             source_widget=source_widget,
             destination=destination,

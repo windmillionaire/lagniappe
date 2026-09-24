@@ -514,6 +514,16 @@ def test_ai_config_combines_search_tools_json_and_thinking_settings():
     assert config.tools[0].google_search is not None
     assert [fd.name for fd in config.tools[0].function_declarations] == ["get_entity"]
 
+    prompt.set_thinking_level("LOW")
+    level_config = ai_core.GenAI.create_config(prompt)
+    assert prompt.thinking_budget is None
+    assert level_config.thinking_config.thinking_level == ai_core.types.ThinkingLevel.LOW
+    assert level_config.thinking_config.thinking_budget is None
+
+    prompt.set_thinking_budget(0)
+    assert ai_core.GenAI.create_config(prompt).thinking_config.thinking_budget == 0
+    assert prompt.thinking_level is None
+
     with pytest.raises(ValueError, match="Service tier"):
         prompt.set_service_tier("fastest")
 

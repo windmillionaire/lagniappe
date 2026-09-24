@@ -128,6 +128,32 @@ export class OfflineQueue {
 		);
 	}
 
+	/**
+	 * A task form can mount after the first reconnect replay found its conflict.
+	 * Give that form the retained record instead of requiring another replay.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_045_offline_queue.mjs::test_late_form_receives_persisted_conflict_after_replay
+	 * @matrix offline : conflict-durability late-widget
+	 */
+	async presentFor(target) {
+		if (!target?.key || typeof target.handleOfflineQueue !== "function")
+			return;
+		const record = this._sortedRecords().find(
+			(candidate) => candidate.target_key === target.key,
+		);
+		if (!record) return;
+		await this._dispatch(
+			{
+				phase: record.conflictResponse ? "conflict" : "queued",
+				queue: this,
+				record,
+				response: record.conflictResponse,
+			},
+			[target],
+		);
+	}
+
 	_responseFromResults(results) {
 		return results.find((result) => {
 			return result && typeof result === "object" && "ok" in result;

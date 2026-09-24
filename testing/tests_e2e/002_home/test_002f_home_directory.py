@@ -352,7 +352,7 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     unmeasured_job = Entities.DEFERRED_JOB.create(
         {
             "actor": owner.entity,
-            "job_type": "report-organize",
+            "job_type": "report-ai",
             "status": "succeeded",
             "idempotency_key": f"unmeasured-{telemetry_id}",
             "telemetry_id": f"unmeasured-{telemetry_id}",
@@ -461,6 +461,7 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     unmeasured = owner.locate(
         f"[data-role='ai-run'][data-job-id='{unmeasured_job.urlsafe_key}']"
     )
+    expect(unmeasured.locator(":scope > summary span.font-semibold")).to_have_text("Report")
     unmeasured.locator(":scope > summary").click()
     expect(unmeasured.locator("[data-role='ai-run-missing']")).to_be_visible()
     expect(unmeasured.locator("[data-role='ai-run-generation']")).to_have_count(0)

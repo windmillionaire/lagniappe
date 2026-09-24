@@ -49,7 +49,10 @@ Reconnect replays commands in order. A revision mismatch retains the command
 and opens the same reconciliation path used for an external edit. If current
 schema/state can safely rebase the queued submission, the queue saves the new
 precondition and retries within the same ordered pass. A conflict needing User
-choice remains queued and blocks later commands.
+choice remains queued and blocks later commands. After a reload, comparison and
+review use the persisted command's values, not the newly rendered saved form.
+If the form mounts after replay found the conflict, it receives the retained
+conflict when it initializes.
 
 After acceptance, the queue removes the IndexedDB record and live lookup before
 requesting an immediate entity poll. That ordering prevents the watcher from

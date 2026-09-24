@@ -267,31 +267,6 @@ const toggle = (attributes) => {
 /**
  * @testable infrastructure
  */
-const explain_prompt = (attributes) => {
-	const { visible = false, classes = [], explain = null } = attributes;
-
-	const button = document.createElement("button");
-	button.type = "submit";
-	button.dataset.role = "explain";
-	if (explain) button.dataset.explain = explain;
-	button.className = STYLES.button.explain;
-	if (visible) button.dataset.visible = "true";
-
-	const promptIcon = button.appendChild(document.createElement("span"));
-	setIcon(promptIcon, "prompt", "text-kind-default");
-	const promptText = button.appendChild(document.createElement("span"));
-	promptText.textContent = "Initial Prompt";
-
-	if (classes.length > 0) {
-		button.classList.add(...classes);
-	}
-
-	return button;
-};
-
-/**
- * @testable infrastructure
- */
 const loading = () => {
 	const wrapper = document.createElement("div");
 	wrapper.className = STYLES.loading.wrapper;
@@ -379,6 +354,5 @@ export const primitives = {
 	icon,
 	div,
 	error,
-	explain_prompt,
 	span,
 };

@@ -1,6 +1,5 @@
 import { FormController } from "../../../forms/controller.mjs";
 import { STYLES } from "../../../generated/styles.mjs";
-import { Modal } from "../../../shared/modal.mjs";
 import { request } from "../../../shared/request.mjs";
 import { buttons } from "../../buttons.mjs";
 import { primitives } from "../../primitives.mjs";
@@ -9,9 +8,8 @@ import { primitives } from "../../primitives.mjs";
  * @testable true
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_inserts_ai_markup_with_insert_modes
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
- * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_explain_includes_selected_text_context
  * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_provider_error_surfaces_in_form
- * @matrix ai editor : error explain generate-text insert-mode replace-selection selected-text
+ * @matrix ai editor : error generate-text insert-mode replace-selection selected-text
  */
 class GenerateText {
 	constructor(toolbar) {
@@ -113,18 +111,7 @@ class GenerateText {
 
 		const insertModeOptions = this._createInsertModeOptions();
 
-		const explain = primitives.explain_prompt({
-			explain: "generate",
-			kind: "default",
-			visible: false,
-		});
-
-		this.html = [
-			this.prompt,
-			this.selectedTextInput,
-			insertModeOptions,
-			explain,
-		].filter(Boolean);
+		this.html = [this.prompt, this.selectedTextInput, insertModeOptions];
 
 		this.form = new FormController(this);
 		this.form.init();
@@ -193,10 +180,7 @@ class GenerateText {
 
 		if (submitter) submitter.disabled = false;
 
-		if (response.ok && response.modal) {
-			const modal = new Modal(this.toolbar.builder);
-			modal.attach(response.modal, this);
-		} else if (response.ok && response.markup) {
+		if (response.ok && response.markup) {
 			const insertMode = formData.get("insert_mode") || "replace";
 			this._addText(response.markup, insertMode);
 		} else if (response.error) {

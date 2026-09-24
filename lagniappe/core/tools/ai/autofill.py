@@ -261,6 +261,7 @@ def generate_autofilled_submission(prompt, *, entity, user, schema=None):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
+# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_original_file_uses_uri_without_redundant_get_file_tool
 # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
 # @matrix ai : file-context output-format prompt-builders search tools
 def form_autofill_prompt(**kwargs):
@@ -268,6 +269,7 @@ def form_autofill_prompt(**kwargs):
 
     intro = "Propose grounded updates to one page or task form, using its current answers, supplied evidence, and focused public research when useful."
     prompt = Prompt(intro, user=kwargs.get("user"), type="autofill")
+    prompt.set_thinking_level("LOW")
     prompt.enable_search()
 
     form_name = (
@@ -277,7 +279,17 @@ def form_autofill_prompt(**kwargs):
         kwargs.get("form").schema if kwargs.get("form") else kwargs.get("schema")
     )
     file = kwargs.get("file")
-    attached_files = kwargs.get("attached_files") or []
+    original_files = tuple(kwargs.get("original_files") or ())
+    original_file_parts = tuple(kwargs.get("original_file_parts") or ())
+    original_hashes = {
+        f"hash:{source.hash}"
+        for source in original_files
+        if getattr(source, "hash", None)
+    }
+    attached_files = [
+        source for source in kwargs.get("attached_files") or ()
+        if source.get("hash") not in original_hashes
+    ]
 
     tool_names = []
     if attached_files:
@@ -303,11 +315,15 @@ def form_autofill_prompt(**kwargs):
         prompt.add_bytes(file, mimetype)
         if not prompt.bytes:
             raise exceptions.ValidationError("This file type cannot be read directly by autofill.")
-    for source in kwargs.get("original_files") or ():
+    for source in original_files:
         before = len(prompt.files)
         prompt.add_file(source, user=kwargs.get("user"))
         if len(prompt.files) == before:
             raise exceptions.ValidationError("The supplied file is no longer available for autofill.")
+    for part in original_file_parts:
+        if not isinstance(part, dict) or not part.get("uri") or not part.get("mime_type"):
+            raise exceptions.ValidationError("The supplied file is no longer available for autofill.")
+        prompt.files.append({"uri": part["uri"], "mime_type": part["mime_type"]})
 
     if prompt.bytes or prompt.files:
         prompt.add_context("file_data", FILE_CONTEXT.strip())

@@ -125,9 +125,8 @@ export class CreateCategory extends CategoryForm {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_form
-	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_explain_button
 	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_generate_toggle
-	 * @matrix categories : ai-form attach-form explain-button manual-form
+	 * @matrix categories : ai-form attach-form manual-form
 	 */
 	get html() {
 		const name = this.nameElement;

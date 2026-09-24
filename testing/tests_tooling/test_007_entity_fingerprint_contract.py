@@ -39,9 +39,11 @@ def _edited_marker_routes(source):
             and target.node.name == "controls"
         ):
             continue
-        arguments = call.args + [kw.value for kw in call.kwargs if kw.key == "route"]
-        assert len(arguments) == 1, "edited_marker requires one focused route"
-        route = arguments[0]
+        route_keywords = [kw.value for kw in call.kwargs if kw.key == "route"]
+        assert not (call.args and route_keywords)
+        assert len(call.args) <= 2 and len(route_keywords) <= 1
+        assert call.args or route_keywords, "edited_marker requires one focused route"
+        route = call.args[0] if call.args else route_keywords[0]
         assert isinstance(route, nodes.Call) and isinstance(route.node, nodes.Name)
         assert route.node.name == "url_for", (
             "edited_marker must use a route destination"
@@ -56,6 +58,7 @@ def _edited_marker_routes(source):
     "source",
     [
         "{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}",
+        "{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key), review_state) }}",
         '{{ controls.edited_marker(\n route=url_for("tasks.get", key=t.urlsafe_key)\n) }}',
         "{# controls.edited_marker() #}{{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}",
     ],
@@ -124,6 +127,7 @@ def test_edited_marker_renders_focused_route_and_reset_control():
         encoding="utf-8"
     )
     environment = Environment(autoescape=True, undefined=StrictUndefined)
+    environment.filters["yesno"] = lambda value: "true" if value else "false"
     tree = environment.parse(source)
     # Render the real macro; unrelated macros need application-only filters.
     tree.body = [
@@ -133,7 +137,8 @@ def test_edited_marker_renders_focused_route_and_reset_control():
     ]
     module = environment.from_string(tree).make_module({"styles": {"message": ""}})
     route = "/l/tasks/settings?key=task-1&mode=review"
-    markup = BeautifulSoup(module.edited_marker(route), "html.parser")
+    state = {"operation": None, "reviews": [], "migration": None, "retry_operation": None}
+    markup = BeautifulSoup(module.edited_marker(route, state), "html.parser")
 
     marker = markup.select_one("[lp-edited-marker]")
     assert marker is not None
@@ -143,3 +148,6 @@ def test_edited_marker_renders_focused_route_and_reset_control():
     reset = marker.select_one('[data-role="edited-reset"]')
     assert reset is not None and reset["type"] == "button"
     assert not markup.select('[data-role="edited-reload"]')
+    reviewed = BeautifulSoup(module.edited_marker(route, {**state, "reviews": [{}]}), "html.parser")
+    assert reviewed.select_one("[lp-edited-marker]")["data-visible"] == "true"
+    assert "Autofill is complete." in reviewed.select_one('[data-role="edited-message"]').get_text()

@@ -74,6 +74,8 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     payload = response_info.value.json()
     job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
     assert job.status == DeferredJobStatus.QUEUED.value
+    assert job.parameters["upload_record"]
+    assert "autofill-context.txt" not in [file.filename for file in Entities.fetch_one(page.entity.key, request=Fetch.direct()).files]
     progress = form.locator("[data-role='form-operation']")
     expect(progress).to_be_visible()
     expect(progress).to_contain_text("running")
@@ -145,3 +147,13 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form.locator("[data-role='submit-group']")).to_be_attached()
     expect(form.locator("[data-role='autofill']")).to_be_attached()
     expect(form).to_have_css("opacity", "1")
+    assert FIELD_ID not in Entities.fetch_one(page.entity.key, request=Fetch.direct()).properties.submission.value
+    with user.page.expect_response("**/pages/*/update") as saved_response:
+        form.locator("[data-role='submit-group'] button[type='submit']").click()
+    assert saved_response.value.ok, saved_response.value.text()
+    saved_page = Entities.fetch_one(page.entity.key, request=Fetch.direct())
+    assert saved_page.properties.submission.value[FIELD_ID] == EXPECTED_VALUE
+    assert "autofill-context.txt" in [file.filename for file in saved_page.files]
+    with user.page.expect_response("**/pages/*/update") as repeated_update:
+        form.locator("[data-role='submit-group'] button[type='submit']").click()
+    assert repeated_update.value.ok, repeated_update.value.text()

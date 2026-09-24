@@ -43,7 +43,7 @@ from testing.elements import (
     Modal,
     SpinnerButtons,
 )
-from testing.utility.network import expect_successful_response
+from testing.utility.network import browser_fetch, expect_successful_response
 from testing.utility.live_ai import submit_live_ai
 
 
@@ -122,36 +122,6 @@ def test_create_category_form(get_user):
     expect(form).not_to_be_visible()
 
 
-# @matrix categories : ai-form explain-button
-@pytest.mark.e2e
-def test_category_form_explain_button(get_user):
-    """
-    Verify AI explain button shows prompt preview modal.
-
-    Same pattern as project form - in AI mode, explain button
-    shows what the AI will generate based on the prompt.
-    """
-    user = get_user(Users.OWNER)
-    home = user.go(SitePages.HOME)
-
-    user.locate(home.CREATE_CATEGORY_TOGGLE).click()
-    form = user.locate(home.CREATE_CATEGORY_FORM)
-    expect(form).to_be_visible()
-
-    form.locator(Buttons.AI_MODE).click()
-    description = form.locator(FormElements.AI_DESCRIPTION)
-    expect(description).to_be_visible()
-    description.fill("Testing the explain button")
-
-    explain_btn = form.locator(Buttons.EXPLAIN)
-    expect(explain_btn).to_be_visible()
-    explain_btn.click()
-
-    modal = Modal(user.page)
-    modal.close()
-    expect(form).to_be_visible()
-
-
 # @matrix categories : ai-form manual-form
 @pytest.mark.e2e
 def test_category_form_generate_toggle(get_user):
@@ -175,10 +145,36 @@ def test_category_form_generate_toggle(get_user):
     ai_description = form.locator(FormElements.AI_DESCRIPTION)
     expect(ai_description).to_be_visible()
     expect(manual_name).not_to_be_visible()
+    expect(form.locator("[data-role='explain']")).to_have_count(0)
 
     form.locator(Buttons.MANUAL_MODE).click()
     expect(manual_name).to_be_visible()
     expect(ai_description).not_to_be_visible()
+
+
+# @matrix categories : retired-preview no-create
+@pytest.mark.e2e
+def test_retired_initial_prompt_request_cannot_create_category(
+    get_user, browser_failures
+):
+    user = get_user(Users.OWNER)
+    user.go(SitePages.HOME)
+
+    with browser_failures.expect_http_error(
+        user, status=422, path="/categories/create"
+    ):
+        response = browser_fetch(
+            user,
+            "/categories/create",
+            data={
+                "role": "explain",
+                "generate": "on",
+                "user_description": "A cached Initial Prompt preview request",
+            },
+        )
+
+    assert response["status"] == 422
+    assert response["text"] == "Initial Prompt is no longer available."
 
 
 # @pair categories:create-manual

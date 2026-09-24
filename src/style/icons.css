@@ -81,6 +81,10 @@
 	--icon-offset-y: 0.5px;
 }
 
+[data-role="checkbox-read-value"] .icon[data-icon="x"] {
+	--icon-offset-y: 1px;
+}
+
 .icon[data-icon="addRow"],
 .icon[data-icon="reset"] {
 	--icon-offset-y: -1px;

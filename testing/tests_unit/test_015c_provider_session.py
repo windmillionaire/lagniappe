@@ -135,7 +135,7 @@ def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch, serv
 
     client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate), aclose=close), close=lambda: None)
     monkeypatch.setattr(provider_session.genai, "Client", lambda **kwargs: client)
-    control = SimpleNamespace(ensure_active=lambda: None, remaining_seconds=10, claim_provider_retry=claim_retry)
+    control = SimpleNamespace(ensure_active=lambda: None, remaining_seconds=60, claim_provider_retry=claim_retry)
     session = provider_session.ProviderSession(control)
     config = types.GenerateContentConfig()
     headers = None
@@ -157,6 +157,41 @@ def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch, serv
     assert all(call["model"] == "fake" for call in calls)
     assert all(call["contents"] is contents for call in calls)
     assert all(call["config"].http_options.retry_options.attempts == 1 for call in calls)
-    assert all(call["config"].http_options.timeout == 10000 for call in calls)
+    assert all(call["config"].http_options.timeout == 60000 for call in calls)
     assert all(call["config"].http_options.headers == headers for call in calls)
     assert config.model_dump() == original_config
+
+
+# @matrix ai : deadline retry-ownership
+def test_transient_error_does_not_retry_with_too_little_time(monkeypatch):
+    calls = []
+    claim_retry = Mock(return_value=True)
+
+    async def generate(**kwargs):
+        calls.append(kwargs)
+        raise httpx.ReadTimeout("provider timed out")
+
+    async def close():
+        pass
+
+    client = SimpleNamespace(
+        aio=SimpleNamespace(
+            models=SimpleNamespace(generate_content=generate), aclose=close
+        ),
+        close=lambda: None,
+    )
+    monkeypatch.setattr(provider_session.genai, "Client", lambda **kwargs: client)
+    control = SimpleNamespace(
+        ensure_active=lambda: None,
+        remaining_seconds=1,
+        claim_provider_retry=claim_retry,
+    )
+    session = provider_session.ProviderSession(control)
+    try:
+        with pytest.raises(httpx.ReadTimeout, match="provider timed out"):
+            session.request(model="fake", contents=[], config=types.GenerateContentConfig())
+    finally:
+        session.close()
+
+    assert len(calls) == 1
+    claim_retry.assert_not_called()

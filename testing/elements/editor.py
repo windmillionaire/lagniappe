@@ -190,8 +190,7 @@ class EditorGenerateTextMode(Enum):
 
 class EditorGenerateText:
     TEXT_AREA = "textarea[name='prompt']"
-    SUBMIT = "button[type='submit']:not([data-role='explain'])"
-    EXPLAIN = "button[data-role='explain']"
+    SUBMIT = "button[type='submit']"
 
     def __init__(self, editor):
         self.form = EditorFormOptions.GENERATE_TEXT.form(editor)
@@ -205,9 +204,6 @@ class EditorGenerateText:
 
     def submit(self):
         self.form.locator(self.SUBMIT).click()
-
-    def explain(self):
-        self.form.locator(self.EXPLAIN).click()
 
 
 class EditorColorOptions(Enum):

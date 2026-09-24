@@ -102,7 +102,8 @@ that receipt completes delivery without rerunning generation or apply, including
 after the generation deadline or deletion of the original target. Unresolved candidates
 pin their terminal jobs against diagnostic deletion. Legacy jobs without a
 snapshot still use the original strict revision guard. Autofill has a cancellable
-120-second lifetime with one in-session transient retry and no outer backoff.
+four-minute lifetime with one in-session transient retry only when at least 30
+seconds remain, and no outer backoff.
 Other mutation adapters use their declared
 target fingerprint. Report execution also checks the report's active operation
 and proposal fingerprint.

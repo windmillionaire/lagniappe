@@ -337,3 +337,115 @@ test("test_deferred_operation_manager_reconciles_server_rendered_terminal_status
 	assert.equal(manager.operations.size, 0);
 	assert.equal(subscriptions.size, 0);
 });
+
+/** @matrix deferred-jobs : rendered-autofill rendered-visibility */
+test("test_cold_task_operations_wait_for_activation_and_completed_reviews_need_no_poll", async (t) => {
+	createBrowser(t);
+	const running = operationNode("task-running").node;
+	running.dataset.widget = "TaskForm";
+	running.dataset.operationRevision = "2";
+	running.dataset.operationBootstrap = JSON.stringify({
+		key: "task-running",
+		revision: 2,
+		type: "autofill",
+		status: "running",
+		terminal: false,
+	});
+	running.dataset.formState = JSON.stringify({
+		operation: JSON.parse(running.dataset.operationBootstrap),
+		reviews: [],
+	});
+	const complete = operationNode("task-complete").node;
+	complete.dataset.widget = "TaskForm";
+	complete.dataset.operationRevision = "7";
+	complete.dataset.operationBootstrap = JSON.stringify({
+		key: "task-complete",
+		revision: 7,
+		type: "autofill",
+		status: "succeeded",
+		terminal: true,
+	});
+	complete.dataset.formState = JSON.stringify({
+		operation: JSON.parse(complete.dataset.operationBootstrap),
+		reviews: [{ operation: "task-complete" }],
+	});
+	const subscriptions = new Map();
+	const triggers = [];
+	const { DeferredOperationManager } = await loadManager();
+	const manager = new DeferredOperationManager({
+		PollingCoordinator: {
+			subscribe(descriptor, hooks) {
+				subscriptions.set(descriptor.id, hooks);
+				return () => subscriptions.delete(descriptor.id);
+			},
+			trigger(ids) {
+				triggers.push(ids);
+			},
+			reschedule() {},
+		},
+	}).init();
+	assert.equal(subscriptions.size, 0);
+	assert.equal(triggers.length, 0);
+
+	// Opening a task registers its running operation; closing drops it.
+	manager.resumeTaskForm(running);
+	assert.equal(subscriptions.has("operation:task-running"), true);
+	assert.deepEqual(triggers, ["operation:task-running"]);
+	manager.suspendTaskForm(running);
+	assert.equal(subscriptions.size, 0);
+	assert.equal(manager.operations.size, 0);
+	manager.resumeTaskForm(running);
+	assert.equal(subscriptions.has("operation:task-running"), true);
+
+	// The server-rendered review is already authoritative; it needs no
+	// operation poll or task-form reconciliation even after opening.
+	manager.resumeTaskForm(complete);
+	assert.equal(subscriptions.has("operation:task-complete"), false);
+	assert.equal(triggers.includes("operation:task-complete"), false);
+	manager.destroy();
+});
+
+/**
+ * @source src/script/shared/deferredOperations.mjs::DeferredOperationManager
+ * @pair deferred-jobs:review-probe
+ */
+test("test_successful_autofill_waits_for_active_form_review_before_retiring", async (t) => {
+	createBrowser(t);
+	const form = document.createElement("form");
+	form.dataset.operation = "autofill-job";
+	form.dataset.operationRevision = "0";
+	document.body.append(form);
+	const widget = { visible: true, reviewState: { reviews: [] } };
+	widget.component = { active: widget };
+	form._lp_widget = widget;
+	const subscriptions = new Map();
+	const { DeferredOperationManager } = await loadManager();
+	const view = {
+		PollingCoordinator: {
+			subscribe(descriptor, hooks) {
+				subscriptions.set(descriptor.id, hooks);
+				return () => subscriptions.delete(descriptor.id);
+			},
+			reschedule() {},
+		},
+		EditWatcher: { expectDeferredCompletion() {} },
+		async reconcileChange() {},
+	};
+	const manager = new DeferredOperationManager(view);
+	manager.track("autofill-job", { node: form, immediate: false });
+	const status = {
+		key: "autofill-job",
+		revision: 1,
+		type: "autofill",
+		status: "succeeded",
+		terminal: true,
+		entity_key: "task-key",
+	};
+	assert.equal(await manager.receive(status), false);
+	assert.equal(manager.operations.has("autofill-job"), true);
+	assert.equal(subscriptions.has("operation:autofill-job"), true);
+	widget.reviewState.reviews = [{ operation: "autofill-job" }];
+	assert.equal(await manager.receive(status), true);
+	assert.equal(manager.operations.has("autofill-job"), false);
+	assert.equal(subscriptions.has("operation:autofill-job"), false);
+});

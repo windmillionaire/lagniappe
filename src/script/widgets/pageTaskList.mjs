@@ -11,6 +11,7 @@ import { withTransition } from "../shared/transitions.mjs";
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
  * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_preserves_rows_with_local_form_state
+ * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_does_not_reinsert_unchanged_rows
  * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
  * @tests tests_js/test_028_form_state_split.mjs::test_task_list_initial_reconciliation_publishes_list_visibility
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
@@ -18,6 +19,7 @@ import { withTransition } from "../shared/transitions.mjs";
  * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconciliation_rejects_incomplete_structure
  * @matrix tasks : active-form-preservation completed-only create create-close dedupe detached-structure dirty-form-preservation empty-state refresh unsaved-marker
  * @matrix tasks : initial-render permission-gates readonly
+ * @pair tasks:refresh-order
  */
 export class PageTaskList extends BaseList {
 	constructor(attributes) {
@@ -25,6 +27,7 @@ export class PageTaskList extends BaseList {
 		this._change = this._change.bind(this);
 		this._click = this._click.bind(this);
 		this._setActiveTask = this._setActiveTask.bind(this);
+		this._scrollOpenedTask = this._scrollOpenedTask.bind(this);
 
 		this._added = [];
 		this._removed = [];
@@ -36,6 +39,7 @@ export class PageTaskList extends BaseList {
 		this.target.addEventListener("change", this._change);
 		this.target.addEventListener("click", this._click);
 		this.target.addEventListener("set-subcomponent", this._setActiveTask);
+		this.target.addEventListener("component-opened", this._scrollOpenedTask);
 	}
 
 	_change(e) {
@@ -56,7 +60,9 @@ export class PageTaskList extends BaseList {
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
 	 * @tests tests_js/test_028_form_state_split.mjs::test_task_completion_keeps_component_update_route_when_history_is_active
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_title_click_is_left_to_view_delegate
 	 * @matrix tasks : active-widget complete route-override
+	 * @matrix tasks : delegated-title-click
 	 * @matrix task-completion : archive uncomplete
 	 */
 	_click(e) {
@@ -115,6 +121,31 @@ export class PageTaskList extends BaseList {
 		const activeTask = e.detail.subcomponent;
 		this._moveTaskIfNecessary(activeTask.elt);
 		this._setListVisibility();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_open_scrolls_when_form_bottom_is_outside_viewport
+	 * @matrix tasks : delegated-title-click open-scroll
+	 */
+	_scrollOpenedTask(e) {
+		const { component, trigger } = e.detail || {};
+		const task = component?.elt;
+		if (
+			e.target !== task ||
+			!task?.matches("li[lp-component][data-kind='task']") ||
+			!this.target.contains(task) ||
+			trigger !== task.querySelector(":scope > [lp-nav][lp-show]")
+		) return;
+
+		const panel = component.active?.target;
+		if (!panel) return;
+		const { top, bottom } = panel.getBoundingClientRect();
+		const viewportBottom =
+			window.innerHeight || document.documentElement.clientHeight;
+		if (top >= 80 && bottom <= viewportBottom) return;
+		panel.classList.add("scroll-mt-20");
+		panel.scrollIntoView({ behavior: "auto", block: "start" });
 	}
 
 	/**
@@ -312,6 +343,21 @@ export class PageTaskList extends BaseList {
 					(task) => [task.dataset.key, task],
 				),
 			);
+			// Keep a viewed task at its current scroll position while its form is
+			// being reconciled. Saving it changes its modified timestamp and would
+			// otherwise move an open row to the top of the list.
+			const preserveActiveOrder = Boolean(
+				this.activeTasks?.querySelector(
+					"li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])",
+				),
+			);
+			const preserveCompletedOrder = Boolean(
+				this.completedTasks?.querySelector(
+					"li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])",
+				),
+			);
+			const activeOrder = [];
+			const completedOrder = [];
 			for (const key of delta.order || []) {
 				const task = refreshed.get(key);
 				if (!task) {
@@ -321,7 +367,30 @@ export class PageTaskList extends BaseList {
 					task.dataset.completed === "true"
 						? this.completedTasks
 						: this.activeTasks;
-				list.append(task);
+				const preserveOrder =
+					task.dataset.completed === "true"
+						? preserveCompletedOrder
+						: preserveActiveOrder;
+				if (preserveOrder) {
+					if (!list.contains(task)) list.append(task);
+				} else {
+					(task.dataset.completed === "true" ? completedOrder : activeOrder).push(task);
+				}
+			}
+			for (const [list, desired] of [
+				[this.activeTasks, activeOrder],
+				[this.completedTasks, completedOrder],
+			]) {
+				if (!desired.length) continue;
+				const current = Array.from(list.children).filter((child) =>
+					child.matches("li[lp-entity][data-kind='task']"),
+				);
+				if (
+					current.length !== desired.length ||
+					current.some((task, index) => task !== desired[index])
+				) {
+					list.append(...desired);
+				}
 			}
 
 			this.target.querySelectorAll("li[data-role='empty']").forEach((empty) => {

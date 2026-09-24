@@ -3,9 +3,18 @@ import { request } from "../../shared/request.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 import { areEqual } from "../../shared/utilities.mjs";
 import { incompatibleSchema } from "../representation.mjs";
+import { renderReviewBar } from "../reviewBar.mjs";
 import { FormRevisionModal, WholeFormRevisionModal } from "./modals.mjs";
 import { loadRevisionPreview } from "./preview.mjs";
-import { renderReviewBar } from "../reviewBar.mjs";
+
+const ACTION_LABELS = {
+	reset: "Reset form",
+	reload: "Reload page",
+	review: "Review values",
+	"whole-review": "Review versions",
+	apply: "Continue",
+	dismiss: "Dismiss",
+};
 
 /**
  * Per-marker authoritative revision probing, comparison, and resolution for
@@ -17,15 +26,18 @@ import { renderReviewBar } from "../reviewBar.mjs";
  * @tests tests_js/test_028_form_state_split.mjs::test_edit_watcher_separates_schema_and_renderer_value_changes
  * @tests tests_js/test_028_form_state_split.mjs::test_edit_watcher_reconciles_independent_field_selections
  * @tests tests_js/test_028_form_state_split.mjs::test_owned_deferred_completion_replaces_clean_active_form
+ * @tests tests_js/test_024_edit_watcher.mjs::test_conflict_preview_failure_offers_reload_without_losing_draft
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
  * @tests tests_js/test_036c_form_migrations.mjs::test_projected_matching_values_do_not_discard_incompatible_drafts
  * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_offline_submission_survives_schema_migration_until_review
- * @matrix edited-entity-notice : active-state clean-state coalescing comparison dirty-state focused-state latest-schema local-values mixed-submission overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability saved-default schema-only submission-choice targeted-reset transition whole-form-selection
+ * @matrix edited-entity-notice : active-state clean-state coalescing comparison conflict-fallback dirty-state focused-state latest-schema local-values mixed-submission overlap-follow-up owned-deferred-completion per-field-selection reload-fallback renderer-capability saved-default schema-only structured-conflict submission-choice targeted-reset transition whole-form-selection
  * @matrix forms : latest-schema mixed-submission per-field-selection saved-default submission-choice
  * @pair edited-entity-notice:unchanged-form
+ * @pair forms:autofill-completion-review
  * @pair pages:unsaved-preservation
  * @pairs form-schema:notice reconnect-refresh:dirty-form-preservation
  * @matrix form-migration : stale-input queued-conflict explicit-review
+ * @matrix offline : conflict-durability reload submission-choice
  */
 export class EditReconciler {
 	constructor(
@@ -83,17 +95,8 @@ export class EditReconciler {
 		const state = this._state(marker);
 		state.mode = mode;
 		const button = marker.querySelector("[data-role='edited-reset']");
-		if (button) {
-			button.textContent =
-				{
-					reset: "Reset form",
-					reload: "Reload page",
-					review: "Review values",
-					"whole-review": "Review versions",
-					apply: "Continue",
-					dismiss: "Dismiss",
-				}[mode] ?? "Review update";
-		}
+		if (button && !button.dataset?.reviewPending)
+			button.textContent = ACTION_LABELS[mode] ?? "Review update";
 		const copy = marker.querySelector("[data-role='edited-message']");
 		if (copy && message) copy.textContent = message;
 		if (button) button.hidden = false;
@@ -187,11 +190,37 @@ export class EditReconciler {
 		const state = this._state(marker);
 		record ??= state.record;
 		if (response.form_state) {
+			const incomingOperation = response.form_state.operation;
+			const currentOperation = widget.reviewState?.operation;
+			const operation =
+				incomingOperation?.key &&
+				incomingOperation.key === currentOperation?.key &&
+				Number(currentOperation.revision) >= Number(incomingOperation.revision)
+					? currentOperation
+					: incomingOperation;
 			// A new candidate is not acknowledgement of a new answer baseline.
 			widget.reviewState = {
 				...response.form_state,
+				operation,
 				revision: widget.reviewState?.revision ?? response.form_state.revision,
 			};
+			if (operation?.key) {
+				widget.lockDeferredOperation?.({
+					operation: operation.key,
+					revision: operation.revision,
+					scope: operation.scope,
+					blocks_edit: operation.blocks_edit,
+					status: operation,
+				});
+				const operations =
+					this.view.DeferredOperations ||
+					(await this.view.ensureDeferredOperations?.());
+				operations?.track(operation.key, {
+					node: widget.target,
+					revision: operation.revision,
+					status: operation,
+				});
+			}
 			renderReviewBar(widget);
 		}
 		const explicitReview = Boolean(
@@ -280,7 +309,11 @@ export class EditReconciler {
 
 		const current = widget.revisionSnapshot();
 		const rendererCapable = this._rendererCapable(widget, response);
-		const local = widget.buildLocalRevision(response);
+		// A freshly rendered form starts from saved values after reload. The
+		// queued command, not that form, is the local side of this conflict.
+		const local = record
+			? widget.buildLocalRevision(response, record)
+			: widget.buildLocalRevision(response);
 		const localPreview = await loadRevisionPreview(widget, local.response);
 		if (token && state.token !== token) {
 			localPreview?.destroy?.();
@@ -306,7 +339,8 @@ export class EditReconciler {
 
 		if (
 			!requiresReview &&
-			(localSnapshot === remoteSnapshot || current === remoteSnapshot)
+			(localSnapshot === remoteSnapshot ||
+				(!record && current === remoteSnapshot))
 		) {
 			if (record) await this.view.offlineQueue?.cancel(record.id);
 			const commitRevision = await this._prepareRevision(widget, response);
@@ -567,11 +601,25 @@ export class EditReconciler {
 		state.conflictPromise = reconcile;
 		try {
 			return await reconcile;
+		} catch (error) {
+			this.fallback(marker, error);
+			return false;
 		} finally {
 			if (state.conflictPromise === reconcile) {
 				state.conflictPromise = null;
 			}
 		}
+	}
+
+	async openConflictReview(widget, { blockedAction = null } = {}) {
+		const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
+		const state = marker ? this._state(marker) : null;
+		if (!state || !["review", "whole-review"].includes(state.mode))
+			return false;
+		const button = marker.querySelector("[data-role='edited-reset']");
+		if (!button || button.disabled) return false;
+		await this._activateAction(marker, button, { refresh: true, blockedAction });
+		return true;
 	}
 
 	async resolveRevision(marker, choice) {
@@ -645,8 +693,13 @@ export class EditReconciler {
 				state.response.form_state?.migration)
 		) {
 			widget._reviewedOperations ??= new Set();
+			widget._usedAutofillOperations ??= new Set();
 			for (const review of state.response.form_state?.reviews ?? [])
 				widget._reviewedOperations.add(review.operation);
+			for (const source of Object.values(fieldSelection ?? {})) {
+				if (source.startsWith("ai:"))
+					widget._usedAutofillOperations.add(source.slice(3));
+			}
 			widget._reviewedMigration = JSON.stringify(
 				state.response.form_state?.migration ?? null,
 			);
@@ -660,8 +713,13 @@ export class EditReconciler {
 		const button = event.target.closest("[data-role='edited-reset']");
 		if (!button) return;
 		const marker = button.closest("[lp-edited-marker]");
+		if (!marker) return;
+		await this._activateAction(marker, button);
+	}
+
+	async _activateAction(marker, button, { refresh = false, blockedAction = null } = {}) {
 		const state = marker ? this._state(marker) : null;
-		if (!marker || !state) return;
+		if (!state) return;
 
 		if (state.mode === "reload") {
 			window.location.reload();
@@ -671,12 +729,20 @@ export class EditReconciler {
 			this._hide(marker);
 			return;
 		}
+		if (button.disabled) return;
 		const widget = marker.closest("form[data-widget]")?._lp_widget;
+		const reviewPending = ["review", "whole-review"].includes(state.mode);
+		const originalLabel = button.textContent;
 		button.disabled = true;
+		if (reviewPending) {
+			button.dataset.reviewPending = "true";
+			button.textContent = "Opening review…";
+			button.setAttribute("aria-busy", "true");
+		}
 		try {
 			await state.probePromise;
 			await state.conflictPromise;
-			if (widget?.target?.dataset?.formState && !state.record) {
+			if ((refresh || widget?.target?.dataset?.formState) && !state.record) {
 				// Completion can arrive before the revision probe finishes. Refresh on
 				// opening, including cold loads with no staged response yet.
 				const response = await request.get(marker.dataset.editedRoute, null, {
@@ -692,12 +758,15 @@ export class EditReconciler {
 					await this._stageRevision(marker, widget, response);
 				}
 			}
+			if (!state.response && marker.dataset.visible === "false") return;
 			if (!widget || !state.response) {
 				this.fallback(marker);
 				return;
 			}
 			if (state.mode === "review") {
-				const modal = new FormRevisionModal(this, marker, widget, state);
+				const modal = new FormRevisionModal(this, marker, widget, state, {
+					blockedAction,
+				});
 				const shown = await modal.init();
 				if (!shown && state.record) {
 					await new WholeFormRevisionModal(this, marker, widget).init();
@@ -721,6 +790,11 @@ export class EditReconciler {
 				error,
 			);
 		} finally {
+			if (reviewPending) {
+				delete button.dataset.reviewPending;
+				button.removeAttribute("aria-busy");
+				button.textContent = ACTION_LABELS[state.mode] ?? originalLabel;
+			}
 			button.disabled = false;
 		}
 	}

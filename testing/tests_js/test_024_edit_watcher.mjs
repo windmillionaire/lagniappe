@@ -23,14 +23,13 @@ async function loadEditOwners({
 	loadRevisionPreview,
 	request = {},
 	withTransition = async (callback) => callback(),
+	captureError = (error) => { throw error; },
 } = {}) {
 	const { EditReconciler } = await esmock.strict(
 		"../../src/script/forms/revisions/reconciler.mjs",
 		{
 			"../../src/script/shared/errors.mjs": {
-				captureError(error) {
-					throw error;
-				},
+				captureError,
 			},
 			"../../src/script/shared/request.mjs": { request },
 			"../../src/script/shared/transitions.mjs": { withTransition },
@@ -49,9 +48,7 @@ async function loadEditOwners({
 		"../../src/script/forms/revisions/watcher.mjs",
 		{
 			"../../src/script/shared/errors.mjs": {
-				captureError(error) {
-					throw error;
-				},
+				captureError,
 			},
 			"../../src/script/forms/revisions/reconciler.mjs": { EditReconciler },
 		},
@@ -520,6 +517,50 @@ test("test_edit_watcher_coalesces_overlapping_revision_probes", async (t) => {
 	);
 });
 
+/** @matrix edited-entity-notice : conflict-fallback */
+test("test_conflict_preview_failure_offers_reload_without_losing_draft", async () => {
+	const errors = [];
+	const { EditReconciler } = await loadEditOwners({
+		loadRevisionPreview() {
+			throw new TypeError("Malformed replacement HTML");
+		},
+		captureError(error) {
+			errors.push(error.message);
+		},
+	});
+	const button = { dataset: {}, textContent: "", hidden: true };
+	const message = { textContent: "" };
+	const marker = {
+		dataset: { visible: "false" },
+		querySelector(selector) {
+			return selector === "[data-role='edited-reset']" ? button : message;
+		},
+		closest(selector) {
+			return selector === "[lp-entity]"
+				? { dataset: { fingerprint: "old", modified: "before" } }
+				: null;
+		},
+	};
+	const widget = {
+		key: "task-key",
+		target: { querySelector: () => marker },
+		revisionBaseline: "local draft",
+		schema: [],
+		submission: {},
+		_offlineConflict: { record: { id: "queued" } },
+	};
+	const reconciler = new EditReconciler({});
+	assert.equal(await reconciler.stageConflict(widget, {
+		response: { conflict: true, schema: [], submission: {} },
+	}), false);
+	assert.equal(marker.dataset.visible, "true");
+	assert.equal(button.textContent, "Reload page");
+	assert.equal(button.hidden, false);
+	assert.deepEqual(errors, ["Malformed replacement HTML"]);
+	assert.equal(widget._offlineConflict.record.id, "queued");
+	assert.equal(reconciler._state(marker).conflictPromise, null);
+});
+
 /** @pair edited-entity-notice:unchanged-form */
 /** @source src/script/forms/revisions/reconciler.mjs::EditReconciler */
 test("test_metadata_only_revision_preserves_clean_and_dirty_forms", async (t) => {
@@ -579,4 +620,77 @@ test("test_metadata_only_revision_preserves_clean_and_dirty_forms", async (t) =>
 			assert.equal(marker.dataset.visible, "true");
 		}
 	}
+});
+
+/** @matrix offline : conflict-durability reload submission-choice */
+/** @source src/script/forms/revisions/reconciler.mjs::EditReconciler */
+test("test_reloaded_saved_form_does_not_cancel_different_queued_answers", async (t) => {
+	replaceGlobal(t, "document", { activeElement: null });
+	const { EditReconciler } = await loadEditOwners({
+		loadRevisionPreview: async (_widget, response) => ({
+			revisionSnapshot: () => response.snapshot,
+			destroy() {},
+		}),
+	});
+	const button = { textContent: "", hidden: false };
+	const message = { textContent: "" };
+	const marker = {
+		dataset: { visible: "false" },
+		querySelector(selector) {
+			return selector === "[data-role='edited-reset']" ? button : message;
+		},
+		closest() {
+			return { dataset: { fingerprint: "before", modified: "before" } };
+		},
+	};
+	const schema = [{ id: "summary", type: "input" }];
+	const record = {
+		id: "update:task:one",
+		target_key: "one",
+		fingerprint: "before",
+		modified: "before",
+		renderer_submission: { summary: "QUEUED A" },
+	};
+	let receivedRecord = null;
+	let cancelled = false;
+	const widget = {
+		key: "one",
+		schema,
+		submission: { summary: "SAVED B" },
+		revisionBaseline: "saved",
+		revisionSnapshot: () => "saved",
+		revisionCanReset: () => true,
+		buildLocalRevision(response, state) {
+			receivedRecord = state;
+			return {
+				response: {
+					...response,
+					snapshot: "queued",
+					submission: state.renderer_submission,
+				},
+			};
+		},
+		form: { renderer: {} },
+		target: { contains: () => false },
+	};
+	widget.component = { active: widget };
+	const reconciler = new EditReconciler({
+		addFlash() {},
+		offlineQueue: { async cancel() { cancelled = true; } },
+	});
+	await reconciler._stageRevision(
+		marker,
+		widget,
+		{
+			schema,
+			submission: { summary: "SAVED B" },
+			snapshot: "saved",
+		},
+		{ fingerprint: "after", modified: "after", record },
+	);
+	assert.equal(receivedRecord, record);
+	assert.equal(cancelled, false);
+	assert.equal(marker.dataset.visible, "true");
+	assert.equal(button.textContent, "Review values");
+	assert.equal(reconciler._state(marker).record, record);
 });

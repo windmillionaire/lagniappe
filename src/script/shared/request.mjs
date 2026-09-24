@@ -142,9 +142,10 @@ const _friendlyError = (message, { body = null } = {}) => {
  * @tests tests_js/test_009_request_csrf.mjs::test_plain_text_upstream_error_stays_in_request_error_path
  * @tests tests_js/test_009_request_csrf.mjs::test_request_can_return_html_error_without_replacing_page
  * @tests tests_js/test_009_request_csrf.mjs::test_application_marked_html_error_keeps_existing_behavior
- * @matrix edited-entity-notice : non-invasive-probe reload-fallback
+ * @tests tests_js/test_009_request_csrf.mjs::test_request_parses_conflict_replacement_for_form_review
+ * @matrix edited-entity-notice : non-invasive-probe reload-fallback structured-conflict
  * @matrix request-errors : ajax-upload non-invasive-probe proxy-text-error reload-fallback
- * @matrix request-errors : application-error-marker dom-replacement
+ * @matrix request-errors : application-error-marker dom-replacement structured-conflict
  */
 const _formatError = async (
 	response,
@@ -157,6 +158,11 @@ const _formatError = async (
 			const data = JSON.parse(text);
 			if (data.error) {
 				data.error = _friendlyError(data.error, context);
+			}
+			// Conflict responses carry the same replacement HTML as successful
+			// form responses, even though their HTTP status is not successful.
+			if (typeof data.html === "string" && data.html) {
+				data.html = PARSER.parseFromString(data.html, "text/html");
 			}
 			return { ok: false, ...data };
 		} catch {

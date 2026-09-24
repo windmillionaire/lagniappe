@@ -110,6 +110,30 @@ test("test_offline_replay_blocks_later_records_after_the_oldest_record_fails", a
 	}
 });
 
+/** @matrix offline : conflict-durability late-widget */
+test("test_late_form_receives_persisted_conflict_after_replay", async (t) => {
+	const env = await setup(t);
+	env.view.components = {};
+	env.respond(() => ({ ok: true, conflict: true }));
+	const queue = await env.seed([record("first", 1)]);
+	assert.equal(await queue.replay(), 0);
+	await remaining(env, queue, ["first"]);
+
+	const phases = [];
+	const lateForm = {
+		key: "first",
+		handleOfflineQueue({ phase, record: pending }) {
+			phases.push({ phase, pending });
+		},
+	};
+	await queue.presentFor(lateForm);
+	assert.equal(phases.length, 1);
+	assert.equal(phases[0].phase, "conflict");
+	assert.equal(phases[0].pending.id, "first");
+	assert.equal(phases[0].pending.conflictResponse.conflict, true);
+	await remaining(env, queue, ["first"]);
+});
+
 /** @matrix offline : queue-preserved replay-order retry-boundary */
 test("test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_record", async (t) => {
 	const env = await setup(t);

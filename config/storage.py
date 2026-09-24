@@ -21,6 +21,7 @@ BUCKET_CORS_HEADERS = [
 BUCKET_CORS_MAX_AGE_SECONDS = 3600
 BUCKET_CONFIG_RETRY_DELAYS = (0.25, 1.0)
 RUNTIME_NONCURRENT_RETENTION_DAYS = 14 * 7
+RUNTIME_TEMP_UPLOAD_RETENTION_DAYS = 30
 
 
 # @testable false
@@ -176,7 +177,7 @@ def _normalized_cors(cors):
 # @covered-by config/storage.py::configure_storage_bucket
 # @reason lifecycle normalization is exercised through runtime bucket reconciliation
 def _runtime_lifecycle_rules(rules):
-    """Replace only noncurrent-generation deletion rules owned by setup."""
+    """Replace only version and temporary-upload deletion rules owned by setup."""
     preserved = []
     for rule in rules or []:
         condition = dict(rule.get("condition") or {})
@@ -195,12 +196,27 @@ def _runtime_lifecycle_rules(rules):
             and condition.get("isLive", condition.get("is_live", False)) is False
         ):
             continue
+        if (
+            str(action.get("type") or "").casefold() == "delete"
+            and condition.get("matchesPrefix") == ["tmp/uploads/"]
+            and normalized_keys.issubset({"age", "matchesPrefix"})
+        ):
+            continue
         preserved.append(rule)
     preserved.append(
         {
             "action": {"type": "Delete"},
             "condition": {
                 "daysSinceNoncurrentTime": RUNTIME_NONCURRENT_RETENTION_DAYS
+            },
+        }
+    )
+    preserved.append(
+        {
+            "action": {"type": "Delete"},
+            "condition": {
+                "age": RUNTIME_TEMP_UPLOAD_RETENTION_DAYS,
+                "matchesPrefix": ["tmp/uploads/"],
             },
         }
     )

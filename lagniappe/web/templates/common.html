@@ -131,17 +131,6 @@
   </div>
 {% endmacro %}
 
-{% macro explain_prompt(section=None) %}
-  <button type="submit"
-          class="{{ styles.button.explain }} -mt-1 mb-1"
-          data-visible="false"
-          data-role="explain"
-          data-explain="{{ section }}">
-    {{ render_icon("prompt", "text-kind-default") }}
-    <span>Initial Prompt</span>
-  </button>
-{% endmacro %}
-
 {% macro autofill(enabled=True) %}
   <div data-role="submit-group" class="{{ styles.button.group }}">
     <button type="submit" class="{{ styles.button.submit }} sm:basis-1/2"></button>

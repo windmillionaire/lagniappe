@@ -219,22 +219,19 @@ def test_autofill_preparation_uses_snapshot_and_original_file(monkeypatch):
 
 # @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.start_writes
 # @pair ai:autofill
-def test_autofill_start_writes_include_answers_and_operation_guard(monkeypatch):
+def test_autofill_start_writes_only_operation_reference_with_answer_guard(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
-    target = SimpleNamespace(_form_additional_guards=[("task", {"submission": "old"})], _autofill_file_guard=("file", None))
-    file = object()
-    target._autofill_start_entities = (file, target)
-    plan = SimpleNamespace(roots=None)
-    monkeypatch.setattr(adapter, "plan_mutation", lambda operation, *roots: (setattr(plan, "roots", roots) or plan))
-    monkeypatch.setattr(adapter, "prepare_durable_writes", lambda plan: [SimpleNamespace(entity=root, property_mask=None) for root in plan.roots])
-    monkeypatch.setattr(adapter.form_changes, "mutation_guards", lambda *args: [("form", {"pending_form_change": None})])
+    target = SimpleNamespace(_form_additional_guards=[("task", {"submission": "old"})], submission={"title": "Human"})
+    monkeypatch.setattr(adapter, "plan_root", lambda entity, property_mask: SimpleNamespace(effects=[SimpleNamespace(entity=entity, property_mask=property_mask)]))
+    monkeypatch.setattr(adapter, "prepare_durable_writes", lambda plan: plan.effects)
     writes, guards = adapter.AutofillAdapter().start_writes(
         SimpleNamespace(inputs={"target": target}, parameters={"snapshot": {"version": 1}}),
         SimpleNamespace(urlsafe_key="job", idempotency_key="request", status_revision=1))
-    assert writes == [(file, None), (target, None)]
+    assert writes == [(target, ("deferred_job",))]
     assert target.deferred_job == {"key": "job", "idempotency_key": "request", "revision": 1}
-    assert guards == [("task", {"submission": "old"}), ("file", None), ("form", {"pending_form_change": None})]
+    assert target.submission == {"title": "Human"}
+    assert guards == [("task", {"submission": "old"})]
 
 
 # @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
@@ -247,9 +244,9 @@ def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch):
         db={"submission": '{"title":"Human"}'}, properties=SimpleNamespace(submission=SimpleNamespace(value={"title": "Human"})),
         allowed=lambda *args, **kwargs: True)
     job = SimpleNamespace(key="job", urlsafe_key="job", lease_token="lease", db={}, actor=SimpleNamespace(urlsafe_key="actor"))
-    snapshot = {"generation": 0, "form": None, "revision": "launch", "answers": {}, "prompt": {"schema": target.submission_schema}}
+    snapshot = {"generation": 0, "form": None, "revision": "launch", "values": {}, "prompt": {"schema": target.submission_schema}}
     context = SimpleNamespace(parameters={"snapshot": snapshot}, job=job, actor="actor", inputs={"target": target},
-        input=lambda name: target, ensure_active=lambda: None, checkpoint={"proposal": {"answers": {"title": "AI"}}})
+        input=lambda name: target, ensure_active=lambda: None, checkpoint={"proposal": {"values": {"title": "AI"}}})
     monkeypatch.setattr(adapter.Entities, "fetch_one", lambda *args, **kwargs: target)
     monkeypatch.setattr(adapter, "deferred_job_lock_key", lambda entity: "lock")
     monkeypatch.setattr(adapter, "plan_root", lambda *args, **kwargs: SimpleNamespace(effects=[]))
@@ -274,7 +271,7 @@ def test_autofill_context_or_schema_drift_keeps_suggestions_for_review(monkeypat
     target = SimpleNamespace(key="task", urlsafe_key="task", entity_kind="task", completed=False, form=None, generation=0,
         name="Book A", submission_schema=schema, db={}, properties=SimpleNamespace(submission=SimpleNamespace(value={"title": "Book A"})),
         allowed=lambda *args, **kwargs: True)
-    snapshot = {"generation": 0, "form": None, "revision": "launch", "answers": {"title": "Book A"}, "prompt": {"schema": schema, "target": {"name": "Book A"}}}
+    snapshot = {"generation": 0, "form": None, "revision": "launch", "values": {"title": "Book A"}, "prompt": {"schema": schema, "target": {"name": "Book A"}}}
     if drift == "answers":
         target.properties.submission.value["title"] = "Book B"
     elif drift == "schema":
@@ -285,7 +282,7 @@ def test_autofill_context_or_schema_drift_keeps_suggestions_for_review(monkeypat
     job = SimpleNamespace(key="job", urlsafe_key="job", lease_token="lease", db={}, actor=SimpleNamespace(urlsafe_key="actor"))
     context = SimpleNamespace(parameters={"snapshot": snapshot, "mode": "revise" if drift == "private" else "fill"},
         job=job, actor="actor", inputs={"target": target}, input=lambda name: target, ensure_active=lambda: None,
-        checkpoint={"proposal": {"answers": {"author": "Author of Book A"}}})
+        checkpoint={"proposal": {"values": {"author": "Author of Book A"}}})
     monkeypatch.setattr(adapter.Entities, "fetch_one", lambda *args, **kwargs: target)
     monkeypatch.setattr(adapter, "deferred_job_lock_key", lambda entity: "lock")
     monkeypatch.setattr(adapter, "plan_root", lambda *args, **kwargs: SimpleNamespace(effects=[]))

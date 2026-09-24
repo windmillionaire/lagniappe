@@ -266,9 +266,6 @@ Successful generation keeps the prompt open and uses the normal submitted
 checkmark, clearing the prompt's unsaved marker. The Form's Save icon still
 indicates that the generated schema is unsaved. Generation and Undo/Redo do not
 add success banners above the model.
-Supports an "explain" mode that shows the AI's prompt
-interpretation in an Initial Prompt modal. The modal shows only the starting
-prompt; later tool or search context is dynamic and is not part of the preview.
 Generation is single-flight. Failure leaves its form error visible and releases
 the submitter for retry. A changed draft, canceled request or destroyed view
 cannot accept a late proposal. Stale-draft feedback retains the prompt for

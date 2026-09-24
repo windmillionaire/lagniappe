@@ -1257,6 +1257,71 @@ test("test_task_list_refresh_preserves_rows_with_local_form_state", async () => 
 	assert.equal(incompatibleReplacement.dataset.open, "false");
 });
 
+/**
+ * @source src/script/widgets/pageTaskList.mjs::PageTaskList
+ * @pair tasks:refresh-order
+ */
+test("test_task_list_refresh_keeps_open_task_in_place", async (t) => {
+	createBrowser(t);
+	const { PageTaskList } = await loadPageTaskList();
+	const target = document.createElement("div");
+	target.innerHTML = `
+		<ul data-role="active-tasks">
+			<li lp-entity data-kind="task" data-key="first" data-open="false"></li>
+			<li lp-entity data-kind="task" data-key="open" data-open="TaskForm"></li>
+			<li lp-entity data-kind="task" data-key="last" data-open="false"></li>
+		</ul>
+		<ul data-role="completed-tasks"></ul>
+	`;
+	document.body.append(target);
+	const list = Object.create(PageTaskList.prototype);
+	list.target = target;
+	list._parseRefreshTask = () => null;
+	list.prereconcile = async () => {};
+	list.postreconcile = () => {};
+	list._setListVisibility = () => {};
+	const active = target.querySelector("[data-role='active-tasks']");
+	const order = () => Array.from(active.children, (row) => row.dataset.key);
+	const delta = { upsert: [], remove: [], order: ["open", "first", "last"] };
+	(await list.prepareRefreshDelta(delta))();
+	assert.deepEqual(order(), ["first", "open", "last"]);
+	active.querySelector("[data-key='open']").dataset.open = "false";
+	(await list.prepareRefreshDelta(delta))();
+	assert.deepEqual(order(), ["open", "first", "last"]);
+});
+
+/**
+ * @pair tasks:refresh-order
+ */
+test("test_task_list_refresh_does_not_reinsert_unchanged_rows", async (t) => {
+	createBrowser(t);
+	const { PageTaskList } = await loadPageTaskList();
+	const target = document.createElement("div");
+	target.innerHTML = `
+		<ul data-role="active-tasks">
+			<li lp-entity data-kind="task" data-key="first" data-open="false"></li>
+			<li lp-entity data-kind="task" data-key="second" data-open="false"></li>
+		</ul>
+		<ul data-role="completed-tasks"></ul>
+	`;
+	document.body.append(target);
+	const list = Object.create(PageTaskList.prototype);
+	list.target = target;
+	list.prereconcile = async () => {};
+	list.postreconcile = () => {};
+	list._setListVisibility = () => {};
+	const active = target.querySelector("[data-role='active-tasks']");
+	const originalRows = [...active.children];
+	const mutations = [];
+	const observer = new MutationObserver((records) => mutations.push(...records));
+	observer.observe(active, { childList: true });
+	(await list.prepareRefreshDelta({ upsert: [], remove: [], order: ["first", "second"] }))();
+	await Promise.resolve();
+	observer.disconnect();
+	assert.deepEqual([...active.children], originalRows);
+	assert.deepEqual(mutations, [], "An unchanged poll must not detach hovered rows");
+});
+
 /** @matrix tasks : create dedupe refresh */
 test("test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh", async () => {
 	const { PageTaskList } = await loadPageTaskList();
@@ -1331,6 +1396,79 @@ test("test_task_list_initial_reconciliation_publishes_list_visibility", async ()
 	assert.equal(attributes.has("loaded"), true);
 	assert.equal(activeTasks.dataset.visible, "true");
 	assert.equal(completedHeader.dataset.visible, "false");
+});
+
+/** @matrix tasks : delegated-title-click */
+test("test_task_title_click_is_left_to_view_delegate", async () => {
+	const { PageTaskList } = await loadPageTaskList();
+	let scrolls = 0;
+	const taskElt = {
+		scrollIntoView: () => { scrolls += 1; },
+	};
+	const list = Object.create(PageTaskList.prototype);
+	list._moveTaskIfNecessary = () => {};
+	list._setListVisibility = () => {};
+	Object.defineProperty(list, "completedHeader", {
+		value: null,
+	});
+	let prevented = false;
+	let stopped = false;
+	list._click({
+		target: {
+			closest: () => null,
+		},
+		preventDefault: () => { prevented = true; },
+		stopPropagation: () => { stopped = true; },
+	});
+	list._setActiveTask({ detail: { subcomponent: { elt: taskElt } } });
+	assert.equal(prevented, false);
+	assert.equal(stopped, false);
+	assert.equal(scrolls, 0);
+});
+
+/** @matrix tasks : open-scroll delegated-title-click */
+test("test_task_open_scrolls_when_form_bottom_is_outside_viewport", async (t) => {
+	createBrowser(t);
+	const { PageTaskList } = await loadPageTaskList();
+	const target = document.createElement("div");
+	target.innerHTML = `
+		<ul data-role="active-tasks">
+			<li lp-component data-kind="task">
+				<div lp-nav lp-show="task:active" data-toggle="true"></div>
+				<div data-widget="TaskForm"></div>
+			</li>
+		</ul>
+	`;
+	document.body.append(target);
+	const task = target.querySelector("li");
+	const trigger = task.querySelector("[lp-nav]");
+	const panel = task.querySelector("[data-widget='TaskForm']");
+	const calls = [];
+	task.scrollIntoView = () => { throw new Error("Scroll the form, not its task row"); };
+	panel.scrollIntoView = (options) => calls.push(options);
+	const component = { elt: task, active: { target: panel } };
+	const list = Object.create(PageTaskList.prototype);
+	list.target = target;
+	target.addEventListener("component-opened", (event) => list._scrollOpenedTask(event));
+	const opened = () => task.dispatchEvent(new CustomEvent("component-opened", {
+		bubbles: true,
+		detail: { component, trigger },
+	}));
+	panel.getBoundingClientRect = () => ({ top: 120, bottom: 500 });
+	opened();
+	assert.deepEqual(calls, [], "A fully visible form must not move the task under the pointer");
+	panel.getBoundingClientRect = () => ({ top: 120, bottom: window.innerHeight + 20 });
+	opened();
+	assert.deepEqual(calls, [{ behavior: "auto", block: "start" }]);
+	assert.equal(panel.classList.contains("scroll-mt-20"), true);
+	panel.getBoundingClientRect = () => ({ top: window.innerHeight + 20, bottom: window.innerHeight + 200 });
+	opened();
+	assert.equal(calls.length, 2, "A form starting below the viewport also scrolls");
+	task.dispatchEvent(new CustomEvent("component-opened", {
+		bubbles: true,
+		detail: { component, trigger: panel },
+	}));
+	assert.equal(calls.length, 2, "Only the task-title action may scroll");
 });
 
 /** @matrix tasks : active-widget complete route-override */

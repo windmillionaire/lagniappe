@@ -496,7 +496,7 @@ def _needs_review_report(user):
     return report
 
 
-# @matrix ai-report : ask create explain-button instructions multi-file tool-switcher upload-form
+# @matrix ai-report : ask create instructions multi-file tool-switcher upload-form
 # @template home/tools.html::create_report
 def test_tools_create_form_has_expected_controls(get_user):
     user = get_user(Users.OWNER)
@@ -509,17 +509,10 @@ def test_tools_create_form_has_expected_controls(get_user):
     expect(form.locator("[data-role='dropzone']")).to_be_visible()
     instructions = form.locator("textarea[name='instructions']")
     expect(instructions).to_have_attribute("placeholder", "Ask a question or describe what you want done…")
-    explain = form.locator(Buttons.EXPLAIN)
-    expect(explain).not_to_be_visible()
+    expect(form.locator("[data-role='explain']")).to_have_count(0)
     form.get_by_role("button", name="Start").click()
     expect(form).to_contain_text("Add files or instructions")
     instructions.fill("Create a task and move its file.")
-    expect(explain).to_be_visible()
-    with user.page.expect_response("**/tools/ai"):
-        explain.click()
-    expect(user.page.locator("#modal")).to_contain_text("get_guidelines")
-    expect(user.page.locator("#modal")).to_contain_text("create_task")
-    Modal(user.page).close()
 
 
 # @matrix ai-access : authentication route-gate

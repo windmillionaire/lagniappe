@@ -340,6 +340,9 @@ def create_schema():
 
     require_ai_access(AI.CREATE)
 
+    if request.form.get("explain") or request.form.get("role") == "explain":
+        return responses.error("Initial Prompt is no longer available.")
+
     try:
         schema = form_drafts.validate_draft_schema(_draft_json(request.form, "schema"), form.form_type)
         html_fields = _draft_json(request.form, "html_fields", {})
@@ -359,8 +362,6 @@ def create_schema():
             raise exceptions.ValidationError("Generation needs a valid draft request identity.")
         draft = {"schema": schema, "html_fields": html_fields}
         prompt = ai_schema.form_generation_prompt(form.form_type, description=description, draft=draft)
-        if request.form.get("explain"):
-            return responses.explain(prompt)
         sources = _draft_image_sources(form, html_fields)
         result = ai_schema.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
             value, draft, form_type=form.form_type, image_sources=sources,

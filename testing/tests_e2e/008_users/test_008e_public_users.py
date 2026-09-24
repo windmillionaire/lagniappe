@@ -289,9 +289,6 @@ def test_public_user_creates_task_with_reduced_schedule_options(
     expect(
         date_form.locator("input[name='schedule-type'][value='yearly']")
     ).to_have_count(0)
-    expect(
-        date_form.locator("button[data-role='explain'][data-explain='schedule']")
-    ).to_have_count(0)
     date_form.locator("input[name='scheduled']").uncheck()
 
     task_name = f"Public personal task {uuid4().hex}"
@@ -384,12 +381,14 @@ def test_public_user_restricted_schedules_are_forbidden(
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
+    form_state = json.loads(scenario.page.info_form.get_attribute("data-form-state"))
     metadata_update = browser_fetch(
         scenario.user,
         f"/pages/{page_key}/update",
         method="PUT",
         data={
             "name": scenario.entity.page.name,
+            "form-revision": form_state["revision"],
         },
     )
     assert metadata_update["status"] == 200

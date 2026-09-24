@@ -1,22 +1,16 @@
 """Deferred autofill contracts independent of HTTP response handling."""
 
-import hashlib
 from uuid import uuid4
 
 from lagniappe.core.definitions import (
     DeferredJobSpec,
     DeferredJobType,
     FileConsumer,
-    Fetch,
-    FetchReason,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
-from lagniappe.core.tools.deferred_jobs.errors import DeferredJobLockedError
 from lagniappe.core.tools.forms.review import launch_snapshot
-from lagniappe.core.tools.database import utility as database_utility
-from lagniappe.core import exceptions
 
 
 # @testable false
@@ -52,6 +46,8 @@ def autofill_job_spec(
     lock_target=True,
     mode="fill",
     submission=None,
+    prompt_submission=None,
+    target_context=None,
     review_context=None,
     file_key=None,
 ):
@@ -77,7 +73,8 @@ def autofill_job_spec(
             "mode": mode,
             "snapshot": launch_snapshot(
                 entity, user, instructions=form.get("autofill-description"),
-                submission=submission, review_context=review_context,
+                submission=submission, prompt_submission=prompt_submission,
+                target_context=target_context, review_context=review_context,
             ),
             "file_key": file_key,
         },
@@ -92,64 +89,16 @@ def autofill_job_spec(
 # @matrix ai : autofill deferred
 # @matrix ai tasks : attachment current-answers
 # @pair notifications:autofill
-def start_autofill_job(entity, user, form, *, upload_record=None, **options):
+def start_autofill_job(entity, user, form, *, upload_record=None, trusted_retry_upload=False, **options):
     """Validate any direct upload before creating a job or notification."""
     form = dict(form)
-    # A stable ID also owns the attached upload and survives delivery retries.
     form["operation-id"] = form.get("operation-id") or str(uuid4())
-    attached_file = None
-    upload = None
     if upload_record:
-        upload = storage_assets.direct_upload_file(
-            upload_record,
+        storage_assets.verify_direct_upload(
+            upload_record, max_age=None if trusted_retry_upload else storage_assets.DIRECT_UPLOAD_TOKEN_MAX_AGE,
             consumer=FileConsumer.AI_INLINE,
         )
-        identity = hashlib.sha256(
-            f"{user.urlsafe_key}:{form['operation-id']}".encode()
-        ).hexdigest()
-        file_key = database_utility.create_named_key("file", f"autofill-{identity}")
-        attached_file = Entities.fetch_one(file_key, request=Fetch.nested(
-            because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
-        ))
-        if attached_file is None:
-            upload.lagniappe_preserve_source = True
-            attached_file = Entities.FILE.create(
-                upload=upload,
-                data={"name": upload.filename, "filename": upload.filename, "mimetype": upload.content_type},
-                key=file_key,
-            )
-            if isinstance(entity, Entities.PAGE):
-                attached_file.move_to(entity)
-            else:
-                entity.properties.files.add(attached_file)
-            entity._autofill_start_entities = (attached_file, entity)
-            entity._autofill_file_guard = (file_key, None)
-        elif not isinstance(attached_file, Entities.FILE) or (
-            attached_file.properties.page.key != entity.key
-            and attached_file.properties.task.key != entity.key
-        ):
-            raise exceptions.ValidationError("This autofill upload belongs to another form.")
-        options["file_key"] = attached_file.urlsafe_key
-    try:
-        spec = autofill_job_spec(
-            entity, user, form, upload_record=upload_record, **options,
-        )
-        result = DeferredJobs.start(spec)
-    except (exceptions.ValidationError, exceptions.MutationConflict, DeferredJobLockedError):
-        if attached_file and getattr(upload, "lagniappe_saved_destination", None):
-            # A definite rejected start owns only its unique copy, never the
-            # source upload or a different delivery's accepted attachment.
-            persisted = Entities.fetch_one(attached_file.key, request=Fetch.root())
-            saved = upload.lagniappe_saved_destination
-            if not persisted or persisted.assets.get("file", {}).get("path") != saved["path"]:
-                try:
-                    storage_assets.delete_file_generation(saved["path"], saved["visibility"], saved["generation"])
-                except Exception as error:
-                    exceptions.capture(error, context={"operation": "autofill_rejected_upload_cleanup"}, level="warning")
-        for root in getattr(entity, "_autofill_start_entities", (entity,)):
-            storage_assets.cleanup_rejected_attempt(root)
-        raise
-    if upload_record:
-        # The durable attachment now owns its copy; cancellation never removes it.
-        storage_assets.delete_direct_upload(upload_record)
-    return result
+    spec = autofill_job_spec(
+        entity, user, form, upload_record=upload_record, **options,
+    )
+    return DeferredJobs.start(spec)

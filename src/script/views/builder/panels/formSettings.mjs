@@ -1,10 +1,5 @@
 import { FormController } from "../../../forms/controller.mjs";
-import {
-	captureError,
-	ENDPOINTS,
-	Modal,
-	request,
-} from "../../../shared/index.mjs";
+import { captureError, ENDPOINTS, request } from "../../../shared/index.mjs";
 
 /**
  * @testable infrastructure
@@ -48,9 +43,7 @@ export class FormSettings {
 					},
 				})
 			: null;
-		this._input = this._input.bind(this);
 		this._click = this._click.bind(this);
-		this.modal = null;
 	}
 
 	/**
@@ -66,22 +59,12 @@ export class FormSettings {
 			this.generateForm.target.addEventListener("submit", this._generateSchema);
 		}
 
-		this.column?.addEventListener("input", this._input);
 		this.column?.addEventListener("click", this._click);
 
 		if (this.restrictions) {
 			await this.restrictionForm.init();
 			if (this._destroyed) return;
 			this.restrictions.addEventListener("submit", this._saveRestrictions);
-		}
-	}
-
-	_input(event) {
-		if (event.target.name === "description" && this.generateForm?.target) {
-			const explain = this.generateForm.target.querySelector(
-				"[data-role='explain']",
-			);
-			if (explain) explain.dataset.visible = "true";
 		}
 	}
 
@@ -182,8 +165,6 @@ export class FormSettings {
 		if (!prompt) {
 			this.generateForm.showError("Please enter a description");
 			return Promise.resolve(false);
-		} else if (submitter?.dataset.explain) {
-			data.append("explain", submitter.dataset.explain);
 		}
 
 		this.builder.updateSchema();
@@ -213,10 +194,9 @@ export class FormSettings {
 				if (this._destroyed) return false;
 				if (this._generationIdentity !== identity) return false;
 				if (
-					!response?.modal &&
-					(identity.draft_revision !== this.builder.draft.revision ||
-						response?.request_id !== identity.request_id ||
-						response?.draft_revision !== identity.draft_revision)
+					identity.draft_revision !== this.builder.draft.revision ||
+					response?.request_id !== identity.request_id ||
+					response?.draft_revision !== identity.draft_revision
 				) {
 					if (response?.ok === true) {
 						this.generateForm.messages.submit = "Regenerate";
@@ -228,10 +208,9 @@ export class FormSettings {
 				}
 				const success = await this._updateSchema(response);
 				if (this._destroyed) return false;
-				if (success || (response?.ok === true && response.modal)) {
+				if (success) {
 					this.generateForm.messages.submit = "Generate";
-					if (success) this.generateForm.success();
-					else this.generateForm.resetSubmitButton();
+					this.generateForm.success();
 				}
 				return success;
 			} catch (error) {
@@ -282,10 +261,6 @@ export class FormSettings {
 				return false;
 			}
 			return true;
-		} else if (response?.ok === true && response.modal) {
-			this.modal?.destroy();
-			this.modal = new Modal(this.builder);
-			void this.modal.attach(response.modal, this.generateForm);
 		} else {
 			this.generateForm.showError(
 				response?.error || "Could not generate this form. Try again.",
@@ -303,12 +278,9 @@ export class FormSettings {
 			"submit",
 			this._generateSchema,
 		);
-		this.column?.removeEventListener("input", this._input);
 		this.column?.removeEventListener("click", this._click);
 		this.restrictions?.removeEventListener("submit", this._saveRestrictions);
 		this.restrictionForm?.destroy();
 		this.generateForm?.destroy();
-		this.modal?.destroy();
-		this.modal = null;
 	}
 }

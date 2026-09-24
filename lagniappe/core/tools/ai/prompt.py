@@ -64,6 +64,7 @@ class Prompt:
         self._tools = None
         self._user = user
         self._thinking_budget = None
+        self._thinking_level = None
         self._max_tool_iterations = None
         self._max_tool_file_parts_per_turn = None
         self._allowed_actions = None
@@ -233,6 +234,17 @@ class Prompt:
     def set_thinking_budget(self, budget):
         """Set the thinking token budget (0 disables thinking, None uses model default)."""
         self._thinking_budget = budget
+        self._thinking_level = None
+        return self
+
+    @property
+    def thinking_level(self):
+        return self._thinking_level
+
+    def set_thinking_level(self, level):
+        """Set a model-supported thinking level instead of a token budget."""
+        self._thinking_level = level
+        self._thinking_budget = None
         return self
 
     @property

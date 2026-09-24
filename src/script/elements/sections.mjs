@@ -29,7 +29,6 @@ const generateEntityForm = (form) => {
 	const manualButton = section.querySelector('button[data-role="manual"]');
 	const aiButton = section.querySelector('button[data-role="ai"]');
 	const generate = section.querySelector('[name="generate"]');
-	const explain = form.target.querySelector('[data-role="explain"]');
 	const description = section.querySelector('[name="user_description"]');
 	const aiFields = section.querySelectorAll('[data-role="ai"]:not(button)');
 
@@ -52,12 +51,6 @@ const generateEntityForm = (form) => {
 
 	setMode(form.target.dataset.mode || "manual");
 
-	if (explain && description) {
-		description.addEventListener("input", () => {
-			explain.dataset.visible = "true";
-		});
-	}
-
 	aiButton.addEventListener("click", () => {
 		withTransition(() => {
 			const changed = !generate.checked;
@@ -68,9 +61,6 @@ const generateEntityForm = (form) => {
 			if (changed)
 				generate.dispatchEvent(new Event("change", { bubbles: true }));
 			description.focus();
-			if (explain && description?.value) {
-				explain.dataset.visible = "true";
-			}
 		});
 	});
 
@@ -83,9 +73,6 @@ const generateEntityForm = (form) => {
 			generate.checked = false;
 			if (changed)
 				generate.dispatchEvent(new Event("change", { bubbles: true }));
-			if (explain) {
-				explain.dataset.visible = "false";
-			}
 		});
 	});
 

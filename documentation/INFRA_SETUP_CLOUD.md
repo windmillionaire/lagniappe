@@ -145,6 +145,9 @@ buckets.
 - The recovery bucket has no browser CORS and no runtime service-account
   access; only the saved human operator administers its objects.
 - Existing retention, soft-delete, and lifecycle policy are preserved.
+- Setup also owns a prefix-scoped deletion rule for private temporary direct
+  uploads (`tmp/uploads/`) after 30 days. This bounds abandoned autofill
+  staging without touching attached File assets or other object prefixes.
 - Runtime application startup validates expected buckets and never creates or
   mutates them.
 

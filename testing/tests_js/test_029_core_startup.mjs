@@ -360,6 +360,50 @@ async function loadCore(connectivity = { online: true }) {
 	return Core;
 }
 
+/** @matrix navigation tasks : delegated-toggle task-open-event */
+test("test_component_open_event_follows_delegated_toggle", async (t) => {
+	const { createBrowser } = await import("../utility/js/environment.mjs");
+	createBrowser(t);
+	const Core = await loadCore();
+	const node = document.createElement("li");
+	node.id = "task";
+	const trigger = document.createElement("div");
+	trigger.setAttribute("lp-show", "task:active");
+	trigger.dataset.toggle = "true";
+	node.append(trigger);
+	document.body.append(node);
+	const component = {
+		elt: node,
+		name: "task",
+		active: null,
+		visible: true,
+		async activate(show) {
+			this.active = show ? { name: "TaskForm", visible: true } : null;
+			return Boolean(show);
+		},
+		async prepareRender() {},
+		render(visible) {
+			node.dataset.open = visible ? "TaskForm" : "false";
+		},
+	};
+	const view = Object.create(Core.prototype);
+	view._componentActions = new Map();
+	view._destroyed = false;
+	view.getComponent = () => component;
+	view._setLoadingTrigger = () => null;
+	view._clearLoadingTrigger = () => {};
+	const opened = [];
+	node.addEventListener("component-opened", (event) =>
+		opened.push(event.detail.trigger),
+	);
+	await view.renderComponent(trigger);
+	assert.equal(node.dataset.open, "TaskForm");
+	assert.deepEqual(opened, [trigger]);
+	await view.renderComponent(trigger);
+	assert.equal(node.dataset.open, "false");
+	assert.deepEqual(opened, [trigger], "Closing must not emit an open event");
+});
+
 /** @matrix polling : active-widget channel entity nonblocking refresh subscription-lifecycle visibility */
 /** @matrix startup : nonblocking single-flight */
 test("test_core_polling_subscription_lifecycle", async () => {
@@ -626,6 +670,49 @@ test("test_static_component_without_default_widget_activates", async () => {
 	assert.equal(component.active, null);
 });
 
+/** @matrix deferred-jobs : rendered-visibility */
+test("test_task_form_operation_subscription_follows_component_visibility", async () => {
+	const ViewComponent = await loadViewComponent();
+	const events = [];
+	const widget = {
+		name: "TaskForm",
+		target: { dataset: { widget: "TaskForm" } },
+		visible: true,
+		disable() {
+			this.visible = false;
+			events.push("disable");
+		},
+		enable() {
+			this.visible = true;
+			events.push("enable");
+		},
+		reconcile() {},
+	};
+	const component = Object.create(ViewComponent.prototype);
+	Object.assign(component, {
+		active: widget,
+		_destroyed: false,
+		_nav: null,
+		elt: { dataset: {}, querySelector: () => null },
+		name: "task",
+		view: {
+			DeferredOperations: {
+				suspendTaskForm() {
+					events.push("suspend");
+				},
+				resumeTaskForm() {
+					events.push("resume");
+				},
+			},
+		},
+	});
+	component.loadWidget = async () => widget;
+	assert.equal(await component.activate("TaskForm"), true);
+	assert.deepEqual(events, ["suspend", "disable", "enable", "resume"]);
+	component.deactivate();
+	assert.deepEqual(events.slice(-2), ["suspend", "disable"]);
+});
+
 /** @matrix polling : component-render nonblocking subscription-lifecycle */
 /** @matrix startup : component-render deferred-services nonblocking */
 test("test_component_render_does_not_wait_for_polling_reconciliation", async (t) => {
@@ -680,6 +767,7 @@ test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	);
 	let initialized = false;
 	let renderCalls = 0;
+	let presented = false;
 	const initialReplayReady = new Promise(() => {});
 	const target = {
 		cloneNode: () => ({}),
@@ -690,9 +778,18 @@ test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	};
 	const form = new FormWidget({
 		target,
-		view: { initialReplayReady },
+		view: {
+			initialReplayReady,
+			offlineQueue: {
+				presentFor() {
+					presented = true;
+					return new Promise(() => {});
+				},
+			},
+		},
 		readonly: false,
 	});
+	form.handleOfflineQueue = () => {};
 	form._initForm = async () => {
 		renderCalls += 1;
 	};
@@ -704,6 +801,7 @@ test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	assert.equal(outcome, "rendered");
 	assert.equal(initialized, true);
 	assert.equal(renderCalls, 1);
+	assert.equal(presented, true);
 });
 
 async function loadCollaborativeDocument({ editor } = {}) {

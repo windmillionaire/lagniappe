@@ -42,11 +42,11 @@ lazy imports and the single `core.ai_model` instance.
 - tool-round and per-turn file limits; and
 - stable-instructions-before-context ordering.
 
-`preview()` shows the system instruction and rendered prompt text. It does not
-show provider configuration, function schemas, response schema, file parts,
-future tool calls/results, or the structured-final request. The UI calls it
-**Initial Prompt** for that reason. On direct-upload forms, preparing a preview
-may upload or reuse selected files before rendering the prompt.
+`preview()` remains an internal prompt-inspection helper for tests and
+diagnostics. It shows the system instruction and rendered prompt text, but not
+provider configuration, function schemas, response schema, file parts, future
+tool calls/results, or the structured-final request. The application no longer
+exposes this partial view as a user-facing Initial Prompt action.
 
 ## Model selection
 

@@ -50,7 +50,7 @@ const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
  * @tests tests_js/test_014_direct_upload_retry.mjs::test_directory_drop_is_rejected_before_file_processing
  * @matrix upload : directory-rejection drag-drop
  */
-async function containsDroppedDirectory(dataTransfer) {
+async function containsDroppedDirectory(dataTransfer, files = Array.from(dataTransfer?.files || [])) {
 	const items = Array.from(dataTransfer?.items || []).filter(
 		(item) => item.kind === "file",
 	);
@@ -68,7 +68,7 @@ async function containsDroppedDirectory(dataTransfer) {
 		}
 	}
 
-	return Array.from(dataTransfer?.files || []).some(
+	return files.some(
 		(file) => file.size === 0 && !file.type,
 	);
 }
@@ -525,6 +525,11 @@ export class BaseUpload {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_file_drop_survives_async_directory_check
+	 * @pair upload:async-file-snapshot
+	 */
 	_initDropZone() {
 		if (!this.dropzone) return;
 
@@ -536,12 +541,14 @@ export class BaseUpload {
 		this.dropzone.element.addEventListener("drop", async (event) => {
 			event.preventDefault();
 			try {
-				if (await containsDroppedDirectory(event.dataTransfer)) {
+				// DataTransfer.files is only guaranteed during the drop event. Copy it
+				// before the asynchronous directory check yields to the browser.
+				const files = Array.from(event.dataTransfer?.files || []);
+				if (await containsDroppedDirectory(event.dataTransfer, files)) {
 					this.showError(INDIVIDUAL_FILES_ONLY_ERROR);
 					return;
 				}
-				const files = event.dataTransfer.files;
-				if (files && files.length > 0) {
+				if (files.length > 0) {
 					await this._processNewFiles(files, { source: "drop" });
 				}
 			} catch (error) {

@@ -8,7 +8,7 @@ const AI_DROPZONE_TEXT =
  * @testable true
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
  * @tests tests_js/test_043_ai_email_frontend.mjs::test_ai_email_address_selection_and_copy_controls
- * @matrix ai-report : absent-markup ask clipboard-fallback create email-address-selection explain-button instructions multi-file status-reset tool-switcher upload-form
+ * @matrix ai-report : absent-markup ask clipboard-fallback create email-address-selection instructions multi-file status-reset tool-switcher upload-form
  */
 export class CreateToolReport extends BaseUpload {
 	constructor(attributes) {
@@ -26,7 +26,6 @@ export class CreateToolReport extends BaseUpload {
 		this.header = this.target.querySelector("[data-role='header']");
 		this.submitGroup = this.target.querySelector("[data-role='submit-group']");
 		this.submitButton = this.target.querySelector("[data-role='start-report']");
-		this.explainButton = this.target.querySelector("[data-role='explain']");
 		this.emailSubmissions = this.target.querySelector(
 			"[data-role='email-submissions']",
 		);
@@ -43,7 +42,6 @@ export class CreateToolReport extends BaseUpload {
 			descriptionPlaceholder: "Ask a question or describe what you want done…",
 			descriptionRows: 5,
 			stacked: true,
-			explain: false,
 		});
 		this.dropzone = this.context.dropzone;
 		this.menuOptions = ["remove", "replace", "paste"];
@@ -53,14 +51,12 @@ export class CreateToolReport extends BaseUpload {
 	async init() {
 		await super.init();
 		this.context.description?.addEventListener("input", () => {
-			this.toggleExplainButton();
 			this.form?.showSubmitButton();
 		});
 		this.emailCopyButton?.addEventListener("click", () => {
 			void this.copyEmailAddress();
 		});
 		this.dropzone?.show();
-		this.toggleExplainButton();
 	}
 
 	get html() {
@@ -103,20 +99,8 @@ export class CreateToolReport extends BaseUpload {
 		}, 2000);
 	}
 
-	toggleExplainButton() {
-		if (!this.explainButton) return;
-		const hasText = Boolean(this.context.description?.value?.trim());
-		this.explainButton.dataset.visible =
-			hasText || this.fileAttached ? "true" : "false";
-	}
-
-	showExplainButton() {
-		if (this.explainButton) this.explainButton.dataset.visible = "true";
-	}
-
 	applyDefaultAttachUI(_file, _context) {
 		if (this.dropzone) this.dropzone.setText(this.fileLabel);
-		this.showExplainButton();
 		this.form?.showSubmitButton();
 	}
 
@@ -136,7 +120,6 @@ export class CreateToolReport extends BaseUpload {
 	_resetUI() {
 		this.context?.clear();
 		this.dropzone?.show();
-		this.toggleExplainButton();
 		this.form?.hideSubmitButton();
 	}
 

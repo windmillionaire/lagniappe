@@ -101,10 +101,13 @@ export default class ViewComponent {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.mjs::test_static_component_without_default_widget_activates
+	 * @tests tests_js/test_029_core_startup.mjs::test_task_form_operation_subscription_follows_component_visibility
 	 * @matrix navigation tabs : static-component visibility
+	 * @matrix deferred-jobs : rendered-visibility
 	 */
 	async activate(show) {
 		if (this._destroyed) return false;
+		this.view?.DeferredOperations?.suspendTaskForm?.(this.active?.target);
 		this.active?.disable();
 
 		if (!show) {
@@ -138,6 +141,7 @@ export default class ViewComponent {
 		}
 
 		this.active?.enable();
+		this.view?.DeferredOperations?.resumeTaskForm?.(this.active?.target);
 		return true;
 	}
 
@@ -415,6 +419,7 @@ export default class ViewComponent {
 
 	deactivate(visible = true, originator = null) {
 		if (this.active) {
+			this.view?.DeferredOperations?.suspendTaskForm?.(this.active.target);
 			this.active.disable(true);
 			this.active.reconcile(true);
 			this.nav?.reconcile(null, this.name);

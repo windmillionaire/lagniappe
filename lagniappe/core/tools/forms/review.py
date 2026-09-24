@@ -37,13 +37,17 @@ def merge_proposal(baseline, current, proposed, *, review_only=False):
 
 # @testable true
 # @pair ai:autofill
-def launch_snapshot(target, actor, *, instructions=None, submission=None, review_context=None):
+def launch_snapshot(target, actor, *, instructions=None, submission=None, prompt_submission=None, target_context=None, review_context=None):
     """Seal the form and the initial AI input before the worker can reload them."""
     prompt = autofill.autofill_prompt_data(target, actor, user_context=instructions)
     prompt.pop("user", None)
     prompt.pop("file", None)
-    if submission is not None:
+    if prompt_submission is not None:
+        prompt["submission"] = deepcopy(prompt_submission)
+    elif submission is not None:
         prompt["submission"] = deepcopy(submission)
+    if target_context:
+        prompt["target"].update(deepcopy(target_context))
     if review_context:
         prompt["review_context"] = deepcopy(review_context)
     snapshot = {
@@ -52,6 +56,7 @@ def launch_snapshot(target, actor, *, instructions=None, submission=None, review
         "generation": target.generation,
         "revision": target.autofill_revision,
         "answers": deepcopy(target.properties.submission.value or {}),
+        "saved_values": deepcopy(target.properties.submission.form_value or {}),
         "values": deepcopy(submission if submission is not None else target.properties.submission.form_value or {}),
         "prompt": prompt,
     }
@@ -131,6 +136,7 @@ def review_projection(target, actor):
             "fields": list(checkpoint["proposal"]["values"]),
             "schema": snapshot["prompt"]["schema"],
             "baseline": snapshot.get("values", {}),
+            "saved_baseline": snapshot.get("saved_values", {}),
             "submission": {**snapshot.get("values", {}), **checkpoint["proposal"]["values"]},
         })
     return result

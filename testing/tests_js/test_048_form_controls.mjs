@@ -319,3 +319,34 @@ test("test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
 	await assert.rejects(makeForm(root(true)).init(), /failed control/);
 	assert.equal(controls[1].destroyed, 1);
 });
+
+/** @matrix forms : review-notice-placement */
+test("test_form_review_notice_stays_above_expanded_autofill_context", async (t) => {
+	createBrowser(t);
+	const { FormController } = await import("../../src/script/forms/controller.mjs");
+	const target = document.createElement("form");
+	const submitGroup = document.createElement("div");
+	submitGroup.dataset.role = "submit-group";
+	const submitButton = submitGroup.appendChild(document.createElement("button"));
+	submitButton.type = "submit";
+	const panel = document.createElement("div");
+	panel.dataset.role = "autofill";
+	panel.dataset.visible = "true";
+	const marker = document.createElement("div");
+	marker.setAttribute("lp-edited-marker", "");
+	target.append(submitGroup, panel, marker);
+	document.body.append(target);
+	const controller = new FormController({
+		target,
+		readonly: false,
+		schema: [],
+		submitGroup,
+		submitButton,
+	});
+	controller._initSubmitButton =
+		controller._initOfflineState =
+		controller._initUnsavedState = () => {};
+	await controller.init();
+	assert.equal(marker.nextElementSibling, panel);
+	assert.equal(panel.dataset.visible, "true");
+});

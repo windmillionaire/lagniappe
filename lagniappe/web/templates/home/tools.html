@@ -1,5 +1,4 @@
 {% import 'controls.html' as controls %}
-{% from "common.html" import explain_prompt %}
 
 {% macro create_report() %}
   <form lp-create
@@ -39,7 +38,6 @@
     {% endif %}
     <div class="{{ styles.form.submit.group }} -mt-2 flex flex-col gap-2"
          data-role="submit-group">
-      {{ explain_prompt("ai") }}
       <button type="submit"
               data-kind="default"
               data-role="start-report"

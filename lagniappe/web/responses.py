@@ -77,12 +77,6 @@ def not_found(error):
     return error, 404
 
 
-def explain(prompt):
-    preview = prompt.preview() if hasattr(prompt, "preview") else prompt.build()
-    modal = render_template("reference/prompt.html", prompt=preview)
-    return jsonify({"modal": modal}), 200
-
-
 def cell(field, entity, column=None, embedded=False):
     template = get_template_attribute("cell.html", "format_table_cell")
     column_data = {"link": True, "parent": True}

@@ -1,7 +1,5 @@
 """Routes for AI tool reports."""
 
-from types import SimpleNamespace
-
 from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
@@ -20,7 +18,6 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai import planner as report_planner
 from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
 from lagniappe.core.tools.ai.reporting.proposals import selection as report_selection
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
@@ -194,53 +191,6 @@ def _report_upload_manifest():
 
 # @testable false
 # @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason prompt preview uses upload metadata without persisting files
-def _preview_report_files():
-    files = []
-    uploads = [
-        {
-            "filename": upload.filename,
-            "content_type": upload.content_type,
-        }
-        for upload in request.files.getlist("tool-files")
-    ]
-    uploads.extend(
-        direct_uploads.direct_upload_records(
-            request.form,
-            input_name="tool-files",
-        )
-    )
-    for upload in uploads:
-        filename = upload.get("filename")
-        if not filename:
-            continue
-        files.append(
-            SimpleNamespace(
-                urlsafe_key=f"upload:{filename}",
-                name=filename,
-                filename=filename,
-                mimetype=upload.get("content_type") or "application/octet-stream",
-                summary=None,
-            )
-        )
-    return files
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason explain modal shares the real organize prompt assembly
-def _explain_ai_prompt():
-    report = SimpleNamespace(
-        db={},
-        origin="web",
-        instructions=request.form.get("instructions"),
-        input_files=_preview_report_files(),
-    )
-    return responses.explain(report_planner.report_prompt(report, current_user))
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
 # @reason route permission mirrors the final organize upload endpoint
 @tools.route("/ai/direct-upload", methods=["POST"])
 @ai_access(AI.ASK)
@@ -333,7 +283,7 @@ def _start_tool_report(
 @ai_access(AI.ASK)
 def create_ai_report():
     if request.form.get("role") == "explain":
-        return _explain_ai_prompt()
+        return responses.error("Initial Prompt is no longer available.")
 
     try:
         input_files = _uploaded_report_files()

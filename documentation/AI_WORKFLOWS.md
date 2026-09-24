@@ -108,30 +108,37 @@ clear. Field-type guidance is filtered to the schema, including table columns.
 
 It excludes Task history, sibling Tasks, completed Page Tasks, parent-Page Files,
 and eager general workspace lookup. Google Search may supply focused public facts.
-`get_file` appears only when a stored target attachment exists and is capped at
-two rounds.
+The supplied original reaches Gemini as a Cloud Storage URI in the initial
+request; it does not need a model tool call. `get_file` appears only when another
+stored target attachment exists and is capped at two rounds.
 
-Autofill never waits for summaries. A supplied original is read directly; other
-attachments are available via tools. Accepted starts atomically save current
-answers, the uploaded File attachment, the job and its reservation. Cancellation
-or failure retains the answers and File. Automatic retries reuse the sealed
-snapshot. Explicit Retry reuses the original prompt/file with the current draft.
+Autofill never waits for summaries. A supplied original is read directly from
+its verified private temporary Cloud Storage URI; other attachments are
+available via tools. Accepted starts persist only the job and its reservation:
+validated draft answers are sealed in the job snapshot, not saved to the form.
+Cancellation or failure leaves saved answers unchanged and retains the staged
+upload for Retry. Automatic retries reuse the sealed snapshot. Explicit Retry
+reuses the original prompt/upload with the current draft.
 
 The durable `form-autofill` lock prevents duplicate AI operations, not editing.
 Apply compares launch/current/proposed values under target, lease and reservation
-guards, committing an application receipt atomically. Concurrent human changes
-are preserved, with alternatives retained for review. Changed populated context
-or schema makes proposals review-only. Collections are whole-field alternatives,
-not guessed row-by-row merges. Old queued jobs without snapshots retain their
-strict revision guard.
+guards, committing a review receipt atomically but never saving AI answers.
+Concurrent human changes are preserved for review. Ordinary Update saves the
+selected draft and, when an AI suggestion from the uploaded original was chosen,
+attaches that File; otherwise it removes the temporary upload. Collections are
+whole-field alternatives, not guessed row-by-row merges. Old queued jobs without
+snapshots retain their strict revision guard.
 
 The common form review bar/modal also handles remote edits and schema changes.
 Prompt-only refinement stores an actor-private candidate; acceptance updates the
 open draft and ordinary Update saves it. Latest shared/per-actor candidates are
 referenced on the target, and unresolved referenced jobs are excluded from
 diagnostic deletion. Autofill uses a cancellable provider session with a
-120-second total budget and one transient retry within it, without nested SDK
-retry loops or delayed outer backoff. Model thinking configuration is unchanged.
+four-minute total budget and one transient retry within it when at least 30
+seconds remain, without nested SDK retry loops or delayed outer backoff.
+Autofill prompts request Gemini `LOW` thinking; other AI workflows keep their
+existing thinking settings. The total budget starts when the job is created,
+so queue time reduces the provider window.
 
 Multi-file Page upload summary is a separate synchronous route path. It checks
 `AI.CREATE`, runs the shared report summary prepass, then saves the Files.

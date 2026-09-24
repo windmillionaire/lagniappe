@@ -14,20 +14,19 @@ from lagniappe.core.definitions import (
     Fetch,
     FetchReason,
     FileConsumer,
-    MutationOperation,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import dates
 from lagniappe.core.tools.ai import autofill as ai_autofill
+from lagniappe.core.tools.ai.constants import gemini_mimetype
+from lagniappe.core.tools.database.core import DATA
 from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.forms import review as form_review
-from lagniappe.core.tools.forms import changes as form_changes
 from lagniappe.core.mutations import (
-    plan_mutation, plan_root, prepare_durable_writes, execute_mutation,
-    execute_post_commit, consume_mutation_intents,
+    plan_root, prepare_durable_writes, execute_mutation,
 )
 
 from .base import DeferredJobAdapter
@@ -48,7 +47,7 @@ class AutofillAdapter(DeferredJobAdapter):
     queued_message = "Autofilling form..."
     retry_message = "AI is temporarily busy; retrying autofill shortly..."
     mutation_inputs = ()
-    max_lifetime_seconds = 120
+    max_lifetime_seconds = 4 * 60
     cancellable_provider = True
 
     # @testable true
@@ -69,23 +68,20 @@ class AutofillAdapter(DeferredJobAdapter):
             "idempotency_key": job.idempotency_key,
             "revision": int(job.status_revision or 0),
         }
-        roots = getattr(target, "_autofill_start_entities", (target,))
-        plan = plan_mutation(MutationOperation.SAVE, *roots)
+        plan = plan_root(target, property_mask=("deferred_job",))
         writes = prepare_durable_writes(plan)
         guards = list(getattr(target, "_form_additional_guards", ()))
-        file_guard = getattr(target, "_autofill_file_guard", None)
-        if file_guard:
-            guards.append(file_guard)
-        guards.extend(form_changes.mutation_guards(writes, []))
-        target._autofill_start_plan = plan
         return [(effect.entity, effect.property_mask) for effect in writes], guards
 
     # @testable true
+    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_snapshot_checkpoint_needs_proposal_but_not_file_attachment
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_upload_checkpoint_records_durable_attachment
     # @matrix ai deferred-jobs files : autofill checkpoint resume upload
     def checkpoint_ready(self, context):
         if not super().checkpoint_ready(context):
             return False
+        if context.parameters.get("snapshot"):
+            return isinstance(context.checkpoint.get("proposal"), dict)
         return not context.parameters.get("upload_record") or isinstance(
             context.checkpoint.get("attachment"),
             dict,
@@ -97,16 +93,6 @@ class AutofillAdapter(DeferredJobAdapter):
     def started(self, context):
         target = context.input("target")
         if context.parameters.get("snapshot"):
-            plan = getattr(target, "_autofill_start_plan", None)
-            if plan is not None:
-                consume_mutation_intents(plan)
-                try:
-                    execute_post_commit(plan)
-                except Exception as error:
-                    exceptions.capture(error, context={"operation": "autofill_start_post_commit"})
-            else:
-                from lagniappe.core.tools import cache
-                cache.update(target)
             return
         if not isinstance(target, Entities.PAGE):
             return
@@ -280,6 +266,7 @@ class AutofillAdapter(DeferredJobAdapter):
         return checkpoint
 
     # @testable true
+    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_snapshot_passes_prompt_and_staged_original_to_model
     # @pair ai:autofill
     def prepare_snapshot(self, context):
         snapshot = context.parameters["snapshot"]
@@ -293,6 +280,18 @@ class AutofillAdapter(DeferredJobAdapter):
             if not isinstance(file, Entities.FILE) or not file.allowed(Action.VIEW, user=context.actor):
                 raise exceptions.ValidationError("The supplied autofill file is no longer available.")
             prompt_data["original_files"] = [file]
+        elif context.parameters.get("upload_record"):
+            upload = storage_assets.verify_direct_upload(
+                context.parameters["upload_record"], max_age=None,
+                consumer=FileConsumer.AI_INLINE,
+            )
+            mime_type = gemini_mimetype(upload.content_type)
+            if not mime_type:
+                raise exceptions.ValidationError("This file type cannot be read directly by autofill.")
+            prompt_data["original_file_parts"] = [{
+                "uri": f"gs://{DATA.bucket(upload.visibility).name}/{upload.path}",
+                "mime_type": mime_type,
+            }]
         prompt = ai_autofill.form_autofill_prompt(**prompt_data)
         context.set_phase(DeferredJobPhase.GENERATING)
         submission = ai_autofill.generate_autofilled_submission(
@@ -421,54 +420,23 @@ class AutofillAdapter(DeferredJobAdapter):
             if isinstance(target, Entities.TASK) and target.completed:
                 raise exceptions.ValidationError("This task was completed while autofill was running.")
             source = database_utility.ExactEntityState(deepcopy(dict(target.db)))
-            current = target.properties.submission.value or {}
-            schema_changed = (
-                target.generation != snapshot["generation"]
-                or target.submission_schema != snapshot["prompt"]["schema"]
-                or getattr(target.form, "urlsafe_key", None) != snapshot["form"]
+            proposed = context.checkpoint["proposal"]["values"]
+            changed_fields = sorted(
+                field_id for field_id, value in proposed.items()
+                if snapshot["values"].get(field_id) != value
             )
-            context_changed = any(
-                value not in (None, "", [], {}) and current.get(key) != value
-                for key, value in snapshot["answers"].items()
-            )
-            context_changed = context_changed or any(
-                value not in (None, "") and getattr(target, key, None) != value
-                for key, value in snapshot["prompt"].get("target", {}).items()
-                if key in {"name", "description"}
-            )
-            pending = bool(target.form and target.form.db.get("pending_form_change"))
-            review_only = private or schema_changed or context_changed or pending
-            merged, conflicts, applied = form_review.merge_proposal(
-                snapshot["answers"], current, context.checkpoint["proposal"]["answers"],
-                review_only=review_only,
-            )
-            if applied:
-                notice = target.db.get("pre_migration")
-                target.properties.submission.value = merged
-                target.save_submission()
-                # AI completion is not a human acknowledgement of migration losses.
-                if notice:
-                    target.db["pre_migration"] = notice
             form_review.remember_review(target, context.job, private=private)
             result = {
                 "target_key": target.urlsafe_key,
                 "target_kind": target.entity_kind,
-                "applied_fields": applied,
-                "conflicting_fields": sorted(conflicts),
-                "review_only": review_only,
+                "applied_fields": [],
+                "conflicting_fields": changed_fields,
+                "review_only": True,
                 "snapshot_revision": snapshot["revision"],
             }
             context.job.db[form_review.RECEIPT] = json.dumps(result)
             context.job.result = result
-            plan = (
-                plan_mutation(MutationOperation.SAVE, target) if applied else
-                plan_root(target, property_mask=(form_review.REVIEWS, "modified"), property_updates=("modified",))
-            )
-            if not applied:
-                from lagniappe.core.mutations.base import MutationPlanBuilder
-                builder = MutationPlanBuilder(MutationOperation.SAVE, (target,))
-                builder.cache_refresh(target, reason="autofill-review")
-                plan.effects.extend(builder.build().effects)
+            plan = plan_root(target, property_mask=(form_review.REVIEWS,))
             plan.effects.extend(plan_root(
                 context.job, property_mask=(form_review.RECEIPT, "result"),
             ).effects)
@@ -495,8 +463,6 @@ class AutofillAdapter(DeferredJobAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
     # @matrix deferred-jobs : compare-and-delete form-lock terminal-cleanup
     def cleanup(self, context, *, terminal):
-        record = context.parameters.pop("upload_record", None)
-        context.job.parameters = context.parameters
         if terminal:
             target = context.input("target")
             target_reference = (getattr(context.job, "inputs", None) or {}).get(
@@ -521,13 +487,11 @@ class AutofillAdapter(DeferredJobAdapter):
                 ):
                     current.deferred_job = None
                     Entities.save_root(current, property_mask=("deferred_job",))
-        if terminal and record:
-            storage_assets.delete_direct_upload(record)
 
     # @testable infrastructure
     def terminal_message(self, context, *, succeeded, error=None):
         if getattr(context.job, "status", None) in {"cancelled", "superseded"}:
-            return "Autofill cancelled. Your saved answers and files were kept."
+            return "Autofill cancelled. Saved answers were unchanged; Retry can reuse the uploaded file."
         target = context.input("target")
         label = "Task" if isinstance(target, Entities.TASK) else "Page"
         if succeeded:

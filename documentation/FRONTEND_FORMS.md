@@ -195,6 +195,12 @@ that client directly. `elements/upload.mjs` owns upload controls and menus.
 `BaseUpload` prefers resumable browser-to-Storage upload and submits signed
 metadata after each object completes. The widget checkpoints successful files
 so retry resumes from the first unfinished selection.
+On drag-and-drop, `BaseUpload` snapshots the dropped `File` objects before its
+asynchronous directory check; browser `DataTransfer.files` need not remain
+available after the drop handler yields.
+Autofill start keeps the current form draft unsaved. Review acceptance records
+which AI operation supplied a selected value; the next ordinary Update sends
+that selection so the server can attach a staged original only when used.
 
 When direct upload cannot start, a bounded multipart request may carry at most
 five files and 30 MiB total. A selection outside those bounds is not collapsed

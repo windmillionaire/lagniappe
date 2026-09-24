@@ -70,6 +70,213 @@ test("test_duplicate_autofill_start_keeps_draft_dirty", async (t) => {
 });
 
 /**
+ * @matrix edited-entity-notice : structured-conflict
+ * @matrix submit : update-feedback
+ */
+test("test_conflict_review_failure_settles_update_button", async (t) => {
+	const { capturedErrors, SubmissionManager, request } =
+		await setupSubmissionManager(t);
+	const form = document.body.appendChild(document.createElement("form"));
+	const submitter = { dataset: {}, disabled: false };
+	const messages = [];
+	const widget = {
+		target: form,
+		prepareSubmit: async () => true,
+		revisionSnapshot: () => "local draft",
+	};
+	const component = {
+		active: widget,
+		formData: new FormData(),
+		showError: (message) => messages.push(message),
+		widgets: {},
+	};
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		getComponent: () => component,
+		ensureEditWatcher: async () => ({
+			async stageConflict() {
+				throw new Error("Preview failed");
+			},
+		}),
+	});
+	request.put.mock.mockImplementation(async () => ({ conflict: true }));
+	await manager.submit({
+		target: form,
+		submitter,
+		detail: { update: true },
+		preventDefault() {},
+		stopPropagation() {},
+	});
+	await new Promise(setImmediate);
+	assert.equal(submitter.disabled, false);
+	assert.deepEqual(messages, ["Could not finish the update. Please try again."]);
+	assert.equal(capturedErrors.length, 1);
+});
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @matrix edited-entity-notice : structured-conflict
+ */
+test("test_stale_online_update_opens_prepared_review", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	const form = document.body.appendChild(document.createElement("form"));
+	const submitter = { dataset: {}, disabled: false };
+	const calls = [];
+	const widget = {
+		target: form,
+		prepareSubmit: async () => true,
+		revisionSnapshot: () => "unsaved draft",
+		form: { resetSubmitButton: () => calls.push("reset") },
+	};
+	const component = {
+		active: widget,
+		formData: new FormData(),
+		widgets: {},
+	};
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		getComponent: () => component,
+		ensureEditWatcher: async () => ({
+			async stageConflict(received, { response }) {
+				assert.equal(received, widget);
+				assert.equal(response.conflict, true);
+				calls.push("stage");
+				return true;
+			},
+			async openConflictReview(received) {
+				assert.equal(received, widget);
+				calls.push("open");
+			},
+		}),
+	});
+	request.put.mock.mockImplementation(async () => ({ conflict: true }));
+	await manager.submit({
+		target: form,
+		submitter,
+		detail: { update: true, onSettled() {} },
+		preventDefault() {},
+		stopPropagation() {},
+	});
+	assert.deepEqual(calls, ["stage", "open", "reset"]);
+	assert.equal(widget.revisionSnapshot(), "unsaved draft");
+	assert.equal(submitter.disabled, false);
+});
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @matrix edited-entity-notice : structured-conflict
+ */
+test("test_stale_autofill_start_opens_review_with_prestart_context", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	const { FormController } = await import("../../src/script/forms/controller.mjs");
+	const form = document.body.appendChild(document.createElement("form"));
+	const submitGroup = form.appendChild(document.createElement("div"));
+	const submitter = submitGroup.appendChild(document.createElement("button"));
+	submitter.type = "submit";
+	submitter.dataset.role = "autofill-submit";
+	const widget = {
+		target: form,
+		prepareSubmit: async () => true,
+		revisionSnapshot: () => "unsaved draft",
+	};
+	widget.form = new FormController(widget);
+	widget.form._subForm = {
+		submitGroup,
+		submitButton: submitter,
+		messages: { submit: "Autofill Form", submitting: "Starting…" },
+		icon: "generate",
+	};
+	widget.form.setSubmitButton({ message: "submitting", icon: "spinner" });
+	assert.equal(
+		submitter.querySelector("[data-role='text']").textContent,
+		"Starting…",
+	);
+	const component = {
+		active: widget,
+		formData: new FormData(),
+		widgets: {},
+	};
+	let reviewOptions;
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		getComponent: () => component,
+		ensureEditWatcher: async () => ({
+			async stageConflict() {
+				return true;
+			},
+			async openConflictReview(received, options) {
+				assert.equal(received, widget);
+				reviewOptions = options;
+			},
+		}),
+	});
+	request.put.mock.mockImplementation(async (_route, data) => {
+		assert.equal(data.get("role"), "autofill-submit");
+		return { conflict: true };
+	});
+	await manager.submit({
+		target: form,
+		submitter,
+		detail: { update: true, onSettled() {} },
+		preventDefault() {},
+		stopPropagation() {},
+	});
+	assert.deepEqual(reviewOptions, { blockedAction: "autofill" });
+	assert.equal(widget.revisionSnapshot(), "unsaved draft");
+	assert.equal(
+		submitter.querySelector("[data-role='text']").textContent,
+		"Autofill Form",
+	);
+	assert.equal(submitter.disabled, false);
+});
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @pair submit:active-widget
+ */
+test("test_retry_feedback_settles_only_after_start_response", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	const form = document.body.appendChild(document.createElement("form"));
+	const widget = {
+		target: form,
+		prepareSubmit: async () => true,
+		revisionSnapshot: () => "draft",
+	};
+	const errors = [];
+	const component = {
+		active: widget,
+		formData: new FormData(),
+		showError: (message) => errors.push(message),
+	};
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		getComponent: () => component,
+	});
+	let resolveResponse;
+	request.put.mock.mockImplementation(() => new Promise((resolve) => {
+		resolveResponse = resolve;
+	}));
+	let settled = 0;
+	const submitting = manager.submit({
+		target: form,
+		detail: { role: "autofill-submit", update: true, onSettled: () => settled += 1 },
+		preventDefault() {},
+		stopPropagation() {},
+	});
+	await new Promise(setImmediate);
+	assert.equal(typeof resolveResponse, "function");
+	assert.equal(settled, 0, "The button stays pending while the request is in flight");
+	resolveResponse({ ok: false, error: "Retry rejected" });
+	await submitting;
+	assert.equal(settled, 1);
+	assert.deepEqual(errors, ["Retry rejected"]);
+});
+
+/**
  * @source src/script/views/base/submission.mjs::SubmissionManager
  * @pair submit:active-widget
  */
@@ -77,9 +284,13 @@ test("test_autofill_ack_preserves_edits_made_during_request", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const form = document.body.appendChild(document.createElement("form"));
 	let value = "Submitted";
+	const baseline = { title: "Original saved value" };
+	const initialTarget = form.cloneNode(true);
+	initialTarget.dataset.submission = JSON.stringify(baseline);
 	const widget = {
 		target: form,
-		initialTarget: form.cloneNode(true),
+		initialTarget,
+		submission: baseline,
 		revisionSnapshot: () => value,
 		captureFormState: () => ({ renderer_submission: { title: value } }),
 		form: {
@@ -109,8 +320,8 @@ test("test_autofill_ack_preserves_edits_made_during_request", async (t) => {
 	await manager.update({ active: widget }, new FormData(), "/task/update");
 	assert.equal(value, "Typed while waiting");
 	assert.equal(widget.reviewState.revision, "saved");
-	assert.deepEqual(widget._baselineSubmission, { title: "Submitted" });
-	assert.equal(widget._revisionBaseline, "Submitted");
+	assert.deepEqual(widget.submission, baseline);
+	assert.deepEqual(JSON.parse(initialTarget.dataset.submission), baseline);
 });
 
 /**
@@ -235,7 +446,7 @@ test("test_submit_abandons_stale_widget_after_async_prepare", async (t) => {
 	};
 	const manager = new SubmissionManager(view);
 	const create = t.mock.method(manager, "create", () => {});
-	const update = t.mock.method(manager, "update", () => {});
+	const update = t.mock.method(manager, "update", async () => {});
 	const event = createSubmitEvent({ form: submitForm, submitter });
 	event.preventDefault = () => events.push("prevent");
 	event.stopPropagation = () => events.push("stop");
@@ -377,7 +588,7 @@ test("test_submit_uses_explicit_action_route_over_active_widget_route", async (t
 		getComponent: () => component,
 		online: true,
 	});
-	const update = t.mock.method(manager, "update", () => {});
+	const update = t.mock.method(manager, "update", async () => {});
 
 	await manager.submit(
 		createSubmitEvent({

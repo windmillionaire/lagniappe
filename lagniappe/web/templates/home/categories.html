@@ -1,5 +1,5 @@
 {% import 'controls.html' as controls %}
-{% from 'common.html' import generate, explain_prompt %}
+{% from 'common.html' import generate %}
 
 {% macro create() %}
   <form lp-create
@@ -34,7 +34,6 @@
       </div>
     {% endif %}
     <div class="flex flex-col gap-2 -mt-2" data-role="submit-group">
-      {% if current_user.access(AI.CREATE) %}{{ explain_prompt('generate') }}{% endif %}
       <button type="submit" class="{{ styles.button.submit }} mt-2"></button>
     </div>
   </form>

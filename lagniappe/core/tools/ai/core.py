@@ -291,7 +291,11 @@ class GenAI:
         elif function_tool:
             config["tools"] = [function_tool]
 
-        if prompt.thinking_budget is not None:
+        if prompt.thinking_level is not None:
+            config["thinking_config"] = types.ThinkingConfig(
+                thinking_level=prompt.thinking_level
+            )
+        elif prompt.thinking_budget is not None:
             config["thinking_config"] = types.ThinkingConfig(
                 thinking_budget=prompt.thinking_budget
             )

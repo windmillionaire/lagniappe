@@ -193,9 +193,9 @@ fragment anchors are retired.
 `/reference/section/<topic_id>` returns the shared modal; `/help/<topic_id>`
 returns a signed-in article whose Close link returns Home. Both use exact IDs
 and return 404 for unknown topics. General administrator guidance is readable
-by every signed-in user. The dedicated Configuration and Initial Prompt viewers
-keep their authorization and live payloads. Static explanations never include
-those payloads. `topic_context()` supplies configured email and permitted external
+by every signed-in user. The dedicated Configuration viewer retains its
+authorization and live payload; static explanations never include that payload.
+`topic_context()` supplies configured email and permitted external
 connection details at request time. The manual's own email and connection
 explanations retain equivalent authentication and feature guards; anonymous
 manual readers receive generic guidance without live account details.

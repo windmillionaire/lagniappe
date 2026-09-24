@@ -128,23 +128,21 @@ def _generate_category(generated_data):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_explain_button
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_with_form
-# @matrix categories : ai-create attach-form create-manual explain-button
+# @tests tests_e2e/002_home/test_002c_home_categories.py::test_retired_initial_prompt_request_cannot_create_category
+# @matrix categories : ai-create attach-form create-manual retired-preview no-create
 @categories.route("create", methods=["POST"])
 @permission(Resource.MODELS, Action.CREATE)
 def create():
     generate = request.form.get("generate")
-    explain = request.form.get("role") == "explain"
+    if request.form.get("role") == "explain" or request.form.get("explain"):
+        return responses.error("Initial Prompt is no longer available.")
 
     if generate:
         require_ai_access(AI.CREATE)
         prompt = ai_category.category_creation_prompt(request.form.get("user_description"))
-        if explain:
-            return responses.explain(prompt)
-
         try:
             results = ai_category.generate_category(prompt)
             generated_data = _generate_category(results)

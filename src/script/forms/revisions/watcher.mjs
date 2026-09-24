@@ -432,6 +432,10 @@ export class EditWatcher {
 		return this._reconciler.stageConflict(widget, conflict);
 	}
 
+	openConflictReview(widget, options = {}) {
+		return this._reconciler.openConflictReview(widget, options);
+	}
+
 	resolveRevision(marker, choice) {
 		return this._reconciler.resolveRevision(marker, choice);
 	}
