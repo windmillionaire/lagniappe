@@ -13,10 +13,15 @@ import { loadRevisionPreview } from "./preview.mjs";
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_offline_submission_conflict_keeps_queue_until_choice
  * @matrix forms : latest-schema queued-conflict readonly-preview submission-choice
  * @pair forms:autofill-review
- * @pair form-migration:readonly-modal
  */
 export class FormRevisionModal extends Modal {
-	constructor(reconciler, marker, widget, state, { blockedAction = null } = {}) {
+	constructor(
+		reconciler,
+		marker,
+		widget,
+		state,
+		{ blockedAction = null } = {},
+	) {
 		super(reconciler.view, marker.querySelector("[data-role='edited-reset']"));
 		this.reconciler = reconciler;
 		this.marker = marker;
@@ -41,7 +46,6 @@ export class FormRevisionModal extends Modal {
 			schema: response.schema,
 			submission: response.submission,
 			revision: review.revision,
-			migration: review.migration,
 			reviews: review.reviews,
 			queued: this.state.record?.id,
 		});
@@ -67,7 +71,9 @@ export class FormRevisionModal extends Modal {
 	 */
 	_schemaSummary() {
 		const before = new Map(
-			(this.widget.schema ?? []).map((field) => [field?.id, field]),
+			(this.state.record?.renderer_schema ?? this.widget.schema ?? []).map(
+				(field) => [field?.id, field],
+			),
 		);
 		const after = new Map(
 			(this.state.response?.schema ?? []).map((field) => [field?.id, field]),
@@ -136,7 +142,7 @@ export class FormRevisionModal extends Modal {
 			{
 				id: "local",
 				label: this.state.record ? "Queued value" : "Value in this tab",
-				schema: this.widget.schema,
+				schema: this.state.record?.renderer_schema ?? this.widget.schema,
 				submission: localSubmission,
 			},
 			{
@@ -145,19 +151,10 @@ export class FormRevisionModal extends Modal {
 				schema: this.state.response.schema,
 				submission: this.state.response.submission ?? {},
 			},
-			...(state.migration
-				? [
-						{
-							id: "before",
-							label: "Before the schema change",
-							...state.migration,
-						},
-					]
-				: []),
 			...(state.reviews ?? []).map((review) => ({
 				id: `ai:${review.operation}`,
 				label: review.private
-					? "Your revised suggestion"
+					? "Revised suggestion"
 					: "Autofill suggestion",
 				...review,
 			})),
@@ -216,7 +213,7 @@ export class FormRevisionModal extends Modal {
 							),
 					);
 					if (suggestedChange) return true;
-					if (reviews.length && !state.migration && !this.state.record) {
+					if (reviews.length && !this.state.record) {
 						// An existing local draft is context, not a new AI or remote value.
 						const localField = this.sources[0].schema?.find(
 							(item) => item.id === field.id,
@@ -253,7 +250,6 @@ export class FormRevisionModal extends Modal {
 							if (
 								source.id === "server" &&
 								((reviews.length &&
-									!state.migration &&
 									!this.state.record &&
 									!savedChangedSinceLaunch(field) &&
 									compatibleField(
@@ -295,7 +291,7 @@ export class FormRevisionModal extends Modal {
 							const definition = source.schema?.find(
 								(item) => item.id === field.id,
 							);
-							if (!definition && source.id !== "server") return [];
+							if (!definition) return [];
 							if (
 								source.id.startsWith("ai:") &&
 								savedChangedSinceLaunch(field) &&
@@ -341,11 +337,6 @@ export class FormRevisionModal extends Modal {
 											),
 										),
 									value: this._value(rendered[index].get(field.id)),
-									conversionFailed:
-										source.id === "server" &&
-										definition &&
-										source.submission[field.id] == null &&
-										state.migration?.submission?.[field.id] != null,
 								},
 							];
 						})
@@ -405,14 +396,16 @@ export class FormRevisionModal extends Modal {
 	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
 	 * @reason private per-field choice composition is part of the reconciliation modal
 	 */
-	_choice(field, { source, label, compatible, value, conversionFailed }) {
-		const button = document.createElement("button");
-		button.type = "button";
-		button.setAttribute("role", "radio");
-		button.setAttribute(
-			"aria-checked",
-			(source === this.selections.get(field.id)).toString(),
-		);
+	_choice(field, { source, label, compatible, value }) {
+		const button = document.createElement(compatible ? "button" : "div");
+		if (compatible) {
+			button.type = "button";
+			button.setAttribute("role", "radio");
+			button.setAttribute(
+				"aria-checked",
+				(source === this.selections.get(field.id)).toString(),
+			);
+		} else button.dataset.role = "incompatible-value";
 		button.setAttribute("aria-label", `${label} for ${field.label}`);
 		button.dataset.revisionSource = source;
 		button.className =
@@ -422,18 +415,12 @@ export class FormRevisionModal extends Modal {
 		heading.className = "mb-2 block text-xs font-semibold text-base-medium";
 		heading.textContent = label;
 		button.appendChild(value);
-		if (conversionFailed) {
-			const warning = button.appendChild(document.createElement("p"));
-			warning.dataset.kind = "error";
-			warning.className = "mt-2 text-sm italic text-kind-default";
-			warning.textContent = "Value not able to be converted";
-		}
 		if (!compatible) {
-			button.disabled = true;
 			const explanation = button.appendChild(document.createElement("p"));
 			explanation.className = "mt-2 text-xs text-base-medium";
 			explanation.textContent =
 				"This field changed type or was removed. Keep this earlier value for reference and re-enter it in the updated form if needed.";
+			return button;
 		}
 
 		button.addEventListener("click", () => {
@@ -456,7 +443,6 @@ export class FormRevisionModal extends Modal {
 			!differences.length &&
 			!this.blockedAction &&
 			!this.state.record &&
-			!this.state.response.form_state?.migration &&
 			!!this.state.response.form_state?.reviews?.length;
 		const saved = this.sources[1];
 		// An AI value can depend on a different saved field, so a post-launch
@@ -480,30 +466,31 @@ export class FormRevisionModal extends Modal {
 			}) ?? false;
 		for (const field of differences) {
 			const localChoice = field.choices.find(
-				(choice) => choice.source === "local",
+				(choice) => choice.source === "local" && choice.compatible,
 			);
 			const serverChoice = field.choices.find(
-				(choice) => choice.source === "server",
+				(choice) => choice.source === "server" && choice.compatible,
 			);
-			const aiChoice = field.choices.findLast((choice) =>
-				choice.source.startsWith("ai:"),
+			const aiChoice = field.choices.findLast(
+				(choice) => choice.compatible && choice.source.startsWith("ai:"),
 			);
 			const baseline = this.widget._baselineSubmission;
 			const changedLocally =
-				!this.state.record &&
-				baseline &&
-				!this._sameValue(
-					this.sources[0].submission[field.id] ?? null,
-					baseline[field.id] ?? null,
-					field,
-				);
-			let defaultSource = aiChoice?.source ?? serverChoice?.source ?? "local";
+				this.state.record ||
+				(baseline &&
+					!this._sameValue(
+						this.sources[0].submission[field.id] ?? null,
+						baseline[field.id] ?? null,
+						field,
+					));
+			let defaultSource =
+				aiChoice?.source ?? serverChoice?.source ?? localChoice?.source;
 			if (savedContextChanged)
 				defaultSource =
 					serverChoice?.source ??
 					(localChoice?.compatible ? "local" : defaultSource);
 			if (localChoice?.compatible && changedLocally) defaultSource = "local";
-			this.selections.set(field.id, defaultSource);
+			if (defaultSource) this.selections.set(field.id, defaultSource);
 		}
 
 		const modal = document.createElement("div");
@@ -522,11 +509,12 @@ export class FormRevisionModal extends Modal {
 		header.className = STYLES.modal.header;
 		const title = header.appendChild(document.createElement("h2"));
 		title.className = "text-lg font-bold text-base-dark";
-		title.textContent = this.blockedAction === "autofill"
-			? "Review changes before autofill"
-			: noNewAutofillValues
-				? "Autofill is complete"
-				: "Choose form values";
+		title.textContent =
+			this.blockedAction === "autofill"
+				? "Review changes before autofill"
+				: noNewAutofillValues
+					? "Autofill is complete"
+					: "Choose form values";
 		const close = header.appendChild(document.createElement("button"));
 		close.type = "button";
 		close.setAttribute("lp-control", "close");
@@ -537,11 +525,19 @@ export class FormRevisionModal extends Modal {
 		body.className = "space-y-4 p-4 sm:p-6";
 		const intro = body.appendChild(document.createElement("p"));
 		intro.className = "text-sm text-base-medium";
-		intro.textContent = this.blockedAction === "autofill"
-			? "Autofill did not start because the saved form changed. Choose which values to keep, then select Use selected values and start Autofill again. Use Update first if you want to save your choices."
-			: noNewAutofillValues
-				? "No new form values were suggested. Keep your current values or revise the result below. Use Update afterward to acknowledge this review."
-				: "Choose the values to keep. This updates your open form only; use Update afterward to save. Earlier values whose field type changed are shown for reference.";
+		intro.textContent =
+			this.blockedAction === "autofill"
+				? "Autofill did not start because the saved form changed. Choose which values to keep, then select Use selected values and start Autofill again. Use Update first if you want to save your choices."
+				: noNewAutofillValues
+					? "No new form values were suggested. Keep your current values or revise the result below. Use Update afterward to acknowledge this review."
+					: "Choose the values to keep. This updates your open form only; use Update afterward to save. Earlier values whose field type changed are shown for reference.";
+		if (
+			differences.some((field) =>
+				field.choices.some((choice) => !choice.compatible),
+			)
+		)
+			intro.textContent +=
+				" Applying these choices drops incompatible draft values from the updated form. Copy any earlier values you need before continuing.";
 		const schemaSummary = this._schemaSummary();
 		if (schemaSummary) {
 			const schema = body.appendChild(document.createElement("p"));
@@ -557,7 +553,8 @@ export class FormRevisionModal extends Modal {
 			label.className = "mb-2 font-semibold text-base-dark";
 			label.textContent = field.label;
 			const choices = row.appendChild(document.createElement("div"));
-			choices.setAttribute("role", "radiogroup");
+			if (field.choices.some((choice) => choice.compatible))
+				choices.setAttribute("role", "radiogroup");
 			choices.setAttribute("aria-label", field.label);
 			choices.className = "grid gap-2 sm:grid-cols-2";
 			choices.append(
@@ -606,8 +603,7 @@ export class FormRevisionModal extends Modal {
 	/** @testable infrastructure */
 	_selectedSubmission() {
 		const review = this.state.response.form_state ?? {};
-		const preserveTabDraft =
-			!this.state.record && !review.migration && review.reviews?.length;
+		const preserveTabDraft = !this.state.record && review.reviews?.length;
 		const submission = structuredClone(
 			preserveTabDraft
 				? this.sources[0].submission
@@ -617,17 +613,34 @@ export class FormRevisionModal extends Modal {
 			const source = this.sources.find(
 				(candidate) => candidate.id === sourceId,
 			);
+			if (
+				!compatibleField(
+					source?.schema?.find((field) => field.id === id),
+					this.state.response.schema?.find((field) => field.id === id),
+				)
+			)
+				continue;
 			if (Object.hasOwn(source?.submission ?? {}, id))
 				submission[id] = structuredClone(source.submission[id]);
 			else delete submission[id];
 		}
-		return submission;
+		const currentIds = new Set(
+			(this.state.response.schema ?? []).map((field) => field.id),
+		);
+		return Object.fromEntries(
+			Object.entries(submission).filter(([id]) => currentIds.has(id)),
+		);
 	}
 
 	/** @testable infrastructure */
 	_refinement(body) {
 		const url = this.state.response.form_state?.refine_url;
-		if (!url || this.state.record) return;
+		if (
+			!url ||
+			this.state.record ||
+			!this.state.response.form_state?.reviews?.length
+		)
+			return;
 		const section = body.appendChild(document.createElement("section"));
 		section.className = "space-y-2";
 		const label = section.appendChild(document.createElement("label"));
@@ -682,8 +695,7 @@ export class FormRevisionModal extends Modal {
 					status: response.status,
 					revision: response.revision,
 				});
-				message.textContent =
-					"Autofill is running. You can close this review and keep editing; the bar has Cancel and will show when suggestions are ready.";
+				await this.remove();
 			} catch {
 				message.textContent =
 					"Suggestions could not be started. Your choices were kept; please try again.";

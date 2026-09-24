@@ -15,7 +15,8 @@ route and delegates normalized comparison to `EditReconciler`:
 
 - equivalent values acknowledge automatically unless the comparison omits
   incompatible fields from an unsaved or queued draft;
-- schema change projects stable local field IDs into the current schema;
+- clean forms adopt schema changes automatically, including saved conversions;
+- dirty forms carry compatible local field IDs into the current schema;
 - renderer-backed value drift offers per-field saved/local choices;
 - dirty simple forms offer reset;
 - queued simple forms offer queued or saved whole-form state; and
@@ -32,7 +33,7 @@ Only a create/update form with `lp-offline` and a widget
 
 - method, route, submitter role, and destination;
 - entity fingerprint/modified precondition;
-- structured FormRenderer values and ordinary fields;
+- structured FormRenderer values, their originating schema, and ordinary fields;
 - selected Files; and
 - enough optimistic UI state to restore the queued record.
 
@@ -50,7 +51,8 @@ and opens the same reconciliation path used for an external edit. If current
 schema/state can safely rebase the queued submission, the queue saves the new
 precondition and retries within the same ordered pass. A conflict needing User
 choice remains queued and blocks later commands. After a reload, comparison and
-review use the persisted command's values, not the newly rendered saved form.
+review use the persisted command's values and schema, not the newly rendered
+saved form.
 If the form mounts after replay found the conflict, it receives the retained
 conflict when it initializes.
 
@@ -78,11 +80,13 @@ revisions, and `form-lock` polling detects subsequent starts in other tabs.
 Schema migration retains its real writer fence (`blocks_edit=true`).
 
 The shared bar above Submit combines running autofill (Cancel), completed
-autofill (Review), schema changes (Review), and another editor's saved changes.
+autofill (Review), saved schema conversions (View changes), and another editor's
+saved changes.
 Completion does not replace an actively viewed or dirty form. The review modal
-compares current, saved, AI-proposed and pre-migration typed values. Incompatible
-old values remain visible but cannot be selected. Acceptance changes the open
-form only; ordinary Update persists it. Prompt-only AI refinement produces a
+compares current, saved, and compatible AI-proposed values. Incompatible local
+draft values remain visible as reference cards without selection controls.
+Acceptance changes the open form only; ordinary Update persists it.
+Prompt-only AI refinement produces a
 private candidate for the requesting editor, not an immediate saved answer.
 
 Online Page/Task form writes carry `form-revision` as well as generation. The
@@ -109,9 +113,11 @@ omits incompatible local fields, so equality with the saved submission does not
 mean the original draft is safe to discard. Keep its original schema and values,
 and any queued command, until the user resolves the review.
 
-`pre_migration` feeds the same modal, with the old schema used to render earlier
-values. Closing the modal never saves or clears the durable notice. Successful
-ordinary saves consume explicitly reviewed AI references; another editor's
+`pre_migration` feeds the independent informational **View changes** modal only
+when saved values were converted, cleared or removed. Closing it never saves or
+clears the durable notice; the next successful ordinary save/completion does.
+Opening or reloading a clean form shows the current schema and saved values.
+Successful ordinary saves consume explicitly reviewed AI references; another editor's
 private candidate is unaffected.
 
 ## Service worker boundary

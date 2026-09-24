@@ -172,12 +172,13 @@ def test_review_projection_is_actor_scoped(monkeypatch):
         pass
     me = SimpleNamespace(key="me", urlsafe_key="me")
     refs = {"shared": "shared-job", "me": "my-job", "other": "other-job"}
-    target = SimpleNamespace(urlsafe_key="task", db={"autofill_reviews": json.dumps(refs)}, allowed=lambda *args, **kwargs: True)
+    target = SimpleNamespace(urlsafe_key="task", form=None, generation=0, submission_schema=[],
+        db={"autofill_reviews": json.dumps(refs)}, allowed=lambda *args, **kwargs: True)
     jobs = [Job(urlsafe_key="shared-job", job_type="autofill", actor=me, inputs={"target": {"id": "task"}},
-        parameters={"snapshot": {"prompt": {"schema": []}, "values": {"title": "Base"}}},
+        parameters={"snapshot": {"generation": 0, "form": None, "prompt": {"schema": []}, "values": {"title": "Base"}}},
         checkpoint={"proposal": {"values": {"title": "AI"}}}, db={"autofill_receipt": "{}"}),
         Job(urlsafe_key="my-job", job_type="autofill", actor=me, inputs={"target": {"id": "task"}},
-        parameters={"mode": "revise", "snapshot": {"prompt": {"schema": []}, "values": {}}},
+        parameters={"mode": "revise", "snapshot": {"generation": 0, "form": None, "prompt": {"schema": []}, "values": {}}},
         checkpoint={"proposal": {"values": {"title": "Private"}}}, db={"autofill_receipt": "{}"})]
     reads = []
     monkeypatch.setattr(review.Entities, "DEFERRED_JOB", Job)
@@ -188,6 +189,8 @@ def test_review_projection_is_actor_scoped(monkeypatch):
     assert result[0]["fields"] == ["title"]
     jobs[1].actor = SimpleNamespace(key="other")
     assert len(review.review_projection(target, me)) == 1
+    target.submission_schema = [{"id": "new", "type": "textarea"}]
+    assert review.review_projection(target, me) == [], "Completed candidates expire even for same-generation schema edits"
     target.allowed = lambda *args, **kwargs: False
     assert review.review_projection(target, me) == []
 
@@ -236,7 +239,8 @@ def test_autofill_start_writes_only_operation_reference_with_answer_guard(monkey
 
 # @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
 # @pair ai:autofill
-def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch):
+@pytest.mark.parametrize("with_form", [False, True])
+def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch, with_form):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
     target = SimpleNamespace(key="task", urlsafe_key="task", entity_kind="task", completed=False, form=None, generation=0,
@@ -244,7 +248,9 @@ def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch):
         db={"submission": '{"title":"Human"}'}, properties=SimpleNamespace(submission=SimpleNamespace(value={"title": "Human"})),
         allowed=lambda *args, **kwargs: True)
     job = SimpleNamespace(key="job", urlsafe_key="job", lease_token="lease", db={}, actor=SimpleNamespace(urlsafe_key="actor"))
-    snapshot = {"generation": 0, "form": None, "revision": "launch", "values": {}, "prompt": {"schema": target.submission_schema}}
+    if with_form:
+        target.form = SimpleNamespace(key="form", urlsafe_key="form", db={"schema": "original definition"})
+    snapshot = {"generation": 0, "form": "form" if with_form else None, "revision": "launch", "values": {}, "prompt": {"schema": target.submission_schema}}
     context = SimpleNamespace(parameters={"snapshot": snapshot}, job=job, actor="actor", inputs={"target": target},
         input=lambda name: target, ensure_active=lambda: None, checkpoint={"proposal": {"values": {"title": "AI"}}})
     monkeypatch.setattr(adapter.Entities, "fetch_one", lambda *args, **kwargs: target)
@@ -258,12 +264,16 @@ def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch):
     assert json.loads(target.db["autofill_reviews"]) == {"shared": "job"}
     assert json.loads(job.db["autofill_receipt"])["snapshot_revision"] == "launch"
     assert saved[0][1] == ("job", {"status": "running", "lease_token": "lease", "autofill_receipt": None})
-    assert saved[0][2] == ("lock", {"operation": "job"})
+    assert saved[0][-1] == ("lock", {"operation": "job"})
+    if with_form:
+        assert saved[0][2] == ("form", {"schema": "original definition"})
+        assert isinstance(saved[0][2][1], adapter.database_utility.ExactEntityState)
 
 
 # @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
+# @source lagniappe/core/tools/forms/review.py::snapshot_matches_form
 # @pair ai:autofill
-@pytest.mark.parametrize("drift", ["answers", "schema", "metadata", "private"])
+@pytest.mark.parametrize("drift", ["answers", "schema", "definition", "form", "metadata", "private"])
 def test_autofill_context_or_schema_drift_keeps_suggestions_for_review(monkeypatch, drift):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
@@ -276,6 +286,10 @@ def test_autofill_context_or_schema_drift_keeps_suggestions_for_review(monkeypat
         target.properties.submission.value["title"] = "Book B"
     elif drift == "schema":
         target.generation = 1
+    elif drift == "definition":
+        target.submission_schema = [*schema, {"id": "new", "type": "textarea"}]
+    elif drift == "form":
+        target.form = SimpleNamespace(urlsafe_key="other-form")
     elif drift == "metadata":
         target.name = "Book B"
     original = deepcopy(target.properties.submission.value)
@@ -287,6 +301,11 @@ def test_autofill_context_or_schema_drift_keeps_suggestions_for_review(monkeypat
     monkeypatch.setattr(adapter, "deferred_job_lock_key", lambda entity: "lock")
     monkeypatch.setattr(adapter, "plan_root", lambda *args, **kwargs: SimpleNamespace(effects=[]))
     monkeypatch.setattr(adapter, "execute_mutation", lambda *args, **kwargs: None)
+    if drift in {"schema", "definition", "form"}:
+        with pytest.raises(adapter.DeferredJobDriftError, match="form changed.*Run autofill again"):
+            adapter.AutofillAdapter().apply(context)
+        assert not target.db and not job.db, "Obsolete proposals must not publish or change answers"
+        return
     result = adapter.AutofillAdapter().apply(context)
     assert result["review_only"] is True
     assert result["applied_fields"] == []

@@ -448,4 +448,13 @@ test("test_successful_autofill_waits_for_active_form_review_before_retiring", as
 	assert.equal(await manager.receive(status), true);
 	assert.equal(manager.operations.has("autofill-job"), false);
 	assert.equal(subscriptions.has("operation:autofill-job"), false);
+	form.dataset.operation = "obsolete-job";
+	widget.reviewState.reviews = [];
+	manager.track("obsolete-job", { node: form, immediate: false });
+	const obsoleteStatus = { ...status, key: "obsolete-job" };
+	assert.equal(await manager.receive(obsoleteStatus), false);
+	widget.reviewState.stale_autofill = true;
+	assert.equal(await manager.receive(obsoleteStatus), true);
+	assert.equal(manager.operations.has("obsolete-job"), false);
+	assert.equal(subscriptions.has("operation:obsolete-job"), false);
 });

@@ -14,6 +14,7 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Tasks, Users
 from testing.resources import Page, Task
 from testing.utility.live_ai import run_hosted_autofill
+from testing.utility.network import scoped_browser_route
 
 
 pytestmark = pytest.mark.e2e
@@ -201,7 +202,9 @@ def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(ge
         modal.get_by_role("button", name="Revise suggestions with AI", exact=True).click()
     private = revised.value.json()
     assert revised.value.ok, private
-    modal.get_by_role("button", name="Close", exact=True).click()
+    expect(modal).not_to_be_attached()
+    expect(form.locator("[data-role='form-operation']")).to_contain_text("running")
+    expect(form.get_by_role("button", name="Cancel autofill", exact=True)).to_be_visible()
     monkeypatch.setattr(adapter.ai_autofill, "generate_autofilled_submission", lambda *args, **kwargs: {FIELD_ID: "Private revision"})
     with web_app.test_request_context("/"):
         result = DeferredJobs.run(private["operation"])
@@ -211,7 +214,7 @@ def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(ge
     expect(form.locator("[data-role='form-operation']")).to_be_hidden(timeout=25000)
     form.locator("[data-role='edited-reset']").click()
     modal = user.page.locator("#modal")
-    modal.get_by_role("radio", name="Your revised suggestion for Text Field", exact=True).click()
+    modal.get_by_role("radio", name="Revised suggestion for Text Field", exact=True).click()
     modal.get_by_role("button", name="Use selected values", exact=True).click()
     expect(form.locator(f"[name='{FIELD_ID}']")).to_have_value("Private revision")
     expect(form.locator("[data-role='form-operation']")).to_be_hidden()
@@ -321,7 +324,8 @@ def test_autofill_collection_review_applies_to_open_form_without_saving(get_user
 # @source lagniappe/web/deferred_autofill.py::staged_upload_for_update
 # @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
 # @matrix ai files tasks : autofill rejected-suggestion staged-upload-cleanup
-def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_user, monkeypatch):
+@pytest.mark.parametrize("accept", [False, True], ids=["reject", "failed-save-then-accept"])
+def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_user, monkeypatch, browser_failures, accept):
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
@@ -348,14 +352,48 @@ def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_u
     expect(form.locator("[data-role='edited-message']")).to_contain_text("Autofill is complete", timeout=25000)
     form.locator("[data-role='edited-reset']").click()
     modal = user.page.locator("#modal")
-    modal.get_by_role("radio", name="Value in this tab for Text Field", exact=True).click()
+    modal.get_by_role("radio", name=f"{'Autofill suggestion' if accept else 'Value in this tab'} for Text Field", exact=True).click()
     modal.get_by_role("button", name="Use selected values", exact=True).click()
+    if accept:
+        from flask_login import login_user
+        from lagniappe.core.exceptions import ValidationError
+        original_save = Entities.save
+        attempted_assets = []
+        def fail_update(*entities):
+            if any(entity.key == task.entity.key for entity in entities):
+                attempted_assets.extend(entity.assets["file"] for entity in entities if isinstance(entity, Entities.FILE))
+                raise ValidationError("The test interrupted this Update. Try again.")
+            return original_save(*entities)
+        def interrupted_update(route):
+            # Run the browser's actual command through the route in the process
+            # that owns the failing storage boundary, then let the UI retry it.
+            with web_app.test_request_context(
+                f"/tasks/{task.key}/update", method="PUT",
+                data=route.request.post_data_buffer,
+                content_type=route.request.headers["content-type"],
+            ):
+                login_user(user.entity)
+                result = web_app.make_response(web_app.view_functions["tasks.update"](key=task.key))
+                route.fulfill(status=result.status_code, content_type=result.content_type, body=result.get_data(as_text=True))
+        with monkeypatch.context() as failed_save:
+            failed_save.setattr(Entities, "save", fail_update)
+            # The service worker sends mutations, so intercept its context.
+            with scoped_browser_route(user.page.context, f"**/tasks/{task.key}/update", interrupted_update), browser_failures.expect_http_error(user, status=422, path=f"/tasks/{task.key}/update"):
+                with user.page.expect_console_message(predicate=lambda message: "status of 422 " in message.text), user.page.expect_response("**/tasks/*/update") as failure:
+                    form.locator("[data-role='submit-group'] button[type='submit']").click()
+                assert failure.value.status == 422
+        assert storage_assets.verify_direct_upload(record, max_age=None)
+        assert len(attempted_assets) == 1
+        assert storage_assets.file_size(attempted_assets[0]["path"], attempted_assets[0].get("visibility", "private")) is None
+        unchanged = Entities.fetch_one(task.entity.key, request=Fetch.direct())
+        assert unchanged.db.get("autofill_reviews"), "Failed Update must preserve the review for retry"
+        assert not unchanged.files
     with user.page.expect_response("**/tasks/*/update") as saved_response:
         form.locator("[data-role='submit-group'] button[type='submit']").click()
     assert saved_response.value.ok, saved_response.value.text()
     stored = Entities.fetch_one(task.entity.key, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
-    assert stored.properties.submission.value[FIELD_ID] == "Human draft"
-    assert not stored.files
+    assert stored.properties.submission.value[FIELD_ID] == ("AI suggestion" if accept else "Human draft")
+    assert len(stored.files) == (1 if accept else 0)
     with pytest.raises(storage_assets.DirectUploadError):
         storage_assets.verify_direct_upload(record, max_age=None)
     with user.page.expect_response("**/tasks/*/update") as repeated_update:

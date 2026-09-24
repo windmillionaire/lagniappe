@@ -37,7 +37,6 @@ export class CheckboxElement extends BaseElement {
 
 		this._read = document.createElement("div");
 		this._read.className = STYLES.form.submission.default;
-		this._read.dataset.role = "checkbox-read-value";
 
 		const icon = this._read.appendChild(document.createElement("span"));
 		if (this.submission) {

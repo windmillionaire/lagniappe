@@ -169,49 +169,82 @@ def test_quota_fallback_rejects_non_quota_job(change):
 
 
 # @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
-@pytest.mark.parametrize("failure", [None, "non_quota", "terminal", "wrong_type", "permission", "drift"])
+@pytest.mark.parametrize("failure", [None, "non_quota", "terminal", "wrong_type", "permission", "drift", "schema", "file", "actor", "target", "started", "checkpoint", "prompt", "upload"])
 @pytest.mark.parametrize("wrapped", [False, True])
 def test_autofill_fallback_retains_preparation_and_rejects_unrelated_failures(monkeypatch, failure, wrapped):
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+    from lagniappe.core.tools.deferred_jobs import locks
+    from lagniappe.core.tools.database import assets
+    from lagniappe.core import mutations
 
-    job = SimpleNamespace(job_type=DeferredJobType.AUTOFILL.value, status="retry_wait",
-                          error={"type": "AIQuotaError"}, checkpoint={}, next_attempt_at=None)
+    schema = [{"id": "notes", "type": "textarea"}]
+    failed, job = _jobs()
+    for item in (failed, job):
+        item.job_type = "autofill"
+        item.inputs = {"target": {"kind": "task", "id": "task"}}
+        item.parameters = {"snapshot": {"form": None, "generation": 0, "revision": "saved", "prompt": {"schema": schema}},
+                           "user_context": "Use the evidence", "upload_record": {"object": "evidence"}, "mode": "fill"}
+        item.key = item.urlsafe_key
+        item.db = {"status": item.status, "attempt": item.attempt}
+    original_job = deepcopy(job.db)
     if wrapped:
-        job.error = {"type": "AIException", "context": {"ai_provider": {"quota_exhausted": True, "code": 429}}}
-    context = SimpleNamespace(checkpoint={})
+        failed.error = {"type": "AIException", "context": {"ai_provider": {"quota_exhausted": True, "code": 429}}}
+    target = SimpleNamespace(key="task", db={"submission": "{}"}, form=None, generation=0,
+                             submission_schema=schema, autofill_revision="saved")
+    context = SimpleNamespace(input=lambda name: target, actor=job.actor)
     calls, saved = [], []
     def authorize(_context):
         calls.append("authorize")
         if failure == "permission":
             raise ValueError("denied")
-    def validate(_context):
-        calls.append("validate")
-        if failure == "drift":
-            raise ValueError("changed")
-    def prepare(current):
-        calls.append("prepare")
-        return {**current.checkpoint, "attachment": {"key": "existing-upload"}}
-    adapter = SimpleNamespace(load=lambda value: value, authorize=authorize, validate_apply=validate, prepare=prepare)
+    def verify(record, **kwargs):
+        calls.append("file")
+        assert record == {"object": "evidence"} and kwargs["max_age"] is None
+        if failure == "file":
+            raise ValueError("missing upload")
+    adapter = SimpleNamespace(load=lambda value: value, authorize=authorize,
+                              prepare=lambda _: pytest.fail("Fallback must not call the provider"))
     monkeypatch.setattr(DeferredJobs, "adapter", lambda _kind: adapter)
     monkeypatch.setattr(DeferredJobs, "_context", lambda _job: context)
-    monkeypatch.setattr(live_ai.Entities, "save", saved.append)
+    monkeypatch.setattr(assets, "verify_direct_upload", verify)
+    monkeypatch.setattr(locks, "deferred_job_lock_key", lambda _: "lock")
+    monkeypatch.setattr(mutations, "plan_root", lambda entity, **kwargs: entity)
+    monkeypatch.setattr(mutations, "execute_mutation", lambda plan, **kwargs: saved.append((plan, kwargs["guards"])))
     if failure == "non_quota":
-        job.error = {"type": "ValidationError"}
+        failed.error = {"type": "ValidationError"}
     elif failure == "terminal":
         job.status = "failed"
     elif failure == "wrong_type":
         job.job_type = DeferredJobType.REPORT_AI.value
+    elif failure == "drift":
+        target.autofill_revision = "changed"
+    elif failure == "schema":
+        target.submission_schema = []
+    elif failure == "actor":
+        job.actor = SimpleNamespace(key="other")
+    elif failure == "target":
+        job.inputs = {"target": {"id": "other"}}
+    elif failure == "started":
+        job.attempt = 1
+    elif failure == "checkpoint":
+        job.checkpoint = {"submission": {}}
+    elif failure == "prompt":
+        job.parameters["user_context"] = "Different evidence"
+    elif failure == "upload":
+        job.parameters["upload_record"] = {"object": "other"}
     if failure:
         with pytest.raises((AssertionError, ValueError)):
-            live_ai.prepare_autofill_fallback(job, {"notes": "Known value"})
+            live_ai.prepare_autofill_fallback(job, {"notes": "Known value"}, failed_job=failed)
         assert not saved
         assert "prepare" not in calls
     else:
         submission = {"notes": "Known value"}
-        checkpoint = live_ai.prepare_autofill_fallback(job, submission)
-        assert checkpoint == {"submission": submission, "attachment": {"key": "existing-upload"}}
-        assert calls == ["authorize", "validate", "prepare"]
-        assert job.status == "retry_wait" and job.next_attempt_at is not None
-        assert saved == [job]
+        checkpoint = live_ai.prepare_autofill_fallback(job, submission, failed_job=failed)
+        assert checkpoint["submission"] == submission
+        assert checkpoint["proposal"]["values"] == submission
+        assert calls == ["authorize", "file"]
+        assert job.status == "queued" and failed.status == "failed"
+        assert saved[0][0] is job
+        assert saved[0][1] == [(job.key, original_job), ("task", {"submission": "{}"}), ("lock", {"operation": job.urlsafe_key})]
         checkpoint["submission"]["notes"] = "Changed copy"
         assert job.checkpoint["submission"] == submission

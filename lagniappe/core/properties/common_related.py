@@ -353,7 +353,7 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
         if getattr(value, "entity_kind", None) != "form":
             raise ValueError("Value must be a form")
 
-        if self.entity.form and key == self.entity.form.key:
+        if key == self.entity.properties.form.key:
             return False
 
         if key not in [v.key for v in self.value]:

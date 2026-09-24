@@ -123,13 +123,23 @@ reuses the original prompt/upload with the current draft.
 The durable `form-autofill` lock prevents duplicate AI operations, not editing.
 Apply compares launch/current/proposed values under target, lease and reservation
 guards, committing a review receipt atomically but never saving AI answers.
-Concurrent human changes are preserved for review. Ordinary Update saves the
-selected draft and, when an AI suggestion from the uploaded original was chosen,
+Concurrent human answer changes are preserved for review. If the Form identity,
+generation or effective schema changes, the worker fails with a fresh-run message
+and does not publish its candidate. Previously completed candidates from an older
+schema are also withheld and cannot attach their staged File. Explicit Retry uses
+the latest form and current draft; there is no automatic remapping round.
+Ordinary Update saves the selected draft and, when an AI suggestion from the
+uploaded original was chosen,
 attaches that File; otherwise it removes the temporary upload. Collections are
 whole-field alternatives, not guessed row-by-row merges. Old queued jobs without
 snapshots retain their strict revision guard.
+Each attachment save attempt copies to its own asset path. A rejected save
+cleans that copy by generation while retaining the temporary original for retry;
+successful persistence deletes the temporary original.
 
-The common form review bar/modal also handles remote edits and schema changes.
+The common form bar handles remote edits and schema changes. Schema migration
+history uses a separate read-only **View changes** comparison; it is never an AI
+candidate or a selectable answer source.
 Prompt-only refinement stores an actor-private candidate; acceptance updates the
 open draft and ordinary Update saves it. Latest shared/per-actor candidates are
 referenced on the target, and unresolved referenced jobs are excluded from

@@ -66,6 +66,17 @@ def launch_snapshot(target, actor, *, instructions=None, submission=None, prompt
 
 # @testable true
 # @pair ai:autofill
+def snapshot_matches_form(snapshot, target):
+    """Answer drift can be reviewed; a different form definition needs a fresh run."""
+    return bool(snapshot) and (
+        snapshot.get("form") == getattr(target.form, "urlsafe_key", None)
+        and snapshot.get("generation") == target.generation
+        and snapshot.get("prompt", {}).get("schema") == target.submission_schema
+    )
+
+
+# @testable true
+# @pair ai:autofill
 def prepare_proposal(schema, submission, target, actor):
     """Validate against the launch schema and retain both stored and browser values."""
     submission = autofill.validate_submission(submission, entity=target, user=actor, schema=schema)
@@ -128,7 +139,8 @@ def review_projection(target, actor):
             continue
         snapshot = (job.parameters or {}).get("snapshot") or {}
         checkpoint = job.checkpoint or {}
-        if not job.db.get(RECEIPT) or not snapshot or "proposal" not in checkpoint:
+        if (not job.db.get(RECEIPT) or "proposal" not in checkpoint
+                or not snapshot_matches_form(snapshot, target)):
             continue
         result.append({
             "operation": job.urlsafe_key,
@@ -154,19 +166,3 @@ def acknowledge_reviews(target, actor, operations):
         target.db[REVIEWS] = json.dumps(refs)
     else:
         target.db.pop(REVIEWS, None)
-
-
-# @testable infrastructure
-def migration_review(target):
-    """Typed before-values for the same review UI, without discarding old types."""
-    before = json_value(target.db, "pre_migration")
-    schema, values = [], {}
-    for field_id, original in before.items():
-        definition = original["schema"]
-        field = SchemaFields.create_field(definition, target)
-        if field is None:
-            continue
-        field.db_value = original.get("value")
-        schema.append(deepcopy(definition))
-        values[field_id] = field.form_value
-    return {"schema": schema, "submission": values} if schema else None

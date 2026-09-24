@@ -1,6 +1,10 @@
 import { FormController } from "../../forms/controller.mjs";
 import { installMigrationNotice } from "../../forms/migrationNotice.mjs";
-import { installReviewBar, renderReviewBar } from "../../forms/reviewBar.mjs";
+import {
+	currentReviewOperation,
+	installReviewBar,
+	renderReviewBar,
+} from "../../forms/reviewBar.mjs";
 import { compatibleField } from "../../forms/representation.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
@@ -41,6 +45,7 @@ export class FormWidget {
 		this._replacementPromise = null;
 		this._replacementInert = null;
 		this._migrationNotice = null;
+		this._reviewBar = null;
 
 		this._deferredOperation = this.target?.dataset?.operation || null;
 
@@ -65,9 +70,26 @@ export class FormWidget {
 			if (descriptor.blocks_edit === true || descriptor.scope === "form-change")
 				target.dataset.deferredLock = "form";
 			else delete target.dataset.deferredLock;
+			if (descriptor.status && typeof descriptor.status === "object") {
+				target.dataset.operationBootstrap = JSON.stringify(descriptor.status);
+				if (target.dataset.formState) {
+					const state = JSON.parse(target.dataset.formState);
+					state.operation = descriptor.status;
+					if (
+						descriptor.status.type === "autofill" &&
+						!descriptor.status.terminal
+					)
+						state.stale_autofill = false;
+					target.dataset.formState = JSON.stringify(state);
+				}
+			}
 		}
-		if (descriptor.status && typeof descriptor.status === "object")
+		if (descriptor.status && typeof descriptor.status === "object") {
+			this.reviewState = { ...this.reviewState, operation: descriptor.status };
+			if (descriptor.status.type === "autofill" && !descriptor.status.terminal)
+				this.reviewState.stale_autofill = false;
 			renderReviewBar(this, descriptor.status);
+		}
 		return true;
 	}
 
@@ -103,7 +125,12 @@ export class FormWidget {
 		const entries = [...this.formData.entries(), ...this.revisionEntries];
 		for (const [name, rawValue] of entries) {
 			if (
-				["form-revision", "reviewed-operation", "used-autofill-operation", "autofill-retry"].includes(name)
+				[
+					"form-revision",
+					"reviewed-operation",
+					"used-autofill-operation",
+					"autofill-retry",
+				].includes(name)
 			)
 				continue;
 			let value = rawValue;
@@ -179,6 +206,7 @@ export class FormWidget {
 			fields,
 			files,
 			form_controls: formControls,
+			renderer_schema: structuredClone(this.schema),
 			renderer_submission: this.form?.renderer?._packageSubmission?.() ?? null,
 		};
 	}
@@ -190,11 +218,12 @@ export class FormWidget {
 	 */
 	buildLocalRevision(response, state = this.captureFormState()) {
 		const latestSchema = response.schema ?? [];
+		const localSchema = state.renderer_schema ?? this.schema ?? [];
 		const latestIds = new Set(
 			latestSchema.map((field) => field?.id).filter(Boolean),
 		);
 		const localIds = new Set(
-			(this.schema ?? []).map((field) => field?.id).filter(Boolean),
+			localSchema.map((field) => field?.id).filter(Boolean),
 		);
 		const remoteSubmission = response.submission ?? {};
 		const mergedSubmission = structuredClone(remoteSubmission);
@@ -204,7 +233,7 @@ export class FormWidget {
 				!latestIds.has(id) ||
 				!Object.hasOwn(localSubmission, id) ||
 				!compatibleField(
-					this.schema.find((field) => field.id === id),
+					localSchema.find((field) => field.id === id),
 					latestSchema.find((field) => field.id === id),
 				)
 			)
@@ -461,7 +490,7 @@ export class FormWidget {
 		this.form = new FormController(this);
 		await this.form.init();
 		if (this.target.dataset.formState) installReviewBar(this);
-		else if (
+		if (
 			this.target.dataset.migrationNotice &&
 			this.target.dataset.migrationNotice !== "[]"
 		)
@@ -565,6 +594,7 @@ export class FormWidget {
 			loaded: this.loaded,
 			destroyables: [],
 			_migrationNotice: null,
+			_reviewBar: null,
 			...staged,
 		};
 		let adopted = false;
@@ -595,6 +625,11 @@ export class FormWidget {
 				adopt: Object.keys(stagedState),
 				state: stagedState,
 				revisionBaseline: stagedWidget.revisionSnapshot(),
+				baselineSubmission: structuredClone(
+					stagedWidget.form?.renderer?._packageSubmission?.() ??
+						stagedWidget.submission ??
+						{},
+				),
 				activate: () => {
 					adopted = true;
 				},
@@ -608,7 +643,8 @@ export class FormWidget {
 
 	commitReset() {
 		if (!this._preparedReset) return false;
-		const { adopt, state, revisionBaseline, activate } = this._preparedReset;
+		const { adopt, state, revisionBaseline, baselineSubmission, activate } =
+			this._preparedReset;
 		this._preparedReset = null;
 		const previousTarget = this.target;
 		const previousInert = this._replacementInert;
@@ -624,6 +660,7 @@ export class FormWidget {
 		activate?.();
 		this.target._lp_widget = this;
 		this._revisionBaseline = revisionBaseline;
+		this._baselineSubmission = baselineSubmission;
 		return true;
 	}
 
@@ -635,6 +672,8 @@ export class FormWidget {
 	}
 
 	_destroyFormState(state) {
+		state._reviewBar?.destroy();
+		state._reviewBar = null;
 		state._migrationNotice?.destroy();
 		state._migrationNotice = null;
 		state.form?.destroy?.();
@@ -713,10 +752,24 @@ export class FormWidget {
 			ownsRendererState &&
 			Object.hasOwn(response, "form_state") &&
 			this.initialTarget
-		)
-			this.initialTarget.dataset.formState = JSON.stringify(
-				response.form_state,
+		) {
+			const operation = currentReviewOperation(
+				this,
+				response.form_state.operation,
 			);
+			this.initialTarget.dataset.formState = JSON.stringify({
+				...response.form_state,
+				operation,
+			});
+			if (operation?.key)
+				this.lockDeferredOperation({
+					operation: operation.key,
+					revision: operation.revision,
+					scope: operation.scope,
+					blocks_edit: operation.blocks_edit,
+					status: operation,
+				});
+		}
 		if (
 			ownsRendererState &&
 			Object.hasOwn(response, "generation") &&
@@ -796,6 +849,8 @@ export class FormWidget {
 	destroy() {
 		this.discardPreparedReset();
 		this._restoreInteractivity();
+		this._reviewBar?.destroy();
+		this._reviewBar = null;
 		this._migrationNotice?.destroy();
 		this._migrationNotice = null;
 		this.form?.destroy();

@@ -23,6 +23,68 @@ from testing.utility.offline import wait_for_offline_mutations
 pytestmark = pytest.mark.e2e
 
 
+# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
+# @source src/script/forms/migrationNotice.mjs::installMigrationNotice
+# @template pages/info.html::info_form
+# @matrix form-migration : informational-notice readonly-modal
+# @matrix edited-entity-notice : clean-state latest-schema
+def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_user, monkeypatch):
+    from dataclasses import replace
+    from flask_login import login_user
+    from lagniappe.web import app as web_app
+    from lagniappe.core.tools.forms import changes, drafts
+    from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+    from testing.resources import Page
+
+    user = get_user(Users.OWNER)
+    quantity = SchemaFields.TEXT_INPUT.get(_id="quantity", title="Quantity")
+    legacy = SchemaFields.TEXT_INPUT.get(_id="legacy", title="Legacy code")
+    form = Form(user=user, definition=FormDefinition(
+        name=f"Informational migration {uuid4().hex[:8]}", form_type="page", schema=(quantity, legacy),
+    )).create()
+    page = Page(user=user, definition=replace(Pages.test_page_autofill.value.definition,
+                name=f"Open migration page {uuid4().hex[:8]}")).create()
+    page.entity.form = form.entity
+    page.entity.submission = {"quantity": "012", "legacy": "KEEP-PAGE"}
+    page.entity.save()
+    user.go(page, query_params={"tab": "info"})
+    info = page.info_form
+    expect(info.locator("input[name='quantity']")).to_have_value("012")
+    draft = drafts.builder_draft(form.entity)
+    draft["schema"] = [
+        {**draft["schema"][0], "input": "number"},
+        {"id": "newnote", "type": "textarea", "title": "New note"},
+    ]
+    draft["migration"] = {"version": 1, "clear_invalid": True}
+    with monkeypatch.context() as held:
+        held.setattr(DeferredJobs, "dispatch", lambda *args, **kwargs: "held")
+        with web_app.test_request_context("/"):
+            login_user(user.entity)
+            change = changes.start_change(form.entity, draft, str(uuid4()), user.entity)
+    with web_app.test_request_context("/"):
+        login_user(user.entity)
+        result = DeferredJobs.run(change["pending_change"]["operation"])
+    assert result.success, result.error
+    expect(info.locator("input[name='quantity'][type='number']")).to_have_value("12", timeout=30000)
+    expect(info.locator("input[name='legacy']")).to_have_count(0)
+    expect(info.locator("textarea[name='newnote']")).to_have_count(1)
+    expect(info.get_by_role("button", name="Review values", exact=True)).to_be_hidden()
+    info.get_by_role("button", name="View changes", exact=True).click()
+    modal = user.page.locator("#modal")
+    expect(modal.get_by_role("radio")).to_have_count(0)
+    expect(modal.get_by_text("KEEP-PAGE", exact=True)).to_have_count(1)
+    expect(modal.get_by_text("Converted value", exact=True)).to_be_visible()
+    expect(modal.get_by_text("Deleted from form", exact=True)).to_be_visible()
+    modal.get_by_role("button", name="Close", exact=True).click()
+    user.page.reload()
+    info = page.info_form
+    expect(info.locator("input[name='quantity']")).to_have_value("12")
+    expect(info.get_by_role("button", name="View changes", exact=True)).to_be_visible()
+    with expect_successful_response(user.page, method="PUT", path=f"/pages/{page.key}/update"):
+        info.locator("[data-role='submit-group'] button[type='submit']").click()
+    expect(page.info_form.get_by_role("button", name="View changes", exact=True)).to_be_hidden()
+
+
 # @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
 # @source lagniappe/core/tools/forms/changes.py::apply_target
 # @matrix form-migration : preflight batch-job publication recovery partial-read generation removed-link
@@ -477,15 +539,21 @@ def test_offline_submission_survives_schema_migration_until_review(
         expect(marker).to_be_visible()
         wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
         expect(field.locator("input")).to_have_value("unfinished")
+        owner.page.reload()
+        task_form = task.task_form
+        marker = task_form.locator("[lp-edited-marker]")
+        expect(marker.get_by_role("button", name="Review values", exact=True)).to_be_visible()
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
         marker.get_by_role("button", name="Review values", exact=True).click()
         modal = owner.page.locator("#modal")
         expect(modal.get_by_text("unfinished", exact=True)).to_be_visible()
-        local = modal.locator("[data-revision-source='local']")
-        expect(local).to_be_disabled()
+        local = modal.locator("[data-role='incompatible-value']")
+        expect(local).to_contain_text("unfinished")
+        expect(local.locator("[role='radio']")).to_have_count(0)
         modal.get_by_role("button", name="Use selected values", exact=True).click()
         expect(modal).not_to_be_attached()
         wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
-        expect(submit).not_to_contain_text("Queued Sync")
+        expect(task.task_form.locator("button[type='submit']:not([data-role])")).not_to_contain_text("Queued Sync")
         owner.page.reload()
         current_form = task.task_form
         if change == "convert":
@@ -852,7 +920,7 @@ def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_user):
     ] == [{"decision": "true"}, {"decision": "false"}]
 
 
-# @source src/script/forms/revisions/modals.mjs::FormRevisionModal
+# @source src/script/forms/migrationNotice.mjs::installMigrationNotice
 # @matrix form-migration : modify-panel no-submission-read draft-undo saved-job progress reload recovery informational-notice readonly-modal
 # @matrix task-completion : original-view readonly permission-gates
 # @style radio.fieldset.column
@@ -994,19 +1062,18 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
     user.go(task_resource)
     task_form = task_resource.task_form
     expect(task_form.locator("[data-role='edited-message']")).to_contain_text("fields have changed")
-    task_form.get_by_role("button", name="Review values", exact=True).click()
+    task_form.get_by_role("button", name="View changes", exact=True).click()
     modal = user.locate("#modal")
     expect(modal).to_contain_text("unknown")
     invalid = modal.get_by_text("Value not able to be converted", exact=True)
     expect(invalid).to_be_visible()
     expect(invalid).to_have_attribute("data-kind", "error")
     expect(invalid).to_have_css("font-style", "italic")
-    expect(modal.get_by_role("radio")).to_have_count(3)
-    expect(modal.get_by_role("radio", name="Before the schema change for Quantity", exact=True)).to_be_disabled()
-    expect(modal.get_by_label("Revise these values with AI")).to_be_visible()
+    expect(modal.get_by_role("radio")).to_have_count(0)
+    expect(modal.get_by_label("Revise these values with AI")).to_have_count(0)
     expect(modal.locator("header").get_by_role("button", name="Close", exact=True)).to_be_visible()
-    before = modal.get_by_role("radio", name="Value in this tab for Quantity", exact=True)
-    after = modal.get_by_role("radio", name="Latest saved value for Quantity", exact=True)
+    before = modal.locator("[data-role='migration-before']")
+    after = modal.locator("[data-role='migration-after']")
     assert abs(before.bounding_box()["y"] - after.bounding_box()["y"]) < 2
     user.page.screenshot(path=tmp_path / "migration-modal-desktop.png")
     viewport = user.page.viewport_size
@@ -1039,7 +1106,7 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
     assert saved.db.get("pre_migration") == saved_notice
     task_form = task_resource.task_form
     expect(task_form.locator("[data-role='edited-message']")).to_contain_text("fields have changed")
-    task_form.get_by_role("button", name="Review values", exact=True).click()
+    task_form.get_by_role("button", name="View changes", exact=True).click()
     expect(modal.locator("#modal-content")).to_have_text(before_settings, use_inner_text=True)
     modal.get_by_role("button", name="Close", exact=True).click()
 

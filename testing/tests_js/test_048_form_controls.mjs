@@ -133,6 +133,79 @@ test("test_form_replacements_serialize_and_adopt_only_latest_controls", async (t
 	);
 });
 
+/**
+ * @source src/script/widgets/base/formWidget.mjs::FormWidget
+ * @source src/script/forms/reviewBar.mjs::currentReviewOperation
+ * @pair forms:autofill-completion-review
+ * @pair forms:reset
+ */
+test("test_form_replacement_keeps_running_operation_and_refreshes_saved_baseline", async (t) => {
+	const { widget, setInitialize } = await setupFormWidget(t);
+	const scans = [];
+	widget.view = {
+		ensureDeferredOperations: async () => ({
+			scan: (node) => scans.push(node.dataset.operation),
+		}),
+	};
+	setInitialize(async (controller) => {
+		controller.renderer = {
+			_packageSubmission: () => controller.widget.submission,
+		};
+	});
+	widget.schema = [{ id: "notes", type: "textarea" }];
+	widget.submission = { notes: "Previously saved" };
+	widget.target.dataset.formState = JSON.stringify({
+		revision: "before",
+		reviews: [],
+		stale_autofill: true,
+	});
+	widget.initialTarget = widget.target.cloneNode(true);
+	await widget.init();
+	const operation = {
+		key: "new-job",
+		revision: 3,
+		type: "autofill",
+		status: "running",
+		terminal: false,
+		can_cancel: true,
+	};
+	widget.lockDeferredOperation({
+		operation: operation.key,
+		revision: 3,
+		status: operation,
+	});
+	assert.equal(widget.reviewState.stale_autofill, false);
+	const next = target("Saved");
+	next.dataset.schema = "[]";
+	next.innerHTML +=
+		'<div lp-edited-marker><span data-role="form-operation"></span><button data-role="autofill-cancel">Cancel autofill</button></div>';
+	await widget.applyRevision({
+		...response(next),
+		schema: widget.schema,
+		submission: { notes: "" },
+		form_state: { revision: "after", reviews: [], operation: null },
+	});
+	assert.deepEqual(
+		widget._baselineSubmission,
+		{ notes: "" },
+		"An ordinary saved clear becomes the comparison baseline",
+	);
+	assert.equal(widget.target.dataset.operation, "new-job");
+	assert.equal(widget.reviewState.operation.key, "new-job");
+	assert.equal(
+		widget.target.querySelector("[data-role=autofill-cancel]").hidden,
+		false,
+	);
+	assert.match(
+		widget.target.querySelector("[data-role=form-operation]").textContent,
+		/running/,
+	);
+	assert.ok(
+		scans.includes("new-job"),
+		"The replacement remains subscribed to its running job",
+	);
+});
+
 /** @matrix forms user-groups : rebuild-serialization single-reconciliation */
 test("test_queued_commit_waits_for_newer_replacement", async (t) => {
 	const { widget, setInitialize } = await setupFormWidget(t);
@@ -323,11 +396,15 @@ test("test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
 /** @matrix forms : review-notice-placement */
 test("test_form_review_notice_stays_above_expanded_autofill_context", async (t) => {
 	createBrowser(t);
-	const { FormController } = await import("../../src/script/forms/controller.mjs");
+	const { FormController } = await import(
+		"../../src/script/forms/controller.mjs"
+	);
 	const target = document.createElement("form");
 	const submitGroup = document.createElement("div");
 	submitGroup.dataset.role = "submit-group";
-	const submitButton = submitGroup.appendChild(document.createElement("button"));
+	const submitButton = submitGroup.appendChild(
+		document.createElement("button"),
+	);
 	submitButton.type = "submit";
 	const panel = document.createElement("div");
 	panel.dataset.role = "autofill";
@@ -345,7 +422,8 @@ test("test_form_review_notice_stays_above_expanded_autofill_context", async (t) 
 	});
 	controller._initSubmitButton =
 		controller._initOfflineState =
-		controller._initUnsavedState = () => {};
+		controller._initUnsavedState =
+			() => {};
 	await controller.init();
 	assert.equal(marker.nextElementSibling, panel);
 	assert.equal(panel.dataset.visible, "true");

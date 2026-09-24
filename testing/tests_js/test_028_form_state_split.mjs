@@ -441,6 +441,7 @@ test("test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload",
 	};
 	const widget = {
 		target: document.querySelector("form"),
+		schema: [{ id: "headline", type: "input", input: "text" }],
 		form: {
 			renderer: { _packageSubmission: () => rendererSubmission },
 		},
@@ -463,6 +464,7 @@ test("test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload",
 		"PUT",
 	);
 	assert.deepEqual(stored.renderer_submission, rendererSubmission);
+	assert.deepEqual(stored.renderer_schema, widget.schema);
 	await manager._send(stored);
 	assert.deepEqual(replayed, [
 		["headline", "Queued headline"],
@@ -1313,13 +1315,25 @@ test("test_task_list_refresh_does_not_reinsert_unchanged_rows", async (t) => {
 	const active = target.querySelector("[data-role='active-tasks']");
 	const originalRows = [...active.children];
 	const mutations = [];
-	const observer = new MutationObserver((records) => mutations.push(...records));
+	const observer = new MutationObserver((records) =>
+		mutations.push(...records),
+	);
 	observer.observe(active, { childList: true });
-	(await list.prepareRefreshDelta({ upsert: [], remove: [], order: ["first", "second"] }))();
+	(
+		await list.prepareRefreshDelta({
+			upsert: [],
+			remove: [],
+			order: ["first", "second"],
+		})
+	)();
 	await Promise.resolve();
 	observer.disconnect();
 	assert.deepEqual([...active.children], originalRows);
-	assert.deepEqual(mutations, [], "An unchanged poll must not detach hovered rows");
+	assert.deepEqual(
+		mutations,
+		[],
+		"An unchanged poll must not detach hovered rows",
+	);
 });
 
 /** @matrix tasks : create dedupe refresh */
@@ -1403,7 +1417,9 @@ test("test_task_title_click_is_left_to_view_delegate", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	let scrolls = 0;
 	const taskElt = {
-		scrollIntoView: () => { scrolls += 1; },
+		scrollIntoView: () => {
+			scrolls += 1;
+		},
 	};
 	const list = Object.create(PageTaskList.prototype);
 	list._moveTaskIfNecessary = () => {};
@@ -1417,8 +1433,12 @@ test("test_task_title_click_is_left_to_view_delegate", async () => {
 		target: {
 			closest: () => null,
 		},
-		preventDefault: () => { prevented = true; },
-		stopPropagation: () => { stopped = true; },
+		preventDefault: () => {
+			prevented = true;
+		},
+		stopPropagation: () => {
+			stopped = true;
+		},
 	});
 	list._setActiveTask({ detail: { subcomponent: { elt: taskElt } } });
 	assert.equal(prevented, false);
@@ -1427,8 +1447,12 @@ test("test_task_title_click_is_left_to_view_delegate", async () => {
 });
 
 /** @matrix tasks : open-scroll delegated-title-click */
-test("test_task_open_scrolls_when_form_bottom_is_outside_viewport", async (t) => {
+test("test_task_open_scrolls_row_only_when_mostly_outside_viewport", async (t) => {
 	createBrowser(t);
+	Object.defineProperty(window, "innerHeight", {
+		value: 800,
+		configurable: true,
+	});
 	const { PageTaskList } = await loadPageTaskList();
 	const target = document.createElement("div");
 	target.innerHTML = `
@@ -1444,31 +1468,66 @@ test("test_task_open_scrolls_when_form_bottom_is_outside_viewport", async (t) =>
 	const trigger = task.querySelector("[lp-nav]");
 	const panel = task.querySelector("[data-widget='TaskForm']");
 	const calls = [];
-	task.scrollIntoView = () => { throw new Error("Scroll the form, not its task row"); };
-	panel.scrollIntoView = (options) => calls.push(options);
+	panel.scrollIntoView = () => {
+		throw new Error("Scroll the whole task row so its title remains visible");
+	};
+	task.scrollIntoView = (options) => calls.push(options);
 	const component = { elt: task, active: { target: panel } };
 	const list = Object.create(PageTaskList.prototype);
 	list.target = target;
-	target.addEventListener("component-opened", (event) => list._scrollOpenedTask(event));
-	const opened = () => task.dispatchEvent(new CustomEvent("component-opened", {
-		bubbles: true,
-		detail: { component, trigger },
-	}));
-	panel.getBoundingClientRect = () => ({ top: 120, bottom: 500 });
-	opened();
-	assert.deepEqual(calls, [], "A fully visible form must not move the task under the pointer");
-	panel.getBoundingClientRect = () => ({ top: 120, bottom: window.innerHeight + 20 });
-	opened();
-	assert.deepEqual(calls, [{ behavior: "auto", block: "start" }]);
-	assert.equal(panel.classList.contains("scroll-mt-20"), true);
-	panel.getBoundingClientRect = () => ({ top: window.innerHeight + 20, bottom: window.innerHeight + 200 });
-	opened();
-	assert.equal(calls.length, 2, "A form starting below the viewport also scrolls");
-	task.dispatchEvent(new CustomEvent("component-opened", {
-		bubbles: true,
-		detail: { component, trigger: panel },
-	}));
-	assert.equal(calls.length, 2, "Only the task-title action may scroll");
+	target.addEventListener("component-opened", (event) =>
+		list._scrollOpenedTask(event),
+	);
+	const opened = () =>
+		task.dispatchEvent(
+			new CustomEvent("component-opened", {
+				bubbles: true,
+				detail: { component, trigger },
+			}),
+		);
+	for (const { label, top, bottom, block } of [
+		{ label: "Fully visible", top: 120, bottom: 500 },
+		{ label: "Only a little below the window", top: 500, bottom: 820 },
+		{ label: "Tall but comfortably visible", top: 100, bottom: 1100 },
+		{
+			label: "Mostly hidden short task",
+			top: 740,
+			bottom: 1000,
+			block: "nearest",
+		},
+		{
+			label: "Mostly hidden tall task",
+			top: 740,
+			bottom: 1740,
+			block: "start",
+		},
+		{
+			label: "Entirely below the window",
+			top: 820,
+			bottom: 1000,
+			block: "nearest",
+		},
+		{
+			label: "Mostly above the header",
+			top: -200,
+			bottom: 150,
+			block: "nearest",
+		},
+	]) {
+		calls.length = 0;
+		task.getBoundingClientRect = () => ({ top, bottom });
+		opened();
+		assert.deepEqual(calls, block ? [{ behavior: "auto", block }] : [], label);
+	}
+	assert.equal(task.classList.contains("scroll-mt-20"), true);
+	calls.length = 0;
+	task.dispatchEvent(
+		new CustomEvent("component-opened", {
+			bubbles: true,
+			detail: { component, trigger: panel },
+		}),
+	);
+	assert.equal(calls.length, 0, "Only the task-title action may scroll");
 });
 
 /** @matrix tasks : active-widget complete route-override */

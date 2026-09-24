@@ -158,13 +158,11 @@ export class SubmissionManager {
 		if (!response) return false;
 		if (response.already_running) {
 			component.active?.lockDeferredOperation?.(response);
-			void this.view
-				.ensureDeferredOperations?.()
-				.then((manager) =>
-					manager?.track(response.operation, {
-						node: component.active?.target,
-					}),
-				);
+			void this.view.ensureDeferredOperations?.().then((manager) =>
+				manager?.track(response.operation, {
+					node: component.active?.target,
+				}),
+			);
 			component?.showError?.(
 				response.message || "Autofill is already running. Your draft was kept.",
 			);
@@ -238,7 +236,8 @@ export class SubmissionManager {
 				const watcher = await this.view.ensureEditWatcher?.();
 				if (await watcher?.stageConflict?.(submittedWidget, { response }))
 					await watcher?.openConflictReview?.(submittedWidget, {
-						blockedAction: data.get("role") === "autofill-submit" ? "autofill" : null,
+						blockedAction:
+							data.get("role") === "autofill-submit" ? "autofill" : null,
 					});
 			} finally {
 				submittedWidget.form?.resetSubmitButton?.();
@@ -270,6 +269,10 @@ export class SubmissionManager {
 		submittedWidget?._reviewedOperations?.clear();
 		submittedWidget?._usedAutofillOperations?.clear();
 		if (changedDuringSave) {
+			if (Object.hasOwn(response, "submission"))
+				submittedWidget._baselineSubmission = structuredClone(
+					response.submission ?? {},
+				);
 			try {
 				const watcher = await this.view.ensureEditWatcher?.();
 				await watcher?.stageConflict?.(submittedWidget, { response });

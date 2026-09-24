@@ -125,7 +125,7 @@ export class PageTaskList extends BaseList {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_open_scrolls_when_form_bottom_is_outside_viewport
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_open_scrolls_row_only_when_mostly_outside_viewport
 	 * @matrix tasks : delegated-title-click open-scroll
 	 */
 	_scrollOpenedTask(e) {
@@ -136,16 +136,26 @@ export class PageTaskList extends BaseList {
 			!task?.matches("li[lp-component][data-kind='task']") ||
 			!this.target.contains(task) ||
 			trigger !== task.querySelector(":scope > [lp-nav][lp-show]")
-		) return;
+		)
+			return;
 
-		const panel = component.active?.target;
-		if (!panel) return;
-		const { top, bottom } = panel.getBoundingClientRect();
+		if (!component.active?.target) return;
+		const { top, bottom } = task.getBoundingClientRect();
+		const viewportTop = 80;
 		const viewportBottom =
 			window.innerHeight || document.documentElement.clientHeight;
-		if (top >= 80 && bottom <= viewportBottom) return;
-		panel.classList.add("scroll-mt-20");
-		panel.scrollIntoView({ behavior: "auto", block: "start" });
+		const viewportHeight = viewportBottom - viewportTop;
+		const taskHeight = bottom - top;
+		const usableHeight = Math.min(taskHeight, viewportHeight);
+		const visibleHeight =
+			Math.min(bottom, viewportBottom) - Math.max(top, viewportTop);
+		// Leave a comfortably visible task under the pointer, even if it is tall.
+		if (usableHeight <= 0 || visibleHeight >= usableHeight / 2) return;
+		task.classList.add("scroll-mt-20");
+		task.scrollIntoView({
+			behavior: "auto",
+			block: taskHeight <= viewportHeight ? "nearest" : "start",
+		});
 	}
 
 	/**
@@ -374,7 +384,10 @@ export class PageTaskList extends BaseList {
 				if (preserveOrder) {
 					if (!list.contains(task)) list.append(task);
 				} else {
-					(task.dataset.completed === "true" ? completedOrder : activeOrder).push(task);
+					(task.dataset.completed === "true"
+						? completedOrder
+						: activeOrder
+					).push(task);
 				}
 			}
 			for (const [list, desired] of [

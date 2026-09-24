@@ -101,7 +101,6 @@ def refine_autofill(key):
         submission = {key: value for key, value in submission.items() if key in editable_ids}
         submission = validate_submission(submission, entity=target, user=current_user, schema=target.submission_schema)
         context = {
-            "before_schema_change": form_review.migration_review(target),
             "previous_suggestions": form_review.review_projection(target, current_user),
         }
         return deferred_autofill.start_deferred_autofill(

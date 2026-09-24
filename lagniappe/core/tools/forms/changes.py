@@ -274,6 +274,8 @@ def prepare_target(entity, change, *, ai_values=None):
         ai_values=ai_values,
     )
     row = deepcopy(entity.db)
+    # Suggestions were prepared against the previous form definition.
+    row.pop("autofill_reviews", None)
     if (
         entity.entity_kind == "task"
         and entity.completed
@@ -343,6 +345,7 @@ def apply_target(context, raw, *, ai_values=None):
             NOTICE,
             RECEIPT,
             "completed_submission",
+            "autofill_reviews",
             reason="form-change-submission",
         )
     else:

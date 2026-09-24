@@ -170,7 +170,8 @@ submission update, completion or reopening clears the notice. This is separate
 from the existing completed-original selection and concurrent-edit review.
 The modal shares the concurrent-edit review's padded header/body and before/after
 cards. Failed conversions display **Value not able to be converted** in red italic
-text, including cleared table cells.
+text, including cleared table cells. **Deleted from form** uses the same red
+italic treatment.
 
 ### Drag and Drop
 

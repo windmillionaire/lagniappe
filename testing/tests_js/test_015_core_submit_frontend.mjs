@@ -110,7 +110,9 @@ test("test_conflict_review_failure_settles_update_button", async (t) => {
 	});
 	await new Promise(setImmediate);
 	assert.equal(submitter.disabled, false);
-	assert.deepEqual(messages, ["Could not finish the update. Please try again."]);
+	assert.deepEqual(messages, [
+		"Could not finish the update. Please try again.",
+	]);
 	assert.equal(capturedErrors.length, 1);
 });
 
@@ -170,7 +172,9 @@ test("test_stale_online_update_opens_prepared_review", async (t) => {
  */
 test("test_stale_autofill_start_opens_review_with_prestart_context", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
-	const { FormController } = await import("../../src/script/forms/controller.mjs");
+	const { FormController } = await import(
+		"../../src/script/forms/controller.mjs"
+	);
 	const form = document.body.appendChild(document.createElement("form"));
 	const submitGroup = form.appendChild(document.createElement("div"));
 	const submitter = submitGroup.appendChild(document.createElement("button"));
@@ -257,19 +261,30 @@ test("test_retry_feedback_settles_only_after_start_response", async (t) => {
 		getComponent: () => component,
 	});
 	let resolveResponse;
-	request.put.mock.mockImplementation(() => new Promise((resolve) => {
-		resolveResponse = resolve;
-	}));
+	request.put.mock.mockImplementation(
+		() =>
+			new Promise((resolve) => {
+				resolveResponse = resolve;
+			}),
+	);
 	let settled = 0;
 	const submitting = manager.submit({
 		target: form,
-		detail: { role: "autofill-submit", update: true, onSettled: () => settled += 1 },
+		detail: {
+			role: "autofill-submit",
+			update: true,
+			onSettled: () => (settled += 1),
+		},
 		preventDefault() {},
 		stopPropagation() {},
 	});
 	await new Promise(setImmediate);
 	assert.equal(typeof resolveResponse, "function");
-	assert.equal(settled, 0, "The button stays pending while the request is in flight");
+	assert.equal(
+		settled,
+		0,
+		"The button stays pending while the request is in flight",
+	);
 	resolveResponse({ ok: false, error: "Retry rejected" });
 	await submitting;
 	assert.equal(settled, 1);
@@ -322,6 +337,46 @@ test("test_autofill_ack_preserves_edits_made_during_request", async (t) => {
 	assert.equal(widget.reviewState.revision, "saved");
 	assert.deepEqual(widget.submission, baseline);
 	assert.deepEqual(JSON.parse(initialTarget.dataset.submission), baseline);
+});
+
+/**
+ * @source src/script/views/base/submission.mjs::SubmissionManager
+ * @pair submit:active-widget
+ */
+test("test_ordinary_save_updates_comparison_baseline_without_losing_later_draft", async (t) => {
+	const { SubmissionManager, request } = await setupSubmissionManager(t);
+	let value = "Submitted clear";
+	const widget = {
+		target: document.body.appendChild(document.createElement("form")),
+		_baselineSubmission: { title: "Previously saved" },
+		unsavedState: true,
+		revisionSnapshot: () => value,
+		form: {
+			clearUnsavedState() {
+				assert.fail("Later edits must remain dirty");
+			},
+		},
+	};
+	let staged;
+	const manager = new SubmissionManager({
+		online: true,
+		components: {},
+		ensureEditWatcher: async () => ({
+			stageConflict: async (received, { response }) => {
+				assert.equal(received, widget);
+				staged = response;
+			},
+		}),
+	});
+	request.put.mock.mockImplementation(async () => {
+		value = "Typed while saving";
+		return { ok: true, submission: { title: "" } };
+	});
+	await manager.update({ active: widget }, new FormData(), "/task/update");
+	assert.equal(value, "Typed while saving");
+	assert.equal(widget.unsavedState, true);
+	assert.deepEqual(widget._baselineSubmission, { title: "" });
+	assert.deepEqual(staged.submission, { title: "" });
 });
 
 /**

@@ -75,14 +75,9 @@
 	--icon-size: var(--icon-base-glyph-size);
 }
 
-.icon[data-icon="close"],
-.icon[data-icon="x"] {
+.icon[data-icon="close"] {
 	--icon-offset-x: 0.5px;
 	--icon-offset-y: 0.5px;
-}
-
-[data-role="checkbox-read-value"] .icon[data-icon="x"] {
-	--icon-offset-y: 1px;
 }
 
 .icon[data-icon="addRow"],

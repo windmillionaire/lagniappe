@@ -422,6 +422,7 @@ export class DeferredOperationManager {
 							widget?.visible === true &&
 							widget.component?.active === widget &&
 							!widget._reviewedOperations?.has(status.key) &&
+							!widget.reviewState?.stale_autofill &&
 							!widget.reviewState?.reviews?.some(
 								(review) => review.operation === status.key,
 							)

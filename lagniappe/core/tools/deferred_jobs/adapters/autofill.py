@@ -202,7 +202,7 @@ class AutofillAdapter(DeferredJobAdapter):
     def validate_apply(self, context):
         target = context.input("target")
         if context.parameters.get("snapshot"):
-            # Schema and answer drift becomes a review, not lost generation work.
+            # Answer drift is reviewed; apply_proposal rejects obsolete schemas.
             # Ownership and lease are checked inside the application transaction.
             context.ensure_active()
             return
@@ -419,6 +419,10 @@ class AutofillAdapter(DeferredJobAdapter):
                 raise exceptions.ValidationError("This form is no longer available for autofill.")
             if isinstance(target, Entities.TASK) and target.completed:
                 raise exceptions.ValidationError("This task was completed while autofill was running.")
+            if not form_review.snapshot_matches_form(snapshot, target):
+                raise DeferredJobDriftError(
+                    "The form changed while autofill was running. Run autofill again for the updated form."
+                )
             source = database_utility.ExactEntityState(deepcopy(dict(target.db)))
             proposed = context.checkpoint["proposal"]["values"]
             changed_fields = sorted(
@@ -444,6 +448,8 @@ class AutofillAdapter(DeferredJobAdapter):
                 (target.key, source),
                 (context.job.key, {"status": "running", "lease_token": context.job.lease_token, form_review.RECEIPT: None}),
             ]
+            if target.form:
+                guards.append((target.form.key, database_utility.ExactEntityState(deepcopy(dict(target.form.db)))))
             if context.parameters.get("lock_target", True):
                 guards.append((deferred_job_lock_key(target), {"operation": context.job.urlsafe_key}))
             try:

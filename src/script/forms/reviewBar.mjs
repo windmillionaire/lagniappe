@@ -1,10 +1,30 @@
 import { captureError } from "../shared/errors.mjs";
 
 /**
+ * @testable true
+ * @pair forms:autofill-completion-review
+ */
+export function currentReviewOperation(widget, incoming) {
+	const current = widget.reviewState?.operation;
+	if (current?.key === incoming?.key)
+		return Number(current?.revision) > Number(incoming?.revision)
+			? current
+			: incoming;
+	// A response captured before a new run started cannot replace its controls.
+	return current?.type === "autofill" &&
+		!current.terminal &&
+		incoming?.type !== "form-change" &&
+		(!incoming || incoming.terminal)
+		? current
+		: incoming;
+}
+
+/**
  * One notification surface for operation progress, schema changes, and remote edits.
  * @testable true
  * @pair forms:submission-choice
  * @pair forms:autofill-completion-review
+ * @pair form-migration:informational-notice
  */
 export function renderReviewBar(widget, operation = null) {
 	const target = widget?.target;
@@ -16,26 +36,33 @@ export function renderReviewBar(widget, operation = null) {
 	if (operation) state.operation = operation;
 	operation = state.operation;
 	const running = operation && !operation.terminal;
+	const runningAutofill = running && operation.type === "autofill";
 	const unresolvedReviews = (state.reviews ?? []).filter(
 		(review) => !widget._reviewedOperations?.has(review.operation),
 	);
 	const awaitingNewAutofill =
+		!state.stale_autofill &&
 		operation?.type === "autofill" &&
 		(running || (operation.terminal && operation.status === "succeeded")) &&
 		!widget._reviewedOperations?.has(operation.key) &&
 		!unresolvedReviews.some((review) => review.operation === operation.key);
-	const reviews = awaitingNewAutofill ? [] : unresolvedReviews;
+	const reviews =
+		runningAutofill || awaitingNewAutofill ? [] : unresolvedReviews;
 	const migration =
-		state.migration &&
-		widget._reviewedMigration !== JSON.stringify(state.migration);
+		JSON.parse(target.dataset.migrationNotice || "[]").length > 0;
 	const remote = marker._lp_edited_state?.response;
 	const messages = [];
 	if (reviews.length) messages.push("Autofill is complete.");
-	if (migration || marker._lp_edited_state?.schemaChanged)
+	if (migration || (remote && marker._lp_edited_state?.schemaChanged))
 		messages.push("This form's fields have changed.");
-	const remoteNotice = remote && !reviews.length && !migration;
-	if (remoteNotice)
-		messages.push("Another user has edited this form.");
+	if (state.stale_autofill && !running)
+		messages.push("Run Autofill again for new suggestions.");
+	const remoteNotice =
+		remote &&
+		!runningAutofill &&
+		!reviews.length &&
+		!marker._lp_edited_state?.schemaChanged;
+	if (remoteNotice) messages.push("Another user has edited this form.");
 	const copy = marker.querySelector("[data-role='edited-message']");
 	if (copy) {
 		copy.textContent = messages.join(" ");
@@ -46,6 +73,7 @@ export function renderReviewBar(widget, operation = null) {
 		operation?.terminal &&
 		["failed", "cancelled", "superseded"].includes(operation.status);
 	const awaitingReview =
+		!state.stale_autofill &&
 		operation?.terminal &&
 		operation.status === "succeeded" &&
 		operation.type === "autofill" &&
@@ -67,10 +95,12 @@ export function renderReviewBar(widget, operation = null) {
 	}
 	const review = marker.querySelector("[data-role='edited-reset']");
 	if (review) {
-		review.hidden = !messages.length;
-		if ((reviews.length || migration) && !review.dataset?.reviewPending)
+		review.hidden = !!runningAutofill || (!reviews.length && !remote);
+		if ((reviews.length || remote) && !review.dataset?.reviewPending)
 			review.textContent = "Review values";
 	}
+	const changes = marker.querySelector("[data-role='migration-changes']");
+	if (changes) changes.hidden = !migration;
 	const cancel = marker.querySelector("[data-role='autofill-cancel']");
 	if (cancel) cancel.hidden = !running || !operation.can_cancel;
 	const retry = marker.querySelector("[data-role='autofill-retry']");
@@ -87,7 +117,9 @@ export function renderReviewBar(widget, operation = null) {
 		control.disabled = !!running;
 	}
 	marker.dataset.visible =
-		messages.length || running || showTerminal || awaitingReview ? "true" : "false";
+		messages.length || running || showTerminal || awaitingReview
+			? "true"
+			: "false";
 }
 
 /**
@@ -96,7 +128,7 @@ export function renderReviewBar(widget, operation = null) {
  * @pair ai:autofill
  */
 export function installReviewBar(widget) {
-	widget._migrationNotice?.destroy();
+	widget._reviewBar?.destroy();
 	if (widget.revisionPreview || !widget.target?.dataset.formState) return;
 	widget.reviewState = JSON.parse(widget.target.dataset.formState);
 	renderReviewBar(widget);
@@ -115,7 +147,9 @@ export function installReviewBar(widget) {
 		button.disabled = true;
 		if (button.dataset.role === "autofill-cancel") {
 			button.textContent = "Cancelling…";
-			const progress = widget.target.querySelector("[data-role='form-operation']");
+			const progress = widget.target.querySelector(
+				"[data-role='form-operation']",
+			);
 			if (progress) progress.textContent = "Cancellation requested…";
 		}
 		try {
@@ -172,7 +206,7 @@ export function installReviewBar(widget) {
 	};
 	widget.target.addEventListener("click", click);
 	const target = widget.target;
-	widget._migrationNotice = {
+	widget._reviewBar = {
 		destroy: () => target.removeEventListener("click", click),
 	};
 }

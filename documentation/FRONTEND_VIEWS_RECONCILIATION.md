@@ -26,7 +26,8 @@ The watcher, reconciler, review modals, and detached preview adapter live in
 the other modules remain internal to that service. Pure schema compatibility
 comparisons live below them in `forms/representation.mjs`. Page/Task migration,
 remote-edit, and autofill notices share the FormWidget-owned `forms/reviewBar.mjs`;
-`forms/migrationNotice.mjs` remains a fallback for forms without review state.
+`forms/migrationNotice.mjs` owns the independent read-only **View changes** dialog,
+using the shared bar's action or a fallback banner for forms without review state.
 
 A server-rendered entity anchor carries `data-key`, `data-fingerprint`, and,
 for Page/Task forms, `data-modified`. An `lp-edited-marker` inside a form points
@@ -45,7 +46,8 @@ response in a detached preview and compares normalized submissions:
 - an unchanged saved baseline and schema leave the live form and draft intact;
 - otherwise, equal state installs automatically unless projecting an unsaved or
   queued draft omitted incompatible fields;
-- schema-only change projects stable local field IDs into the current schema;
+- clean forms adopt a changed schema and its saved conversions automatically;
+- dirty forms carry compatible local field IDs into the current schema;
 - renderer-capable value drift offers field-by-field saved/local choices;
 - a dirty non-renderer form offers **Reset form**;
 - a queued non-renderer form offers queued versus saved whole-form state; and
@@ -121,8 +123,11 @@ An unchanged task order leaves the existing row elements mounted, preserving
 hover and click continuity across a harmless refresh.
 Task title clicks are handled by the view's delegated `lp-show` handler; the
 task-list widget does not add a second click-driven toggle. The delegated open
-event scrolls the task only when its newly opened form starts outside the
-viewport. Explicit task focus navigation still scrolls its target into view.
+event measures the entire expanded task row below the fixed header. It scrolls
+only when less than half of the row's usable height is visible (capped at the
+available viewport height). Short rows scroll just enough to fit; rows taller
+than the viewport align from their title. The form panel is never the scroll
+target. Explicit task focus navigation still scrolls its target into view.
 
 Polling service startup also schedules widget subscription reconciliation.
 A cached list can finish rendering before the deferred coordinator loads;
@@ -180,8 +185,8 @@ installs authoritative content.
 Likewise, a successful autofill operation stays subscribed and displays a
 loading-review message while its active form awaits the authoritative review
 candidate; the operation is retired only after that candidate arrives. If a
-remote-edit notice is already present in a tab, it takes precedence over the
-running or temporary loading message. The autofill review notice can appear once
+remote-edit notice is already present after the run finishes, it takes precedence
+over the temporary loading message. The autofill review notice can appear once
 its candidate is ready. A newer running autofill, or its successful completion
 still awaiting review values, temporarily hides an older completed autofill's
 notice and Review values action. The newer candidate takes their place once it
@@ -205,16 +210,22 @@ as well as displaying it, and keeps a newer local operation status if an older
 response arrives later. A progress banner must not outlive its subscription.
 Autofill uses `forms/reviewBar.mjs` inside the existing edited marker, without
 disabling inputs or removing Submit. Only schema migration sets `deferredLock`.
-An unresolved remote-edit notice can coexist with a running autofill; the bar
-keeps both the review action and operation progress/Cancel visible.
-`data-form-state` seeds the answer revision, current operation, typed migration
-values and authorized AI candidates; `data-operation-bootstrap` seeds polling.
+While Autofill runs, the bar shows its progress and Cancel action; the remote-edit
+message and Review values action wait until the run finishes or stops. Pending
+remote state and earlier candidates are retained for that later review. Multiple
+available actions stack vertically, and status lines use a flex gap so hidden
+lines leave no extra spacing.
+`data-form-state` seeds the answer revision, current operation and authorized AI
+candidates; `data-operation-bootstrap` seeds polling. `data-migration-notice`
+holds the informational saved-value comparison independently of value choices.
 Once an ordinary save acknowledges the last successful autofill review, the
 server omits that historical success from form operation bootstrap. The client
 also suppresses its in-flight loading notice after a tab has used the review.
 An autofill completion never automatically replaces an actively viewed form,
 even when it is clean. The normal revision modal offers compatible values from
-the tab, saved form, pre-migration schema and AI candidates. Stale modal choices
+the tab, saved form and AI candidates from the current schema. Incompatible local
+values are reference cards only; applying the review explicitly drops them.
+Stale modal choices
 must be reopened before application. Prompt-only refinement is private until
 the user chooses values and performs an ordinary save.
 The modal includes fields changed by autofill even if those values have already
@@ -238,6 +249,10 @@ The review's apply action has no idle completion icon; it shows a spinner and
 disabled **Applying values…** state while resolving the selection. The
 **Revise suggestions** action uses the AI icon in the button's fixed left icon
 slot, with its label centered.
+An accepted refinement closes the chooser and displays the normal running/Cancel
+bar. Applying a previously fetched form response preserves a newer running
+autofill's descriptor and polling subscription. Message/progress text stacks in
+one area; the actions wrap together at narrow widths.
 Opening Review values immediately disables its action and shows
 **Opening review…** while the focused route verifies the latest saved values
 and the comparison modal is prepared; the action returns to its normal state

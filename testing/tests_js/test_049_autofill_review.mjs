@@ -30,7 +30,9 @@ test("test_review_bar_keeps_answers_editable_and_prioritizes_new_operation", asy
 	);
 	const widget = widgetFixture();
 	widget.reviewState.reviews = [{ operation: "prior" }];
-	widget.reviewState.migration = { schema: [] };
+	widget.target.dataset.migrationNotice = JSON.stringify([
+		{ label: "Quantity", before: "nine", after: "", reason: "invalid" },
+	]);
 	renderReviewBar(widget, {
 		key: "job",
 		type: "autofill",
@@ -127,6 +129,131 @@ test("test_new_autofill_hides_prior_completion_until_its_own_review_arrives", as
  * @source src/script/forms/reviewBar.mjs::renderReviewBar
  * @pair forms:autofill-completion-review
  */
+test("test_failed_new_autofill_restores_older_review", async (t) => {
+	createBrowser(t, { html: formHTML });
+	const { renderReviewBar } = await import(
+		"../../src/script/forms/reviewBar.mjs"
+	);
+	const widget = widgetFixture();
+	widget.reviewState.reviews = [
+		{ operation: "older", submission: { title: "Earlier suggestion" } },
+	];
+	renderReviewBar(widget, {
+		key: "newer",
+		type: "autofill",
+		status: "running",
+		terminal: false,
+	});
+	assert.equal(
+		widget.target.querySelector("[data-role=edited-reset]").hidden,
+		true,
+	);
+	widget.reviewState.retry_operation = "newer";
+	renderReviewBar(widget, {
+		key: "newer",
+		type: "autofill",
+		status: "failed",
+		terminal: true,
+		error: "Provider busy",
+	});
+	assert.equal(
+		widget.target.querySelector("[data-role=edited-reset]").hidden,
+		false,
+	);
+	assert.equal(
+		widget.target.querySelector("[data-role=autofill-retry]").hidden,
+		false,
+	);
+	assert.match(
+		widget.target.querySelector("[data-role=form-operation]").textContent,
+		/Provider busy/,
+	);
+	assert.equal(
+		widget.reviewState.reviews[0].submission.title,
+		"Earlier suggestion",
+	);
+});
+
+/**
+ * @source src/script/forms/migrationNotice.mjs::installMigrationNotice
+ * @source src/script/forms/reviewBar.mjs::renderReviewBar
+ * @matrix form-migration : informational-notice readonly-modal
+ */
+test("test_schema_notice_is_readonly_and_independent_of_value_review", async (t) => {
+	createBrowser(t, { html: formHTML });
+	const { renderReviewBar } = await import(
+		"../../src/script/forms/reviewBar.mjs"
+	);
+	const { installMigrationNotice } = await esmock.strict(
+		"../../src/script/forms/migrationNotice.mjs",
+		{
+			"../../src/script/shared/modal.mjs": {
+				Modal: class {
+					async attach(root) {
+						this.root = root;
+						document.body.append(root);
+					}
+					destroy() {
+						this.root?.remove();
+					}
+				},
+			},
+		},
+	);
+	const widget = widgetFixture();
+	const marker = widget.target.querySelector("[lp-edited-marker]");
+	marker.insertAdjacentHTML(
+		"beforeend",
+		'<button data-role="migration-changes" type="button" hidden>View changes</button>',
+	);
+	widget.target.dataset.migrationNotice = JSON.stringify([
+		{ label: "Quantity", before: "012", after: "12", reason: "converted" },
+		{ label: "Removed note", before: "KEEP-ME", after: "", reason: "deleted" },
+		{ label: "Invalid", before: "unknown", after: "", reason: "invalid" },
+	]);
+	renderReviewBar(widget);
+	installMigrationNotice(widget);
+	assert.equal(marker.querySelector("[data-role=edited-reset]").hidden, true);
+	assert.equal(
+		marker.querySelector("[data-role=migration-changes]").hidden,
+		false,
+	);
+	marker.querySelector("[data-role=migration-changes]").click();
+	await new Promise(setImmediate);
+	const modal = document.querySelector("#modal");
+	assert.equal(modal.querySelectorAll('[role="radio"], textarea').length, 0);
+	assert.match(modal.textContent, /Converted value12/);
+	assert.match(modal.textContent, /Deleted from form/);
+	assert.equal(modal.textContent.split("KEEP-ME").length, 2);
+	assert.deepEqual(
+		Array.from(
+			modal.querySelectorAll('[data-kind="error"]'),
+			(node) => node.textContent,
+		),
+		["Deleted from form", "Value not able to be converted"],
+	);
+	widget._migrationNotice.destroy();
+	renderReviewBar(widget);
+	assert.equal(
+		marker.dataset.visible,
+		"true",
+		"Closing the comparison does not acknowledge it",
+	);
+	widget.target.dataset.migrationNotice = "[]";
+	widget.reviewState.stale_autofill = true;
+	renderReviewBar(widget);
+	assert.equal(marker.querySelector("[data-role=edited-reset]").hidden, true);
+	assert.equal(
+		marker.querySelector("[data-role=migration-changes]").hidden,
+		true,
+	);
+	assert.match(marker.textContent, /Run Autofill again/);
+});
+
+/**
+ * @source src/script/forms/reviewBar.mjs::renderReviewBar
+ * @pair forms:autofill-completion-review
+ */
 test("test_review_bar_keeps_success_visible_until_review_arrives", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
@@ -186,7 +313,7 @@ test("test_review_bar_keeps_success_visible_until_review_arrives", async (t) => 
  * @source src/script/forms/reviewBar.mjs::renderReviewBar
  * @pair forms:autofill-completion-review
  */
-test("test_remote_edit_notice_keeps_running_autofill_visible", async (t) => {
+test("test_running_autofill_defers_remote_review_without_discarding_it", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
 		"../../src/script/forms/reviewBar.mjs"
@@ -208,18 +335,30 @@ test("test_remote_edit_notice_keeps_running_autofill_visible", async (t) => {
 		terminal: false,
 		can_cancel: true,
 	});
-	assert.equal(message.textContent, "Another user has edited this form.");
-	assert.equal(message.hidden, false);
-	assert.equal(progress.hidden, false);
-	assert.match(progress.textContent, /Autofill is running.*Preparing inputs/);
-	assert.equal(review.hidden, false);
-	assert.equal(cancel.hidden, false);
-	marker._lp_edited_state.response = null;
-	renderReviewBar(widget);
 	assert.equal(message.hidden, true);
 	assert.equal(progress.hidden, false);
 	assert.match(progress.textContent, /Autofill is running.*Preparing inputs/);
 	assert.equal(review.hidden, true);
+	assert.equal(cancel.hidden, false);
+	assert.equal(marker._lp_edited_state.response.conflict, true);
+	assert.equal(widget.reviewState.reviews[0].operation, "old-job");
+	for (const status of ["cancelled", "failed", "succeeded"]) {
+		renderReviewBar(widget, {
+			key: "new-job",
+			type: "autofill",
+			status,
+			terminal: true,
+		});
+		assert.equal(review.hidden, false, `Review returns after ${status}`);
+		assert.equal(cancel.hidden, true);
+		assert.equal(marker._lp_edited_state.response.conflict, true);
+	}
+	widget.reviewState.reviews = [{ operation: "new-job" }];
+	renderReviewBar(widget);
+	assert.equal(message.textContent, "Autofill is complete.");
+	assert.equal(message.hidden, false);
+	assert.equal(progress.hidden, true);
+	assert.equal(review.hidden, false);
 });
 
 /**
@@ -274,7 +413,7 @@ test("test_review_bar_cancel_uses_operation_identity", async (t) => {
 	});
 	assert.equal(widget.target.querySelector("input").value, "My draft");
 	assert.equal(widget.reviewState.operation.status, "cancelled");
-	widget._migrationNotice.destroy();
+	widget._reviewBar.destroy();
 });
 
 /**
@@ -316,7 +455,7 @@ test("test_retry_button_shows_pending_feedback_until_submission_settles", async 
 	assert.equal(retry.disabled, false);
 	assert.equal(retry.textContent, "Retry autofill");
 	assert.equal(widget.target.querySelector("input").value, "My draft");
-	widget._migrationNotice.destroy();
+	widget._reviewBar.destroy();
 });
 
 /**
@@ -530,7 +669,9 @@ test("test_remote_form_status_registers_operation_without_regressing_completion"
 			},
 		},
 	);
-	const { FormWidget } = await import("../../src/script/widgets/base/formWidget.mjs");
+	const { FormWidget } = await import(
+		"../../src/script/widgets/base/formWidget.mjs"
+	);
 	const widget = widgetFixture();
 	widget.schema = [];
 	widget.submission = {};
@@ -569,7 +710,12 @@ test("test_remote_form_status_registers_operation_without_regressing_completion"
 	assert.equal(tracked[0].options.node, widget.target);
 	assert.equal(tracked[0].options.revision, 1);
 	assert.equal(ensured, 1);
-	const completed = { ...running, revision: 2, status: "succeeded", terminal: true };
+	const completed = {
+		...running,
+		revision: 2,
+		status: "succeeded",
+		terminal: true,
+	};
 	widget.reviewState.operation = completed;
 	await reconciler._stageRevision(marker, widget, {
 		schema: [],
@@ -650,7 +796,9 @@ test("test_prestart_conflict_chooser_says_autofill_did_not_start", async (t) => 
 		},
 	);
 	const widget = widgetFixture();
-	const schema = [{ id: "title", title: "Summary", type: "input", input: "text" }];
+	const schema = [
+		{ id: "title", title: "Summary", type: "input", input: "text" },
+	];
 	widget.schema = schema;
 	widget.captureFormState = () => ({
 		renderer_submission: { title: "A draft" },
@@ -663,13 +811,9 @@ test("test_prestart_conflict_chooser_says_autofill_did_not_start", async (t) => 
 		response: { schema, submission: { title: "B saved" } },
 	};
 	const marker = widget.target.querySelector("[lp-edited-marker]");
-	const modal = new FormRevisionModal(
-		{ view: {} },
-		marker,
-		widget,
-		state,
-		{ blockedAction: "autofill" },
-	);
+	const modal = new FormRevisionModal({ view: {} }, marker, widget, state, {
+		blockedAction: "autofill",
+	});
 	await modal.init();
 	assert.equal(
 		document.querySelector("#modal h2").textContent,
@@ -735,7 +879,8 @@ test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection"
 		title: "My draft",
 		todo: { items: [{ text: "Read", checked: true }] },
 	};
-	widget.schema = schema;
+	widget.schema = [...schema, { id: "removed", type: "input", input: "text" }];
+	local.removed = "Keep this for reference";
 	widget.captureFormState = () => ({ renderer_submission: local });
 	local.untouched = "";
 	widget._baselineSubmission = { title: "Saved", todo: local.todo };
@@ -753,11 +898,15 @@ test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection"
 			schema,
 			submission: { title: "Saved", todo: local.todo },
 			form_state: {
-				reviews: [{ operation: "job", schema, submission: proposal }],
-				migration: {
-					schema: [{ id: "title", type: "input", input: "number" }],
-					submission: { title: 123 },
-				},
+				reviews: [
+					{
+						operation: "job",
+						schema,
+						fields: ["title", "todo"],
+						baseline: {},
+						submission: proposal,
+					},
+				],
 			},
 		},
 	};
@@ -780,10 +929,10 @@ test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection"
 		2,
 		"Empty controls must not produce spurious differences",
 	);
-	assert.equal(
-		document.querySelector("[data-revision-source=before]").disabled,
-		true,
-	);
+	const reference = document.querySelector("[data-role=incompatible-value]");
+	assert.match(reference.textContent, /Keep this for reference/);
+	assert.equal(reference.hasAttribute("role"), false);
+	assert.equal(modal.selections.has("removed"), false);
 	const suggestions = [
 		...document.querySelectorAll("[data-revision-source='ai:job']"),
 	];

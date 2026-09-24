@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from uuid import uuid4
 
 from flask import g, url_for
 from flask_login import current_user
@@ -106,14 +107,19 @@ def form_state(entity, user=None):
     reviews = review.review_projection(entity, user)
     # The entity retains its last job key after an ordinary save acknowledges
     # the review. A consumed success is history, not an active form operation.
+    stale_autofill = False
     if (status and status["type"] == "autofill" and status["status"] == "succeeded"
             and not any(candidate["operation"] == key for candidate in reviews)):
+        job = Entities.fetch_one(key, request=Fetch.direct())
+        if job and ((job.parameters or {}).get("mode") != "revise" or job.actor.key == user.key):
+            snapshot = (job.parameters or {}).get("snapshot")
+            stale_autofill = bool(snapshot) and not review.snapshot_matches_form(snapshot, entity)
         status = None
     result = {
         "revision": entity.autofill_revision,
         "operation": status,
         "reviews": reviews,
-        "migration": review.migration_review(entity),
+        "stale_autofill": stale_autofill,
         "refine_url": url_for("tools.refine_autofill", key=entity.urlsafe_key) if user.access(AI.CREATE) else None,
     }
     if status and status["type"] == "autofill":
@@ -164,6 +170,7 @@ def conflict_response(entity):
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_autofill_start_snapshots_draft_and_stages_file_without_saving_them
 # @pair ai:autofill
+# @matrix ai files tasks : autofill rejected-suggestion staged-upload-cleanup
 def staged_upload_for_update(entity, actor, form):
     """Prepare an accepted AI upload; defer deletion until the form save commits."""
     reviewed = set(form.getlist("reviewed-operation"))
@@ -173,6 +180,14 @@ def staged_upload_for_update(entity, actor, form):
     references = set(review.review_references(entity).values())
     if not used.issubset(references):
         raise exceptions.ValidationError("This autofill review is no longer available.")
+    if used:
+        available = {candidate["operation"] for candidate in review.review_projection(entity, actor)}
+        if not used.issubset(available):
+            raise exceptions.ValidationError("The form changed. Run autofill again before using its suggestions.")
+        if entity.form:
+            guards = list(getattr(entity, "_form_additional_guards", ()))
+            guards.append((entity.form.key, database_utility.ExactEntityState(dict(entity.form.db))))
+            entity._form_additional_guards = guards
 
     candidates = set(reviewed & references)
     current_key = (entity.deferred_job or {}).get("key")
@@ -186,14 +201,16 @@ def staged_upload_for_update(entity, actor, form):
                 or job.job_type != "autofill"
                 or ((job.inputs or {}).get("target") or {}).get("id") != entity.urlsafe_key):
             continue
+        snapshot = (job.parameters or {}).get("snapshot")
+        stale = bool(snapshot) and not review.snapshot_matches_form(snapshot, entity)
         record = (job.parameters or {}).get("upload_record")
         if not record:
             continue
         # Private prompt-only refinements build on the shared suggestion. A
         # selected refinement still uses the original evidence from that review.
-        accepted = job.urlsafe_key in reviewed and bool(used) and job.status == "succeeded"
+        accepted = job.urlsafe_key in reviewed and bool(used) and job.status == "succeeded" and not stale
         discarded = job.urlsafe_key in reviewed and not accepted
-        abandoned = (job.urlsafe_key == current_key and job.status in {"failed", "cancelled"}
+        abandoned = (job.urlsafe_key == current_key and (job.status in {"failed", "cancelled"} or (job.status == "succeeded" and stale))
                      and job.actor.key == actor.key)
         if not (accepted or discarded or abandoned):
             continue
@@ -209,12 +226,16 @@ def staged_upload_for_update(entity, actor, form):
             file = Entities.fetch_one(file_key, request=Fetch.direct())
             if file is None:
                 upload.lagniappe_preserve_source = True
+                # Each save attempt owns its copy; a rejected save can clean it
+                # without blocking a retry or deleting another attempt's blob.
+                upload.lagniappe_asset_nonce = uuid4().hex
                 file = Entities.FILE.create(
                     upload=upload,
                     data={"name": upload.filename, "filename": upload.filename,
                           "mimetype": upload.content_type},
                     key=file_key,
                 )
+                storage_assets.record_attempt_asset(file, file.assets["file"])
                 file.move_to(entity)
             elif not isinstance(file, Entities.FILE) or getattr(file.owner, "key", None) != entity.key:
                 raise exceptions.ValidationError("This autofill attachment belongs to another form.")
@@ -222,10 +243,13 @@ def staged_upload_for_update(entity, actor, form):
     if current_key:
         current = next((job for job in jobs if job.urlsafe_key == current_key), None)
         if current_key in reviewed or (
-            current and current.status in {"failed", "cancelled"}
+            current and (current.status in {"failed", "cancelled"}
+                         or (current.status == "succeeded" and (current.parameters or {}).get("snapshot")
+                             and not review.snapshot_matches_form(current.parameters["snapshot"], entity)))
             and current.actor.key == actor.key
         ):
             entity.deferred_job = None
+            review.acknowledge_reviews(entity, actor, [current_key])
     return file, cleanup
 
 

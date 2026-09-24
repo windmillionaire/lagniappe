@@ -3,7 +3,7 @@ import { request } from "../../shared/request.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 import { areEqual } from "../../shared/utilities.mjs";
 import { incompatibleSchema } from "../representation.mjs";
-import { renderReviewBar } from "../reviewBar.mjs";
+import { currentReviewOperation, renderReviewBar } from "../reviewBar.mjs";
 import { FormRevisionModal, WholeFormRevisionModal } from "./modals.mjs";
 import { loadRevisionPreview } from "./preview.mjs";
 
@@ -190,14 +190,10 @@ export class EditReconciler {
 		const state = this._state(marker);
 		record ??= state.record;
 		if (response.form_state) {
-			const incomingOperation = response.form_state.operation;
-			const currentOperation = widget.reviewState?.operation;
-			const operation =
-				incomingOperation?.key &&
-				incomingOperation.key === currentOperation?.key &&
-				Number(currentOperation.revision) >= Number(incomingOperation.revision)
-					? currentOperation
-					: incomingOperation;
+			const operation = currentReviewOperation(
+				widget,
+				response.form_state.operation,
+			);
 			// A new candidate is not acknowledgement of a new answer baseline.
 			widget.reviewState = {
 				...response.form_state,
@@ -224,10 +220,9 @@ export class EditReconciler {
 			renderReviewBar(widget);
 		}
 		const explicitReview = Boolean(
-			response.form_state?.migration ||
-				response.form_state?.reviews?.some(
-					(review) => !widget._reviewedOperations?.has(review.operation),
-				),
+			response.form_state?.reviews?.some(
+				(review) => !widget._reviewedOperations?.has(review.operation),
+			),
 		);
 		const token = state.token;
 		const anchor = marker.closest?.("[lp-entity]");
@@ -249,6 +244,10 @@ export class EditReconciler {
 			response.schema ?? null,
 		);
 		const schemaChanged = observedSchemaChanged || schemaOnlyRevision;
+		if (observedSchemaChanged) {
+			widget._reviewedOperations?.clear();
+			widget._usedAutofillOperations?.clear();
+		}
 
 		const remotePreview = await loadRevisionPreview(widget, response);
 		if (token && state.token !== token) {
@@ -292,7 +291,7 @@ export class EditReconciler {
 			explicitReview ||
 			unsaved ||
 			queued ||
-			(!ownedDeferredCompletion && (active || focused));
+			(!schemaChanged && !ownedDeferredCompletion && (active || focused));
 		if (!protectedRevision) {
 			const commitRevision = await this._prepareRevision(widget, response);
 			await withTransition(
@@ -329,7 +328,7 @@ export class EditReconciler {
 		const rendererValuesDiffer =
 			rendererCapable && this._rendererValuesDiffer(response, local.response);
 		const incompatible = incompatibleSchema(
-			widget.schema ?? [],
+			record?.renderer_schema ?? widget.schema ?? [],
 			response.schema ?? [],
 		);
 		// Projection drops incompatible local values. A matching projection cannot
@@ -393,23 +392,18 @@ export class EditReconciler {
 				() => {
 					commitRevision();
 					marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
-					this._storeRevision(marker, response, {
-						fingerprint,
-						modified,
-						record,
-						remoteSnapshot,
-						schemaChanged,
-						submissionChoice: false,
-					});
-					this._setAction(
-						marker,
-						record ? "apply" : "dismiss",
-						"This form's fields have changed. It has been updated to reflect the latest schema.",
-					);
-					this._show(marker);
+					this._hide(marker);
 				},
 				{ label: "edit-reconcile:rebase-schema" },
 			);
+			if (record) {
+				const rebased = await this.view.offlineQueue?.rebaseSubmit(
+					record,
+					widget,
+					{ fingerprint, modified },
+				);
+				if (rebased) await this.view.offlineQueue?.replay();
+			}
 			return;
 		}
 
@@ -618,7 +612,10 @@ export class EditReconciler {
 			return false;
 		const button = marker.querySelector("[data-role='edited-reset']");
 		if (!button || button.disabled) return false;
-		await this._activateAction(marker, button, { refresh: true, blockedAction });
+		await this._activateAction(marker, button, {
+			refresh: true,
+			blockedAction,
+		});
 		return true;
 	}
 
@@ -687,11 +684,7 @@ export class EditReconciler {
 
 		const currentMarker =
 			widget.target?.querySelector("[lp-edited-marker]") ?? marker;
-		if (
-			!state.record &&
-			(state.response.form_state?.reviews?.length ||
-				state.response.form_state?.migration)
-		) {
+		if (!state.record && state.response.form_state?.reviews?.length) {
 			widget._reviewedOperations ??= new Set();
 			widget._usedAutofillOperations ??= new Set();
 			for (const review of state.response.form_state?.reviews ?? [])
@@ -700,9 +693,6 @@ export class EditReconciler {
 				if (source.startsWith("ai:"))
 					widget._usedAutofillOperations.add(source.slice(3));
 			}
-			widget._reviewedMigration = JSON.stringify(
-				state.response.form_state?.migration ?? null,
-			);
 			widget.markUnsavedState?.();
 		}
 		this._hide(currentMarker);
@@ -717,7 +707,11 @@ export class EditReconciler {
 		await this._activateAction(marker, button);
 	}
 
-	async _activateAction(marker, button, { refresh = false, blockedAction = null } = {}) {
+	async _activateAction(
+		marker,
+		button,
+		{ refresh = false, blockedAction = null } = {},
+	) {
 		const state = marker ? this._state(marker) : null;
 		if (!state) return;
 

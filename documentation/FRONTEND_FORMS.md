@@ -139,6 +139,9 @@ checkbox. An attached Form's restrictions remain independent.
 
 A marked FormWidget retains an in-memory normalized snapshot of its form data.
 The baseline is refreshed after initialization and authoritative replacement.
+The saved renderer values are refreshed too, including explicit clears. If edits
+arrive during an ordinary save request, its accepted submission becomes the
+comparison baseline while the later draft remains available for reconciliation.
 Repeated values compare without order; Files compare by metadata; a widget may
 add state deliberately omitted from its HTTP payload.
 
@@ -169,7 +172,10 @@ widget continues to own snapshots, local-state capture/projection, and staged
 replacement; those operations do not import revision coordination.
 
 `forms/migrationNotice.mjs` independently installs the informational notice for
-values converted by a schema migration. Its banner/modal belong to FormWidget's
+saved values converted, cleared or removed by a schema migration. It binds **View
+changes** in the shared review bar when present. Its dialog is read-only. The
+notice persists through closing/reloading and clears on the next ordinary save/completion.
+Its banner/modal and the separately owned review bar belong to FormWidget's
 prepared state, not the revision watcher or reconciler. Polling, offline replay,
 deferred operations, and collaborative documents keep their existing owners.
 

@@ -262,7 +262,8 @@ def test_category_filter_conditions_include_only_viewable_forms():
 
 # @matrix category form : add duplicate-primary related-forms relation-registration
 @pytest.mark.unit
-def test_related_forms_add_skips_primary_form_and_registers_relation():
+@pytest.mark.parametrize("primary_loaded", [True, False])
+def test_related_forms_add_skips_primary_form_and_registers_relation(primary_loaded):
     category = TestEntities.get(
         "CATEGORY",
         {"name": "Related Forms Category", "hash": "catrel"},
@@ -275,7 +276,10 @@ def test_related_forms_add_skips_primary_form_and_registers_relation():
         "FORM",
         {"name": "Related Form", "hash": "related_form"},
     )
-    category.form = primary
+    if primary_loaded:
+        category.form = primary
+    else:
+        category.db["form"] = primary.key
     forms = category.properties.forms
 
     forms.add(primary)
