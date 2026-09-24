@@ -15,6 +15,8 @@ export class TableSorting {
 		this.headers = new Map();
 		this.lastReorderColumn = null;
 		this.initialized = false;
+		this._destroyed = false;
+		this._onFilterToggle = this._filterToggle.bind(this);
 	}
 
 	get storageKey() {
@@ -36,13 +38,13 @@ export class TableSorting {
 	}
 
 	init() {
-		if (this.initialized) return;
+		if (this._destroyed || this.initialized) return;
 		this.initialized = true;
 
 		this._setSortingToggles();
 		const saved = this._loadState();
 
-		this.header.querySelectorAll("th[data-ordering]").forEach(async (th) => {
+		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
 			const column = th.dataset.column;
 			const ordering = th.dataset.ordering;
 			this.headers.set(column, th);
@@ -54,32 +56,37 @@ export class TableSorting {
 		this._restoreLastReorderColumn(saved);
 		if (this._hasActiveSorts()) this.sort();
 
-		this.view.elt.addEventListener("toggle-column-filter", (e) => {
-			const column = e.detail.column;
+		this.view.elt.addEventListener(
+			"toggle-column-filter",
+			this._onFilterToggle,
+		);
+	}
 
-			if (this.view.mobile) {
-				void withTransition(
-					() => {
-						const sort = this._enableSort(this.sorts.get(column));
-						if (sort.active) {
-							const toggle = this.toggles.get(column);
-							toggle.dataset.active = "true";
-						}
-						const container = this.containers.get(column);
-						const visible = container.dataset.visible === "true";
-						container.dataset.visible = visible ? "false" : "true";
-					},
-					{ label: "table-sorting:toggle-mobile" },
-				);
-				return;
-			} else {
-				const button = e.detail.button;
-				this._toggleColumn(column, button);
-			}
-		});
+	_filterToggle(e) {
+		if (this._destroyed) return;
+		const column = e.detail.column;
+		if (this.view.mobile) {
+			void withTransition(
+				() => {
+					if (this._destroyed) return;
+					const sort = this._enableSort(this.sorts.get(column));
+					if (sort.active) {
+						const toggle = this.toggles.get(column);
+						toggle.dataset.active = "true";
+					}
+					const container = this.containers.get(column);
+					const visible = container.dataset.visible === "true";
+					container.dataset.visible = visible ? "false" : "true";
+				},
+				{ label: "table-sorting:toggle-mobile" },
+			);
+		} else {
+			void this._toggleColumn(column, e.detail.button);
+		}
 	}
 
 	reset() {
+		if (this._destroyed) return;
 		this.containers.forEach((container) => {
 			container.remove();
 		});
@@ -108,7 +115,7 @@ export class TableSorting {
 	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refresh
 	 */
 	refreshRows() {
-		if (!this.initialized) return;
+		if (this._destroyed || !this.initialized) return;
 
 		const saved = {
 			lastReorderColumn: this.lastReorderColumn,
@@ -224,6 +231,7 @@ export class TableSorting {
 	async _toggleColumn(column, button) {
 		await withTransition(
 			() => {
+				if (this._destroyed) return;
 				const sort = this._enableSort(this.sorts.get(column));
 				if (sort.disabled) return;
 
@@ -288,6 +296,7 @@ export class TableSorting {
 	 * @matrix table-controls : boolean-column due-date exists-column filtering name phone sort-asc sort-clear sort-desc sorting
 	 */
 	sort() {
+		if (this._destroyed) return;
 		let reorderRows = false;
 		let showRows = new Set();
 
@@ -443,6 +452,28 @@ export class TableSorting {
 		);
 
 		return this.sorts.get(column);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_sorting_destroy_removes_controls_and_rejects_queued_toggles
+	 * @matrix table-controls : persistence sorting teardown
+	 */
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.initialized = false;
+		this.visible = false;
+		this.view.elt.removeEventListener(
+			"toggle-column-filter",
+			this._onFilterToggle,
+		);
+		for (const container of this.containers.values()) container.remove();
+		this.containers.clear();
+		this.sorts.clear();
+		this.toggles.clear();
+		this.headers.clear();
+		this.lastReorderColumn = null;
 	}
 }
 

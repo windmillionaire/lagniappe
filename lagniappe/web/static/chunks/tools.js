@@ -1,2 +1,154 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="5bce8a68-bd30-4b0c-9c5c-eaedc1064e6a",e._sentryDebugIdIdentifier="sentry-dbid-5bce8a68-bd30-4b0c-9c5c-eaedc1064e6a");}catch(e){}}();import{B as o,u as r,U as a}from"./baseUpload.js?v=bc767b1a";import"./controller.js?v=bc767b1a";import"./primitives.js?v=bc767b1a";import"./styles.js?v=bc767b1a";import"./icons.js?v=bc767b1a";import"./foundation.js?v=bc767b1a";import"./upstreamUnavailable.js?v=bc767b1a";import"./connectivity.js?v=bc767b1a";import"./loader.js?v=bc767b1a";import"./directUpload.js?v=bc767b1a";import"./buttons.js?v=bc767b1a";import"./formatting.js?v=bc767b1a";import"./dropdown.js?v=bc767b1a";import"./combobox.js?v=bc767b1a";const n="Drop files here, click to upload, or paste a screenshot.";class l extends o{constructor(t){super(t),this.messages={submit:"Start",submitting:"Starting",submitted:"Started"},this.icon="generate",this.uploadType="file",this.inputName="tool-files",this.multiple=!0,this.header=this.target.querySelector("[data-role='header']"),this.submitGroup=this.target.querySelector("[data-role='submit-group']"),this.submitButton=this.target.querySelector("[data-role='start-report']"),this.emailSubmissions=this.target.querySelector("[data-role='email-submissions']"),this.emailAddress=this.target.querySelector("[data-role='email-address']"),this.emailCopyButton=this.target.querySelector("[data-role='email-copy']"),this.context=r.contextUpload({text:n,label:!1,descriptionName:"instructions",descriptionPlaceholder:"Ask a question or describe what you want done\u2026",descriptionRows:5,stacked:!0}),this.dropzone=this.context.dropzone,this.menuOptions=["remove","replace","paste"],this.uploadMenu=new a(this)}async init(){await super.init(),this.context.description?.addEventListener("input",()=>{this.form?.showSubmitButton()}),this.emailCopyButton?.addEventListener("click",()=>{this.copyEmailAddress()}),this.dropzone?.show()}get html(){return[this.context.element]}async copyEmailAddress(){const t=this.emailCopyButton,s=this.emailAddress?.textContent?.trim();if(!t||!s)return;let i=!1;try{navigator.clipboard?.writeText&&(await navigator.clipboard.writeText(s),i=!0)}catch{i=!1}if(!i){const e=document.createElement("textarea");e.value=s,e.setAttribute("readonly",""),e.style.position="fixed",e.style.opacity="0",document.body.append(e),e.select();try{i=document.execCommand("copy")}catch{i=!1}e.remove(),t.focus()}t.textContent=i?"Copied":"Copy failed",clearTimeout(this.emailCopyResetTimer),this.emailCopyResetTimer=setTimeout(()=>{t.isConnected&&(t.textContent="Copy")},2e3)}applyDefaultAttachUI(t,s){this.dropzone&&this.dropzone.setText(this.fileLabel),this.form?.showSubmitButton()}async prepareSubmit(t={}){return!this.context.description?.value?.trim()&&!this.fileAttached?(this.showError("Add files or instructions before creating a report."),!1):super.prepareSubmit(t)}async created(){this.form.success(),this.createdReport=!0}_resetUI(){this.context?.clear(),this.dropzone?.show(),this.form?.hideSubmitButton()}reset(){super.reset(),this._resetUI()}postreconcile(){this.createdReport&&(this.reset(),this.visible=!1,this.target.dataset.visible="false",this.createdReport=!1)}}export{l as CreateToolReport};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b518b165';
+import './controller.js?v=b518b165';
+import './primitives.js?v=b518b165';
+import './styles.js?v=b518b165';
+import './icons.js?v=b518b165';
+import './foundation.js?v=b518b165';
+import './upstreamUnavailable.js?v=b518b165';
+import './connectivity.js?v=b518b165';
+import './loader.js?v=b518b165';
+import './directUpload.js?v=b518b165';
+import './buttons.js?v=b518b165';
+import './formatting.js?v=b518b165';
+import './dropdown.js?v=b518b165';
+import './combobox.js?v=b518b165';
+
+const AI_DROPZONE_TEXT =
+	"Drop files here, click to upload, or paste a screenshot.";
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
+ * @tests tests_js/test_043_ai_email_frontend.mjs::test_ai_email_address_selection_and_copy_controls
+ * @matrix ai-report : absent-markup ask clipboard-fallback create email-address-selection instructions multi-file status-reset tool-switcher upload-form
+ */
+class CreateToolReport extends BaseUpload {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Start",
+			submitting: "Starting",
+			submitted: "Started",
+		};
+		this.icon = "generate";
+		this.uploadType = "file";
+		this.inputName = "tool-files";
+		this.multiple = true;
+
+		this.header = this.target.querySelector("[data-role='header']");
+		this.submitGroup = this.target.querySelector("[data-role='submit-group']");
+		this.submitButton = this.target.querySelector("[data-role='start-report']");
+		this.emailSubmissions = this.target.querySelector(
+			"[data-role='email-submissions']",
+		);
+		this.emailAddress = this.target.querySelector(
+			"[data-role='email-address']",
+		);
+		this.emailCopyButton = this.target.querySelector(
+			"[data-role='email-copy']",
+		);
+		this.context = uploadElement.contextUpload({
+			text: AI_DROPZONE_TEXT,
+			label: false,
+			descriptionName: "instructions",
+			descriptionPlaceholder: "Ask a question or describe what you want done…",
+			descriptionRows: 5,
+			stacked: true,
+		});
+		this.dropzone = this.context.dropzone;
+		this.menuOptions = ["remove", "replace", "paste"];
+		this.uploadMenu = new UploadMenu(this);
+	}
+
+	async init() {
+		await super.init();
+		this.context.description?.addEventListener("input", () => {
+			this.form?.showSubmitButton();
+		});
+		this.emailCopyButton?.addEventListener("click", () => {
+			void this.copyEmailAddress();
+		});
+		this.dropzone?.show();
+	}
+
+	get html() {
+		return [this.context.element];
+	}
+
+	async copyEmailAddress() {
+		const button = this.emailCopyButton;
+		const address = this.emailAddress?.textContent?.trim();
+		if (!button || !address) return;
+		let copied = false;
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(address);
+				copied = true;
+			}
+		} catch {
+			copied = false;
+		}
+		if (!copied) {
+			const textarea = document.createElement("textarea");
+			textarea.value = address;
+			textarea.setAttribute("readonly", "");
+			textarea.style.position = "fixed";
+			textarea.style.opacity = "0";
+			document.body.append(textarea);
+			textarea.select();
+			try {
+				copied = document.execCommand("copy");
+			} catch {
+				copied = false;
+			}
+			textarea.remove();
+			button.focus();
+		}
+		button.textContent = copied ? "Copied" : "Copy failed";
+		clearTimeout(this.emailCopyResetTimer);
+		this.emailCopyResetTimer = setTimeout(() => {
+			if (button.isConnected) button.textContent = "Copy";
+		}, 2000);
+	}
+
+	applyDefaultAttachUI(_file, _context) {
+		if (this.dropzone) this.dropzone.setText(this.fileLabel);
+		this.form?.showSubmitButton();
+	}
+
+	async prepareSubmit(options = {}) {
+		if (!this.context.description?.value?.trim() && !this.fileAttached) {
+			this.showError("Add files or instructions before creating a report.");
+			return false;
+		}
+		return super.prepareSubmit(options);
+	}
+
+	async created() {
+		this.form.success();
+		this.createdReport = true;
+	}
+
+	_resetUI() {
+		this.context?.clear();
+		this.dropzone?.show();
+		this.form?.hideSubmitButton();
+	}
+
+	reset() {
+		super.reset();
+		this._resetUI();
+	}
+
+	postreconcile() {
+		if (this.createdReport) {
+			this.reset();
+			this.visible = false;
+			this.target.dataset.visible = "false";
+			this.createdReport = false;
+		}
+	}
+}
+
+export { CreateToolReport };

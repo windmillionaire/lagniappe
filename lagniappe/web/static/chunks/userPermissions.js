@@ -1,2 +1,92 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="b93f5c6c-3183-4dae-bad7-f3bf1a247680",e._sentryDebugIdIdentifier="sentry-dbid-b93f5c6c-3183-4dae-bad7-f3bf1a247680");}catch(e){}}();import{F as r}from"./formWidget.js?v=bc767b1a";import"./controller.js?v=bc767b1a";import"./primitives.js?v=bc767b1a";import"./styles.js?v=bc767b1a";import"./icons.js?v=bc767b1a";import"./foundation.js?v=bc767b1a";import"./upstreamUnavailable.js?v=bc767b1a";import"./connectivity.js?v=bc767b1a";import"./loader.js?v=bc767b1a";import"./modal.js?v=bc767b1a";import"./reviewBar.js?v=bc767b1a";import"./representation.js?v=bc767b1a";class m extends r{constructor(t){super(t),this.messages={submit:"Update Public Permissions",submitting:"Updating Public Permissions",submitted:"Public Permissions Updated"}}}class u extends r{constructor(t){super(t),this.messages={submit:"Update User Group",submitting:"Updating User Group",submitted:"User Group Updated"},this._submittedName=null}async prepareSubmit(t){return await super.prepareSubmit(t)?(this._submittedName=this.formData.get("name"),!0):!1}async reset(){this._submittedName=null,await super.reset()}async prepareRevision(t){return this._submittedName=null,super.prepareRevision(t)}postreconcile(){const t=this._updated,e=this.target.querySelector("[name='name']")?.value,a=t&&this._submittedName!==null&&e!==this._submittedName;if(super.postreconcile(),!(!t||this._updated)){if(this._submittedName=null,!this.revisionPreview){const s=Array.from(this.component.elt.querySelectorAll("[data-role='group-selectors'] button[data-key]")).find(o=>o.dataset.key===this.key)?.querySelector("[data-role='group-name']");s&&(s.textContent=this.target.dataset.name)}a&&(this.target.querySelector("[name='name']").value=e,this.markUnsavedState())}}}export{u as GroupPermissions,m as PublicPermissions};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormWidget } from './formWidget.js?v=b518b165';
+import './controller.js?v=b518b165';
+import './primitives.js?v=b518b165';
+import './styles.js?v=b518b165';
+import './icons.js?v=b518b165';
+import './foundation.js?v=b518b165';
+import './upstreamUnavailable.js?v=b518b165';
+import './connectivity.js?v=b518b165';
+import './loader.js?v=b518b165';
+import './modal.js?v=b518b165';
+import './reviewBar.js?v=b518b165';
+import './representation.js?v=b518b165';
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
+ * @matrix permissions public-groups : active permission-update public
+ */
+class PublicPermissions extends FormWidget {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Public Permissions",
+			submitting: "Updating Public Permissions",
+			submitted: "Public Permissions Updated",
+		};
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
+ * @tests tests_js/test_044_user_widget_frontend.mjs::test_group_permissions_tracks_rename_draft_after_target_rebuild
+ * @matrix user-groups : entity-permissions general-permissions permission-update rename reset-rebinding
+ */
+class GroupPermissions extends FormWidget {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update User Group",
+			submitting: "Updating User Group",
+			submitted: "User Group Updated",
+		};
+		this._submittedName = null;
+	}
+
+	async prepareSubmit(options) {
+		if (!(await super.prepareSubmit(options))) return false;
+		this._submittedName = this.formData.get("name");
+		return true;
+	}
+
+	async reset() {
+		this._submittedName = null;
+		await super.reset();
+	}
+
+	async prepareRevision(response) {
+		this._submittedName = null;
+		return super.prepareRevision(response);
+	}
+
+	postreconcile() {
+		const updated = this._updated;
+		const localName = this.target.querySelector("[name='name']")?.value;
+		const newerDraft =
+			updated &&
+			this._submittedName !== null &&
+			localName !== this._submittedName;
+		super.postreconcile();
+		if (!updated || this._updated) return;
+		this._submittedName = null;
+		if (!this.revisionPreview) {
+			const selector = Array.from(
+				this.component.elt.querySelectorAll(
+					"[data-role='group-selectors'] button[data-key]",
+				),
+			).find((button) => button.dataset.key === this.key);
+			const label = selector?.querySelector("[data-role='group-name']");
+			if (label) label.textContent = this.target.dataset.name;
+		}
+		if (newerDraft) {
+			this.target.querySelector("[name='name']").value = localName;
+			this.markUnsavedState();
+		}
+	}
+}
+
+export { GroupPermissions, PublicPermissions };

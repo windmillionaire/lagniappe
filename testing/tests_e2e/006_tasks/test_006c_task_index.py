@@ -6,6 +6,7 @@ from playwright.sync_api import expect
 
 from testing.definitions import SitePages, Tasks, Users
 from testing.elements import Buttons, Modal
+from testing.utility.network import expect_successful_response, scoped_browser_route
 
 """
 Tests for the Tasks index page (/tasks).
@@ -249,6 +250,69 @@ def test_task_index_quick_edit_updates_editable_cell(get_user):
         name_input.press("Enter")
 
     expect(cell).to_contain_text(updated_name)
+
+
+# @source src/script/widgets/tables/editor.mjs::TableEditor
+# @matrix table-controls : quick-edit pending-save
+# @pair task-index:quick-edit
+def test_task_index_quick_edit_background_save_preserves_newer_edit(get_user):
+    user = get_user(Users.OWNER)
+    first = Tasks.test_task_index_page_active.get(user)
+    second = Tasks.test_task_index_personal_today.get(user)
+    user.go(SitePages.TASK_INDEX)
+
+    body = user.locate("#table tbody")
+    expect(body).to_have_attribute("loaded", "")
+    toggle = user.locate("button[lp-show='table:TableEditor']")
+    first_cell = user.locate(f"{TASK_ROW}[data-key='{first.key}'] td[data-column='name']")
+    second_cell = user.locate(f"{TASK_ROW}[data-key='{second.key}'] td[data-column='name']")
+    first_name = "Background quick edit saved"
+    second_name = "Newer quick edit retained"
+    first_path = f"/tasks/{first.key}/patch"
+    held = []
+
+    toggle.click()
+    first_cell.click()
+    first_input = first_cell.locator("input[name='name']")
+    first_input.fill(first_name)
+    with scoped_browser_route(user.page.context, f"**{first_path}", lambda route: held.append(route)):
+        try:
+            with user.page.context.expect_event(
+                "request",
+                predicate=lambda request: request.method == "PATCH" and request.url.endswith(first_path),
+            ):
+                first_input.press("Enter")
+            expect(first_cell).to_have_attribute("aria-busy", "true")
+            toggle.click()
+            expect(body).to_have_attribute("data-editing", "false")
+            expect(first_input).not_to_be_attached()
+
+            toggle.click()
+            second_cell.click()
+            second_input = second_cell.locator("input[name='name']")
+            second_input.fill(second_name)
+            expect(second_input).to_be_focused()
+
+            assert len(held) == 1
+            with expect_successful_response(user.page, method="PATCH", path=first_path):
+                held.pop().continue_()
+            expect(first_cell).to_contain_text(first_name)
+            expect(first_cell).not_to_have_attribute("aria-busy", "true")
+            expect(second_input).to_have_value(second_name)
+            expect(second_input).to_be_focused()
+
+            with expect_successful_response(
+                user.page, method="PATCH", path=f"/tasks/{second.key}/patch",
+            ):
+                second_input.press("Enter")
+            expect(second_cell).to_contain_text(second_name)
+        finally:
+            for route in held:
+                route.continue_()
+
+    user.go(SitePages.TASK_INDEX)
+    expect(first_cell).to_contain_text(first_name)
+    expect(second_cell).to_contain_text(second_name)
 
 
 # @matrix table-controls task-index : checkbox-cell column-visibility quick-edit

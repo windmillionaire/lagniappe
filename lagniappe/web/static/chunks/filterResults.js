@@ -1,2 +1,105 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="bf493603-5dba-4130-a15f-4689324ca7db",e._sentryDebugIdIdentifier="sentry-dbid-bf493603-5dba-4130-a15f-4689324ca7db");}catch(e){}}();import{E as e}from"./baseTable.js?v=bc767b1a";import{STYLES as i}from"./styles.js?v=bc767b1a";import"./foundation.js?v=bc767b1a";import"./upstreamUnavailable.js?v=bc767b1a";import"./connectivity.js?v=bc767b1a";import"./icons.js?v=bc767b1a";import"./primitives.js?v=bc767b1a";import"./table.js?v=bc767b1a";import"./baseElement.js?v=bc767b1a";import"./checkbox.js?v=bc767b1a";import"./input.js?v=bc767b1a";import"./formatting.js?v=bc767b1a";import"./link.js?v=bc767b1a";import"./facets.js?v=bc767b1a";import"./remote.js?v=bc767b1a";import"./queryLifecycle.js?v=bc767b1a";import"./combobox.js?v=bc767b1a";import"./results.js?v=bc767b1a";import"./storage.js?v=bc767b1a";import"./submitter.js?v=bc767b1a";import"./loader.js?v=bc767b1a";class r extends e{constructor(t){super(t),this.badges=null,this.table=null,this.tableContainer=null,this.container=null,this.filtering=this.target.dataset.kind}async updated(t){this.table=t.html.querySelector("#embedded-table")||t.html.querySelector("table"),this.filtering==="page"&&(this.badges=this.component.widgets.Filters.filters.cloneNode(!0))}get tbody(){return this.table.querySelector("tbody")}get rows(){return this.tbody.querySelectorAll("tr:not([data-role='empty'])")}get empty(){return this.tbody.querySelector("tr[data-role='empty']")}postreconcile(){!this.table||this.target.contains(this.table)||(this.container=document.createElement("div"),this.container.dataset.role="results-table",this.container.className=i.table.container,this.tableContainer=document.createElement("div"),this.tableContainer.className="table-container px-4",this.tableContainer.dataset.role="table",this.tableContainer.dataset.embedded="true",this.tableContainer.appendChild(this.table),this.container.appendChild(this.tableContainer),this.table.dataset.visible="true",this.initVisibility(this.table),this.filtering==="page"?this.target.replaceChildren(this.badges,this.container):this.target.replaceChildren(this.container))}reset(){this.badges&&(this.badges.remove(),this.badges=null),this.container&&(this.container.remove(),this.container=null),this.tableContainer&&(this.tableContainer=null),this.table&&(this.table=null)}}export{r as FilterResults};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as EmbeddedTable } from './baseTable.js?v=b518b165';
+import { STYLES } from './styles.js?v=b518b165';
+import './foundation.js?v=b518b165';
+import './upstreamUnavailable.js?v=b518b165';
+import './connectivity.js?v=b518b165';
+import './icons.js?v=b518b165';
+import './primitives.js?v=b518b165';
+import './table.js?v=b518b165';
+import './baseElement.js?v=b518b165';
+import './checkbox.js?v=b518b165';
+import './input.js?v=b518b165';
+import './formatting.js?v=b518b165';
+import './link.js?v=b518b165';
+import './facets.js?v=b518b165';
+import './remote.js?v=b518b165';
+import './queryLifecycle.js?v=b518b165';
+import './combobox.js?v=b518b165';
+import './results.js?v=b518b165';
+import './storage.js?v=b518b165';
+import './submitter.js?v=b518b165';
+import './loader.js?v=b518b165';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_results_expands_table_submission_cell
+ * @matrix embedded-table : horizontal-scroll run-results table-cell-expand
+ */
+class FilterResults extends EmbeddedTable {
+	constructor(attributes) {
+		super(attributes);
+		this.badges = null;
+		this.table = null;
+		this.tableContainer = null;
+		this.container = null;
+		this.filtering = this.target.dataset.kind;
+	}
+
+	async updated(response) {
+		this.table =
+			response.html.querySelector("#embedded-table") ||
+			response.html.querySelector("table");
+		if (this.filtering === "page") {
+			this.badges = this.component.widgets.Filters.filters.cloneNode(true);
+		}
+	}
+
+	get tbody() {
+		return this.table.querySelector("tbody");
+	}
+
+	get rows() {
+		return this.tbody.querySelectorAll("tr:not([data-role='empty'])");
+	}
+
+	get empty() {
+		return this.tbody.querySelector("tr[data-role='empty']");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
+	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
+	 * @matrix filters : run-results results-layout
+	 */
+	postreconcile() {
+		if (!this.table || this.target.contains(this.table)) return;
+
+		this.container = document.createElement("div");
+		this.container.dataset.role = "results-table";
+		this.container.className = STYLES.table.container;
+		this.tableContainer = document.createElement("div");
+		this.tableContainer.className = "table-container px-4";
+		this.tableContainer.dataset.role = "table";
+		this.tableContainer.dataset.embedded = "true";
+		this.tableContainer.appendChild(this.table);
+		this.container.appendChild(this.tableContainer);
+		this.table.dataset.visible = "true";
+		this.initVisibility(this.table);
+		if (this.filtering === "page") {
+			this.target.replaceChildren(this.badges, this.container);
+		} else {
+			this.target.replaceChildren(this.container);
+		}
+	}
+
+	reset() {
+		if (this.badges) {
+			this.badges.remove();
+			this.badges = null;
+		}
+		if (this.container) {
+			this.container.remove();
+			this.container = null;
+		}
+		if (this.tableContainer) {
+			this.tableContainer = null;
+		}
+		if (this.table) {
+			this.table = null;
+		}
+	}
+}
+
+export { FilterResults };

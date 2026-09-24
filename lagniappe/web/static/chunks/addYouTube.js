@@ -1,2 +1,74 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6e40d23b-29df-49ce-9f46-1730982dce63",e._sentryDebugIdIdentifier="sentry-dbid-6e40d23b-29df-49ce-9f46-1730982dce63");}catch(e){}}();import{F as i}from"./controller.js?v=bc767b1a";import{b as s}from"./buttons.js?v=bc767b1a";import{p as e}from"./primitives.js?v=bc767b1a";import"./icons.js?v=bc767b1a";import"./foundation.js?v=bc767b1a";import"./upstreamUnavailable.js?v=bc767b1a";import"./connectivity.js?v=bc767b1a";import"./loader.js?v=bc767b1a";import"./styles.js?v=bc767b1a";import"./formatting.js?v=bc767b1a";class o{constructor(t){this.toolbar=t,this.submit=this.submit.bind(this),this.endpoints=t.endpoints,this.name="addYouTube",this.messages={url:"Please add a YouTube URL",submit:"Add YouTube Video"},this._active=!1}get active(){return this._active}set active(t){this._active=t,this.link.focus()}init(){this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.className='mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addYouTube"]/toolbar:flex',this.target.dataset.option=this.name,this.link=e.input({name:"url",placeholder:"YouTube URL...",type:"url"});const t=s.submit({kind:"editor"});this.html=[this.link,t],this.form=new i(this),this.form.init()}submit(){const t=this.link.value;t?(this.toolbar.editor.chain().focus().setYoutubeVideo({src:t}).run(),this.form.resetSubmitButton(),this.toolbar.toggleForm(this.name),this.link.value=""):this.form.showError(this.messages.url)}}export{o as addYouTube};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormController } from './controller.js?v=b518b165';
+import { b as buttons } from './buttons.js?v=b518b165';
+import { p as primitives } from './primitives.js?v=b518b165';
+import './icons.js?v=b518b165';
+import './foundation.js?v=b518b165';
+import './upstreamUnavailable.js?v=b518b165';
+import './connectivity.js?v=b518b165';
+import './loader.js?v=b518b165';
+import './styles.js?v=b518b165';
+import './formatting.js?v=b518b165';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_youtube
+ * @pair editor:youtube-embed
+ */
+class AddYouTube {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.submit = this.submit.bind(this);
+		this.endpoints = toolbar.endpoints;
+		this.name = "addYouTube";
+		this.messages = {
+			url: "Please add a YouTube URL",
+			submit: "Add YouTube Video",
+		};
+		this._active = false;
+	}
+
+	get active() {
+		return this._active;
+	}
+
+	set active(value) {
+		this._active = value;
+		this.link.focus();
+	}
+
+	init() {
+		this.target = this.toolbar.element.appendChild(
+			document.createElement("form"),
+		);
+		this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addYouTube"]/toolbar:flex`;
+		this.target.dataset.option = this.name;
+
+		this.link = primitives.input({
+			name: "url",
+			placeholder: "YouTube URL...",
+			type: "url",
+		});
+		const submit = buttons.submit({
+			kind: "editor",
+		});
+		this.html = [this.link, submit];
+
+		this.form = new FormController(this);
+		this.form.init();
+	}
+
+	submit() {
+		const url = this.link.value;
+		if (url) {
+			this.toolbar.editor.chain().focus().setYoutubeVideo({ src: url }).run();
+			this.form.resetSubmitButton();
+			this.toolbar.toggleForm(this.name);
+			this.link.value = "";
+		} else {
+			this.form.showError(this.messages.url);
+		}
+	}
+}
+
+export { AddYouTube as addYouTube };

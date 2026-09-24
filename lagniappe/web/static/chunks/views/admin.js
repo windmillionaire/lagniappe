@@ -1,2 +1,21 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"2.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="78c9fd84-d6b6-4a8e-922a-d86614dbd297",e._sentryDebugIdIdentifier="sentry-dbid-78c9fd84-d6b6-4a8e-922a-d86614dbd297");}catch(e){}}();import{E as r}from"../entity-foundation.js?v=bc767b1a";import"../core-foundation.js?v=bc767b1a";import"../connectivity.js?v=bc767b1a";import"../foundation.js?v=bc767b1a";import"../upstreamUnavailable.js?v=bc767b1a";import"../storage.js?v=bc767b1a";class s extends r{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{s as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity-foundation.js?v=b518b165';
+import '../core-foundation.js?v=b518b165';
+import '../connectivity.js?v=b518b165';
+import '../foundation.js?v=b518b165';
+import '../upstreamUnavailable.js?v=b518b165';
+import '../storage.js?v=b518b165';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
+ * @matrix admin : page-load site-settings
+ */
+class Admin extends Entity {
+	constructor(node) {
+		super(node);
+		this._defaultTabId = node.dataset.defaultTab || "settings";
+	}
+}
+
+export { Admin as default };
