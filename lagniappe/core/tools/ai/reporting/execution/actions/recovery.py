@@ -108,7 +108,7 @@ def _inspect_action_applied(action, report, user, record):
     if entity is not None and not _recovery_entity_allowed(entity, user):
         return ACTION_DRIFTED
 
-    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
+    if action_type in {"update_task", "update_page", "update_project", "update_model_task", "update_file"}:
         from lagniappe.core.tools.entity_patches import _projection
         if entity is not None and _projection(entity) == expected.get("entity_update_after"):
             return ACTION_APPLIED

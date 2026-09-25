@@ -566,14 +566,14 @@ form:
     surfaces: [frontend, server]
   submission:
     default:
-      classes: submission-outline flex min-h-10 w-fit flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm
-      intent: default presentation within form submission
+      classes: submission-outline flex min-h-10 min-w-0 w-fit max-w-full flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]
+      intent: compact form value that wraps long text within its container
       surfaces: [frontend]
       hooks: [submission-outline]
       css: [src/style/forms.css]
     grows:
-      classes: submission-outline w-fit rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm
-      intent: grows presentation within form submission
+      classes: submission-outline min-w-0 w-fit max-w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]
+      intent: multiline form value that wraps long text within its container
       surfaces: [frontend]
       hooks: [submission-outline]
       css: [src/style/forms.css]

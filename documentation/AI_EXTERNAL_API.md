@@ -517,7 +517,7 @@ reference its action id in `move_file.data.to_task_action` and `depends_on`.
 Task Form submissions must contain final values.
 
 The cohesive update contracts are `update_task`, `update_model_task`,
-`update_project`, and `update_page`. Every action supplies an exact `entity`
+`update_project`, `update_page`, and `update_file`. Every action supplies an exact `entity`
 and a nonempty `changes` object. Earlier outputs use `$action_id` references.
 
 ```json
@@ -531,6 +531,15 @@ Use `get_entity(view="edit")` or paginated `get_page_tasks(view="edit")` for
 complete descriptions, answer IDs, revisions, relationships, and shared schemas.
 Contract 10 removes superseded atomic updates and aliases. Schema migrations,
 completion, file movement and document append remain distinct actions.
+
+`update_file` edits the display `name` and/or `description` of an existing File.
+Use `get_entity(view="edit")` for its complete description and editable fields.
+Omitted fields are preserved; `description: null` clears it. The original bytes,
+filename and attachment location remain unchanged. Description search follows
+whether the new description is nonempty, as in File Info, without launching AI
+processing. File edit permission is checked during both review and execution.
+Existing Files need no upload or `file_usage` entry, even when the same Plan also
+organizes new uploads. `summarize_file` remains the summary step for new uploads.
 
 After execution starts, `start_plan(revises_plan_id=..., instructions=...)`
 creates a linked correction. Read its source snapshot and current workspace

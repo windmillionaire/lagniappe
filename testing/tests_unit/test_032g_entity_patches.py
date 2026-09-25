@@ -545,6 +545,185 @@ def test_edit_view_preserves_complete_descriptions_and_deduplicates_schema(monke
     assert edit_entity(task, actor)["editable_fields"] == []
 
 
+# @source lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
+# @matrix ai : edit-view model-task attached-form
+@pytest.mark.parametrize("with_form", [False, True])
+def test_model_edit_view_only_reads_supported_properties(monkeypatch, with_form):
+    from lagniappe.core.tools.ai.function_definitions.get_entity import execute_get_entity
+    import importlib
+
+    actor, task, form, page = case()
+    project = entity("PROJECT", "model-project")
+    model = entity("MODEL_TASK", "model")
+    model.project = project
+    model.form = form if with_form else None
+    for module in ("form", "project"):
+        monkeypatch.setattr(importlib.import_module("lagniappe.core.entities." + module), "url_for", lambda endpoint, **kwargs: "/entity/" + kwargs["key"])
+    monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: reference if hasattr(reference, "entity_kind") else model)
+
+    result = execute_get_entity({"id": model.urlsafe_key, "view": "edit"}, actor)
+    assert result["editable_fields"] == ["form", "name"]
+    assert "description" not in result
+    assert "answers" not in result
+    if with_form:
+        assert result["form"]["schema"] == form.schema
+        assert result["form"]["hash"] == "hash:old-form"
+    else:
+        assert "form" not in result
+
+
+# @source lagniappe/core/tools/entity_patches.py::prepare_patch
+# @matrix entity-patch : preservation validation preparation permissions
+@pytest.mark.parametrize("description", ["Corrected file description", None])
+def test_file_patch_preserves_original_and_checks_owner_permission(description):
+    page = entity("PAGE", "file-page")
+    actor = _permissioned_user("file-editor", {page.hash: "EDIT"})
+    file = entity("FILE", "original-file")
+    file.page = page
+    file.filename = "original.txt"
+    file.summary = "Original description"
+    file.properties.summarize.enabled = True
+    file.properties.summarize.complete = True
+    file.properties.summarize.retrieval_terms = ["baseline", "measurement"]
+    file.properties.extract.enabled = True
+    original = deepcopy(file.db)
+
+    prepared = prepare_patch(file, {"description": description}, actor)
+    updated = prepared.entity
+    assert file.db == original
+    assert updated.key == file.key
+    assert updated.page.key == page.key
+    assert updated.name == file.name
+    assert updated.filename == "original.txt"
+    assert updated.summary == description
+    assert updated.properties.summarize.search is bool(description)
+    assert updated.properties.summarize.enabled is True
+    assert updated.properties.summarize.complete is True
+    assert updated.properties.summarize.retrieval_terms == ["baseline", "measurement"]
+    assert updated.properties.extract.enabled is True
+    assert prepared.before["description"] == "Original description"
+    assert prepared.after["description"] == description
+    assert prepared.writes == (updated,)
+    renamed = prepare_patch(file, {"name": "Readable name"}, actor).entity
+    assert renamed.name == "Readable name"
+    assert renamed.summary == file.summary
+    for changes in ({"name": ""}, {"filename": "replacement.txt"}):
+        with pytest.raises(ValidationError):
+            prepare_patch(file, changes, actor)
+    actor.permissions = {page.hash: "VIEW"}
+    with pytest.raises(ValidationError, match="permission"):
+        prepare_patch(file, {"description": "Unauthorized"}, actor)
+    assert file.db == original
+
+
+# @source lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
+# @source lagniappe/core/tools/ai/reporting/entity_updates.py::review_update_action
+# @source lagniappe/core/tools/ai/reporting/entity_updates.py::execute_update_action
+# @source lagniappe/core/tools/ai/reporting/execution/actions/recovery.py::_inspect_action_applied
+# @matrix ai : edit-view
+# @matrix entity-patch : integration review stale-state
+# @matrix ai-report : permissions recovery
+def test_file_edit_read_review_execution_and_recovery(monkeypatch):
+    from lagniappe.core.tools.ai.function_definitions.get_entity import execute_get_entity
+    from lagniappe.core.tools.ai.reporting.execution.actions.recovery import _inspect_action_applied, ACTION_APPLIED, ACTION_DRIFTED
+    from lagniappe.core.entities import file as file_module, page as page_module
+
+    page = entity("PAGE", "file-page")
+    actor = _permissioned_user("file-editor", {page.hash: "EDIT"})
+    file = entity("FILE", "original-file")
+    file.page = page
+    file.summary = "Full original description. " * 100
+    store = {file.urlsafe_key: file}
+    monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: reference if hasattr(reference, "entity_kind") else store.get(reference))
+    for module in (file_module, page_module):
+        monkeypatch.setattr(module, "url_for", lambda endpoint, **kwargs: "/entity/" + kwargs["key"])
+    result = execute_get_entity({"id": file.urlsafe_key, "view": "edit"}, actor)
+    assert result["description"] == file.summary
+    assert result["editable_fields"] == ["description", "name"]
+    action = {"type": "update_file", "data": {"entity": file.urlsafe_key, "changes": {"description": "Corrected"}}}
+    review_update_action(action, actor)
+    assert action["_entity_update"]["before"]["description"] == file.summary
+    assert action["_entity_update"]["display_after"]["description"] == "Corrected"
+    actor.permissions = {page.hash: "VIEW"}
+    assert execute_get_entity({"id": file.urlsafe_key, "view": "edit"}, actor)["editable_fields"] == []
+    with pytest.raises(ValidationError, match="permission"):
+        execute_update_action(action, None, actor, {})
+    actor.permissions = {page.hash: "EDIT"}
+    updated, writes, receipt = execute_update_action(action, None, actor, {})
+    assert writes == [updated]
+    assert updated.summary == "Corrected"
+    store[file.urlsafe_key] = updated
+    record = {"entity": {"id": file.urlsafe_key}, "expected": {"entity": file.urlsafe_key, "entity_update_after": receipt["entity_update_after"]}}
+    report = SimpleNamespace(result={"actions": []})
+    assert _inspect_action_applied(action, report, actor, record) == ACTION_APPLIED
+    updated.summary = "Later human edit"
+    assert _inspect_action_applied(action, report, actor, record) == ACTION_DRIFTED
+
+
+# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
+# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
+# @matrix entity-patch : integration review
+# @matrix ai-report : execute idempotency preservation
+@pytest.mark.parametrize("with_upload", [False, True])
+def test_existing_file_metadata_plan_runs_with_or_without_new_uploads(monkeypatch, with_upload):
+    from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
+    from lagniappe.core.tools import cache
+    from lagniappe.core.tools.ai.external.validation import validate_external_proposal
+    from lagniappe.core.tools.ai.reporting.execution.runner import run_report
+    from lagniappe.core.tools.database import get as database_get
+
+    actor = _test_user("file-plan-owner")
+    page = entity("PAGE", "aaaaaaaaaaaa")
+    file = entity("FILE", "bbbbbbbbbbbb")
+    file.page, file.summary, file.filename = page, "Old description", "original.txt"
+    upload = entity("FILE", "cccccccccccc")
+    report = entity("REPORT", "file-plan")
+    report.format_version, report.user, report.parent = REPORT_FORMAT_VERSION, actor, actor
+    report.instructions = "Correct the existing description and file any new evidence."
+    report.status, report.pending, report.input_files = "ready", False, [upload] if with_upload else []
+    store = {item.urlsafe_key: item for item in (file, page, upload, report)}
+    details = {item.hash: {"id": item.urlsafe_key, "kind": item.entity_kind} for item in (file, page, upload)}
+    monkeypatch.setattr(cache, "get_details_by_hash", lambda hashes: {key: details[key] for key in hashes if key in details})
+    monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: reference if hasattr(reference, "entity_kind") else store.get(reference))
+    monkeypatch.setattr(Entities, "fetch", lambda *references, **kwargs: [reference if hasattr(reference, "entity_kind") else store[reference] for reference in references])
+    monkeypatch.setattr(database_get, "entity", lambda key, **kwargs: next((item.db for item in store.values() if item.key == key), None))
+    writes = []
+
+    def save(*items):
+        writes.extend(items)
+        store.update({item.urlsafe_key: item for item in items})
+
+    monkeypatch.setattr(Entities, "save", save)
+    proposal = {"summary": "Correct the file description.", "confidence": 1, "actions": [
+        {"id": "edit", "type": "update_file", "data": {"entity": "hash:bbbbbbbbbbbb", "changes": {"description": "Corrected existing evidence"}}},
+    ]}
+    usage = []
+    if with_upload:
+        usage = [{"file": "hash:cccccccccccc", "usage": "organize"}]
+        proposal["actions"].extend([
+            {"id": "summary", "type": "summarize_file", "data": {"file": "hash:cccccccccccc", "summary": "New measurement evidence", "retrieval_terms": ["measurement", "baseline"]}},
+            {"id": "attach", "type": "attach_file", "data": {"file": "hash:cccccccccccc", "entity": "hash:aaaaaaaaaaaa"}},
+        ])
+    report.proposal = validate_external_proposal(proposal, report, actor, file_usage=usage)
+    assert file.summary == "Old description"
+    assert report.proposal["actions"][0]["_entity_update"]["before"]["description"] == "Old description"
+    result = run_report(report, actor)
+    assert result["status"] == "complete", [record.get("error") for record in result["actions"]]
+    assert all(record["status"] == "complete" for record in result["actions"])
+    updated = store[file.urlsafe_key]
+    assert updated.summary == "Corrected existing evidence"
+    assert updated.page.key == page.key
+    assert updated.filename == "original.txt"
+    if with_upload:
+        assert store[upload.urlsafe_key].page.key == page.key
+        assert store[upload.urlsafe_key].summary == "New measurement evidence"
+    count = len(writes)
+    assert run_report(report, actor)["status"] == "complete"
+    assert len(writes) == count
+
+
 # @source lagniappe/core/tools/ai/reporting/corrections.py::link_correction
 # @source lagniappe/core/tools/ai/reporting/corrections.py::approve_correction
 # @source lagniappe/core/tools/ai/report_history.py::delete_report_record

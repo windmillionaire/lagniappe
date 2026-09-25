@@ -18,6 +18,7 @@ PATCH_FIELDS = {
     "model": frozenset({"name", "form"}),
     "project": frozenset({"name", "description", "model_tasks"}),
     "page": frozenset({"name", "description", "categories", "form", "submission"}),
+    "file": frozenset({"name", "description"}),
 }
 
 
@@ -192,7 +193,11 @@ def prepare_patch(entity, changes, actor):
             raise ValidationError("Name cannot be cleared.")
         if value is not None and not isinstance(value, str):
             raise ValidationError(f"{field} must be text or null.")
-        setattr(candidate, field, value)
+        if kind == "file" and field == "description":
+            candidate.summary = value
+            candidate.properties.summarize.search = bool(candidate.summary)
+        else:
+            setattr(candidate, field, value)
     _require(candidate, actor, Action.EDIT)
     # Ordinary edits have the same overwrite semantics as the editor. The
     # mutation executor fences Form generations and completion transitions;
@@ -219,11 +224,13 @@ class PreparedPatch:
 # @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
 # @reason detached copies preserve storage and already-loaded relations
 def _copy_entity(entity):
-    cls = {"task": Entities.TASK, "page": Entities.PAGE, "project": Entities.PROJECT, "model": Entities.MODEL_TASK, "category": Entities.CATEGORY}[entity.entity_kind]
+    cls = {"task": Entities.TASK, "page": Entities.PAGE, "project": Entities.PROJECT, "model": Entities.MODEL_TASK, "category": Entities.CATEGORY, "file": Entities.FILE}[entity.entity_kind]
     result = cls(entity.key)
     result._db = deepcopy(entity.db)
     result.attach(entity.related_entities)
     result._mutation_intents = list(entity.mutation_intents)
+    if entity.entity_kind == "file":
+        result._processes = deepcopy(entity._processes)
     if entity.entity_kind == "project":
         result.properties.model_tasks._value = list(entity.model_tasks)
     return result
@@ -285,7 +292,7 @@ def _projection(entity):
         if field == "model_tasks":
             result[field] = [{"id": model.urlsafe_key, "name": model.name} for model in entity.model_tasks]
             continue
-        value = getattr(entity, field, None)
+        value = entity.summary if entity.entity_kind == "file" and field == "description" else getattr(entity, field, None)
         if field == "schedule":
             value = entity.properties.schedule.value
         if hasattr(value, "urlsafe_key"):

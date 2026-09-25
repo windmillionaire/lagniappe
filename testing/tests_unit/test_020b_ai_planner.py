@@ -334,7 +334,7 @@ def test_action_catalog_uses_create_update_delete_permissions(
     assert {key for key, value in capabilities.items() if value} == expected_capabilities
     assert actions == {
         "create_task", "complete_task", "skip", "needs_review", "update_task",
-        "update_page", "update_project", "update_model_task",
+        "update_page", "update_project", "update_model_task", "update_file",
     } | additional_actions
 
 

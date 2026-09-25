@@ -78,7 +78,8 @@ one home and put its ordinary app File link on other Results/Run Pages that need
 it. Verify the destination's file list as well as the original-byte checksum.
 Keep original evidence when correcting a measurement, append a dated correction
 to Results, and update misleading file descriptions through the normal File
-Info form.
+Info form or an MCP Plan's `update_file` action. Existing-file metadata edits
+require no upload or `file_usage` classification.
 
 ## Measurements and their limits
 

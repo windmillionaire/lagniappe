@@ -167,7 +167,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
     # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_does_not_require_loaded_owner
-    # @matrix admin : page privileged-account
+    # @matrix admin : page privileged-account personal-page
     # @matrix page : group-match restricted-access view-owner-short-circuit
     # @matrix page permissions users : models-scope user-page
     # @pair owner:owner-only
@@ -178,7 +178,10 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         if action.value > Action.VIEW.value:
             target_user = self.user
             if target_user and target_user.is_admin and user and not user.is_owner:
-                return False
+                # Personal workspace content is separate from account management.
+                # Keep privileged account deletion and permissions Owner-only.
+                if target_user.key != user.key or action not in {Action.EDIT, Action.CREATE}:
+                    return False
         return super().allowed(action, user=user)
 
     @classmethod

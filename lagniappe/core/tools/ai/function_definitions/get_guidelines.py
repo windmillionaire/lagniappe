@@ -86,7 +86,8 @@ ACTION_GUIDELINES = {
     "move_task": "Use exact editable source and destination references; propose only requested moves.",
     "move_file": "Use an exact file and editable source/destination; preserve evidence attachments required by the plan.",
     "suggest_page_deletion": "Return only as a final manual-cleanup suggestion after useful content is preserved; the runner does not automatically delete it.",
-    "summarize_file": "Summarize only uploads classified as organize, once per exact report file ref, with a grounded full-file summary, two distinct broad retrieval terms, and normally search=true. Evidence-only uploads and existing workspace files do not require summary actions.",
+    "summarize_file": "Summarize only uploads classified as organize, once per exact report file ref, with a grounded full-file summary, two distinct broad retrieval terms, and normally search=true. Evidence-only uploads and existing workspace files do not require summary actions. Correct existing File descriptions with update_file.",
+    "update_file": "Edit an existing File's name and/or description with data.entity and data.changes. Read get_entity(view=edit) first. Omitted fields are preserved; description=null clears it. Name must be nonempty. File contents, filename, attachments, and processing settings are preserved; description search follows whether the description is nonempty, as in File Info. No upload, retrieval terms, or file_usage entry is needed for the existing File. Current File edit permission is checked at review and execution.",
     "skip": "Use only when an artifact truly should not be saved or the user explicitly excluded it.",
     "needs_review": "Use when a real human judgment remains; do not use it to avoid documented schema or reference work.",
 }

@@ -9,7 +9,7 @@ from .actions import ACTION_ORDER
 def allowed_report_actions(user):
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
-    allowed = {"create_task", "complete_task", "skip", "needs_review", "update_task", "update_page", "update_project", "update_model_task"}
+    allowed = {"create_task", "complete_task", "skip", "needs_review", "update_task", "update_page", "update_project", "update_model_task", "update_file"}
 
     if capabilities["can_create_forms"]:
         allowed.add("create_form")
@@ -61,6 +61,8 @@ def report_action_permission_context(user, allowed_actions=None):
         rules.append("Moving tasks requires editable source and target entities.")
     if "move_file" in allowed_set:
         rules.append("Moving files requires editable source and target pages or tasks.")
+    if "update_file" in allowed_set:
+        rules.append("File name and description edits use update_file with an exact editable File. Omitted fields preserve values; description=null clears it. This preserves the file's contents and location, and requires no upload or file_usage entry for the existing File.")
     if "update_form_schema" in allowed_set:
         rules.append("Schema edits require editable forms and user review. Preview migrations across every affected Page/Task, explain destructive changes, and require visibility of the complete population.")
     if "suggest_page_deletion" in allowed_set:

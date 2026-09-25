@@ -20,6 +20,7 @@ UPDATE_TARGETS = {
     "update_model_task": "model",
     "update_project": "project",
     "update_page": "page",
+    "update_file": "file",
 }
 RELATION_FIELDS = {
     "page": "page", "project": "project", "model": "model",

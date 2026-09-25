@@ -21,7 +21,7 @@ pytestmark = pytest.mark.unit
 # @source lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
 # @matrix agent-api ai-report : external-schema proposal-contract structured-output
 @pytest.mark.parametrize(
-    "kind", ["update_task", "update_page", "update_project", "update_model_task"]
+    "kind", ["update_task", "update_page", "update_project", "update_model_task", "update_file"]
 )
 def test_cohesive_update_contract_requires_target_and_nonempty_known_patch(kind):
     schema = external_report_proposal_response_schema([kind])

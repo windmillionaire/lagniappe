@@ -360,9 +360,9 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     }
     if required:
         schema["required"] = required
-    if action_type in {"update_task", "update_model_task", "update_project", "update_page"}:
+    if action_type in {"update_task", "update_model_task", "update_project", "update_page", "update_file"}:
         from lagniappe.core.tools.entity_patches import PATCH_FIELDS
-        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_page": "page"}[action_type]
+        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_page": "page", "update_file": "file"}[action_type]
         fields = {}
         for field in sorted(PATCH_FIELDS[kind]):
             if field in {"categories", "model_tasks"}:
