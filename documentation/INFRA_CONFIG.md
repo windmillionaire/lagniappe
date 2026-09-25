@@ -43,6 +43,12 @@ configuration.
 and deployment workflows. `SETTINGS.save()` writes the generated set; passing a
 specific `File` writes only that target. Unchanged documents are not replaced.
 
+Installer generation uses `installer/config_builders.py` with explicit settings
+mappings, package version, and generated secret defaults. Builders return new
+document mappings; `installer/create_config.py` owns secret creation, applying
+those results in place, and persistence. This keeps the existing `SETTINGS`
+dictionary identities and runtime loading contract intact.
+
 Writes use UTF-8/LF, a same-directory temporary file, flush/fsync,
 `os.replace`, and a parent-directory fsync where supported. Empty documents are
 rejected. Secret-bearing files receive owner-only POSIX mode and a restricted

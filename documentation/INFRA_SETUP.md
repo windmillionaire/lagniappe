@@ -127,10 +127,14 @@ unchanged when that confirmation is declined.
 | Module/package | Responsibility |
 | --- | --- |
 | `installer/install.py` | Ordered installation orchestration. |
-| `create_config.py` | Generated settings/deployment/index files and generation marker. |
+| `create_config.py` | Installation/recovery orchestration, settings persistence, regeneration, and configuration validation. |
+| `config_builders.py` | Deterministic application, deployment, development/test, index, and manifest documents from explicit inputs. |
+| `credentials.py` | Explicit ADC transaction, authentication, identity inspection, and quota-project alignment. |
+| `setup_target.py` | Account/project selection, immutable `SetupTarget`, and read-only CLI authority checks. |
+| `project_bootstrap.py` | Project/billing/API preflight and separately invoked, confirmed bootstrap mutations. |
 | `commands.py` | Generic gcloud execution, prerequisite checks, and provider-error translation. |
 | `gcloud.py` | Project, billing, APIs, App Engine, runtime IAM, buckets, Tasks, OCR. |
-| `identity.py`, `admin.py`, `auth_email.py` | Identity Platform, Owner/OAuth, authentication email. |
+| `identity.py`, `admin.py`, `auth_email.py` | Identity Platform, Owner/OAuth and delegated application bootstrap, authentication email. |
 | `domain/` | App Engine mapping and Cloudflare/manual DNS. |
 | `ai.py`, `ai_email.py` | AI settings and AI email provider setup. |
 | `redis.py`, `security.py` | Redis discovery, connection test, and TLS. |
@@ -150,6 +154,20 @@ processes started on older checkouts. New callers must use `installer.deploy`.
 The deployment workflow keeps its configuration and provider imports lazy so
 bootstrap command checks can run before setup dependencies are installed.
 
+`create_config` retains the public `set_application_defaults()`,
+`update_config()`, `verify_application_config(upgrade=False)`, and
+`validate_project_id()` entrypoints. It passes the selected application name,
+gcloud configuration, account, and project as an immutable `SetupTarget` to
+credential and provider preparation. Helpers do not rediscover that target from
+mutable settings. The preflight result remains explicit, and the orchestrator
+controls when the credential-alignment callback runs during project preparation.
+
+ADC helpers receive a transaction explicitly. The orchestrator commits it after
+operator permission confirmation; cancellation or interruption before that
+commit restores prior credentials or removes unconfirmed credentials. Later
+installation failure does not undo a confirmed credential. The separate
+`setup auth`/runner authentication workflow retains its own behavior.
+
 ## Generated configuration
 
 Setup writes `lagniappe.yaml`, `index.yaml`, the PWA manifest, and the ignored
@@ -157,6 +175,13 @@ files under `config/files/`. Writes are atomic and generated-file completeness
 is committed through `lagniappe_generation.json`. Only
 `lagniappe_settings.yaml` and optional `redis_ca.pem` enter the App Engine
 upload. See [INFRA_CONFIG.md](INFRA_CONFIG.md).
+
+Builders return mappings without reading or mutating `SETTINGS`, prompting,
+creating secrets, or writing files. The orchestrator generates missing secrets,
+applies the results to the existing settings dictionaries in place, and saves
+through the normal atomic writer. During update/upgrade, `update_config()`
+reloads the builders and their shared manifest helper's deployment module so
+an older running upgrade process uses the replaced checkout's implementations.
 
 ## Development installation
 

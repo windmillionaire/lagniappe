@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as captureError } from './foundation.js?v=b518b165';
+import { c as captureError } from './foundation.js?v=b276e1c2';
 
 /**
  * @testable true
@@ -159,7 +159,7 @@ function installReviewBar(widget) {
 				if (!operation?.can_cancel) return;
 				const data = new FormData();
 				data.set("operation-id", operation.operation_id);
-				const { request } = await import('./foundation.js?v=b518b165').then(function (n) { return n.k; });
+				const { request } = await import('./foundation.js?v=b276e1c2').then(function (n) { return n.k; });
 				const response = await request.post(
 					`/tools/operations/${encodeURIComponent(operation.key)}/cancel`,
 					data,

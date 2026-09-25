@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { e as areEqual, r as request, c as captureError, w as withTransition } from './foundation.js?v=b518b165';
-import { c as compatibleField, i as incompatibleSchema } from './representation.js?v=b518b165';
-import { r as renderReviewBar, c as currentReviewOperation } from './reviewBar.js?v=b518b165';
-import { b as buttons } from './buttons.js?v=b518b165';
-import { STYLES } from './styles.js?v=b518b165';
-import { Modal } from './modal.js?v=b518b165';
-import { l as loadWidget } from './core-foundation.js?v=b518b165';
-import './upstreamUnavailable.js?v=b518b165';
-import './connectivity.js?v=b518b165';
-import './icons.js?v=b518b165';
-import './formatting.js?v=b518b165';
-import './storage.js?v=b518b165';
+import { e as areEqual, r as request, c as captureError, w as withTransition } from './foundation.js?v=b276e1c2';
+import { c as compatibleField, i as incompatibleSchema } from './representation.js?v=b276e1c2';
+import { r as renderReviewBar, c as currentReviewOperation } from './reviewBar.js?v=b276e1c2';
+import { b as buttons } from './buttons.js?v=b276e1c2';
+import { STYLES } from './styles.js?v=b276e1c2';
+import { Modal } from './modal.js?v=b276e1c2';
+import { l as loadWidget } from './core-foundation.js?v=b276e1c2';
+import './upstreamUnavailable.js?v=b276e1c2';
+import './connectivity.js?v=b276e1c2';
+import './icons.js?v=b276e1c2';
+import './formatting.js?v=b276e1c2';
+import './storage.js?v=b276e1c2';
 
 /**
  * Build a fully rendered, detached copy of a form widget for revision

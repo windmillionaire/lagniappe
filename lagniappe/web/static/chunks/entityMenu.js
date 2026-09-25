@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b518b165';
-import { Dropdown } from './dropdown.js?v=b518b165';
-import './icons.js?v=b518b165';
-import './combobox.js?v=b518b165';
-import './foundation.js?v=b518b165';
-import './upstreamUnavailable.js?v=b518b165';
-import './connectivity.js?v=b518b165';
-import './primitives.js?v=b518b165';
+import { STYLES } from './styles.js?v=b276e1c2';
+import { Dropdown } from './dropdown.js?v=b276e1c2';
+import './icons.js?v=b276e1c2';
+import './combobox.js?v=b276e1c2';
+import './foundation.js?v=b276e1c2';
+import './upstreamUnavailable.js?v=b276e1c2';
+import './connectivity.js?v=b276e1c2';
+import './primitives.js?v=b276e1c2';
 
 /**
  * Adapts template-defined entity actions to the shared Dropdown primitive.

@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from installer import credentials, project_bootstrap, setup_target
+
 from installer.errors import SetupError
 from installer.state import (
     SetupProcessLock,
@@ -729,15 +731,15 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         return project_id
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_gcloud_account",
         lambda account: deployer,
     )
-    monkeypatch.setattr(create_config, "_get_gcloud_project", select_project)
+    monkeypatch.setattr(setup_target, "_get_gcloud_project", select_project)
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_set_adc_quota_project",
-        lambda project_id, spinner: events.append(("adc", project_id))
+        lambda target, spinner, **kwargs: events.append(("adc", target.project_id))
         or {
             "state": "success",
             "principal": deployer,
@@ -747,7 +749,7 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         },
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda project_id, **kwargs: events.append(
             (
@@ -759,12 +761,12 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
     )
     project_client = object()
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_gcloud_project_client",
         lambda account: events.append(("cli-token", account)) or project_client,
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_active_cli_identity",
         lambda: {
             "configuration": "recovered-app",
@@ -784,12 +786,12 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         "missing_apis": [],
     }
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_target_preflight",
-        lambda project_id: events.append(("preflight", project_id)) or preflight,
+        lambda target: events.append(("preflight", target.project_id)) or preflight,
     )
-    def ensure_adc(account, project_id=None):
-        events.append(("adc-auth", account, project_id))
+    def ensure_adc(target, **kwargs):
+        events.append(("adc-auth", target.account, target.project_id))
         return {
             "state": "success",
             "principal": deployer,
@@ -798,14 +800,14 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
             "error": None,
         }
 
-    monkeypatch.setattr(create_config, "_ensure_adc_principal", ensure_adc)
+    monkeypatch.setattr(credentials, "_ensure_adc_principal", ensure_adc)
     monkeypatch.setattr(
         create_config,
         "_display_install_identity_summary",
         lambda target_preflight, adc_identity: None,
     )
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_apply_target_preflight",
         lambda project_id, target_preflight, project_ready=None: None,
     )

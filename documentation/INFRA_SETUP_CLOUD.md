@@ -1,7 +1,9 @@
 # Infrastructure Cloud Setup
 
-`installer/gcloud.py` owns Google Cloud project and runtime resource
-provisioning. It runs with the saved human installer/deployer credential;
+`installer/project_bootstrap.py` owns initial project, billing, and bootstrap
+API preparation; `installer/gcloud.py` owns required-API reconciliation and
+runtime resource provisioning. Both run with the selected human
+installer/deployer credential;
 application runtime clients use the attached service account.
 
 ## Identities
