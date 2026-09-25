@@ -127,6 +127,7 @@ class DeferredJobRunner:
         )
         context = self._context(job)
         control.report_planning = not adapter.resume_preparation
+        control.cancellable_provider = adapter.cancellable_provider
         control.provider_retry_callback = lambda: self._claim_provider_retry(job, lease_token, context)
         context.active_check = lambda: self._claim_active(job, lease_token)
         context.execution_control = control
@@ -154,6 +155,12 @@ class DeferredJobRunner:
                 raise exceptions.ValidationError(
                     "Deferred job authorization snapshot is invalid."
                 )
+            committed = adapter.committed_result(job)
+            if committed is not None:
+                # An atomic receipt proves that authorization and guarded apply
+                # already succeeded. Only delivery remains, even if the deadline
+                # expired or an input was deleted after the committed write.
+                return self._complete(job, adapter, lease_token, committed)
             context = adapter.load(context)
             if context.actor is None:
                 raise exceptions.ValidationError("Deferred job actor is missing.")
@@ -241,33 +248,7 @@ class DeferredJobRunner:
                     job.result or context.checkpoint.get("result") or {}
                 )
 
-            _validate_payload(
-                authorization=job.authorization or {},
-                inputs=job.inputs or {},
-                parameters=job.parameters or {},
-                client=job.client or {},
-                checkpoint=context.checkpoint,
-                result=result,
-            )
-            self._persist_claimed(
-                job,
-                lease_token,
-                status=DeferredJobStatus.SUCCEEDED.value,
-                dispatch_state="delivery_pending",
-                deadline_at=None,
-                result=result,
-                error={},
-                progress={
-                    "phase": DeferredJobPhase.COMPLETE.value,
-                    "updated_at": _utc().isoformat(),
-                },
-                delivery={"cleanup": False, "notification": False},
-                status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
-            )
-            context.checkpoint = job.checkpoint or context.checkpoint
-            self._finish_terminal_delivery(job, adapter, context=context)
-            self._release(job, lease_token)
-            return DeferredJobResult(DeferredJobRunState.COMPLETE, job=job)
+            return self._complete(job, adapter, lease_token, result, context=context)
         except DeferredJobDependencyPendingError as error:
             return self._schedule_dependency_wait(
                 job,
@@ -306,7 +287,7 @@ class DeferredJobRunner:
                 raise DeferredJobInfrastructureError(
                     "Deferred job terminal delivery is incomplete."
                 ) from error
-            if adapter.resume_preparation and _retryable(error) and _provider_retry_attempt(job) <= len(
+            if adapter.resume_preparation and not adapter.cancellable_provider and _retryable(error) and _provider_retry_attempt(job) <= len(
                 _retry_delays(error)
             ):
                 return self._schedule_retry(
@@ -324,6 +305,39 @@ class DeferredJobRunner:
                 raise
         finally:
             lease_guard.__exit__()
+
+    # @testable infrastructure
+    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
+    def _complete(self, job, adapter, lease_token, result, *, context=None):
+        result = _json_copy(result)
+        _validate_payload(
+            authorization=job.authorization or {},
+            inputs=job.inputs or {},
+            parameters=job.parameters or {},
+            client=job.client or {},
+            checkpoint=context.checkpoint if context else job.checkpoint,
+            result=result,
+        )
+        self._persist_claimed(
+            job,
+            lease_token,
+            status=DeferredJobStatus.SUCCEEDED.value,
+            dispatch_state="delivery_pending",
+            deadline_at=None,
+            result=result,
+            error={},
+            progress={
+                "phase": DeferredJobPhase.COMPLETE.value,
+                "updated_at": _utc().isoformat(),
+            },
+            delivery={"cleanup": False, "notification": False},
+            status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
+        )
+        if context is not None:
+            context.checkpoint = job.checkpoint or context.checkpoint
+        self._finish_terminal_delivery(job, adapter, context=context)
+        self._release(job, lease_token)
+        return DeferredJobResult(DeferredJobRunState.COMPLETE, job=job)
 
 
     # @testable infrastructure

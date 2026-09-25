@@ -291,7 +291,11 @@ class GenAI:
         elif function_tool:
             config["tools"] = [function_tool]
 
-        if prompt.thinking_budget is not None:
+        if prompt.thinking_level is not None:
+            config["thinking_config"] = types.ThinkingConfig(
+                thinking_level=prompt.thinking_level
+            )
+        elif prompt.thinking_budget is not None:
             config["thinking_config"] = types.ThinkingConfig(
                 thinking_budget=prompt.thinking_budget
             )
@@ -384,7 +388,10 @@ class GenAI:
         token = observer.install()
         terminal_error = None
         control = current_execution_control()
-        session = ProviderSession(control) if getattr(control, "report_planning", False) else None
+        session = ProviderSession(control) if (
+            getattr(control, "report_planning", False)
+            or getattr(control, "cancellable_provider", False)
+        ) else None
         session_token = current_session.set(session)
         try:
             settings = runtime_ai_settings()

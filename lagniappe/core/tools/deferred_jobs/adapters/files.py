@@ -60,8 +60,10 @@ class FileAdapter(DeferredJobAdapter):
                 "The original file changed while this operation was running."
             )
 
-    # @testable infrastructure
+    # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_ai_adapters_reject_restricted_actor_before_prepare
+    # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_adapter_requires_edit_permission_from_explicit_actor
+    # @matrix deferred-jobs file : authorization explicit-actor
     def authorize(self, context):
         super().authorize(context)
         file = context.input("file")

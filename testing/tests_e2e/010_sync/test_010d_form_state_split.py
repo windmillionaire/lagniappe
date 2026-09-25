@@ -142,7 +142,7 @@ def test_form_submission_reconciliation_uses_latest_schema(
     marker = info.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
     expect(marker.locator("[data-role='edited-message']")).to_contain_text(
-        "fields and saved values changed"
+        "fields have changed"
     )
     marker.locator("[data-role='edited-reset']").click()
 
@@ -161,13 +161,15 @@ def test_form_submission_reconciliation_uses_latest_schema(
     saved_choice = modal.locator("[data-revision-source='server']").filter(
         has_text=server_value
     )
+    expect(saved_choice).to_have_attribute("aria-checked", "false")
+    expect(local_choice).to_have_attribute("aria-checked", "true")
+    saved_choice.click()
     expect(saved_choice).to_have_attribute("aria-checked", "true")
-    expect(local_choice).to_have_attribute("aria-checked", "false")
     local_choice.click()
     expect(local_choice).to_have_attribute("aria-checked", "true")
     expect(saved_choice).to_have_attribute("aria-checked", "false")
 
-    modal.get_by_role("button", name="Update values").click()
+    modal.get_by_role("button", name="Use selected values").click()
     expect(modal).not_to_be_attached()
 
     info = first.locator("[data-widget='PageInfo']")

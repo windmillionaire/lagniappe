@@ -301,15 +301,6 @@ const contextUpload = (settings = {}) => {
 	context.append(dropzoneElement.element);
 	context.append(description);
 
-	if (settings.explain !== false) {
-		const explain = primitives.explain_prompt({
-			explain: settings.explain || "autofill",
-			visible: true,
-			classes: ["mt-1"],
-		});
-		container.append(explain);
-	}
-
 	return {
 		element: container,
 		dropzone: dropzoneElement,

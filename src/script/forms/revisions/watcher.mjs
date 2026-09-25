@@ -258,7 +258,12 @@ export class EditWatcher {
 				form.dataset.operation = descriptor.operation;
 				form.dataset.operationRevision = String(descriptor.revision ?? 0);
 				form.dataset.operationScope = descriptor.scope || "";
-				form.dataset.deferredLock = "form";
+				if (
+					descriptor.blocks_edit === true ||
+					descriptor.scope === "form-change"
+				)
+					form.dataset.deferredLock = "form";
+				else delete form.dataset.deferredLock;
 			}
 			tracked.push({
 				revision: descriptor.revision ?? 0,
@@ -425,6 +430,10 @@ export class EditWatcher {
 
 	stageConflict(widget, conflict = {}) {
 		return this._reconciler.stageConflict(widget, conflict);
+	}
+
+	openConflictReview(widget, options = {}) {
+		return this._reconciler.openConflictReview(widget, options);
 	}
 
 	resolveRevision(marker, choice) {

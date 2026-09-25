@@ -8,7 +8,8 @@ import { FormRenderer } from "./renderer.mjs";
 /**
  * @testable true
  * @tests tests_js/test_048_form_controls.mjs::test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
- * @matrix forms : initialization teardown readonly
+ * @tests tests_js/test_048_form_controls.mjs::test_form_review_notice_stays_above_expanded_autofill_context
+ * @matrix forms : initialization review-notice-placement teardown readonly
  */
 export class FormController {
 	constructor(widget) {
@@ -178,12 +179,17 @@ export class FormController {
 			this.target.append(submitGroup);
 		}
 
-		if (this._editedMarker && !this.target.contains(this._editedMarker)) {
-			const markerAnchor = this.submitGroup ?? this.submitButton;
-			if (markerAnchor) {
-				markerAnchor.before(this._editedMarker);
-			} else {
-				this.target.append(this._editedMarker);
+		if (this._editedMarker) {
+			const autofillPanel = this.target.querySelector("[data-role='autofill']");
+			if (autofillPanel) {
+				autofillPanel.before(this._editedMarker);
+			} else if (!this.target.contains(this._editedMarker)) {
+				const markerAnchor = this.submitGroup ?? this.submitButton;
+				if (markerAnchor) {
+					markerAnchor.before(this._editedMarker);
+				} else {
+					this.target.append(this._editedMarker);
+				}
 			}
 		}
 

@@ -236,7 +236,7 @@ tbody[data-editing="true"] td [data-role="quick-edit-content"] {
 }
 
 /* @style form.table.form */
-tbody[data-editing="true"] td [data-role="quick-edit-error"] {
+td [data-role="quick-edit-error"] {
 	margin-top: 0.25rem;
 	margin-right: 0.5rem;
 	font-size: 0.75rem;

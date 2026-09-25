@@ -6,19 +6,17 @@ from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
     AI,
-    FileConsumer,
     FileConsumerLimitError,
-    enforce_file_consumer,
 )
-from lagniappe.core.tools.ai import autofill as ai_autofill
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.site import public_pages as public_page_service
 from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
     UNAVAILABLE_REFERENCE_ERROR,
 )
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
-from lagniappe.core.tools.polling.projections import page_tasks_revision
+from lagniappe.core.tools.forms import review as form_review
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -68,7 +66,7 @@ def _load_page_settings_relations(page, *, restrictions=False):
 # @matrix pages : document-tab load permission-gates readonly tabs
 # @matrix pages : access-restrictions source-summary
 @pages.route("<key>", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def view(key, **kwargs):
     page = _load_page_settings_relations(
         kwargs["entity"],
@@ -82,7 +80,7 @@ def view(key, **kwargs):
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def info(key, **kwargs):
     page = kwargs["entity"]
     return responses.page_info(page)
@@ -124,7 +122,7 @@ def document_settings(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @matrix tasks : basic create
 @pages.route("<key>/tasks", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW, fingerprint=page_tasks_revision)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.page_tasks_fingerprint)
 def tasks(key, **kwargs):
     page = kwargs["entity"]
 
@@ -223,33 +221,6 @@ def _page_data(form, page=None, category=None):
     return page_data
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::create
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason autofill prompt data assembly is part of page create/update request flow
-def _autofill_data(page, request, create=False):
-    file = request.files.get("autofill-file") or direct_uploads.direct_upload_file(
-        "autofill-file", consumer=FileConsumer.AI_INLINE
-    )
-    if file:
-        try:
-            enforce_file_consumer(
-                file,
-                FileConsumer.AI_INLINE,
-                filename=getattr(file, "filename", None),
-            )
-        except FileConsumerLimitError as error:
-            abort(422, description=str(error))
-    return ai_autofill.autofill_prompt_data(
-        page,
-        current_user,
-        user_context=request.form.get("autofill-description"),
-        file=file,
-        mimetype=request.form.get("mimetype"),
-        create=create,
-    )
-
-
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
 # @matrix pages : form-switch info-form
@@ -314,7 +285,7 @@ def _is_offline_replay(form):
 # @pair pages:submission-validation
 # @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def update(key, **kwargs):
     page = kwargs["entity"]
 
@@ -342,6 +313,8 @@ def update(key, **kwargs):
 
     role = request.form.get("role")
     if role != "user-settings":
+        if not form_review.stage_submission_guard(page, request.form):
+            return deferred_autofill.conflict_response(page)
         locked = deferred_autofill.locked_response(page, request.form)
         if locked:
             return locked
@@ -378,30 +351,32 @@ def update(key, **kwargs):
         )
         return responses.user_settings(page)
 
-    if role in ["autofill-submit", "explain"]:
+    if role == "explain" or request.form.get("explain"):
+        return responses.error("Initial Prompt is no longer available.")
+
+    if role == "autofill-submit":
         require_ai_access(AI.CREATE)
-        _apply_page_metadata_update(page, page_data, user=current_user)
+        if getattr(page_data["form"], "key", None) != getattr(page.form, "key", None):
+            return responses.error("Save the form selection before running autofill.")
+        draft = None
         if page.form:
             try:
-                _apply_page_submission(page, request)
+                draft = page.preview_form_submission(request, actor=current_user)
             except exceptions.ValidationError as error:
                 return responses.error(str(error))
-        if role == "explain":
-            try:
-                prompt = ai_autofill.form_autofill_prompt(**_autofill_data(page, request))
-                return responses.explain(prompt)
-            finally:
-                direct_uploads.cleanup_direct_uploads(
-                    request.form, input_name="autofill-file"
-                )
-
-        page.save()
+        target_context = {
+            "name": page_data["name"],
+            "description": page_data["description"],
+        }
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 page,
                 current_user,
                 request.form,
                 multipart_file=bool(request.files.get("autofill-file")),
+                submission=draft["values"] if draft else None,
+                prompt_submission=draft["ai_values"] if draft else None,
+                target_context=target_context,
             ),
             page,
         )
@@ -412,7 +387,25 @@ def update(key, **kwargs):
         except exceptions.ValidationError as error:
             return responses.error(str(error))
 
-    page.save()
+    staged_file = None
+    try:
+        staged_file, staged_cleanup = deferred_autofill.staged_upload_for_update(
+            page, current_user, request.form,
+        )
+        form_review.acknowledge_reviews(page, current_user, request.form.getlist("reviewed-operation"))
+        if staged_file:
+            Entities.save(staged_file, page)
+        else:
+            page.save()
+    except exceptions.MutationConflict:
+        if staged_file:
+            storage_assets.cleanup_rejected_attempt(staged_file)
+        return deferred_autofill.conflict_response(page)
+    except (exceptions.ValidationError, storage_assets.DirectUploadError, FileConsumerLimitError) as error:
+        if staged_file:
+            storage_assets.cleanup_rejected_attempt(staged_file)
+        return responses.error(str(error))
+    deferred_autofill.cleanup_staged_uploads(staged_cleanup)
     if _is_offline_replay(request.form):
         _offline_update_notification(page)
         return responses.entity_response(
@@ -437,7 +430,7 @@ def update_direct(key, **kwargs):
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
-    locked = deferred_autofill.locked_response(kwargs["entity"], request.form)
+    locked = deferred_autofill.locked_response(kwargs["entity"], upload_data)
     if locked:
         return locked
     return direct_uploads.direct_upload_response()
@@ -520,19 +513,11 @@ def create(key, **kwargs):
             "The autofill attachment was not uploaded. Try attaching it again."
         )
 
-    if role in ["autofill-submit", "explain"]:
-        require_ai_access(AI.CREATE)
-        if role == "explain":
-            try:
-                prompt = ai_autofill.form_autofill_prompt(
-                    **_autofill_data(page, request, create=True)
-                )
-                return responses.explain(prompt)
-            finally:
-                direct_uploads.cleanup_direct_uploads(
-                    request.form, input_name="autofill-file"
-                )
+    if role == "explain" or request.form.get("explain"):
+        return responses.error("Initial Prompt is no longer available.")
 
+    if role == "autofill-submit":
+        require_ai_access(AI.CREATE)
         if page.form:
             try:
                 _apply_page_submission(page, request)

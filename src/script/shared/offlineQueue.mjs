@@ -128,6 +128,31 @@ export class OfflineQueue {
 		);
 	}
 
+	/**
+	 * A task form can mount after the first reconnect replay found its conflict.
+	 * Give that form the retained record instead of requiring another replay.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_045_offline_queue.mjs::test_late_form_receives_persisted_conflict_after_replay
+	 * @matrix offline : conflict-durability late-widget
+	 */
+	async presentFor(target) {
+		if (!target?.key || typeof target.handleOfflineQueue !== "function") return;
+		const record = this._sortedRecords().find(
+			(candidate) => candidate.target_key === target.key,
+		);
+		if (!record) return;
+		await this._dispatch(
+			{
+				phase: record.conflictResponse ? "conflict" : "queued",
+				queue: this,
+				record,
+				response: record.conflictResponse,
+			},
+			[target],
+		);
+	}
+
 	_responseFromResults(results) {
 		return results.find((result) => {
 			return result && typeof result === "object" && "ok" in result;
@@ -196,6 +221,7 @@ export class OfflineQueue {
 			fingerprint,
 			modified,
 			renderer_submission: rendererSubmission,
+			renderer_schema: partial.renderer_schema ?? widget.schema ?? null,
 			form_controls: formControls,
 		});
 
@@ -361,6 +387,7 @@ export class OfflineQueue {
 				widget.form?.renderer?._packageSubmission?.() ??
 				record.renderer_submission ??
 				null,
+			renderer_schema: widget.schema ?? record.renderer_schema ?? null,
 			fields: serialized.fields,
 			files: serialized.files,
 		};
@@ -411,6 +438,7 @@ export class OfflineQueue {
 			fingerprint: record.fingerprint || null,
 			modified: record.modified || null,
 			renderer_submission: record.renderer_submission ?? null,
+			renderer_schema: record.renderer_schema ?? null,
 			form_controls: record.form_controls || [],
 			fields: serialized.fields,
 			files: serialized.files,

@@ -808,6 +808,11 @@ export default class Core extends ShellView {
 		trigger.removeAttribute("aria-busy");
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.mjs::test_component_open_event_follows_delegated_toggle
+	 * @matrix navigation tasks : delegated-toggle task-open-event
+	 */
 	renderComponent(trigger) {
 		if (!trigger) return;
 		if (this._componentActions.has(trigger)) {
@@ -855,13 +860,28 @@ export default class Core extends ShellView {
 			.then(async (activated) => {
 				if (this._destroyed || trigger.isConnected === false) return null;
 				await component.prepareRender(activated);
-				return withTransition(
+				const committed = await withTransition(
 					() => {
 						if (this._destroyed) return;
 						component.render(activated);
 					},
 					{ label: `${component.name}:activate` },
 				);
+				if (
+					activated &&
+					committed !== false &&
+					!this._destroyed &&
+					trigger.isConnected &&
+					component.elt.isConnected
+				) {
+					component.elt.dispatchEvent(
+						new CustomEvent("component-opened", {
+							bubbles: true,
+							detail: { component, trigger },
+						}),
+					);
+				}
+				return committed;
 			})
 			.catch((error) => {
 				this.reportStartupError(error, trigger, "component-activation");

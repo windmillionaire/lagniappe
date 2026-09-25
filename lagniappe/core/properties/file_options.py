@@ -103,11 +103,14 @@ class Summarize(ProcessProperty):
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
 # @matrix deferred-jobs file : deferred-dispatch extraction-follow-up post-save-dispatch summary-first
-def dispatch_file_processing(file, request):
+# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
+# @matrix file deferred-jobs : explicit-actor
+def dispatch_file_processing(file, request, *, actor):
     """Start persisted file work, chaining extraction behind summarization."""
     if request.get("summarize"):
         return summarize_file(
             file,
+            actor=actor,
             parameters=(
                 {"extract_after_summary": True}
                 if request.get("extract")
@@ -115,7 +118,7 @@ def dispatch_file_processing(file, request):
             ),
         )
     if request.get("extract"):
-        return get_file_text(file)
+        return get_file_text(file, actor=actor)
     return None
 
 

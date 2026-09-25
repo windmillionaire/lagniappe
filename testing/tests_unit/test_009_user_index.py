@@ -119,8 +119,8 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
     )
     visible_user.allowed = lambda action, user=None: True
     hidden_user.allowed = lambda action, user=None: False
-    allowed_group.allowed = lambda action: True
-    denied_group.allowed = lambda action: False
+    allowed_group.allowed = lambda action, user=None: True
+    denied_group.allowed = lambda action, user=None: False
 
     def fake_url_for(endpoint, **kwargs):
         pieces = [endpoint]

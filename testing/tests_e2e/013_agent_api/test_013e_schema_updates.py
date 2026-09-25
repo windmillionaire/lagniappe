@@ -30,7 +30,7 @@ pytestmark = pytest.mark.e2e
 # @source lagniappe/core/tools/forms/changes.py::prepare_target
 # @source lagniappe/core/tools/ai/reporting/schema_updates.py::report_impact
 # @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
 # @matrix form-migration : preview external-provider-free publication completed-task review
 # @matrix ai-report : schema-update deterministic-run continue

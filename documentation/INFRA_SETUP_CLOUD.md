@@ -1,7 +1,9 @@
 # Infrastructure Cloud Setup
 
-`installer/gcloud.py` owns Google Cloud project and runtime resource
-provisioning. It runs with the saved human installer/deployer credential;
+`installer/project_bootstrap.py` owns initial project, billing, and bootstrap
+API preparation; `installer/gcloud.py` owns required-API reconciliation and
+runtime resource provisioning. Both run with the selected human
+installer/deployer credential;
 application runtime clients use the attached service account.
 
 ## Identities
@@ -145,6 +147,9 @@ buckets.
 - The recovery bucket has no browser CORS and no runtime service-account
   access; only the saved human operator administers its objects.
 - Existing retention, soft-delete, and lifecycle policy are preserved.
+- Setup also owns a prefix-scoped deletion rule for private temporary direct
+  uploads (`tmp/uploads/`) after 30 days. This bounds abandoned autofill
+  staging without touching attached File assets or other object prefixes.
 - Runtime application startup validates expected buckets and never creates or
   mutates them.
 

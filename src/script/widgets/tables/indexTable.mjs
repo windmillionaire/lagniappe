@@ -1,4 +1,5 @@
 import { BaseTable } from "../../elements/base/baseTable.mjs";
+import { captureError } from "../../shared/errors.mjs";
 
 /**
  * @testable infrastructure
@@ -89,16 +90,21 @@ export class IndexTable extends BaseTable {
 	}
 
 	/**
-	 * @testable infrastructure
-	 * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
+	 * @testable true
+	 * @matrix table-controls : quick-edit row-replacement teardown
 	 */
 	refreshDelta(delta) {
+		const editor = this.component?.widgets?.TableEditor;
 		const existing = new Map(
 			Array.from(this.target.querySelectorAll("tr[lp-entity]"), (row) => [
 				row.dataset.key,
 				row,
 			]),
 		);
+		editor?.releaseRows([
+			...(delta.remove || []).map((key) => existing.get(key)),
+			...(delta.upsert || []).map(({ key }) => existing.get(key)),
+		]);
 		for (const key of delta.remove || []) {
 			existing.get(key)?.remove();
 			existing.delete(key);
@@ -111,8 +117,9 @@ export class IndexTable extends BaseTable {
 				throw new Error("Invalid table refresh row");
 			}
 			const current = existing.get(update.key);
-			if (current) current.replaceWith(row);
-			else added.push(row);
+			if (current) {
+				current.replaceWith(row);
+			} else added.push(row);
 			existing.set(update.key, row);
 		}
 
@@ -134,28 +141,37 @@ export class IndexTable extends BaseTable {
 
 		this.setEmptyRowVisibility();
 		this.sortingWidget?.refreshRows?.();
+		void editor?.refreshCheckboxes().catch(captureError);
 	}
 
 	/**
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
 	 * @matrix form-index : delete-target destination-refresh sorting
+	 * @matrix table-controls : quick-edit row-replacement teardown
 	 */
 	refresh(response) {
 		if (!response?.html) return;
+		const editor = this.component?.widgets?.TableEditor;
 		const newRows = [...response.html.querySelectorAll("tr[lp-entity]")];
 		const newKeys = new Set(
 			newRows.map((row) => row.dataset.key).filter(Boolean),
 		);
 		const prepend = [];
+		editor?.releaseRows(
+			Array.from(this.target.querySelectorAll("tr[lp-entity]")).filter(
+				(row) => !this.prefetched || newKeys.has(row.dataset.key),
+			),
+		);
 
 		for (const newRow of newRows) {
 			const key = newRow.dataset.key;
 			if (!key) continue;
 
 			const existing = this.target.querySelector(`tr[data-key="${key}"]`);
-			if (existing) existing.replaceWith(newRow);
-			else prepend.push(newRow);
+			if (existing) {
+				existing.replaceWith(newRow);
+			} else prepend.push(newRow);
 		}
 
 		if (prepend.length) {
@@ -167,12 +183,15 @@ export class IndexTable extends BaseTable {
 
 		if (!this.prefetched) {
 			this.target.querySelectorAll("tr[lp-entity]").forEach((row) => {
-				if (!newKeys.has(row.dataset.key)) row.remove();
+				if (!newKeys.has(row.dataset.key)) {
+					row.remove();
+				}
 			});
 		}
 
 		this.setEmptyRowVisibility();
 		this.sortingWidget?.refreshRows?.();
+		void editor?.refreshCheckboxes().catch(captureError);
 	}
 
 	/**
@@ -222,6 +241,9 @@ export class IndexTable extends BaseTable {
 		if (rowsChanged) {
 			this.setEmptyRowVisibility();
 			if (sortingWasInitialized) this.sortingWidget.refreshRows();
+			void this.component?.widgets?.TableEditor?.refreshCheckboxes().catch(
+				captureError,
+			);
 		}
 	}
 }

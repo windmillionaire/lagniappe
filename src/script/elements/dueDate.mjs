@@ -586,13 +586,6 @@ export class DueDate {
 			}),
 		);
 
-		monthlyOptions.appendChild(
-			primitives.explain_prompt({
-				explain: "schedule",
-				classes: ["self-start", "-mb-2"],
-			}),
-		);
-
 		return monthlyOptions;
 	}
 
@@ -618,13 +611,6 @@ export class DueDate {
 						? this.schedule.scheduled?.description || ""
 						: "",
 				label: "Describe when this repeats (description will be parsed by AI)",
-			}),
-		);
-
-		yearlyOptions.appendChild(
-			primitives.explain_prompt({
-				explain: "schedule",
-				classes: ["self-start", "-mb-2"],
 			}),
 		);
 
@@ -667,13 +653,6 @@ export class DueDate {
 				value: this.schedule.periodic?.description || "",
 				label:
 					"Describe how often this repeats (description will be parsed by AI)",
-			}),
-		);
-
-		periodicOptions.appendChild(
-			primitives.explain_prompt({
-				explain: "schedule",
-				classes: ["self-start", "-mb-2"],
 			}),
 		);
 

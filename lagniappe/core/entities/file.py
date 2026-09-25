@@ -210,11 +210,14 @@ class File(AssetMixin, Entity):
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
     # @matrix deferred-jobs file : deferred-dispatch post-save-dispatch summary-first
-    def dispatch_pending_processing(self):
+    # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
+    # @tests tests_unit/test_006_file_properties.py::test_file_processing_preserves_pending_request_when_dispatch_fails
+    # @matrix file deferred-jobs : explicit-actor retry
+    def dispatch_pending_processing(self, *, actor):
         """Dispatch processing selected by the last update after persistence."""
         request = getattr(self, "_pending_file_processing", None)
         if not request:
             return None
-        result = file_options.dispatch_file_processing(self, request)
+        result = file_options.dispatch_file_processing(self, request, actor=actor)
         self._pending_file_processing = None
         return result

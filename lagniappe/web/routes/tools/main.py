@@ -1,7 +1,5 @@
 """Routes for AI tool reports."""
 
-from types import SimpleNamespace
-
 from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
@@ -12,6 +10,7 @@ from lagniappe.core.definitions import (
     DeferredJobSpec,
     DeferredJobType,
     Fetch,
+    FetchReason,
     FileConsumer,
     FileConsumerLimitError,
     INDIVIDUAL_FILES_ONLY_ERROR,
@@ -19,15 +18,16 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai import planner as report_planner
 from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
 from lagniappe.core.tools.ai.reporting.proposals import selection as report_selection
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_operations, report_history
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+from lagniappe.core.tools.forms import review as form_review
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
+from lagniappe.web import deferred_autofill
 from lagniappe.web.auth import ai_access, logged_in, require_ai_access
 
 from . import tools
@@ -35,12 +35,27 @@ from . import tools
 
 # @testable true
 # @matrix ai-report : cancellation revision reload
+# @pair ai:autofill
+# @matrix ai tasks : cancellation
 @tools.route("/operations/<job_key>/cancel", methods=["POST"])
 @logged_in
 def cancel_generation(job_key):
     job = Entities.fetch_one(job_key, request=Fetch.direct())
-    if not isinstance(job, Entities.DEFERRED_JOB) or job.job_type != DeferredJobType.REPORT_AI.value:
+    if not isinstance(job, Entities.DEFERRED_JOB) or job.job_type not in {"autofill", DeferredJobType.REPORT_AI.value}:
         abort(404)
+    if job.job_type == "autofill":
+        target = Entities.fetch_one(((job.inputs or {}).get("target") or {}).get("id"), request=Fetch.direct())
+        if not isinstance(target, (Entities.PAGE, Entities.TASK)) or not target.allowed(Action.EDIT, user=current_user):
+            abort(403)
+        if (job.parameters or {}).get("mode") == "revise" and job.actor.key != current_user.key:
+            abort(403)
+        if request.form.get("operation-id") != job.idempotency_key:
+            abort(409, description="This autofill control is stale. Refresh before trying again.")
+        DeferredJobs.cancel(job)
+        statuses = DeferredJobs.statuses([job_key], current_user)
+        was_cancelled = bool(statuses and statuses[0]["status"] in {"cancelled", "superseded"})
+        return responses.json_response({"status": statuses[0] if statuses else None,
+            "message": "Autofill cancelled. Saved answers and files were kept." if was_cancelled else "Autofill has already finished or applied its results."})
     if job.actor.key != current_user.key and not current_user.has_permission(Resource.SITE, Action.EDIT):
         abort(403)
     if request.form.get("operation-id") != job.idempotency_key:
@@ -57,6 +72,43 @@ def cancel_generation(job_key):
     if job.actor.key != current_user.key:
         return redirect(url_for("analytics.index"))
     return redirect(url_for("tools.report", key=report.urlsafe_key))
+
+
+# @testable true
+# @pair ai:autofill
+@tools.route("/autofill/<key>/revise", methods=["POST"])
+@ai_access(AI.CREATE)
+def refine_autofill(key):
+    """Prompt-only, actor-private proposals; never save the modal's draft answers."""
+    target = Entities.fetch_one(key, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
+    if not isinstance(target, (Entities.PAGE, Entities.TASK)) or not target.allowed(Action.EDIT, user=current_user):
+        abort(403)
+    if getattr(target, "completed", False):
+        abort(409, description="This task is complete.")
+    if not form_review.stage_submission_guard(target, request.form):
+        return deferred_autofill.conflict_response(target)
+    locked = deferred_autofill.locked_response(target, {"role": "autofill-submit"})
+    if locked:
+        return locked
+    try:
+        import json
+        submission = json.loads(request.form.get("submission", "{}"))
+        if not isinstance(submission, dict) or len(request.form.get("submission", "")) > 300 * 1024:
+            raise exceptions.ValidationError("The review draft is too large or invalid.")
+        # Validate editable IDs/types and reference permissions before sealing.
+        from lagniappe.core.tools.ai.autofill import validate_submission
+        editable_ids = {field["id"] for field in target.submission_schema if field.get("type") not in {"signature", "status", "html"}}
+        submission = {key: value for key, value in submission.items() if key in editable_ids}
+        submission = validate_submission(submission, entity=target, user=current_user, schema=target.submission_schema)
+        context = {
+            "previous_suggestions": form_review.review_projection(target, current_user),
+        }
+        return deferred_autofill.start_deferred_autofill(
+            target, current_user, request.form, mode="revise", submission=submission,
+            review_context=context,
+        )
+    except (ValueError, exceptions.ValidationError, exceptions.AIException) as error:
+        return responses.error(str(error))
 
 
 # @testable true
@@ -134,53 +186,6 @@ def _report_upload_manifest():
         input_name="tool-files",
     )
     return report_uploads.prepare_report_upload_manifest(records)
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason prompt preview uses upload metadata without persisting files
-def _preview_report_files():
-    files = []
-    uploads = [
-        {
-            "filename": upload.filename,
-            "content_type": upload.content_type,
-        }
-        for upload in request.files.getlist("tool-files")
-    ]
-    uploads.extend(
-        direct_uploads.direct_upload_records(
-            request.form,
-            input_name="tool-files",
-        )
-    )
-    for upload in uploads:
-        filename = upload.get("filename")
-        if not filename:
-            continue
-        files.append(
-            SimpleNamespace(
-                urlsafe_key=f"upload:{filename}",
-                name=filename,
-                filename=filename,
-                mimetype=upload.get("content_type") or "application/octet-stream",
-                summary=None,
-            )
-        )
-    return files
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason explain modal shares the real organize prompt assembly
-def _explain_ai_prompt():
-    report = SimpleNamespace(
-        db={},
-        origin="web",
-        instructions=request.form.get("instructions"),
-        input_files=_preview_report_files(),
-    )
-    return responses.explain(report_planner.report_prompt(report, current_user))
 
 
 # @testable false
@@ -277,7 +282,7 @@ def _start_tool_report(
 @ai_access(AI.ASK)
 def create_ai_report():
     if request.form.get("role") == "explain":
-        return _explain_ai_prompt()
+        return responses.error("Initial Prompt is no longer available.")
 
     try:
         input_files = _uploaded_report_files()

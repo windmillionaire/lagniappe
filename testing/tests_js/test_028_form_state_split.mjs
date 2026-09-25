@@ -244,7 +244,7 @@ test("test_offline_database_upgrade_discards_legacy_activity_records", async (t)
 });
 
 /** @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync */
-test("test_form_submit_is_guarded_only_by_durable_autofill_lock", async (t) => {
+test("test_form_submit_is_blocked_by_schema_migration_but_not_autofill", async (t) => {
 	createBrowser(t);
 	const { FormWidget } = await loadFormWidget();
 	const target = document.createElement("div");
@@ -286,7 +286,7 @@ test("test_form_submit_is_guarded_only_by_durable_autofill_lock", async (t) => {
 	};
 	assert.equal(formWidget.formData.directUploadApplied, true);
 	widget.lockDeferredOperation({ operation: "operation-1", revision: 3 });
-	assert.equal(await widget.prepareSubmit(), false);
+	assert.equal(await widget.prepareSubmit(), true);
 	widget.lockDeferredOperation({
 		operation: "migration-1",
 		revision: 0,
@@ -295,6 +295,7 @@ test("test_form_submit_is_guarded_only_by_durable_autofill_lock", async (t) => {
 	for (const node of [widget.target, widget.initialTarget]) {
 		assert.equal(node.dataset.operationScope, "form-change");
 	}
+	assert.equal(await widget.prepareSubmit(), false);
 });
 
 /** @matrix deferred-jobs : form-lock reload */
@@ -440,6 +441,7 @@ test("test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload",
 	};
 	const widget = {
 		target: document.querySelector("form"),
+		schema: [{ id: "headline", type: "input", input: "text" }],
 		form: {
 			renderer: { _packageSubmission: () => rendererSubmission },
 		},
@@ -462,6 +464,7 @@ test("test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload",
 		"PUT",
 	);
 	assert.deepEqual(stored.renderer_submission, rendererSubmission);
+	assert.deepEqual(stored.renderer_schema, widget.schema);
 	await manager._send(stored);
 	assert.deepEqual(replayed, [
 		["headline", "Queued headline"],
@@ -1256,6 +1259,83 @@ test("test_task_list_refresh_preserves_rows_with_local_form_state", async () => 
 	assert.equal(incompatibleReplacement.dataset.open, "false");
 });
 
+/**
+ * @source src/script/widgets/pageTaskList.mjs::PageTaskList
+ * @pair tasks:refresh-order
+ */
+test("test_task_list_refresh_keeps_open_task_in_place", async (t) => {
+	createBrowser(t);
+	const { PageTaskList } = await loadPageTaskList();
+	const target = document.createElement("div");
+	target.innerHTML = `
+		<ul data-role="active-tasks">
+			<li lp-entity data-kind="task" data-key="first" data-open="false"></li>
+			<li lp-entity data-kind="task" data-key="open" data-open="TaskForm"></li>
+			<li lp-entity data-kind="task" data-key="last" data-open="false"></li>
+		</ul>
+		<ul data-role="completed-tasks"></ul>
+	`;
+	document.body.append(target);
+	const list = Object.create(PageTaskList.prototype);
+	list.target = target;
+	list._parseRefreshTask = () => null;
+	list.prereconcile = async () => {};
+	list.postreconcile = () => {};
+	list._setListVisibility = () => {};
+	const active = target.querySelector("[data-role='active-tasks']");
+	const order = () => Array.from(active.children, (row) => row.dataset.key);
+	const delta = { upsert: [], remove: [], order: ["open", "first", "last"] };
+	(await list.prepareRefreshDelta(delta))();
+	assert.deepEqual(order(), ["first", "open", "last"]);
+	active.querySelector("[data-key='open']").dataset.open = "false";
+	(await list.prepareRefreshDelta(delta))();
+	assert.deepEqual(order(), ["open", "first", "last"]);
+});
+
+/**
+ * @pair tasks:refresh-order
+ */
+test("test_task_list_refresh_does_not_reinsert_unchanged_rows", async (t) => {
+	createBrowser(t);
+	const { PageTaskList } = await loadPageTaskList();
+	const target = document.createElement("div");
+	target.innerHTML = `
+		<ul data-role="active-tasks">
+			<li lp-entity data-kind="task" data-key="first" data-open="false"></li>
+			<li lp-entity data-kind="task" data-key="second" data-open="false"></li>
+		</ul>
+		<ul data-role="completed-tasks"></ul>
+	`;
+	document.body.append(target);
+	const list = Object.create(PageTaskList.prototype);
+	list.target = target;
+	list.prereconcile = async () => {};
+	list.postreconcile = () => {};
+	list._setListVisibility = () => {};
+	const active = target.querySelector("[data-role='active-tasks']");
+	const originalRows = [...active.children];
+	const mutations = [];
+	const observer = new MutationObserver((records) =>
+		mutations.push(...records),
+	);
+	observer.observe(active, { childList: true });
+	(
+		await list.prepareRefreshDelta({
+			upsert: [],
+			remove: [],
+			order: ["first", "second"],
+		})
+	)();
+	await Promise.resolve();
+	observer.disconnect();
+	assert.deepEqual([...active.children], originalRows);
+	assert.deepEqual(
+		mutations,
+		[],
+		"An unchanged poll must not detach hovered rows",
+	);
+});
+
 /** @matrix tasks : create dedupe refresh */
 test("test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh", async () => {
 	const { PageTaskList } = await loadPageTaskList();
@@ -1330,6 +1410,124 @@ test("test_task_list_initial_reconciliation_publishes_list_visibility", async ()
 	assert.equal(attributes.has("loaded"), true);
 	assert.equal(activeTasks.dataset.visible, "true");
 	assert.equal(completedHeader.dataset.visible, "false");
+});
+
+/** @matrix tasks : delegated-title-click */
+test("test_task_title_click_is_left_to_view_delegate", async () => {
+	const { PageTaskList } = await loadPageTaskList();
+	let scrolls = 0;
+	const taskElt = {
+		scrollIntoView: () => {
+			scrolls += 1;
+		},
+	};
+	const list = Object.create(PageTaskList.prototype);
+	list._moveTaskIfNecessary = () => {};
+	list._setListVisibility = () => {};
+	Object.defineProperty(list, "completedHeader", {
+		value: null,
+	});
+	let prevented = false;
+	let stopped = false;
+	list._click({
+		target: {
+			closest: () => null,
+		},
+		preventDefault: () => {
+			prevented = true;
+		},
+		stopPropagation: () => {
+			stopped = true;
+		},
+	});
+	list._setActiveTask({ detail: { subcomponent: { elt: taskElt } } });
+	assert.equal(prevented, false);
+	assert.equal(stopped, false);
+	assert.equal(scrolls, 0);
+});
+
+/** @matrix tasks : open-scroll delegated-title-click */
+test("test_task_open_scrolls_row_only_when_mostly_outside_viewport", async (t) => {
+	createBrowser(t);
+	Object.defineProperty(window, "innerHeight", {
+		value: 800,
+		configurable: true,
+	});
+	const { PageTaskList } = await loadPageTaskList();
+	const target = document.createElement("div");
+	target.innerHTML = `
+		<ul data-role="active-tasks">
+			<li lp-component data-kind="task">
+				<div lp-nav lp-show="task:active" data-toggle="true"></div>
+				<div data-widget="TaskForm"></div>
+			</li>
+		</ul>
+	`;
+	document.body.append(target);
+	const task = target.querySelector("li");
+	const trigger = task.querySelector("[lp-nav]");
+	const panel = task.querySelector("[data-widget='TaskForm']");
+	const calls = [];
+	panel.scrollIntoView = () => {
+		throw new Error("Scroll the whole task row so its title remains visible");
+	};
+	task.scrollIntoView = (options) => calls.push(options);
+	const component = { elt: task, active: { target: panel } };
+	const list = Object.create(PageTaskList.prototype);
+	list.target = target;
+	target.addEventListener("component-opened", (event) =>
+		list._scrollOpenedTask(event),
+	);
+	const opened = () =>
+		task.dispatchEvent(
+			new CustomEvent("component-opened", {
+				bubbles: true,
+				detail: { component, trigger },
+			}),
+		);
+	for (const { label, top, bottom, block } of [
+		{ label: "Fully visible", top: 120, bottom: 500 },
+		{ label: "Only a little below the window", top: 500, bottom: 820 },
+		{ label: "Tall but comfortably visible", top: 100, bottom: 1100 },
+		{
+			label: "Mostly hidden short task",
+			top: 740,
+			bottom: 1000,
+			block: "nearest",
+		},
+		{
+			label: "Mostly hidden tall task",
+			top: 740,
+			bottom: 1740,
+			block: "start",
+		},
+		{
+			label: "Entirely below the window",
+			top: 820,
+			bottom: 1000,
+			block: "nearest",
+		},
+		{
+			label: "Mostly above the header",
+			top: -200,
+			bottom: 150,
+			block: "nearest",
+		},
+	]) {
+		calls.length = 0;
+		task.getBoundingClientRect = () => ({ top, bottom });
+		opened();
+		assert.deepEqual(calls, block ? [{ behavior: "auto", block }] : [], label);
+	}
+	assert.equal(task.classList.contains("scroll-mt-20"), true);
+	calls.length = 0;
+	task.dispatchEvent(
+		new CustomEvent("component-opened", {
+			bubbles: true,
+			detail: { component, trigger: panel },
+		}),
+	);
+	assert.equal(calls.length, 0, "Only the task-title action may scroll");
 });
 
 /** @matrix tasks : active-widget complete route-override */

@@ -103,6 +103,9 @@ The view awaits `component.activate()` and `prepareRender()`, then calls
 `component.render()` inside `withTransition()`. A trigger for an unloaded
 `lp-load` or `lp-prefetch` widget carries `data-loading` and `aria-busy` until
 preparation finishes.
+After a user-triggered open commits, the view emits `component-opened` with the
+component and original trigger. Widgets can respond to the completed action
+without installing another click handler for the same control.
 
 At concrete view publication, components marked `lp-prefetch` start loading
 their child widget targets marked the same way. The response is held for later
@@ -197,6 +200,26 @@ transport cancellation. A prepared result must re-check that its view and
 logical input owner are current immediately before publishing connected DOM.
 Base combobox mutation/open methods reject work after destroy as defense in
 depth.
+
+Table helpers follow this ownership boundary without adding navigation teardown
+to the multi-page app. `TableEditor` and `TableSorting` have terminal, idempotent
+`destroy()` hooks. Sorting removes its root listener and generated desktop/mobile
+controls without clearing persisted sort preferences. Quick Edit owns its field
+instances, pending field preparation, row listeners, and saved-feedback timers.
+Cell opens and checkbox batches use `QueryLifecycle` tokens and re-check ownership
+inside the DOM commit. Replaced, superseded, or closed preparations release their
+fields. `IndexTable` calls `TableEditor.releaseRows()` before replacing/removing
+rows and refreshes checkbox controls for the current rows afterward. That cleanup
+also releases rows already detached by view-level deletion reconciliation.
+
+Closing Quick Edit discards unsent drafts and field preparation immediately.
+Already-submitted PATCHes continue independently of their field instances; the
+submitting cell remains busy and inert until settlement. Repeated commits share
+that cell's pending request. Success updates only the original surviving cell,
+and failure remains visible inline, including after closure. A current failed
+editor retains its draft for retry. Settlement cannot close a newer editor or
+move its focus; removed rows and destroyed widgets reject late UI publication.
+Opening the column-visibility picker continues to preserve Quick Edit.
 
 Body portals are owned by exact instance references, never rediscovered by a
 global ID during teardown. `Modal.remove()` detaches a reusable modal instance;

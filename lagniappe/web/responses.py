@@ -77,12 +77,6 @@ def not_found(error):
     return error, 404
 
 
-def explain(prompt):
-    preview = prompt.preview() if hasattr(prompt, "preview") else prompt.build()
-    modal = render_template("reference/prompt.html", prompt=preview)
-    return jsonify({"modal": modal}), 200
-
-
 def cell(field, entity, column=None, embedded=False):
     template = get_template_attribute("cell.html", "format_table_cell")
     column_data = {"link": True, "parent": True}
@@ -290,6 +284,7 @@ def document_image(url):
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::entity_response
 def page_task(task, **extra):
+    from lagniappe.web.deferred_autofill import form_state
     submission = task.properties.submission.form_value
     template = get_template_attribute("pages/tasks.html", "task")
     schema = task.submission_schema
@@ -301,6 +296,7 @@ def page_task(task, **extra):
                     "schema": schema,
                     "submission": submission,
                     "schema_error": task.submission_schema_error,
+                    "form_state": form_state(task),
                     **extra,
                 }
             ),
@@ -471,6 +467,7 @@ def new_file_upload(file, page):
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::entity_response
 def page_info(page, **extra):
+    from lagniappe.web.deferred_autofill import form_state
     template = get_template_attribute("pages/info.html", "info_form")
     schema = page.submission_schema if page.form else None
     submission = page.properties.submission.form_value if page.form else None
@@ -481,6 +478,7 @@ def page_info(page, **extra):
                     "html": template(page),
                     "schema": schema,
                     "submission": submission,
+                    "form_state": form_state(page),
                     **extra,
                 }
             ),
@@ -856,7 +854,7 @@ def home_section(section):
 # @covered-by lagniappe/web/routes/tasks/main.py::update
 # @reason route response adapter is exercised through its owning task mutation
 def home_task_list():
-    home = Entities.HOME()
+    home = Entities.HOME(user=current_user._get_current_object())
     template = get_template_attribute("home/tasks.html", "list")
     task_list_html = template(home.section("tasks"))
 

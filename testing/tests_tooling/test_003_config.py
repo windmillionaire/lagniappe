@@ -1,6 +1,8 @@
 """Tooling smoke tests for load-bearing config surfaces."""
 
 import ast
+import copy
+from dataclasses import FrozenInstanceError
 import importlib
 import importlib.util
 import json
@@ -16,6 +18,365 @@ import yaml
 from runner import context as runner_context
 
 pytestmark = pytest.mark.tooling
+
+
+@pytest.fixture
+def settings_config(monkeypatch, tmp_path):
+    """Exercise the real package against disposable files, including reloads."""
+    original_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "config" or name.startswith("config.")
+    }
+    for name in original_modules:
+        sys.modules.pop(name)
+    monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(tmp_path))
+    try:
+        yield importlib.import_module("config")
+    finally:
+        for name in list(sys.modules):
+            if name == "config" or name.startswith("config."):
+                sys.modules.pop(name)
+        sys.modules.update(original_modules)
+
+
+@pytest.fixture
+def saved_projection_settings(settings_config):
+    config = settings_config
+    config.File.APP_SETTINGS_YAML.save(
+        {
+            "APP_NAME": "Saved app",
+            "GOOGLE_CLOUD_PROJECT": "project-1",
+            "PREFIX": "",
+            "SERVER_NAME": "production.example.test",
+            "SERVER_PORT": "443",
+            "ANALYTICS": False,
+            "AI_OBSERVABILITY": False,
+            "AGENT_ACCESS_ENABLED": False,
+            "PUBLIC_MANUAL": False,
+            "NESTED": {"items": [{"label": "saved"}]},
+        }
+    )
+    config.File.DEV_YAML.save(
+        {
+            "gcloud_config": {"PROJECT": "project-1"},
+            "dev_settings": {"SERVER_NAME": "127.0.0.1", "SERVER_PORT": "5050"},
+            "test_settings": {"SERVER_NAME": "127.0.0.1", "SERVER_PORT": "5000"},
+        }
+    )
+    return config
+
+
+# @matrix config : configuration transactional-state
+def test_runtime_settings_own_nested_values_and_return_independent_copies(
+    settings_config,
+):
+    config = settings_config
+    source = {"TOKEN": "secret-value", "NESTED": {"items": [{"enabled": True}]}}
+    snapshot = config.RuntimeSettings(config.Environment.PRODUCTION, source)
+    source["NESTED"]["items"][0]["enabled"] = False
+
+    assert snapshot.values["NESTED"]["items"][0]["enabled"] is True
+    with pytest.raises(TypeError):
+        snapshot.values["TOKEN"] = "changed"
+    with pytest.raises(TypeError):
+        snapshot.values["NESTED"]["items"][0]["enabled"] = False
+    with pytest.raises(AttributeError):
+        snapshot.values["NESTED"]["items"].append({})
+    with pytest.raises(FrozenInstanceError):
+        snapshot.environment = config.Environment.TESTING
+    assert "secret-value" not in repr(snapshot)
+
+    copied = snapshot.as_dict()
+    assert isinstance(copied["NESTED"]["items"], list)
+    copied["NESTED"]["items"][0]["enabled"] = False
+    copied["NESTED"]["items"].append({"enabled": False})
+    assert snapshot.as_dict() == {
+        "TOKEN": "secret-value",
+        "NESTED": {"items": [{"enabled": True}]},
+    }
+
+
+# @matrix config : configuration transactional-state
+def test_settings_drafts_own_documents_and_preserve_internal_aliases(
+    saved_projection_settings,
+):
+    config = saved_projection_settings
+    first, second = config.SettingsDraft(), config.Settings()
+    assert config.Settings is config.SettingsDraft
+    original = copy.deepcopy(second.APP)
+    first.APP["NESTED"]["items"][0]["label"] = "changed"
+    first.DEV_CONFIG["SERVER_PORT"] = "9000"
+    first.GCLOUD_CONFIG["PROJECT"] = "changed-project"
+    assert second.APP == original
+    assert second.DEV_CONFIG["SERVER_PORT"] == "5050"
+    assert second.GCLOUD_CONFIG["PROJECT"] == "project-1"
+    for name in (
+        "APP",
+        "DEV",
+        "DEPLOY",
+        "NODE",
+        "INDEX",
+        "MANIFEST",
+        "BROWSER_PROTOCOL",
+    ):
+        assert getattr(first, name) is not getattr(second, name)
+    assert first.DEV_CONFIG is first.DEV["dev_settings"]
+    assert first.TEST_CONFIG is first.DEV["test_settings"]
+    assert first.GCLOUD_CONFIG is first.DEV["gcloud_config"]
+
+
+# @matrix config : config-files configuration parsing
+def test_runtime_loading_is_independent_of_drafts_and_generated_documents(
+    saved_projection_settings, monkeypatch
+):
+    config = saved_projection_settings
+    config.File.DEV_YAML.value.write_text("[invalid YAML", encoding="utf-8")
+    config.File.APP_YAML.value.write_text("[invalid YAML", encoding="utf-8")
+    real_load = config.File.load
+
+    def production_load(file_ref):
+        assert file_ref is config.File.APP_SETTINGS_YAML
+        return real_load(file_ref)
+
+    monkeypatch.setattr(config.File, "load", production_load)
+    monkeypatch.setattr(
+        config,
+        "SettingsDraft",
+        lambda: pytest.fail("runtime constructed an installer draft"),
+    )
+    snapshot = config.load_runtime_settings(config.Environment.PRODUCTION)
+    assert snapshot.as_dict()["APP_NAME"] == "Saved app"
+    assert config._settings_draft is None
+    config.File.APP_SETTINGS_YAML.save({"APP_NAME": "New saved app"})
+    assert snapshot.as_dict()["APP_NAME"] == "Saved app"
+    assert config.load_runtime_settings(config.Environment.PRODUCTION).as_dict() == {
+        "APP_NAME": "New saved app"
+    }
+
+
+# @matrix config : config-files configuration parsing
+@pytest.mark.parametrize(
+    "environment,port,analytics",
+    [
+        ("production", 443, False),
+        ("development", "5050", False),
+        ("testing", "5000", True),
+    ],
+)
+def test_runtime_and_draft_projections_preserve_environment_precedence(
+    saved_projection_settings, environment, port, analytics
+):
+    config = saved_projection_settings
+    environment = config.Environment(environment)
+    draft = config.SettingsDraft()
+    snapshot = config.load_runtime_settings(environment)
+    projected = snapshot.as_dict()
+    assert projected == draft.snapshot(environment).as_dict()
+    assert projected["SERVER_PORT"] == port
+    assert projected["ANALYTICS"] is analytics
+    if environment == config.Environment.TESTING:
+        assert projected["BASE_URL"] == "http://127.0.0.1:5000"
+        assert projected["AI_OBSERVABILITY"] is True
+        assert projected["AGENT_ACCESS_ENABLED"] is True
+        assert projected["PUBLIC_MANUAL"] is True
+        assert (
+            projected["AGENT_ACCESS_EMAIL"]
+            == config.constants.DEFAULT_AGENT_ACCESS_EMAIL
+        )
+        assert (
+            projected["AGENT_ACCESS_NAME"] == config.constants.DEFAULT_AGENT_ACCESS_NAME
+        )
+        assert (
+            projected["AGENT_ACCESS_CODE"]
+            == config.constants.DEFAULT_AGENT_ACCESS_TEST_CODE
+        )
+        draft.TEST_CONFIG.update(
+            {
+                "ANALYTICS": False,
+                "AI_OBSERVABILITY": False,
+                "AGENT_ACCESS_ENABLED": False,
+                "PUBLIC_MANUAL": False,
+                "AGENT_ACCESS_CODE": "explicit-code",
+            }
+        )
+        draft.save(config.File.DEV_YAML)
+        updated = config.load_runtime_settings(environment).as_dict()
+        assert updated == draft.snapshot(environment).as_dict()
+        for key in (
+            "ANALYTICS",
+            "AI_OBSERVABILITY",
+            "AGENT_ACCESS_ENABLED",
+            "PUBLIC_MANUAL",
+        ):
+            assert updated[key] is False
+        assert updated["AGENT_ACCESS_CODE"] == "explicit-code"
+
+
+# @matrix config : configuration transactional-state
+def test_draft_projections_observe_edits_without_saving_or_aliasing(
+    saved_projection_settings, monkeypatch
+):
+    config = saved_projection_settings
+    draft = config.SettingsDraft()
+    old_snapshot = draft.snapshot(config.Environment.TESTING)
+    old_dev = draft.dev_config
+    monkeypatch.setattr(
+        config.File, "load", lambda *args: pytest.fail("draft read from disk")
+    )
+    monkeypatch.setattr(
+        config.File, "save", lambda *args: pytest.fail("draft wrote to disk")
+    )
+    draft.APP["APP_NAME"] = "Draft app"
+    draft.APP["NESTED"]["items"][0]["label"] = "draft"
+    draft.DEV_CONFIG["SERVER_PORT"] = "9000"
+    draft.TEST_CONFIG.update({"SERVER_PORT": "9001", "AI_OBSERVABILITY": False})
+    assert draft.app_config["APP_NAME"] == "Draft app"
+    assert draft.dev_config["APP_NAME"] == "Draft app"
+    assert draft.dev_config["SERVER_PORT"] == "9000"
+    assert draft.test_config["APP_NAME"] == "Draft app"
+    assert draft.test_config["BASE_URL"] == "http://127.0.0.1:9001"
+    assert draft.test_config["AI_OBSERVABILITY"] is False
+    assert old_snapshot.as_dict()["NESTED"]["items"][0]["label"] == "saved"
+    assert old_dev["SERVER_PORT"] == "5050"
+    for projected in (draft.app_config, draft.dev_config, draft.test_config):
+        projected["NESTED"]["items"].clear()
+    assert draft.APP["NESTED"]["items"] == [{"label": "draft"}]
+
+
+# @matrix config : config-files transactional-state
+def test_draft_save_preserves_identity_and_publishes_only_selected_files(
+    saved_projection_settings, monkeypatch
+):
+    config = saved_projection_settings
+    draft = config.SettingsDraft()
+    app, dev, test = draft.APP, draft.DEV_CONFIG, draft.TEST_CONFIG
+    snapshot = config.load_runtime_settings(config.Environment.PRODUCTION)
+    draft.APP["APP_NAME"] = "Changed app"
+    draft.DEV_CONFIG["SERVER_PORT"] = "9000"
+    assert draft.save(config.File.DEV_YAML) == ("DEV_YAML",)
+    assert draft.save(config.File.DEV_YAML) == ()
+    assert config.File.APP_SETTINGS_YAML.load()["APP_NAME"] == "Saved app"
+    assert config.File.DEV_YAML.load()["dev_settings"]["SERVER_PORT"] == "9000"
+    assert draft.save(config.File.APP_SETTINGS_YAML) == ("APP_SETTINGS_YAML",)
+    assert (
+        config.load_runtime_settings(config.Environment.PRODUCTION).as_dict()[
+            "APP_NAME"
+        ]
+        == "Changed app"
+    )
+    assert snapshot.as_dict()["APP_NAME"] == "Saved app"
+    assert draft.APP is app and draft.DEV_CONFIG is dev and draft.TEST_CONFIG is test
+    with pytest.raises(ValueError, match="Unsupported generated file"):
+        draft.save(config.File.BROWSER_PROTOCOL_JSON)
+
+    draft.APP["APP_NAME"] = "Unpublished app"
+
+    def fail_replace(*args):
+        raise OSError("forced publication failure")
+
+    monkeypatch.setattr(config.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="forced publication failure"):
+        draft.save(config.File.APP_SETTINGS_YAML)
+    assert config.File.APP_SETTINGS_YAML.load()["APP_NAME"] == "Changed app"
+    assert draft.APP["APP_NAME"] == "Unpublished app"
+
+
+# @matrix config : config-files parsing
+def test_saved_settings_reader_preserves_raw_values_without_loading_a_draft(
+    settings_config, monkeypatch
+):
+    config = settings_config
+    config.File.APP_SETTINGS_YAML.value.write_text(
+        'BUILD_ID: old\nAI_ENABLED: "True"\nPORT: "6379"\nAUTH: \'{"enabled":true}\'\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        config,
+        "SettingsDraft",
+        lambda: pytest.fail("export constructed an installer draft"),
+    )
+    assert config.read_saved_app_settings() == {
+        "AI_ENABLED": "True",
+        "PORT": "6379",
+        "AUTH": '{"enabled":true}',
+    }
+    config.File.APP_SETTINGS_YAML.value.write_text(
+        "APP_NAME: Updated\n", encoding="utf-8"
+    )
+    assert config.read_saved_app_settings() == {"APP_NAME": "Updated"}
+    assert config._settings_draft is None
+
+
+# @matrix config setup : config-files git-upgrade
+def test_settings_singleton_is_lazy_and_reloads_saved_documents(
+    saved_projection_settings,
+):
+    config = saved_projection_settings
+    assert config._settings_draft is None
+    with pytest.raises(AttributeError):
+        getattr(config, "unknown_setting_attribute")
+    first = config.SETTINGS
+    assert first is config.SETTINGS
+    assert first.APP["APP_NAME"] == "Saved app"
+    config.File.APP_SETTINGS_YAML.save({"APP_NAME": "After upgrade"})
+    config.SETTINGS = first  # Old source generations eagerly bound this name.
+    config = importlib.reload(config)
+    assert config._settings_draft is None
+    assert config.SETTINGS is not first
+    assert config.SETTINGS.APP == {"APP_NAME": "After upgrade"}
+    assert first.APP["APP_NAME"] == "Saved app"
+
+
+# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
+# @pair config:configuration
+# @source config/hosted_e2e.py::hosted_e2e_settings_overrides
+def test_hosted_runtime_projection_preserves_validated_overrides(
+    saved_projection_settings, monkeypatch
+):
+    config = saved_projection_settings
+    base_url = "https://e2e-abcdef1234567890-dot-e2e-dot-project-1.uc.r.appspot.com"
+    environment = {
+        "LAGNIAPPE_HOSTED_E2E": "true",
+        "LAGNIAPPE_HOSTED_E2E_ROLE": "runner",
+        "LAGNIAPPE_HOSTED_E2E_BASE_URL": base_url,
+        "LAGNIAPPE_HOSTED_E2E_PREFIX": "test-",
+        "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL": "runner@project-1.iam.gserviceaccount.com",
+        "LAGNIAPPE_HOSTED_E2E_VERSION": "e2e-abcdef1234567890",
+        "LAGNIAPPE_HOSTED_E2E_SOURCE": "a" * 40,
+        "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": "b" * 64,
+        "LAGNIAPPE_HOSTED_E2E_BUILD_ID": "b1234567",
+        "LAGNIAPPE_HOSTED_E2E_SERVICE": "e2e",
+        "LAGNIAPPE_HOSTED_E2E_CALLER_EMAIL": "runner@project-1.iam.gserviceaccount.com",
+        "LAGNIAPPE_HOSTED_E2E_JOB": "lagniappe-e2e",
+        "CLOUD_RUN_JOB": "lagniappe-e2e",
+    }
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
+    draft = config.SettingsDraft()
+    draft.TEST_CONFIG.update(
+        {"BASE_URL": "http://ignored.test", "ADMIN_EMAIL": "ignored@example.test"}
+    )
+    draft.save(config.File.DEV_YAML)
+    projected = config.load_runtime_settings(config.Environment.TESTING).as_dict()
+    assert projected == draft.test_config
+    assert projected["BASE_URL"] == base_url
+    assert projected["SERVER_PORT"] == "443"
+    assert projected["PREFIX"] == "test-"
+    assert projected["ADMIN_EMAIL"] == "admin@test.com"
+    assert (
+        projected["RUNTIME_SERVICE_ACCOUNT_EMAIL"]
+        == "runner@project-1.iam.gserviceaccount.com"
+    )
+    assert projected["HOSTED_E2E_BUILD_ID"] == "b1234567"
+    monkeypatch.setenv(
+        "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL",
+        "runner@wrong.iam.gserviceaccount.com",
+    )
+    with pytest.raises(RuntimeError, match="runtime identity"):
+        config.load_runtime_settings(config.Environment.TESTING)
+    with pytest.raises(RuntimeError, match="runtime identity"):
+        draft.snapshot(config.Environment.TESTING)
 
 
 def _load_recovery_module(monkeypatch):
@@ -471,8 +832,6 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
                 "AI_OBSERVABILITY": False,
             }
         )
-        SETTINGS._TEST_SETTINGS = None
-
         assert SETTINGS.test_config["AGENT_ACCESS_ENABLED"] is False
         assert SETTINGS.test_config["AGENT_ACCESS_CODE"] == "custom-test-code"
         assert SETTINGS.test_config["AI_OBSERVABILITY"] is False
@@ -780,11 +1139,17 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
             sys.modules.pop(name, None)
         sys.modules.update(original_config_modules)
         sys.modules.pop("runner.deploy", None)
+        # importlib.reload requires the package attribute and module cache to
+        # refer to the same module after this isolated deployment import.
+        import runner
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
+            runner.deploy = original_runner_deploy
+        else:
+            runner.__dict__.pop("deploy", None)
 
 # @matrix deploy : deploy-surface gcloudignore imports package-boundary
-def test_runtime_upload_boundary_has_no_local_orchestration_imports():
+def test_runtime_upload_boundary_has_no_local_orchestration_imports(settings_config):
     from runner.deploy import runtime_deploy_surface_issues
 
     assert runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT) == []
@@ -1351,8 +1716,14 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
             sys.modules.pop(name, None)
         sys.modules.update(original_config_modules)
         sys.modules.pop("runner.deploy", None)
+        # importlib.reload requires the package attribute and module cache to
+        # refer to the same module after this isolated deployment import.
+        import runner
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
+            runner.deploy = original_runner_deploy
+        else:
+            runner.__dict__.pop("deploy", None)
 
     package_lock = json.loads(lock_path.read_text())
     assert package_lock["version"] == "1.24"
@@ -1657,8 +2028,14 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             sys.modules.pop(name, None)
         sys.modules.update(original_config_modules)
         sys.modules.pop("runner.deploy", None)
+        # importlib.reload requires the package attribute and module cache to
+        # refer to the same module after this isolated deployment import.
+        import runner
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
+            runner.deploy = original_runner_deploy
+        else:
+            runner.__dict__.pop("deploy", None)
 
 
 # @matrix config : recovery-validation site-policy

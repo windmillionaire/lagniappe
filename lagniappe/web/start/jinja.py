@@ -181,6 +181,7 @@ def initialize(app):
         }
     )
     app.jinja_env.filters.pop("safe", None)
+    from lagniappe.web.deferred_autofill import form_state
     app.jinja_env.globals.update(
         {
             "CONFIG": CONFIG,
@@ -194,6 +195,7 @@ def initialize(app):
             "fonts": styles.FONTS,
             "is_starred": starred,
             "current_user": current_user,
+            "form_state": form_state,
             "Action": Action,
             "AI": AI,
             "Resource": Resource,

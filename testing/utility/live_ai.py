@@ -161,23 +161,48 @@ def inject_quota_fallback_checkpoint(job, proposal, *, failed_job):
 # @testable true
 # @tests tests_unit/test_023g_live_ai_test_helper.py::test_autofill_fallback_retains_preparation_and_rejects_unrelated_failures
 # @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
-def prepare_autofill_fallback(job, submission):
-    """Retain real attachment preparation, authorization, and apply-time guards."""
-    from datetime import datetime, timezone
+def prepare_autofill_fallback(job, submission, *, failed_job):
+    """Stage verified values on a fresh UI retry; never revive a terminal job."""
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+    from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_key
+    from lagniappe.core.tools.forms import review
+    from lagniappe.core.tools.database import assets
+    from lagniappe.core.tools.database.utility import ExactEntityState
+    from lagniappe.core.mutations import execute_mutation, plan_root
+    from lagniappe.core.definitions import Action, Fetch, FileConsumer
 
-    assert quota_blocked_job(job) and job.status == DeferredJobStatus.RETRY_WAIT.value
-    assert job.job_type == DeferredJobType.AUTOFILL.value
+    assert (
+        quota_blocked_job(failed_job)
+        and failed_job.status == DeferredJobStatus.FAILED.value
+        and job.job_type == failed_job.job_type == DeferredJobType.AUTOFILL.value
+        and job.status == DeferredJobStatus.QUEUED.value
+        and not job.attempt and not job.checkpoint
+        and job.urlsafe_key != failed_job.urlsafe_key
+        and job.inputs == failed_job.inputs and job.actor.key == failed_job.actor.key
+        and all(job.parameters.get(key) == failed_job.parameters.get(key)
+                for key in ("user_context", "upload_record", "file_key", "mode", "lock_target"))
+    ), "Autofill fallback requires an unstarted retry of the same quota-blocked input."
+    original = ExactEntityState(deepcopy(dict(job.db)))
     adapter = DeferredJobs.adapter(job.job_type)
     context = adapter.load(DeferredJobs._context(job))
     adapter.authorize(context)
-    adapter.validate_apply(context)
-    context.checkpoint = {"submission": deepcopy(submission)}
-    job.checkpoint = adapter.prepare(context)
-    # The remaining delivery publishes an already prepared value; it makes no
-    # provider request, so the test need not wait out the provider backoff.
-    job.next_attempt_at = datetime.now(timezone.utc)
-    Entities.save(job)
+    target = context.input("target")
+    snapshot = job.parameters["snapshot"]
+    assert review.snapshot_matches_form(snapshot, target), "The retry form changed."
+    assert snapshot["revision"] == target.autofill_revision, "The retry answers changed."
+    if job.parameters.get("upload_record"):
+        assets.verify_direct_upload(job.parameters["upload_record"], max_age=None, consumer=FileConsumer.AI_INLINE)
+    if job.parameters.get("file_key"):
+        file = Entities.fetch_one(job.parameters["file_key"], request=Fetch.direct())
+        assert isinstance(file, Entities.FILE) and file.allowed(Action.VIEW, user=context.actor)
+    proposal = review.prepare_proposal(snapshot["prompt"]["schema"], deepcopy(submission), target, context.actor)
+    guards = [(job.key, original), (target.key, ExactEntityState(deepcopy(dict(target.db))))]
+    if target.form:
+        guards.append((target.form.key, ExactEntityState(deepcopy(dict(target.form.db)))))
+    if job.parameters.get("lock_target", True):
+        guards.append((deferred_job_lock_key(target), {"operation": job.urlsafe_key}))
+    job.checkpoint = {"submission": deepcopy(submission), "proposal": proposal}
+    execute_mutation(plan_root(job, property_mask=("checkpoint",)), guards=guards)
     return deepcopy(job.checkpoint)
 
 
@@ -189,6 +214,32 @@ def run_hosted_autofill(user, job, *, results, verify_submission):
     current_job = job
     records = []
 
+    def retry():
+        nonlocal current_job
+        from lagniappe.core.definitions import Fetch
+        from playwright.sync_api import expect
+
+        failed = current_job
+        assert quota_blocked_job(failed) and failed.status == DeferredJobStatus.FAILED.value
+        target_key = failed.inputs["target"]["id"]
+        form = user.page.locator(f'form[data-operation="{failed.urlsafe_key}"]')
+        button = form.get_by_role("button", name="Retry autofill", exact=True)
+        # Operation polls back off to 30 seconds. The terminal poll must also
+        # reconcile the form before its retry action becomes available.
+        expect(button).to_be_visible(timeout=45_000)
+        with user.page.expect_response(
+            lambda response: response.request.method == "PUT"
+            and urlsplit(response.url).path.endswith(f"/{target_key}/update")
+        ) as response_info:
+            button.click()
+        response = response_info.value
+        assert response.ok, response.text()
+        payload = response.json()
+        assert payload.get("operation") and payload["operation"] != failed.urlsafe_key
+        current_job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
+        results.record("provider_retry_operation", current_job.urlsafe_key)
+        return failed
+
     def deliver():
         nonlocal current_job
         current_job, attempts = dispatch_hosted_deferred_job(
@@ -199,7 +250,9 @@ def run_hosted_autofill(user, job, *, results, verify_submission):
         results.record("deferred_job_attempts", list(records))
         return current_job
 
-    def attempt(_number):
+    def attempt(number):
+        if number > 1:
+            retry()
         deliver()
         if quota_blocked_job(current_job):
             raise ProviderQuotaBlocked((current_job.error or {}).get("message", "AIQuotaError"))
@@ -207,7 +260,9 @@ def run_hosted_autofill(user, job, *, results, verify_submission):
         return current_job
 
     def fallback():
-        checkpoint = prepare_autofill_fallback(current_job, verify_submission())
+        submission = verify_submission()
+        failed = retry()
+        checkpoint = prepare_autofill_fallback(current_job, submission, failed_job=failed)
         results.record("provider_quota_fallback", {"used": True, "checkpoint": checkpoint})
         deliver()
         assert current_job.status == DeferredJobStatus.SUCCEEDED.value, records

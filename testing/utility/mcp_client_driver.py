@@ -598,6 +598,43 @@ async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], 
 
 
 # @testable true
+# @tests tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_rest_and_mcp_share_submission_validation
+# @pair mcp-adapter:product-contract
+async def _submission_parity(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Submit identical candidates through both public paths, with real validators."""
+    async with _connection() as client:
+        brief = {"instructions": "Review proposed task updates.", "revises_plan_id": None}
+        direct, _ = await client.rest.request_json("POST", "plans", body=brief)
+        wrapped = (await client.execute("start_plan", brief)).value
+        direct_contract, _ = await client.rest.request_json("GET", f"plans/{direct['id']}/contract")
+        wrapped_contract = (await client.execute("get_plan_contract", {"plan_id": wrapped["id"]})).value
+        result = {
+            "defaults": [
+                {key: contract[key] for key in ("schema_scope", "proposal_schema", "contract_version")}
+                for contract in (direct_contract, wrapped_contract)
+            ],
+            "cases": [],
+        }
+        for case in specification["cases"]:
+            body = {"contract_version": direct_contract["contract_version"], "file_usage": [], **case["body"]}
+            pair = []
+            for plan, through_mcp in ((direct, False), (wrapped, True)):
+                try:
+                    if through_mcp:
+                        receipt = (await client.execute("submit_plan", {"plan_id": plan["id"], **body})).value
+                    else:
+                        receipt, _ = await client.rest.request_json("POST", f"plans/{plan['id']}/submit", body=body)
+                    outcome = {"status": receipt["status"]}
+                except AdapterError as error:
+                    outcome = {"code": error.code, "http_status": error.status, "details": error.details}
+                stored, _ = await client.rest.request_json("GET", f"plans/{plan['id']}")
+                outcome["stored"] = {key: stored[key] for key in ("status", "proposal", "file_usage")}
+                pair.append(outcome)
+            result["cases"].append({"name": case["name"], "pair": pair})
+        return result, ""
+
+
+# @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_mcp_original_pdf_download_uses_existing_api_and_storage
 async def _original_file(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
@@ -837,6 +874,8 @@ def main(arguments: list[str]) -> int:
             result, diagnostics = asyncio.run(_foreign_plan(specification))
         elif mode == "original_file":
             result, diagnostics = asyncio.run(_original_file(specification))
+        elif mode == "submission_parity":
+            result, diagnostics = asyncio.run(_submission_parity(specification))
         else:
             raise ValueError("unknown MCP E2E driver mode")
         sensitive = _sensitive_material(specification)

@@ -262,7 +262,8 @@ def test_category_filter_conditions_include_only_viewable_forms():
 
 # @matrix category form : add duplicate-primary related-forms relation-registration
 @pytest.mark.unit
-def test_related_forms_add_skips_primary_form_and_registers_relation():
+@pytest.mark.parametrize("primary_loaded", [True, False])
+def test_related_forms_add_skips_primary_form_and_registers_relation(primary_loaded):
     category = TestEntities.get(
         "CATEGORY",
         {"name": "Related Forms Category", "hash": "catrel"},
@@ -275,7 +276,10 @@ def test_related_forms_add_skips_primary_form_and_registers_relation():
         "FORM",
         {"name": "Related Form", "hash": "related_form"},
     )
-    category.form = primary
+    if primary_loaded:
+        category.form = primary
+    else:
+        category.db["form"] = primary.key
     forms = category.properties.forms
 
     forms.add(primary)
@@ -294,6 +298,23 @@ def test_related_forms_add_skips_primary_form_and_registers_relation():
     assert len(category.mutation_intents) == 1
     assert category.mutation_intents[0].intent is MutationIntentType.TOUCH
     assert category.mutation_intents[0].entity is related
+
+
+# @matrix category form : add related-forms relation-registration
+@pytest.mark.unit
+def test_related_forms_add_existing_key_does_not_load_other_forms():
+    category = TestEntities.get("CATEGORY", {"name": "Stored form registry"})
+    current = TestEntities.get("FORM", {"name": "Current page form"})
+    other = TestEntities.get("FORM", {"name": "Another page's form"})
+    category.db["forms"] = [current.key, other.key]
+    forms = category.properties.forms
+    assert not forms.is_set
+
+    assert forms.add(current) is False
+
+    assert forms.keys == [current.key, other.key]
+    assert not forms.is_set
+    assert category.mutation_intents == []
 
 
 # @matrix category form : related-forms validation

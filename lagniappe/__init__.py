@@ -4,7 +4,7 @@ import os
 import re
 from urllib.parse import urlsplit
 
-from config import SETTINGS, Environment, constants
+from config import Environment, constants, load_runtime_settings
 from config.locations import (
     normalize_app_engine_location,
     normalize_resource_region,
@@ -50,21 +50,20 @@ def _sample_rate(value, name):
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
 # @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
+# @tests tests_unit/test_016_config.py::test_config_owns_values_from_an_explicit_runtime_snapshot
 # @matrix config : ai-email build-id configuration constants error-reporting google-signin observability-setting optional-providers public-projection secrets site-policy source-link stale-settings validation
 # @pairs ai:observability error-reporting:sampling
+# @pair config:transactional-state
 class Config:
     """Application configuration."""
 
-    def __init__(self):
-        self.ENV = Environment(os.environ.get("FLASK_ENV", "production"))
-        if self.ENV in [Environment.PRODUCTION]:
-            app_settings = SETTINGS.app_config
-        elif self.ENV == Environment.DEVELOPMENT:
-            app_settings = SETTINGS.dev_config
-        elif self.ENV == Environment.TESTING:
-            app_settings = SETTINGS.test_config
-        else:
-            raise ValueError(f"Invalid environment: {self.ENV}")
+    def __init__(self, settings=None):
+        if settings is None:
+            settings = load_runtime_settings(
+                Environment(os.environ.get("FLASK_ENV", "production"))
+            )
+        self.ENV = settings.environment
+        app_settings = settings.as_dict()
 
         unsupported = sorted(
             constants.UNSUPPORTED_SETTING_KEYS.intersection(app_settings)

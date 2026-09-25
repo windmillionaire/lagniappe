@@ -665,7 +665,7 @@ def inject_plan_id(schema: Any) -> dict[str, Any]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper
+# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
 def validate_value(schema: dict[str, Any], value: Any, *, phase: str) -> None:
     try:
         Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)

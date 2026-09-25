@@ -56,7 +56,6 @@ def document_generation_context(entity, user, field=None):
 
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_explain_includes_selected_text_context
 # @matrix ai : output-format project-context prompt-builders search selected-text tools
 def text_generation_prompt(user_prompt, context_data):
     """Build the AI prompt for text generation from page context.

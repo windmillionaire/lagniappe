@@ -1,6 +1,5 @@
 """Text extraction from files via Document AI OCR and direct reading."""
 
-from flask_login import current_user
 from google.cloud import documentai
 
 from lagniappe import CONFIG
@@ -13,7 +12,10 @@ from .constants import DOCUMENT_AI_MIMETYPES
 # @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
 # @matrix file : deferred-dispatch extract process-complete text-asset
-def get_file_text(file, *, dispatch=True):
+# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
+# @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
+# @matrix file deferred-jobs : explicit-actor validation
+def get_file_text(file, *, actor=None, dispatch=True):
     """Initiate text extraction for a file, dispatching to OCR or a background task.
 
     Args:
@@ -22,6 +24,8 @@ def get_file_text(file, *, dispatch=True):
     Returns:
         Dict with extraction status, and 'text' or 'error' when complete.
     """
+    if dispatch and not getattr(actor, "is_authenticated", False):
+        raise exceptions.ValidationError("File processing requires an authenticated actor.")
     extract = file.properties.extract
 
     text = file.properties.text
@@ -32,7 +36,7 @@ def get_file_text(file, *, dispatch=True):
     elif text.extractable:
         extract.status = "Extracting text..."
         if dispatch:
-            start_file_extraction(file)
+            start_file_extraction(file, actor=actor)
     else:
         extract.error = "Unsupported file type."
 
@@ -42,10 +46,13 @@ def get_file_text(file, *, dispatch=True):
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_start_file_extraction_uses_explicit_actor_and_identity
 # @matrix deferred-jobs file : extraction follow-up idempotency
+# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
+# @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
+# @matrix file deferred-jobs : explicit-actor validation
 def start_file_extraction(
     file,
     *,
-    actor=None,
+    actor,
     idempotency_key=None,
     delay_seconds=5,
 ):
@@ -53,10 +60,12 @@ def start_file_extraction(
     from ...definitions import DeferredJobSpec, DeferredJobType
     from ..deferred_jobs.service import DeferredJobs
 
+    if not getattr(actor, "is_authenticated", False):
+        raise exceptions.ValidationError("File processing requires an authenticated actor.")
     return DeferredJobs.start(
         DeferredJobSpec(
             job_type=DeferredJobType.FILE_EXTRACT,
-            actor=actor or current_user._get_current_object(),
+            actor=actor,
             inputs={"file": file},
             notification_body=None,
             client={},

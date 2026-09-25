@@ -100,19 +100,17 @@ def _create_project(generated_data):
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
-# @matrix projects : ai-create create-manual explain-button
+# @matrix projects : ai-create create-manual
 @projects.route("/create", methods=["POST"])
 @permission(Resource.PROJECTS, Action.CREATE)
 def create():
     generate = request.form.get("generate")
-    explain = request.form.get("role") == "explain"
+    if request.form.get("role") == "explain" or request.form.get("explain"):
+        return responses.error("Initial Prompt is no longer available.")
 
     if generate:
         require_ai_access(AI.CREATE)
         prompt = ai_project.project_creation_prompt(request.form.get("user_description"))
-        if explain:
-            return responses.explain(prompt)
-
         try:
             generated_data = ai_project.generate_project(prompt)
         except (exceptions.AIException, Exception) as e:

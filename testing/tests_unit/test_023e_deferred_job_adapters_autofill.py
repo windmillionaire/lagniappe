@@ -13,12 +13,24 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
-from lagniappe.core.tools.deferred_jobs.errors import (
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
-)
 
 pytestmark = pytest.mark.unit
+
+
+def test_autofill_lifetime_uses_four_minute_total_budget():
+    assert autofill_adapters.AutofillAdapter.max_lifetime_seconds == 4 * 60
+
+
+# @pair ai:autofill
+def test_snapshot_checkpoint_needs_proposal_but_not_file_attachment():
+    adapter = autofill_adapters.AutofillAdapter()
+    context = SimpleNamespace(
+        parameters={"snapshot": {"version": 1}, "upload_record": {"token": "signed"}},
+        checkpoint={"submission": {"subject": "draft"}, "proposal": {"values": {"subject": "AI"}}},
+    )
+    assert adapter.checkpoint_ready(context)
+    context.checkpoint.pop("proposal")
+    assert not adapter.checkpoint_ready(context)
 
 
 # @pairs ai:autofill deferred-jobs:form-revision
@@ -216,7 +228,7 @@ def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
 
 
 # @matrix ai deferred-jobs files : autofill failed pending summary-dependency
-def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
+def test_autofill_prepare_does_not_wait_for_attached_file_summaries(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     phases = []
     context = SimpleNamespace(
@@ -228,45 +240,86 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
     monkeypatch.setattr(
         autofill_adapters.ai_autofill,
         "autofill_summary_dependencies",
-        lambda *_args: {
-            "complete": [SimpleNamespace()],
-            "pending": [SimpleNamespace()],
-            "failed": [],
-        },
+        lambda *_args: pytest.fail("Autofill must not check summary readiness"),
     )
     monkeypatch.setattr(
         autofill_adapters.ai_autofill,
         "generate_autofilled_submission",
-        lambda _prompt: (_ for _ in ()).throw(
-            AssertionError("Gemini must not run before summaries complete")
-        ),
+        lambda _prompt, **kwargs: {"title": "Read original evidence"},
     )
 
-    with pytest.raises(
-        DeferredJobDependencyPendingError,
-        match="still processing",
-    ):
-        adapter.prepare(context)
+    monkeypatch.setattr(autofill_adapters.ai_autofill, "autofill_prompt_data", lambda *args, **kwargs: {})
+    monkeypatch.setattr(autofill_adapters.ai_autofill, "form_autofill_prompt", lambda **kwargs: object())
+    assert adapter.prepare(context) == {"submission": {"title": "Read original evidence"}}
+    assert phases[-1] == (DeferredJobPhase.GENERATING, {})
 
-    assert phases[-1] == (
-        DeferredJobPhase.SUMMARIZING,
-        {"completed": 1, "total": 2},
+
+# @matrix ai files : autofill original-prompt staged-upload model-input
+def test_autofill_snapshot_passes_prompt_and_staged_original_to_model(monkeypatch):
+    adapter = autofill_adapters.AutofillAdapter()
+    actor = SimpleNamespace()
+    target = SimpleNamespace()
+    upload_record = {"token": "retry-staged-upload"}
+    upload = SimpleNamespace(
+        content_type="text/plain", visibility="private", path="qa/retry-evidence.txt",
     )
-
+    verified = []
     monkeypatch.setattr(
-        autofill_adapters.ai_autofill,
-        "autofill_summary_dependencies",
-        lambda *_args: {
-            "complete": [],
-            "pending": [],
-            "failed": [SimpleNamespace()],
-        },
+        autofill_adapters.storage_assets,
+        "verify_direct_upload",
+        lambda record, **options: verified.append((record, options)) or upload,
     )
-    with pytest.raises(
-        DeferredJobDependencyFailedError,
-        match="summary failed",
-    ):
-        adapter.prepare(context)
+    monkeypatch.setattr(
+        autofill_adapters.DATA,
+        "bucket",
+        lambda visibility: SimpleNamespace(name="qa-private-bucket"),
+    )
+    captured = {}
+    prompt = object()
+
+    def build_prompt(**data):
+        captured.update(data)
+        return prompt
+
+    def generate(model_prompt, **options):
+        assert model_prompt is prompt
+        assert options["entity"] is target
+        return {"field-one": "Suggested answer"}
+
+    monkeypatch.setattr(autofill_adapters.ai_autofill, "form_autofill_prompt", build_prompt)
+    monkeypatch.setattr(autofill_adapters.ai_autofill, "generate_autofilled_submission", generate)
+    monkeypatch.setattr(
+        autofill_adapters.form_review,
+        "prepare_proposal",
+        lambda *_args: {"values": {"field-one": "Suggested answer"}},
+    )
+    phases = []
+    context = SimpleNamespace(
+        actor=actor,
+        parameters={
+            "snapshot": {"prompt": {
+                "user_context": "Use the original evidence and keep other fields.",
+                "submission": {"field-one": "Current retry draft"},
+                "schema": [{"id": "field-one", "type": "input", "input": "text"}],
+            }},
+            "upload_record": upload_record,
+        },
+        input=lambda name: target if name == "target" else None,
+        set_phase=lambda phase: phases.append(phase),
+    )
+
+    result = adapter.prepare_snapshot(context)
+
+    assert captured["user_context"] == "Use the original evidence and keep other fields."
+    assert captured["submission"]["field-one"] == "Current retry draft"
+    assert captured["original_file_parts"] == [{
+        "uri": "gs://qa-private-bucket/qa/retry-evidence.txt",
+        "mime_type": "text/plain",
+    }]
+    assert verified[0][0] == upload_record
+    assert verified[0][1]["max_age"] is None
+    assert result["submission"] == {"field-one": "Suggested answer"}
+    assert phases == [DeferredJobPhase.GENERATING, DeferredJobPhase.VALIDATING]
 
 
 # @matrix ai deferred-jobs files : autofill checkpoint resume upload

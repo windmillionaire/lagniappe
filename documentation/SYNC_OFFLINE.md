@@ -15,7 +15,8 @@ route and delegates normalized comparison to `EditReconciler`:
 
 - equivalent values acknowledge automatically unless the comparison omits
   incompatible fields from an unsaved or queued draft;
-- schema change projects stable local field IDs into the current schema;
+- clean forms adopt schema changes automatically, including saved conversions;
+- dirty forms carry compatible local field IDs into the current schema;
 - renderer-backed value drift offers per-field saved/local choices;
 - dirty simple forms offer reset;
 - queued simple forms offer queued or saved whole-form state; and
@@ -32,7 +33,7 @@ Only a create/update form with `lp-offline` and a widget
 
 - method, route, submitter role, and destination;
 - entity fingerprint/modified precondition;
-- structured FormRenderer values and ordinary fields;
+- structured FormRenderer values, their originating schema, and ordinary fields;
 - selected Files; and
 - enough optimistic UI state to restore the queued record.
 
@@ -49,7 +50,11 @@ Reconnect replays commands in order. A revision mismatch retains the command
 and opens the same reconciliation path used for an external edit. If current
 schema/state can safely rebase the queued submission, the queue saves the new
 precondition and retries within the same ordered pass. A conflict needing User
-choice remains queued and blocks later commands.
+choice remains queued and blocks later commands. After a reload, comparison and
+review use the persisted command's values and schema, not the newly rendered
+saved form.
+If the form mounts after replay found the conflict, it receives the retained
+conflict when it initializes.
 
 After acceptance, the queue removes the IndexedDB record and live lookup before
 requesting an immediate entity poll. That ordering prevents the watcher from
@@ -68,14 +73,27 @@ prerequisite.
 
 ## Deferred form locks
 
-Autofill and related Page/Task work can acquire a durable `DeferredJobLock` for
-the target form. Submit, quick-edit, and default-field routes reject conflicting
-mutations. `form-lock` polling restores the lock and operation status after
-reload or in another tab even when the entity fingerprint is unchanged.
+Autofill's durable `DeferredJobLock` reserves one AI operation for the target;
+it does not block ordinary editing or saving. Page/Task HTML bootstraps operation
+status and review candidates. Focused form and task-list ETags include operation
+revisions, and `form-lock` polling detects subsequent starts in other tabs.
+Schema migration retains its real writer fence (`blocks_edit=true`).
 
-On terminal state, a matching clean form may reconcile automatically. Unsaved
-or queued state retains the ordinary saved/local review boundary. A stale
-rendered lock is also cleared from authoritative terminal state.
+The shared bar above Submit combines running autofill (Cancel), completed
+autofill (Review), saved schema conversions (View changes), and another editor's
+saved changes.
+Completion does not replace an actively viewed or dirty form. The review modal
+compares current, saved, and compatible AI-proposed values. Incompatible local
+draft values remain visible as reference cards without selection controls.
+Acceptance changes the open form only; ordinary Update persists it.
+Prompt-only AI refinement produces a
+private candidate for the requesting editor, not an immediate saved answer.
+
+Online Page/Task form writes carry `form-revision` as well as generation. The
+server checks that baseline and fences the eventual commit with the loaded row;
+a mismatch returns typed conflict state and leaves the draft untouched. Missing
+baselines require review, including pre-upgrade cached clients. Duplicate AI
+starts likewise do not acknowledge or clear the submitted draft.
 
 A pending deterministic Form change also pauses every attached Page/Task. Its
 Form-owned marker remains authoritative after job failure or expiry, so an old
@@ -95,9 +113,12 @@ omits incompatible local fields, so equality with the saved submission does not
 mean the original draft is safe to discard. Keep its original schema and values,
 and any queued command, until the user resolves the review.
 
-The `pre_migration` notice is a separate, read-only display of saved changes. It
-does not resolve an offline/concurrent conflict, and closing it never saves or
-clears the notice.
+`pre_migration` feeds the independent informational **View changes** modal only
+when saved values were converted, cleared or removed. Closing it never saves or
+clears the durable notice; the next successful ordinary save/completion does.
+Opening or reloading a clean form shows the current schema and saved values.
+Successful ordinary saves consume explicitly reviewed AI references; another editor's
+private candidate is unaffected.
 
 ## Service worker boundary
 

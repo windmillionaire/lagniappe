@@ -63,7 +63,6 @@ class Buttons:
         Mode toggles:
             AI_MODE: Switch to AI-assisted mode
             MANUAL_MODE: Switch to manual entry mode
-            EXPLAIN: Request AI explanation
 
         Source selection:
             SOURCE_TEXT: Text input source
@@ -78,7 +77,6 @@ class Buttons:
     LP_CLOSE = "button[lp-close]"
     LP_HELP = "button[lp-help]"
     SIGNIN = "button[data-role='signin']"
-    EXPLAIN = "button[data-role='explain']"
     DELETE = "button[data-role='delete']"
     CANCEL = "button[data-role='cancel']"
     AI_MODE = "button[data-role='ai']"

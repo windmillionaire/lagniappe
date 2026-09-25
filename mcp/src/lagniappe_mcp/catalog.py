@@ -466,7 +466,7 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
                 "type": "string",
             },
             "name": {"type": "string", "maxLength": 120},
-            "revises_plan_id": {"type": "string", "description": "Creator-owned stopped execution to correct. Read current workspace state; propose only additional changes."},
+            "revises_plan_id": {"type": ["string", "null"], "minLength": 1, "description": "Creator-owned stopped execution to correct. Omit or use null for an independent Plan. Read current workspace state; propose only additional changes."},
             **(
                 {
                     "actions": {
@@ -751,7 +751,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan_contract",
-            "Load exact schemas for selected allowed actions; actions=[] returns a saved-answer schema with no changes. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. submit_plan independently validates against the full current contract.",
+            "Load exact schemas for selected allowed actions; actions=[] returns a saved-answer schema with no changes. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. The default summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. Submission uses the API's current validation and permissions.",
             {
                 **_plan_id_input(),
                 "properties": {
@@ -798,7 +798,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "submit_plan",
-            "Save an explicitly requested answer or a mutation proposal to the existing plan_id. Reuse for revisions: optional name and instructions update the current brief atomically with the complete proposal; original_brief is retained. Never executes workspace changes. Validates against the fresh full contract; no separate final contract read is needed. Give preview_url for authenticated review, never claim a proposal was applied.",
+            "Save an explicitly requested answer or a mutation proposal to the existing plan_id. Reuse for revisions: optional name and instructions update the current brief atomically with the complete proposal; original_brief is retained. Never executes workspace changes. The API validates against current permissions and state; no separate final contract read is needed. Give preview_url for authenticated review, never claim a proposal was applied.",
             {
                 "type": "object",
                 "required": ["plan_id", "contract_version", "proposal", "file_usage"],

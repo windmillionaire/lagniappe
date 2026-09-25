@@ -164,7 +164,7 @@ def validate_manifest(value, *, bearer):
 # @matrix mcp-upload : terminal upload-batch-identity safe-result
 async def prepare_uploads(adapter, arguments):
     plan_id, files = arguments["plan_id"], arguments["files"]
-    contract = await adapter._load_contract(plan_id)
+    contract = await adapter._load_contract(plan_id, view="summary")
     _preflight_requested_count(contract, files)
     _preflight_contract(contract, [SimpleNamespace(**item) for item in files])
     created, _ = await adapter.rest.request_json(

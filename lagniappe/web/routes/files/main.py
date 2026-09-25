@@ -107,7 +107,7 @@ def update(key, **kwargs):
             return responses.error(str(error))
     file.update(request.form)
     Entities.save(file)
-    file.dispatch_pending_processing()
+    file.dispatch_pending_processing(actor=current_user._get_current_object())
     if changed:
         return responses.json_response({"reload": True})
     return responses.file_info(file)
@@ -218,7 +218,7 @@ def upload(key, **kwargs):
         _summarize_page_uploads(uploaded_files)
     Entities.save(*uploaded_files, page)
     for uploaded_file in uploaded_files:
-        uploaded_file.dispatch_pending_processing()
+        uploaded_file.dispatch_pending_processing(actor=current_user._get_current_object())
 
     return responses.new_file_upload(uploaded_files, page)
 

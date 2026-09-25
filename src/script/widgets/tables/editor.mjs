@@ -1,5 +1,7 @@
 import { getFormElement } from "../../elements/loader.mjs";
+import { captureError } from "../../shared/errors.mjs";
 import { setIcon } from "../../shared/icons.mjs";
+import { QueryLifecycle } from "../../shared/queryLifecycle.mjs";
 import { request } from "../../shared/request.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
@@ -17,6 +19,7 @@ const ROUTES = {
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_renders_checkbox_cells
  * @matrix category-index : checkbox-cell quick-edit
  * @matrix task-index : checkbox-cell column-visibility editable-cell link-affordance quick-edit
+ * @matrix table-controls : quick-edit async-preparation pending-save teardown
  */
 export class TableEditor {
 	constructor(attributes) {
@@ -32,15 +35,49 @@ export class TableEditor {
 		);
 		this.activeEdit = null;
 		this.checkboxEdits = new Map();
-		this._preparedCheckboxEdits = [];
+		this._openLifecycle = new QueryLifecycle();
+		this._checkboxLifecycle = new QueryLifecycle();
+		this._preparedOpen = null;
+		this._preparedCheckboxes = null;
+		this._saves = new Map();
+		this._savedTimers = new Map();
+		this._destroyed = false;
+		this._listenerTarget = null;
+		this._onClick = (event) => void this._click(event).catch(captureError);
+		this._onChange = (event) => void this._change(event).catch(captureError);
+		this._onKeydown = (event) => void this._keydown(event).catch(captureError);
 	}
 
 	async init() {
-		this.rows = await this.component.loadWidget("IndexTable");
+		if (this._destroyed || this._listenerTarget) return;
+		const rows = await this.component.loadWidget("IndexTable");
+		if (
+			this._destroyed ||
+			this.component._destroyed ||
+			this.view._destroyed ||
+			!rows
+		)
+			return;
+		this.rows = rows;
+		this._listenerTarget = rows.target;
 
-		this.rows.target.addEventListener("click", (e) => this._click(e));
-		this.rows.target.addEventListener("change", (e) => this._change(e));
-		this.rows.target.addEventListener("keydown", (e) => this._keydown(e));
+		this._listenerTarget.addEventListener("click", this._onClick);
+		this._listenerTarget.addEventListener("change", this._onChange);
+		this._listenerTarget.addEventListener("keydown", this._onKeydown);
+	}
+
+	_ownsCell(cell) {
+		return Boolean(
+			!this._destroyed &&
+				!this.component._destroyed &&
+				!this.view._destroyed &&
+				cell?.isConnected &&
+				this.rows?.target.contains(cell),
+		);
+	}
+
+	_canEdit(cell) {
+		return this.visible && this._ownsCell(cell) && !this._saves.has(cell);
 	}
 
 	_parseValue(cell) {
@@ -145,98 +182,145 @@ export class TableEditor {
 		if (!error) {
 			error = document.createElement("p");
 			error.dataset.role = "quick-edit-error";
+			error.setAttribute("role", "alert");
 			cell.appendChild(error);
 		}
 		error.textContent = message || "Could not save this value.";
-		this._control(cell)?.focus();
 	}
 
 	_editableCell(target) {
 		const cell = target.closest("td");
-		if (!this.visible || cell?.dataset.editable !== "true") return null;
+		if (!this._canEdit(cell) || cell?.dataset.editable !== "true") return null;
 		if (!this._schema(cell) || !this._route(cell)) return null;
 		return cell;
 	}
 
-	async _openCheckboxes() {
+	async _prepareCheckboxes() {
+		this._discardPreparedCheckboxes();
+		if (this._destroyed || !this.visible) return null;
 		this._cleanupCheckboxEdits();
-		this._preparedCheckboxEdits = (
-			await Promise.all(
-				this._editableCells()
-					.filter((cell) => this._isCheckboxCell(cell))
-					.map((cell) => this._prepareCheckbox(cell)),
-			)
-		).filter(Boolean);
-		await withTransition(() => this._commitPreparedCheckboxes(), {
+		const batch = {
+			token: this._checkboxLifecycle.begin(this.rows.target, {
+				cancelTransport: false,
+			}),
+			edits: new Set(),
+			ready: false,
+		};
+		this._preparedCheckboxes = batch;
+		const results = await Promise.allSettled(
+			this._editableCells()
+				.filter((cell) => this._isCheckboxCell(cell))
+				.map((cell) => this._prepareCheckbox(cell, batch)),
+		);
+		const failure = results.find((result) => result.status === "rejected");
+		if (failure || !this._checkboxLifecycle.isCurrent(batch.token)) {
+			this._discardPreparedCheckboxes(batch);
+			if (failure) captureError(failure.reason);
+			return null;
+		}
+		batch.ready = true;
+		return batch;
+	}
+
+	async refreshCheckboxes() {
+		if (this._destroyed || !this.visible) return;
+		const batch = await this._prepareCheckboxes();
+		if (!batch) return;
+		await withTransition(() => this._commitPreparedCheckboxes(batch), {
 			label: "table-editor:refresh-checkboxes",
 		});
 	}
 
-	async refreshCheckboxes() {
-		if (this.visible) await this._openCheckboxes();
-	}
-
-	async _prepareCheckbox(cell) {
-		if (this.checkboxEdits.has(cell)) return null;
+	async _prepareCheckbox(cell, batch) {
+		if (!this._canEdit(cell) || this.checkboxEdits.has(cell)) return;
 
 		const schema = this._schema(cell);
 		const value = this._parseValue(cell);
 		const element = await getFormElement(this._editRenderer(), schema, value);
-		const editor = element.cell;
-		if (!editor) {
-			element.destroy();
-			return null;
+		let edit;
+		try {
+			if (
+				!this._checkboxLifecycle.isCurrent(batch.token) ||
+				!this._canEdit(cell) ||
+				this.checkboxEdits.has(cell)
+			)
+				return;
+			const editor = element.cell;
+			if (!editor) return;
+			edit = { cell, element, editor, value, column: this._column(cell) };
+			batch.edits.add(edit);
+		} finally {
+			if (!edit) element.destroy();
 		}
-
-		return {
-			editor,
-			record: {
-				before: cell.innerHTML,
-				cell,
-				column: this._column(cell),
-				element,
-				value,
-			},
-		};
 	}
 
-	_commitPreparedCheckboxes() {
-		for (const { editor, record } of this._preparedCheckboxEdits) {
-			if (!record.cell.isConnected) {
-				record.element.destroy();
+	_discardPreparedCheckboxes(batch = this._preparedCheckboxes) {
+		if (!batch) return;
+		for (const edit of batch.edits) this._releaseEdit(edit);
+		batch.edits.clear();
+		if (this._preparedCheckboxes === batch) this._preparedCheckboxes = null;
+	}
+
+	_commitPreparedCheckboxes(batch = this._preparedCheckboxes) {
+		if (!batch?.ready) return;
+		if (!this._checkboxLifecycle.isCurrent(batch.token) || !this.visible) {
+			this._discardPreparedCheckboxes(batch);
+			return;
+		}
+		for (const edit of batch.edits) {
+			const { cell, editor } = edit;
+			if (
+				!edit.element ||
+				!this._canEdit(cell) ||
+				this.checkboxEdits.has(cell)
+			) {
+				this._releaseEdit(edit);
 				continue;
 			}
-			this.checkboxEdits.set(record.cell, record);
-			record.cell.dataset.editState = "editing";
-			record.cell.replaceChildren(editor);
+			this._clearSavedTimer(cell);
+			const error = cell.querySelector(
+				"[data-role='quick-edit-error']",
+			)?.textContent;
+			this._clearError(cell);
+			edit.before = cell.innerHTML;
+			this.checkboxEdits.set(cell, edit);
+			cell.dataset.editState = "editing";
+			cell.replaceChildren(editor);
+			if (error) this._showError(cell, error);
 		}
-		this._preparedCheckboxEdits = [];
+		batch.edits.clear();
+		if (this._preparedCheckboxes === batch) this._preparedCheckboxes = null;
 	}
 
 	_cleanupCheckboxEdits() {
 		this.checkboxEdits.forEach((edit, cell) => {
-			if (cell.isConnected) return;
-			edit.element.destroy();
-			this.checkboxEdits.delete(cell);
+			if (!this._ownsCell(cell)) this._releaseEdit(edit);
 		});
 	}
 
-	_cancelCheckbox(cell) {
-		const edit = this.checkboxEdits.get(cell);
-		if (!edit) return;
-
-		if (cell.isConnected) {
+	_releaseEdit(edit, restore = false) {
+		if (!edit?.element) return;
+		const { cell, element } = edit;
+		if (restore && cell.isConnected && this.rows?.target.contains(cell)) {
+			const error = cell.querySelector(
+				"[data-role='quick-edit-error']",
+			)?.textContent;
 			cell.innerHTML = edit.before;
-			delete cell.dataset.editState;
+			if (this._saves.has(cell)) cell.dataset.editState = "saving";
+			else delete cell.dataset.editState;
+			if (error) this._showError(cell, error);
 		}
-		edit.element.destroy();
-		this.checkboxEdits.delete(cell);
+		edit.element = null;
+		edit.editor = null;
+		if (this.activeEdit === edit) this.activeEdit = null;
+		if (this._preparedOpen === edit) this._preparedOpen = null;
+		if (this.checkboxEdits.get(cell) === edit) this.checkboxEdits.delete(cell);
+		element.destroy();
 	}
 
 	_cancelCheckboxes() {
-		Array.from(this.checkboxEdits.keys()).forEach((cell) => {
-			this._cancelCheckbox(cell);
-		});
+		for (const edit of this.checkboxEdits.values())
+			this._releaseEdit(edit, true);
 	}
 
 	async _click(e) {
@@ -261,56 +345,77 @@ export class TableEditor {
 		if (!cell || !this._isCheckboxCell(cell)) return;
 
 		e.stopPropagation();
-		if (!this.checkboxEdits.has(cell)) return;
+		const edit = this.checkboxEdits.get(cell);
+		if (!edit) return;
 
 		if (
 			this.activeEdit &&
 			this.activeEdit.cell !== cell &&
 			!(await this._commit(this.activeEdit.cell))
 		) {
-			const control = this._control(cell);
-			const edit = this.checkboxEdits.get(cell);
-			if (control) control.checked = edit.value === true;
+			if (this._canEdit(cell) && this.checkboxEdits.get(cell) === edit) {
+				const control = this._control(cell);
+				if (control) control.checked = edit.value === true;
+			}
 			return;
 		}
 
-		await this._commitCheckbox(cell);
+		if (this._canEdit(cell) && this.checkboxEdits.get(cell) === edit) {
+			await this._commitCheckbox(cell);
+		}
 	}
 
 	async _open(cell) {
+		if (!this._canEdit(cell)) return;
 		if (this.activeEdit?.cell === cell) return;
 		if (this._isCheckboxCell(cell)) return;
+		const token = this._openLifecycle.begin(cell, { cancelTransport: false });
+		this._releaseEdit(this._preparedOpen);
 
 		if (this.activeEdit && !(await this._commit(this.activeEdit.cell))) {
 			return;
 		}
+		if (!this._openLifecycle.isCurrent(token) || !this._canEdit(cell)) return;
 
 		const schema = this._schema(cell);
 		const value = this._parseValue(cell);
 		const element = await getFormElement(this._editRenderer(), schema, value);
-		const editor = element.cell;
-		if (!editor) {
-			element.destroy();
-			return;
+		let edit;
+		try {
+			if (!this._openLifecycle.isCurrent(token) || !this._canEdit(cell)) return;
+			const editor = element.cell;
+			if (!editor) return;
+			edit = { cell, element, editor, value, column: this._column(cell) };
+			this._preparedOpen = edit;
+			await withTransition(
+				() => {
+					if (
+						!edit.element ||
+						!this._openLifecycle.isCurrent(token) ||
+						!this._canEdit(cell)
+					)
+						return;
+					this._clearSavedTimer(cell);
+					this._clearError(cell);
+					edit.before = cell.innerHTML;
+					cell.dataset.editState = "editing";
+					this.activeEdit = edit;
+					this._preparedOpen = null;
+					cell.replaceChildren(editor);
+				},
+				{ label: "table-editor:open-cell" },
+			);
+			if (
+				this.activeEdit === edit &&
+				this._openLifecycle.isCurrent(token) &&
+				this._canEdit(cell)
+			) {
+				this._control(editor)?.focus({ preventScroll: true });
+			}
+		} finally {
+			if (!edit) element.destroy();
+			else if (this.activeEdit !== edit) this._releaseEdit(edit);
 		}
-
-		await withTransition(
-			() => {
-				cell.dataset.editState = "editing";
-				this.activeEdit = {
-					before: cell.innerHTML,
-					cell,
-					column: this._column(cell),
-					element,
-					value,
-				};
-				cell.replaceChildren(editor);
-			},
-			{ label: "table-editor:open-cell" },
-		);
-
-		const control = this._control(editor);
-		control?.focus({ preventScroll: true });
 	}
 
 	async _keydown(e) {
@@ -324,12 +429,22 @@ export class TableEditor {
 		e.stopPropagation();
 
 		if (e.key === "Escape") {
+			this._openLifecycle.invalidate();
+			this._releaseEdit(this._preparedOpen);
 			this._cancel(cell);
 			return;
 		}
 
+		const epoch = this._openLifecycle.epoch;
 		const committed = await this._commit(cell);
-		if (committed && e.key === "Tab") await this._focusNext(cell, e.shiftKey);
+		if (
+			committed &&
+			e.key === "Tab" &&
+			epoch === this._openLifecycle.epoch &&
+			this._canEdit(cell) &&
+			!this.activeEdit
+		)
+			await this._focusNext(cell, e.shiftKey);
 	}
 
 	_nextEditableCell(cell, reverse = false) {
@@ -343,8 +458,8 @@ export class TableEditor {
 
 	async _focusNext(cell, reverse = false) {
 		const next = this._nextEditableCell(cell, reverse);
-		next?.focus?.();
-		if (!next) return;
+		if (!this._canEdit(next)) return;
+		next.focus?.();
 		if (this._isCheckboxCell(next)) {
 			this._control(next)?.focus({ preventScroll: true });
 			return;
@@ -354,94 +469,178 @@ export class TableEditor {
 
 	_cancel(cell) {
 		if (!this.activeEdit || this.activeEdit.cell !== cell) return;
-
-		cell.innerHTML = this.activeEdit.before;
-		delete cell.dataset.editState;
-		this.activeEdit.element.destroy();
-		this.activeEdit = null;
+		this._releaseEdit(this.activeEdit, true);
 	}
 
 	async _commit(cell) {
+		if (this._saves.has(cell)) return this._saves.get(cell).promise;
+		if (!this._canEdit(cell)) return false;
 		if (!this.activeEdit || this.activeEdit.cell !== cell) return false;
 
 		const edit = this.activeEdit;
-		const value = edit.element.value;
 		if (!this._changed(edit)) {
 			this._cancel(cell);
 			return true;
 		}
-
-		cell.dataset.editState = "saving";
-		this._clearError(cell);
-		const response = await request.patch(this._route(cell), {
-			schema_id: edit.element.schema.id,
-			form_generation: cell.dataset.formGeneration || "0",
-			value,
-			column: edit.column,
-		});
-
-		if (!response?.ok) {
-			this._showError(cell, response?.error);
-			return false;
-		}
-
-		this._renderValue(cell, response.html?.body?.innerHTML ?? "", {
-			saved: true,
-		});
-		cell.dataset.editValue = JSON.stringify(value);
-		cell.dataset.editState = "saved";
-		edit.element.destroy();
-		this.activeEdit = null;
-
-		setTimeout(() => {
-			if (cell.dataset.editState !== "saved") return;
-			delete cell.dataset.editState;
-			cell.querySelector("[data-role='quick-edit-saved']")?.remove();
-		}, SAVED_STATE_MS);
-
-		return true;
+		return this._startSave(edit, false);
 	}
 
 	async _commitCheckbox(cell) {
+		if (this._saves.has(cell)) return this._saves.get(cell).promise;
+		if (!this._canEdit(cell)) return false;
 		const edit = this.checkboxEdits.get(cell);
 		if (!edit) return true;
 
-		const value = edit.element.value;
 		if (!this._changed(edit)) {
 			cell.dataset.editState = "editing";
 			this._clearError(cell);
 			return true;
 		}
+		return this._startSave(edit, true);
+	}
 
-		cell.dataset.editState = "saving";
-		this._clearError(cell);
-		const response = await request.patch(this._route(cell), {
+	_startSave(edit, checkbox) {
+		const { cell } = edit;
+		// The request outlives its field when Quick Edit closes. Keep its payload
+		// and settlement authority separate from the currently mounted editor.
+		const payload = structuredClone({
 			schema_id: edit.element.schema.id,
 			form_generation: cell.dataset.formGeneration || "0",
-			value,
+			value: edit.element.value,
 			column: edit.column,
 		});
+		const operation = { edit, checkbox, payload, route: this._route(cell) };
+		this._saves.set(cell, operation);
+		this._clearSavedTimer(cell);
+		cell.dataset.editState = "saving";
+		cell.setAttribute("aria-busy", "true");
+		cell.setAttribute("inert", "");
+		this._clearError(cell);
+		operation.promise = this._save(operation);
+		return operation.promise;
+	}
 
-		if (!response?.ok) {
-			this._showError(cell, response?.error);
-			return false;
-		}
-
-		edit.before = response.html?.body?.innerHTML ?? edit.before;
-		edit.value = value;
-		cell.dataset.editValue = JSON.stringify(value);
-		cell.dataset.editState = "saved";
-
-		setTimeout(() => {
-			if (cell.dataset.editState === "saved") {
-				cell.dataset.editState = "editing";
+	async _save(operation) {
+		const { edit, checkbox, payload, route } = operation;
+		const { cell } = edit;
+		try {
+			const response = await request.patch(route, payload);
+			if (!this._ownsCell(cell) || this._saves.get(cell) !== operation)
+				return false;
+			if (!response?.ok) {
+				this._showError(cell, response?.error);
+				return false;
 			}
-		}, SAVED_STATE_MS);
+			const html = response.html?.body?.innerHTML ?? edit.before;
+			cell.dataset.editValue = JSON.stringify(payload.value);
+			if (checkbox && this.checkboxEdits.get(cell) === edit) {
+				edit.before = html;
+				edit.value = payload.value;
+			} else {
+				this._releaseEdit(edit);
+				this._renderValue(cell, html, { saved: this.visible });
+			}
+			cell.dataset.editState = "saved";
+			this._scheduleSavedTimer(cell);
+			return true;
+		} catch (error) {
+			if (this._ownsCell(cell) && this._saves.get(cell) === operation) {
+				this._showError(cell, "Could not save this value.");
+				captureError(error);
+			}
+			return false;
+		} finally {
+			if (this._saves.get(cell) === operation) {
+				this._saves.delete(cell);
+				this._unlockCell(cell);
+				if (checkbox && this._canEdit(cell) && !this.checkboxEdits.has(cell)) {
+					void this.refreshCheckboxes().catch(captureError);
+				}
+			}
+		}
+	}
 
-		return true;
+	_unlockCell(cell) {
+		cell.removeAttribute("aria-busy");
+		cell.removeAttribute("inert");
+	}
+
+	_scheduleSavedTimer(cell) {
+		this._clearSavedTimer(cell);
+		const timer = setTimeout(() => {
+			if (this._savedTimers.get(cell) !== timer) return;
+			this._savedTimers.delete(cell);
+			if (this._ownsCell(cell)) this._clearSavedState(cell);
+		}, SAVED_STATE_MS);
+		this._savedTimers.set(cell, timer);
+	}
+
+	_clearSavedState(cell) {
+		if (cell.dataset.editState === "saved") {
+			if (this.checkboxEdits.has(cell)) cell.dataset.editState = "editing";
+			else delete cell.dataset.editState;
+		}
+		cell.querySelector("[data-role='quick-edit-saved']")?.remove();
+	}
+
+	_clearSavedTimer(cell) {
+		const timer = this._savedTimers.get(cell);
+		if (timer === undefined) return;
+		clearTimeout(timer);
+		this._savedTimers.delete(cell);
+		this._clearSavedState(cell);
+	}
+
+	_invalidatePreparation() {
+		// Preparation can be invalidated before a transition commits closure;
+		// restoring mounted cells belongs to _closeEdits() inside that commit.
+		this._openLifecycle.invalidate();
+		this._checkboxLifecycle.invalidate();
+		this._releaseEdit(this._preparedOpen);
+		this._discardPreparedCheckboxes();
+	}
+
+	_closeEdits() {
+		this._invalidatePreparation();
+		this._releaseEdit(this.activeEdit, true);
+		this._cancelCheckboxes();
+		for (const cell of this._savedTimers.keys()) this._clearSavedTimer(cell);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_refresh_releases_replaced_and_removed_edits
+	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_refresh_rejects_pending_fields_and_save_results
+	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_refresh_preserves_edits_in_unchanged_rows
+	 * @matrix table-controls : quick-edit row-replacement teardown
+	 */
+	releaseRows(rows) {
+		const retired = new Set(rows.filter(Boolean));
+		// View-level deletion can remove a row before the table delta commits.
+		const affected = (cell) =>
+			!this._ownsCell(cell) || retired.has(cell.closest("tr[lp-entity]"));
+		for (const edit of [
+			this.activeEdit,
+			this._preparedOpen,
+			...this.checkboxEdits.values(),
+		]) {
+			if (edit && affected(edit.cell)) this._releaseEdit(edit);
+		}
+		for (const edit of this._preparedCheckboxes?.edits || []) {
+			if (affected(edit.cell)) this._releaseEdit(edit);
+		}
+		for (const cell of this._saves.keys()) {
+			if (!affected(cell)) continue;
+			this._saves.delete(cell);
+			this._unlockCell(cell);
+		}
+		for (const cell of this._savedTimers.keys()) {
+			if (affected(cell)) this._clearSavedTimer(cell);
+		}
 	}
 
 	async prereconcile() {
+		if (this._destroyed || !this.rows) return;
 		const visibility = this.component.active;
 		const preserveForVisibility =
 			!this.visible &&
@@ -451,23 +650,16 @@ export class TableEditor {
 			this.visible = true;
 			visibility.preserveEditor?.(this);
 		}
-		if (!this.visible) return;
-
-		this._cleanupCheckboxEdits();
-		this._preparedCheckboxEdits = (
-			await Promise.all(
-				this._editableCells()
-					.filter((cell) => this._isCheckboxCell(cell))
-					.map((cell) => this._prepareCheckbox(cell)),
-			)
-		).filter(Boolean);
+		if (!this.visible) {
+			this._invalidatePreparation();
+			return;
+		}
+		await this._prepareCheckboxes();
 	}
 
 	postreconcile() {
-		if (!this.visible && this.activeEdit) this._cancel(this.activeEdit.cell);
-		if (!this.visible) {
-			this._cancelCheckboxes();
-		}
+		if (this._destroyed || !this.rows) return;
+		if (!this.visible) this._closeEdits();
 
 		this.rows.target.dataset.editing = this.visible ? "true" : "false";
 		this.view.elt
@@ -478,5 +670,28 @@ export class TableEditor {
 			});
 
 		if (this.visible) this._commitPreparedCheckboxes();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_editor_destroy_releases_fields_listeners_and_pending_work
+	 * @matrix table-controls : quick-edit teardown
+	 */
+	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.visible = false;
+		this._closeEdits();
+		this._openLifecycle.destroy();
+		this._checkboxLifecycle.destroy();
+		this._listenerTarget?.removeEventListener("click", this._onClick);
+		this._listenerTarget?.removeEventListener("change", this._onChange);
+		this._listenerTarget?.removeEventListener("keydown", this._onKeydown);
+		this._listenerTarget = null;
+		for (const cell of this._saves.keys()) this._unlockCell(cell);
+		this._saves.clear();
+		this.checkboxEdits.clear();
+		this.columns.clear();
+		this.rows = null;
 	}
 }

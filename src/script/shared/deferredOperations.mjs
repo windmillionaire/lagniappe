@@ -1,3 +1,4 @@
+import { renderReviewBar } from "../forms/reviewBar.mjs";
 import { captureError } from "./errors.mjs";
 import { createIcon } from "./icons.mjs";
 import { withTransition } from "./transitions.mjs";
@@ -54,13 +55,42 @@ function operationNodeVisible(node) {
 }
 
 /**
+ * @testable false
+ * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
+ * @reason terminal autofill bootstrap is exercised through manager registration
+ */
+function completedAutofillInMarkup(node, status) {
+	if (
+		node.dataset.widget !== "TaskForm" ||
+		!node.dataset.operationBootstrap ||
+		!node.dataset.formState ||
+		status?.type !== "autofill" ||
+		!status.terminal
+	)
+		return false;
+	try {
+		const state = JSON.parse(node.dataset.formState);
+		return (
+			state.operation?.key === status.key &&
+			state.operation?.revision === status.revision &&
+			(status.status !== "succeeded" ||
+				state.reviews?.some((review) => review.operation === status.key))
+		);
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Reconcile every visible deferred operation through the shared poll contract.
  *
  * @testable true
  * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_batches_orders_and_renders_status
  * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
+ * @tests tests_js/test_023_deferred_operations.mjs::test_cold_task_operations_wait_for_activation_and_completed_reviews_need_no_poll
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
- * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
+ * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-autofill rendered-visibility revision status teardown terminal-ownership timing visible-blur
+ * @pair deferred-jobs:review-probe
  */
 export class DeferredOperationManager {
 	constructor(view) {
@@ -82,22 +112,36 @@ export class DeferredOperationManager {
 		const terminalKeys = new Set();
 		const scannedKeys = new Set();
 		for (const node of nodes) {
+			// Task forms in the page's initial HTML are cold until opened. Their
+			// operation state is already rendered, and opening the form scans it.
+			if (
+				root === document &&
+				node.dataset.widget === "TaskForm" &&
+				node._lp_widget?.visible !== true
+			)
+				continue;
 			const revision = operationRevision(node.dataset.operationRevision);
-			const status = node.dataset.operationStatus
-				? {
-						key: node.dataset.operation,
-						revision,
-						status: node.dataset.operationStatus,
-						phase: node.dataset.operationPhase || "unknown",
-						phase_label: node.dataset.operationPhaseLabel || "Working",
-						elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
-						recovering: node.dataset.operationRecovering === "true",
-						terminal: node.dataset.operationTerminal === "true",
-						...(node.dataset.operationError
-							? { error: node.dataset.operationError }
-							: {}),
-					}
-				: null;
+			const status = node.dataset.operationBootstrap
+				? JSON.parse(node.dataset.operationBootstrap)
+				: node.dataset.operationStatus
+					? {
+							key: node.dataset.operation,
+							revision,
+							status: node.dataset.operationStatus,
+							phase: node.dataset.operationPhase || "unknown",
+							phase_label: node.dataset.operationPhaseLabel || "Working",
+							elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
+							recovering: node.dataset.operationRecovering === "true",
+							terminal: node.dataset.operationTerminal === "true",
+							...(node.dataset.operationError
+								? { error: node.dataset.operationError }
+								: {}),
+						}
+					: null;
+			// A completed autofill and its review already came in this form's HTML.
+			// Re-polling it would initialize closed task forms and refresh every
+			// collection without adding any state the reader needs.
+			if (completedAutofillInMarkup(node, status)) continue;
 			const tracked = this.track(node.dataset.operation, {
 				revision,
 				node,
@@ -119,6 +163,30 @@ export class DeferredOperationManager {
 				Array.from(terminalKeys, (key) => `operation:${key}`),
 			);
 		}
+	}
+
+	resumeTaskForm(node) {
+		if (node?.dataset.widget !== "TaskForm") return;
+		this.scan(node);
+		const key = node.dataset.operation;
+		if (this.operations.has(key) && node.dataset.operationTerminal !== "true") {
+			this.view.PollingCoordinator?.trigger(`operation:${key}`);
+		}
+	}
+
+	suspendTaskForm(node) {
+		if (node?.dataset.widget !== "TaskForm") return;
+		const key = node.dataset.operation;
+		if (
+			!key ||
+			operationNodes(key).some(
+				(other) => other !== node && other._lp_widget?.visible === true,
+			)
+		)
+			return;
+		this.operations.delete(key);
+		this.unsubscribers.get(key)?.();
+		this.unsubscribers.delete(key);
 	}
 
 	track(
@@ -222,6 +290,13 @@ export class DeferredOperationManager {
 	decorate(node, key) {
 		if (!node || !key) return;
 		node.dataset.operation = key;
+		if (
+			node.dataset.formState &&
+			node.dataset.operationScope !== "form-change"
+		) {
+			if (node._lp_widget) renderReviewBar(node._lp_widget);
+			return;
+		}
 		const formLocked = node.dataset.deferredLock === "form";
 		if (formLocked) {
 			node.setAttribute("aria-busy", "true");
@@ -337,6 +412,23 @@ export class DeferredOperationManager {
 					destination: status.destination,
 					deferred_revision: `${status.key}:${revision}`,
 				});
+				if (status.type === "autofill" && status.status === "succeeded") {
+					// A terminal operation poll can enqueue the form probe instead of
+					// awaiting it. Do not retire the operation while its visible form
+					// still lacks the authoritative review candidate.
+					reconciled = !operationNodes(status.key).some((node) => {
+						const widget = node._lp_widget;
+						return (
+							widget?.visible === true &&
+							widget.component?.active === widget &&
+							!widget._reviewedOperations?.has(status.key) &&
+							!widget.reviewState?.stale_autofill &&
+							!widget.reviewState?.reviews?.some(
+								(review) => review.operation === status.key,
+							)
+						);
+					});
+				}
 			} catch {
 				reconciled = false;
 			}
@@ -355,6 +447,13 @@ export class DeferredOperationManager {
 
 	_render(status, elapsedSeconds = status.elapsed_seconds) {
 		for (const node of operationNodes(status.key)) {
+			if (status.type === "autofill" && node._lp_widget) {
+				renderReviewBar(node._lp_widget, {
+					...status,
+					elapsed_seconds: elapsedSeconds,
+				});
+			}
+			delete node.dataset.operationBootstrap;
 			node.dataset.operationRevision = String(status.revision);
 			node.dataset.operationStatus = status.status || "unknown";
 			node.dataset.operationPhase = status.phase || "unknown";

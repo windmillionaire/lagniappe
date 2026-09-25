@@ -195,13 +195,16 @@ def add_document_image_direct(key, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_explain_includes_selected_text_context
 # @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files
-# @matrix ai : document-context explain generate-text live-provider page-context selected-text
+# @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
+# @matrix ai : document-context generate-text live-provider page-context selected-text
 @assets.route("<key>/document/generate", methods=["POST"])
 @permission(requested=Action.EDIT)
 def generate_text(key, **kwargs):
     require_ai_access(AI.CREATE)
+
+    if request.form.get("role") == "explain" or request.form.get("explain"):
+        return responses.error("Initial Prompt is no longer available.")
 
     entity = Entities.fetch_one(
         kwargs["entity"],
@@ -224,9 +227,6 @@ def generate_text(key, **kwargs):
         context_data["selected_text"] = request.form.get("selected_text").strip()
 
     prompt = ai_text.text_generation_prompt(user_prompt, context_data)
-    if request.form.get("role") == "explain":
-        return responses.explain(prompt)
-
     try:
         markdown = ai_text.generate_ai_text(prompt)
     except exceptions.AIException as e:

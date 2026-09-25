@@ -1,6 +1,7 @@
 """Deferred-job Datastore transactions and Scheduler control records."""
 
 from datetime import datetime, timedelta, timezone
+import json
 
 from google.cloud.datastore import Entity, Key
 from google.cloud.datastore import query as datastore_query
@@ -87,6 +88,17 @@ def delete_terminal_records(*, before=None, batch_size=500):
             continue
         if record.get("dispatch_state") == "delivery_pending":
             continue
+        if record.get("autofill_receipt"):
+            # Review candidates are product data until editors acknowledge them,
+            # even when their diagnostic operation is otherwise purgeable.
+            inputs = record.get("inputs") or "{}"
+            inputs = json.loads(inputs) if isinstance(inputs, str) else inputs
+            target_key = _deferred_job_key((inputs.get("target") or {}).get("id"))
+            target = DATA.datastore.get(target_key) if target_key else None
+            refs = (target or {}).get("autofill_reviews") or "{}"
+            refs = json.loads(refs) if isinstance(refs, str) else refs
+            if encode_urlsafe_key(record.key) in refs.values():
+                continue
         keys.append(record.key)
         if len(keys) < batch_size:
             continue
@@ -677,7 +689,10 @@ def claim_deferred_job_recovery(
 
         before = dict(entity)
         created = _deferred_datetime(entity.get("created"))
-        if created and (now - created).total_seconds() >= max_age_seconds:
+        if (
+            created and (now - created).total_seconds() >= max_age_seconds
+            and not entity.get("autofill_receipt")
+        ):
             for name, value in stale_updates.items():
                 if value is None:
                     entity.pop(name, None)
@@ -772,6 +787,10 @@ def transition_active_deferred_job(identifier, updates, now):
             return {"transitioned": False, "reason": "missing", "entity": None}
         if entity.get("status") in {"succeeded", "failed", "cancelled", "superseded"}:
             return {"transitioned": False, "reason": "terminal", "entity": entity}
+        # Applying answers and writing this receipt are one transaction. Once it
+        # wins, cancellation must not claim to have prevented that application.
+        if entity.get("autofill_receipt"):
+            return {"transitioned": False, "reason": "applied", "entity": entity}
         before = dict(entity)
         for name, value in updates.items():
             if value is None:

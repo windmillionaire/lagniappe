@@ -25,7 +25,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import notifications as notification_database
 from runner import mcp_environment
-from testing.definitions import Pages, SitePages, Users
+from testing.definitions import Groups, Pages, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.utility.network import browser_fetch
 
@@ -42,19 +42,19 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
-# Reviewed contract v10: corrective plan references and metadata replace Undo.
+# Reviewed v10: nullable revision IDs and API-owned validation guidance in contracts.
 LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                      'f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d'),
  'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                '5467240ac9b25c0e3e6a0fb035a1385501dba9f6470747ae83af4ad808b6f66f'),
- 'start_plan': ('6c2c89175643d9d53cd58c0b163309c05eb9897bf45b3f72f6c2d96ea2d9b18e',
-                'fc738ed0ec888dcea05a06f7a2c645d24b3a31353ee5cfd769f640e0e265e246'),
+ 'start_plan': ('6b80b5bbc86766d1de25efec1b3d9db01071fe4418ddca24121e8498650cb1bf',
+                '9db8d984e62c2f4c56ca97010933b002920ed5d4639769cf70a8b7be53a32a56'),
  'get_plan': ('79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9',
               '615df466a99cd13f48c1ff1911c487fccb8502ae3dcfb78a93aafb5844e1c060'),
  'get_plan_contract': ('337cb97fa06d416268081a87b7a7f90574031467337bbc6806554a989ca0dde3',
-                       '57818398da1cb29649893125d2e61164a7635f353859a3f35a11886c4e00c72a'),
+                       '512d8688602644cb4fb4136d272c3795c70e2381ca77e69f6e66467079496a9c'),
  'upload_local_files': ('716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259',
-                        '81a3e26378c135d90921d6c093a3cbe4a03b339eb6408ddab2da74d2863567c5'),
+                        '0f2d24c0f0dad18b882e7df3157963f6be9957b87fc6fc8649f5466cb37601e1'),
  'submit_plan': ('e96a342d76b63829e1d3e608b14befaa396c987206ba713adf9505641e13be0d',
                  '4ac050543b3e323571d61ee3e6f60b6041c2b5706ae9fdaf887f96874bae0670')}
 PLAN_KEYS = {
@@ -224,6 +224,87 @@ def _canonical_sha256(value) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+# @pair mcp-adapter:product-contract
+# @matrix agent-api : submission proposal-contract schema field-path proposal-validation references
+# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
+# @source lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
+# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+def test_rest_and_mcp_share_submission_validation(get_user, tmp_path, monkeypatch, setup_test_server):
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
+    for cookie in setup_test_server.browser_cookies:
+        if cookie["name"] == "__Host-lagniappe-e2e":
+            monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", cookie["value"])
+    _prepare_package_environment()
+    suffix = uuid4().hex
+    owner = get_user(
+        UserDefinition(
+            name=f"Validation Parity {suffix}",
+            email=f"validation-parity-{suffix}@example.test",
+            groups=[Groups.all_create],
+            ai_access=AI.NONE,
+        ),
+        creator=get_user(Users.OWNER),
+    )
+    owner.go(SitePages.HOME)
+    task = Entities.TASK.create({"name": "Validation parity task", "page": owner.entity.page})
+    task.save()
+    proposal = {
+        "summary": "Update the task deadline.", "confidence": 1,
+        "actions": [{"type": "update_task", "data": {
+            "entity": f"hash:{task.hash}", "changes": {"due_date": "2028-02-29"},
+        }}],
+    }
+    invalid_date = deepcopy(proposal)
+    invalid_date["actions"][0]["data"]["changes"]["due_date"] = "2026-02-29"
+    missing_reference = deepcopy(proposal)
+    missing_reference["actions"][0]["data"]["entity"] = "hash:zzzzzzzzzzzz"
+    null_date = deepcopy(proposal)
+    null_date["actions"][0]["data"]["changes"]["due_date"] = None
+    invalid_schedule = {
+        **proposal,
+        "actions": [{"type": "create_task", "data": {
+            "name": "Repeat", "page": f"hash:{task.page.hash}",
+            "schedule": {"kind": "recurring", "interval": 0, "unit": "week"},
+        }}],
+    }
+    cases = [
+        {"name": "stale_version", "body": {"contract_version": 0, "proposal": proposal}},
+        {"name": "shape", "body": {"proposal": {"summary": "", "confidence": 2, "actions": [], "extra": True}}},
+        {"name": "file_usage", "body": {"proposal": proposal, "file_usage": [{"file": "hash:zzzzzzzzzzzz", "usage": "invalid"}]}},
+        {"name": "invalid_date", "body": {"proposal": invalid_date}},
+        {"name": "invalid_schedule", "body": {"proposal": invalid_schedule}},
+        {"name": "missing_reference", "body": {"proposal": missing_reference}},
+        {"name": "leap_date", "body": {"proposal": proposal}},
+        {"name": "null_date", "body": {"proposal": null_date}},
+    ]
+    token = _issue_key(owner)
+    try:
+        result = _run_driver(tmp_path, monkeypatch, mode="submission_parity", token=token, specification={"cases": cases})
+        direct, wrapped = result["defaults"]
+        assert direct == wrapped
+        assert direct["schema_scope"] == "summary"
+        assert direct["proposal_schema"] is None
+        for case in result["cases"]:
+            direct, wrapped = case["pair"]
+            assert direct == wrapped, case["name"]
+            if case["name"] in {"leap_date", "null_date"}:
+                assert direct["status"] == direct["stored"]["status"] == "ready"
+                expected = "2028-02-29" if case["name"] == "leap_date" else None
+                assert direct["stored"]["proposal"]["actions"][0]["data"]["changes"]["due_date"] == expected
+            else:
+                assert direct["http_status"] == 422, case["name"]
+                assert direct["code"] == "validation_failed"
+                assert direct["stored"]["status"] == "draft"
+                assert direct["stored"]["proposal"] is None
+        stale = result["cases"][0]["pair"][0]
+        assert stale["details"]["errors"][0]["path"] == "$.contract_version"
+        assert stale["details"]["errors"][0]["code"] == "contract_version"
+    finally:
+        _revoke_if_active(owner)
 
 
 def _canonical_file_sha256(value) -> str:
@@ -426,7 +507,8 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
     assert submission["proposal_schema"] == "$.proposal_schema"
     assert submission["instructions"].startswith("Call submit_plan")
     assert "to this contract object" in submission["instructions"]
-    assert "current contract again" in submission["instructions"]
+    assert "refreshes summary context" in submission["instructions"]
+    assert "API validates the submission" in submission["instructions"]
     workflow = "\n".join(contract["workflow_rules"])
     assert "fetch the latest contract and submit it" not in workflow
     assert "Fetch this contract after finalizing uploads" not in workflow
@@ -557,13 +639,13 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
 # @source lagniappe/web/routes/api/main.py::me
 # @source lagniappe/web/routes/api/main.py::tools
 # @source lagniappe/web/routes/api/main.py::create_plan
-# @source lagniappe/web/routes/api/main.py::_load_plan
+# @source lagniappe/core/tools/ai/external/plans.py::load_plan
 # @source lagniappe/web/routes/api/main.py::get_plan
 # @source lagniappe/web/routes/api/main.py::get_plan_contract
-# @source lagniappe/web/routes/api/main.py::create_uploads
-# @source lagniappe/web/routes/api/main.py::finalize_uploads
+# @source lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
+# @source lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
 # @source lagniappe/web/routes/api/main.py::execute_tool
-# @source lagniappe/web/routes/api/main.py::submit_plan
+# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
 # @source lagniappe/web/routes/users/api_key.py::api_key
 # @source lagniappe/core/tools/email/notifications/links.py::origin
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter

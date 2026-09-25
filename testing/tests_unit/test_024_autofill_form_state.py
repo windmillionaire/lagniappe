@@ -451,6 +451,7 @@ def test_autofill_job_spec_contains_only_durable_inputs(monkeypatch):
         pass
 
     monkeypatch.setattr(autofill_jobs.Entities, "TASK", Task)
+    monkeypatch.setattr(autofill_jobs, "launch_snapshot", lambda *args, **kwargs: {"version": 1, "revision": "current-draft"})
     entity = SimpleNamespace(urlsafe_key="page-key")
     user = SimpleNamespace(urlsafe_key="user-key")
     record = {"token": "signed", "filename": "context.pdf"}
@@ -470,6 +471,7 @@ def test_autofill_job_spec_contains_only_durable_inputs(monkeypatch):
     assert spec.inputs == {"target": entity}
     assert spec.parameters["upload_record"] == record
     assert spec.parameters["lock_target"] is True
+    assert spec.parameters["snapshot"] == {"version": 1, "revision": "current-draft"}
     assert spec.client["destination"] == "info:PageInfo"
 
     task = Task()
@@ -495,7 +497,7 @@ def test_autofill_upload_is_validated_before_job_start(monkeypatch):
     )
     monkeypatch.setattr(
         autofill_jobs.storage_assets,
-        "direct_upload_file",
+        "verify_direct_upload",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
     )
     monkeypatch.setattr(

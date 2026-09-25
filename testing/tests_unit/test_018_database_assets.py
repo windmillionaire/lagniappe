@@ -495,7 +495,8 @@ def test_configure_bucket_is_idempotent():
             {
                 "action": {"type": "Delete"},
                 "condition": {"daysSinceNoncurrentTime": 98},
-            }
+            },
+            {"action": {"type": "Delete"}, "condition": {"age": 30, "matchesPrefix": ["tmp/uploads/"]}},
         ]
         cors = [
             {
@@ -607,6 +608,7 @@ def test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
             "action": {"type": "Delete"},
             "condition": {"daysSinceNoncurrentTime": 98},
         },
+        {"action": {"type": "Delete"}, "condition": {"age": 30, "matchesPrefix": ["tmp/uploads/"]}},
     ]
     assert bucket.retention_period == 86400
     assert bucket.soft_delete_policy.retention_duration_seconds == 604800

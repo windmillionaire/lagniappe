@@ -15,6 +15,12 @@ from lagniappe.core.definitions import asset as asset_defs
 from lagniappe.core.definitions import Action, LARGE_ASSET_BYTES
 from lagniappe.core.definitions.asset import ImageAsset
 from lagniappe.core.entities.history import TaskHistory
+from lagniappe import CONFIG
+from lagniappe.core import exceptions
+from lagniappe.core.definitions import DeferredJobType
+from lagniappe.core.tools.ai import summarize as file_summary
+from lagniappe.core.tools.files import extract as file_extract
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.properties.file_assets import FileAsset
 from testing.utility.test_entities import TestEntities
 
@@ -419,6 +425,7 @@ def test_summarize_update_upload_search_summary_remains_opt_in():
 def test_file_processing_dispatches_summary_before_extraction():
     """Selecting both operations queues one summary with extraction as its successor."""
     file = TestEntities.get("FILE", {"filename": "photo.png"})
+    actor = TestEntities.get("USER", {"hash": "file-processing-actor"})
 
     def prepare_extract(entity, *, dispatch):
         assert entity is file
@@ -462,16 +469,102 @@ def test_file_processing_dispatches_summary_before_extraction():
             return_value=file.properties.summarize,
         ) as start_summary,
     ):
-        result = file.dispatch_pending_processing()
-        duplicate = file.dispatch_pending_processing()
+        result = file.dispatch_pending_processing(actor=actor)
+        duplicate = file.dispatch_pending_processing(actor=actor)
 
     assert result is file.properties.summarize
     assert duplicate is None
     start_summary.assert_called_once_with(
         file,
+        actor=actor,
         parameters={"extract_after_summary": True},
     )
     start_extract.assert_not_called()
+
+
+# @matrix file deferred-jobs : explicit-actor deferred-dispatch
+@pytest.mark.unit
+@pytest.mark.parametrize("operation", ["summarize", "extract"])
+def test_file_processing_dispatch_uses_explicit_actor(monkeypatch, operation):
+    file = TestEntities.get("FILE", {"filename": "photo.png"})
+    file.mimetype = "image/png"
+    actor = TestEntities.get("USER", {"hash": "file-actor"})
+    ambient = TestEntities.get("USER", {"hash": "different-actor", "owner": True})
+    monkeypatch.setattr(CONFIG, "TEST_CURRENT_USER", ambient)
+    monkeypatch.setattr(file_summary, "can_summarize_file", lambda _file: True)
+    started = []
+    monkeypatch.setattr(DeferredJobs, "start", lambda spec: started.append(spec))
+
+    # Preparation stays usable without an actor; only dispatch requires one.
+    file.update({operation: "on"})
+    assert started == []
+    file.dispatch_pending_processing(actor=actor)
+    assert file.dispatch_pending_processing(actor=actor) is None
+
+    assert len(started) == 1
+    spec = started[0]
+    assert spec.actor is actor
+    assert spec.inputs == {"file": file}
+    assert spec.job_type is (
+        DeferredJobType.FILE_SUMMARIZE
+        if operation == "summarize"
+        else DeferredJobType.FILE_EXTRACT
+    )
+    assert spec.delay_seconds == (10 if operation == "summarize" else 5)
+
+
+# @matrix file deferred-jobs : explicit-actor validation
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "dispatch",
+    [
+        file_summary.summarize_file,
+        file_extract.get_file_text,
+        file_extract.start_file_extraction,
+    ],
+)
+@pytest.mark.parametrize(
+    "actor",
+    [None, SimpleNamespace(is_authenticated=False)],
+    ids=["missing", "anonymous"],
+)
+def test_file_dispatch_rejects_missing_actor_before_changing_status(
+    monkeypatch, dispatch, actor
+):
+    file = TestEntities.get("FILE", {"filename": "photo.png"})
+    file.properties.summarize.status = "Previous summary status"
+    file.properties.extract.status = "Previous extraction status"
+    started = []
+    monkeypatch.setattr(DeferredJobs, "start", lambda spec: started.append(spec))
+
+    with pytest.raises(exceptions.ValidationError, match="authenticated actor"):
+        dispatch(file, actor=actor)
+
+    assert file.properties.summarize.status == "Previous summary status"
+    assert file.properties.extract.status == "Previous extraction status"
+    assert started == []
+
+
+# @matrix file deferred-jobs : deferred-dispatch retry
+@pytest.mark.unit
+def test_file_processing_preserves_pending_request_when_dispatch_fails(monkeypatch):
+    file = TestEntities.get("FILE", {"filename": "photo.png"})
+    file.mimetype = "image/png"
+    actor = TestEntities.get("USER", {"hash": "retry-actor"})
+    file.update({"extract": "on"})
+    with patch.object(
+        DeferredJobs, "start", side_effect=RuntimeError("Queue unavailable")
+    ):
+        with pytest.raises(RuntimeError, match="Queue unavailable"):
+            file.dispatch_pending_processing(actor=actor)
+
+    started = []
+    monkeypatch.setattr(DeferredJobs, "start", lambda spec: started.append(spec))
+    file.dispatch_pending_processing(actor=actor)
+    assert len(started) == 1
+    assert started[0].actor is actor
+    assert started[0].job_type is DeferredJobType.FILE_EXTRACT
+    assert file.dispatch_pending_processing(actor=actor) is None
 
 
 # @matrix file : asset mimetype preview

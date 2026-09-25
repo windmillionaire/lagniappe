@@ -116,6 +116,20 @@ async function setupRequest(t, { pathname = "/home" } = {}) {
 				},
 			);
 		}
+		if (path === "/form-conflict") {
+			return new Response(
+				JSON.stringify({
+					conflict: true,
+					html: '<form data-widget="TaskForm"></form>',
+					schema: [{ id: "summary", type: "textarea" }],
+					submission: { summary: "Latest saved" },
+				}),
+				{
+					status: 409,
+					headers: { "Content-Type": "application/json" },
+				},
+			);
+		}
 		if (path === "/validation-text") {
 			return new Response("Specific validation message.", {
 				status: 422,
@@ -385,6 +399,19 @@ test("test_request_preserves_structured_validation_error", async (t) => {
 	assert.equal(response.code, "invalid_poll_contract");
 	assert.equal(response.path, "subscriptions[0].revision");
 	assert.equal(response.reason, "type");
+});
+
+/** @matrix edited-entity-notice request-errors : structured-conflict */
+test("test_request_parses_conflict_replacement_for_form_review", async (t) => {
+	const { request } = await setupRequest(t);
+	const response = await request.put("/form-conflict", new FormData());
+	assert.equal(response.ok, false);
+	assert.equal(response.conflict, true);
+	assert.equal(
+		response.html.querySelector("[data-widget='TaskForm']")?.tagName,
+		"FORM",
+	);
+	assert.equal(response.submission.summary, "Latest saved");
 });
 
 /** @matrix request-errors : diagnostics plain-validation */

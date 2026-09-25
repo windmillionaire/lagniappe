@@ -103,7 +103,7 @@ def test_autofill_repairs_invalid_ids_and_table_rows_before_acceptance(monkeypat
             autofill.generate_autofilled_submission(prompt, entity=page, user=actor)
     else:
         result = autofill.generate_autofilled_submission(prompt, entity=page, user=actor)
-        assert result == {**final, "select-playstat": "Interested in playing"}
+        assert result == final, "Validation keeps selected-field corrections as proposals"
     assert len(calls) == 3
     assert page.submission == before
     correction = calls[1]["contents"][-1].parts[0].text
@@ -121,7 +121,7 @@ def test_autofill_repairs_invalid_ids_and_table_rows_before_acceptance(monkeypat
 # @matrix submission : ai validation preservation
 # @matrix ai : validation
 @pytest.mark.unit
-def test_autofill_preserves_answers_and_applies_dates_for_actor(monkeypatch, game):
+def test_autofill_proposes_corrections_and_legacy_apply_preserves_answers(monkeypatch, game):
     page, actor = game
     monkeypatch.setattr(CONFIG, "TEST_CURRENT_USER", None)
     saved = {"select-playstat": "interested", "checkbox-finished": False, "input-hours": 0}
@@ -130,8 +130,9 @@ def test_autofill_preserves_answers_and_applies_dates_for_actor(monkeypatch, gam
                  "input-hours": 100, "input-release": "2026-09-24"}
     validated = autofill.validate_submission(generated, entity=page, user=actor)
     assert page.submission == saved
-    assert validated["checkbox-finished"] is False
-    assert validated["input-hours"] == 0
+    assert validated == generated
+    # Legacy callers explicitly request empty-only apply. New snapshot-backed
+    # autofill instead resolves populated answers through its guarded merge.
     page.ai_submission(validated, actor=actor, preserve_existing=True)
     assert {key: page.submission[key] for key in saved} == saved
     assert page.properties.submission.fields["input-release"].value == datetime(

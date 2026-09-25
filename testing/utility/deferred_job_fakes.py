@@ -147,6 +147,7 @@ class ContendedDatastore:
 
 class RunnerJob:
     def __init__(self, *, checkpoint=None, attempt=1):
+        self.db = {}
         self.key = "job-key"
         self.urlsafe_key = "job-key"
         self.job_type = DeferredJobType.AUTOFILL.value

@@ -24,6 +24,11 @@ consumers use the property object itself.
 Do not use truthiness to decide whether a field was loaded or submitted. Use
 `is_set`, `value`, and the property's normalization contract.
 
+Home list sections are separate from the entity `Property` hierarchy. Their
+`HomeProperty` constructor requires `user=viewer`; Home binds that user into
+each section factory. Queries, visibility checks, and counts use the bound
+user instead of Flask-Login or a mutable test default.
+
 Entity descriptions and file summaries strip HTML tags while preserving internal
 line breaks, blank lines, and spacing from textarea input. File summaries also
 trim surrounding whitespace. The shared `strip_tags()` helper still collapses
@@ -75,7 +80,9 @@ model or categories uses `Uncategorized Pages`; a Page with categories but no
 model uses its first category only for parent display projections.
 
 Page creation and updates register page-specific forms on ordinary categories
-for filtering. `Uncategorized Pages` is a grab-bag and is excluded from that
+for form selection and filtering. This registry does not grant permissions.
+Re-registering an existing form checks stored keys without loading the category's
+other forms. `Uncategorized Pages` is a grab-bag and is excluded from that
 registration, whether assigned automatically or supplied explicitly. Its pages
 can still have their own forms; creation and updates do not read or extend any
 legacy `forms` references on the fallback category.

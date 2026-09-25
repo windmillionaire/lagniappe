@@ -153,7 +153,7 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     marker = current_form.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
     expect(marker.locator("[data-role='edited-message']")).to_contain_text(
-        "Saved values changed elsewhere"
+        "Another user has edited this form"
     )
     marker.locator("[data-role='edited-reset']").click()
     modal = owner.page.locator("#modal")
@@ -163,7 +163,7 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
         has_text=updated_submission
     )
     expect(saved_choice).to_have_attribute("aria-checked", "true")
-    modal.get_by_role("button", name="Update values").click()
+    modal.get_by_role("button", name="Use selected values").click()
     expect(modal).not_to_be_attached()
     expect(current_form.locator("input[name='sync-text']")).to_have_value(
         updated_submission
@@ -176,6 +176,8 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
 
 
 # @matrix forms : queued-conflict submission-choice
+# @matrix offline : reload
+# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
 def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_failures):
@@ -195,39 +197,39 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
 
     info = page.info_form
     _fill_form_element(info, "[id^='sync-text-renderer-']", queued_value)
-    with browser_failures.expect_offline(owner):
+    with browser_failures.expect_offline(owner, max_ping_count=3):
         owner.offline = True
         _main_submit(info).click()
         expect(_main_submit(info)).to_contain_text("Queued Sync")
         wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
-    collaborator.page.goto(page.url)
-    expect(collaborator.locate("[lp-view]")).to_have_attribute("initialized", "")
-    collaborator_info = collaborator.locate(Page.INFO_FORM)
-    expect(collaborator_info).to_have_attribute("rendered", "")
-    _fill_form_element(
-        collaborator_info,
-        "[id^='sync-text-renderer-']",
-        saved_value,
-    )
-    with expect_successful_response(
-        collaborator.page,
-        method="PUT",
-        path=f"/pages/{page.key}/update",
-        entity_key=page.key,
-    ):
-        _main_submit(collaborator_info).click()
-    expect(collaborator_info.locator("input[name='sync-text']")).to_have_value(
-        saved_value
-    )
+        collaborator.page.goto(page.url)
+        expect(collaborator.locate("[lp-view]")).to_have_attribute("initialized", "")
+        collaborator_info = collaborator.locate(Page.INFO_FORM)
+        expect(collaborator_info).to_have_attribute("rendered", "")
+        _fill_form_element(
+            collaborator_info,
+            "[id^='sync-text-renderer-']",
+            saved_value,
+        )
+        with expect_successful_response(
+            collaborator.page,
+            method="PUT",
+            path=f"/pages/{page.key}/update",
+            entity_key=page.key,
+        ):
+            _main_submit(collaborator_info).click()
+        expect(collaborator_info.locator("input[name='sync-text']")).to_have_value(
+            saved_value
+        )
 
-    with owner.page.expect_response("**/pages/*/update", timeout=15000):
-        owner.offline = False
+        with owner.page.expect_response("**/pages/*/update", timeout=15000):
+            owner.offline = False
 
     marker = info.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
     expect(marker.locator("[data-role='edited-message']")).to_contain_text(
-        "Saved values changed elsewhere"
+        "Another user has edited this form"
     )
     wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
@@ -236,12 +238,31 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
     expect(modal).to_be_visible()
     expect(modal.get_by_text(queued_value, exact=True)).to_be_visible()
     expect(modal.get_by_text(saved_value, exact=True)).to_be_visible()
+    modal.get_by_role("button", name="Close").click()
+    expect(modal).not_to_be_attached()
+    wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
+
+    with owner.page.expect_response("**/pages/*/update", timeout=15000):
+        page = page.reload()
+    wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
+    marker = page.info_form.locator("[lp-edited-marker]")
+    expect(marker).to_be_visible()
+    marker.locator("[data-role='edited-reset']").click()
+    modal = owner.page.locator("#modal")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_text(queued_value, exact=True)).to_be_visible()
+    expect(modal.get_by_text(saved_value, exact=True)).to_be_visible()
     saved_choice = modal.locator("[data-revision-source='server']").filter(
         has_text=saved_value
     )
+    queued_choice = modal.locator("[data-revision-source='local']").filter(
+        has_text=queued_value
+    )
+    expect(queued_choice).to_have_attribute("aria-checked", "true")
+    saved_choice.click()
     expect(saved_choice).to_have_attribute("aria-checked", "true")
-    modal.get_by_role("button", name="Update values").click()
+    modal.get_by_role("button", name="Use selected values").click()
 
     expect(modal).not_to_be_attached()
     wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
-    expect(info.locator("input[name='sync-text']")).to_have_value(saved_value)
+    expect(page.info_form.locator("input[name='sync-text']")).to_have_value(saved_value)

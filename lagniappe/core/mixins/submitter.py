@@ -131,6 +131,36 @@ class SubmitterMixin:
     """
 
     # @testable true
+    # @tests tests_unit/test_004e_submission_behavior.py::test_autofill_preview_validates_draft_without_saving_or_changing_cached_fields
+    # @matrix submission ai : autofill draft snapshot no-save
+    def preview_form_submission(self, values, *, actor):
+        """Validate a browser draft without changing the entity or its saved answers."""
+        from ..properties.form_submission import FormSubmission
+        from ..tools.ai.submission_values import values_by_id
+
+        require_mutable_submission(self)
+        form_values = getattr(values, "form", values)
+        if str(form_values.get("form-generation", "0")) != str(self.submission_definition.generation):
+            raise ValidationError("The form fields changed. Your answers were not saved. Review the updated form before trying again.")
+        submission = FormSubmission(entity=self)
+        updated = normalize_submission_values(form_values, submission.fields)
+        preserved = self.validate_browser_submission_references(
+            updated, actor=actor, normalized=True,
+        )
+        for field_id, field in submission.fields.items():
+            if field_id in preserved:
+                continue
+            value = updated.get(field_id)
+            if isinstance(value, list) and not field.multiple and value:
+                value = value[0]
+            field.validate_submission(value)
+        return {
+            "answers": submission.db_value,
+            "values": submission.form_value,
+            "ai_values": values_by_id(submission.fields, actor),
+        }
+
+    # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission

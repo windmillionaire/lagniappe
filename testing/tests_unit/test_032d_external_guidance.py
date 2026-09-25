@@ -10,6 +10,8 @@ import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai import external_api
+from lagniappe.core.tools.ai.external import contracts as external_contracts
+from lagniappe.core.tools.ai.external import validation as external_validation
 from lagniappe.core.tools.ai import functions
 from lagniappe.core.tools.ai.function_definitions import get_guidelines, search
 from lagniappe.core.tools.ai.guidelines import REPORT_TASK_SCHEDULING_GUIDELINES
@@ -130,9 +132,9 @@ def test_external_schema_patch_uses_standard_nullable_values():
             }
         ],
     }
-    assert external_api._schema_errors(proposal, public, public, "$.proposal") == []
+    assert external_validation._schema_errors(proposal, public, public, "$.proposal") == []
     proposal["actions"][0]["data"]["operations"][0]["patch"] = {"title": None}
-    assert external_api._schema_errors(proposal, public, public, "$.proposal")
+    assert external_validation._schema_errors(proposal, public, public, "$.proposal")
 
 
 # @matrix ai agent-api : guidelines tool-dispatch
@@ -328,7 +330,7 @@ def test_search_dispatch_and_catalog_match_across_ai_entry_points(
 
 
 # @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
-# @source lagniappe/core/tools/ai/external_api.py::submission_validation_errors
+# @source lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
 # @matrix agent-api : schema field-path
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -457,7 +459,7 @@ def test_external_schedule_schema_matches_repeating_schedule_requirements(
     schedule, valid, monkeypatch
 ):
     monkeypatch.setattr(
-        external_api, "allowed_report_actions", lambda user: ("create_task",)
+        external_contracts, "allowed_report_actions", lambda user: ("create_task",)
     )
     errors = external_api.submission_validation_errors(
         {
@@ -516,9 +518,9 @@ def test_external_task_contract_explains_references_without_changing_provider_sc
             },
         ],
     }
-    assert external_api._schema_errors(proposal, external, external, "$.proposal") == []
+    assert external_validation._schema_errors(proposal, external, external, "$.proposal") == []
     proposal["actions"][0]["data"]["schedule"] = {"kind": "scheduled"}
-    assert external_api._schema_errors(proposal, external, external, "$.proposal") == [
+    assert external_validation._schema_errors(proposal, external, external, "$.proposal") == [
         {
             "code": "required",
             "path": "$.proposal.actions[0].data.schedule.mode",
@@ -544,7 +546,7 @@ def test_external_task_contract_explains_references_without_changing_provider_sc
         )
 
 
-# @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @matrix agent-api ai-report : proposal-contract
@@ -562,17 +564,17 @@ def test_external_contract_reuses_known_guidance_and_exposes_canonical_schedulin
         )
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "allowed_report_actions",
         lambda user: ("create_task", "create_page"),
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "report_action_permission_context",
         lambda user, allowed: {"allowed_actions": list(allowed)},
     )
     monkeypatch.setattr(
-        external_api.dates,
+        external_contracts.dates,
         "user_today",
         lambda user: datetime(2026, 9, 4, tzinfo=timezone.utc),
     )

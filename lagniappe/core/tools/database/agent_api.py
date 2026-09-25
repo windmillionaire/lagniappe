@@ -8,6 +8,8 @@ import re
 
 from google.cloud.datastore import Entity as DatastoreEntity
 
+from lagniappe.core.report_contracts import UPLOAD_BATCH_ID_PATTERN
+
 from .core import DATA
 from . import get as database_get
 from . import notifications as database_notifications
@@ -29,7 +31,7 @@ PLAN_OPERATION_MISMATCH = "mismatch"
 PLAN_OPERATION_MISSING = "missing"
 PLAN_OPERATION_PENDING = "pending"
 PLAN_OPERATION_STALE = "stale"
-_UPLOAD_BATCH_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+_UPLOAD_BATCH_PATTERN = re.compile(UPLOAD_BATCH_ID_PATTERN)
 _PLAN_OPERATION_TOKEN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 
 

@@ -699,6 +699,8 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
         SpinnerButtons.UPDATE.click(task_form)
 
     task_form = task.element.locator(task.TASK_FORM)
+    # The response arrives before the widget adopts its new form revision.
+    expect(task_form.get_by_role("button", name="Updated", exact=True)).to_be_visible()
     expect(task_form).to_be_visible()
     for submission in task.definition.submission:
         assert submission.verify_submission_value(task_form)

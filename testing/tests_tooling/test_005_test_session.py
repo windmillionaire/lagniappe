@@ -76,6 +76,19 @@ def isolated_state(monkeypatch, tmp_path):
     lock_path = tmp_path / "test-session.lock"
     monkeypatch.setattr(
         test_session,
+        "SETTINGS",
+        types.SimpleNamespace(
+            test_config={
+                "BASE_URL": "http://127.0.0.1:9876",
+                "SERVER_PORT": 9876,
+                "GOOGLE_CLOUD_PROJECT": "session-test-project",
+                "PREFIX": "session_test_",
+            },
+            GCLOUD_CONFIG={"PROJECT": "session-test-project"},
+        ),
+    )
+    monkeypatch.setattr(
+        test_session,
         "_state_paths",
         lambda: (state_path, lock_path),
     )

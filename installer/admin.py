@@ -715,3 +715,57 @@ def configure_oauth():
             )
         )
     return 0
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_automatically_enables_google_and_installer_bootstrap
+# @matrix admin : bootstrap-email google-signin
+# @matrix setup : billing delegated-install existing-project project-iam
+def _configure_delegated_bootstrap(
+    preflight,
+    account,
+    *,
+    app_settings,
+    project_id=None,
+    project_client=None,
+    owner_checker=None,
+):
+    """Validate and persist the temporary application Admin bootstrap window."""
+    account = str(account or "").strip().casefold()
+    owner_email = str(app_settings.get("ADMIN_EMAIL") or "").strip().casefold()
+    delegated = bool(owner_email and owner_email != account)
+    if not delegated:
+        app_settings.setdefault("BOOTSTRAP_ADMIN_EMAIL", "")
+        return False
+
+    if preflight["project"]["state"] != "available" or not preflight[
+        "billing_enabled"
+    ]:
+        raise RuntimeError(
+            "Delegated installation requires an existing Google Cloud project "
+            "whose billing is already linked by the business."
+        )
+    if not project_id:
+        project_id = str(
+            (preflight["project"].get("details") or {}).get("projectId") or ""
+        ).strip()
+    if not project_id:
+        raise RuntimeError(
+            "Delegated installation requires a positively identified existing "
+            "Google Cloud project."
+        )
+    if owner_checker is None:
+        from installer.iam import require_permanent_owner_binding
+
+        owner_checker = require_permanent_owner_binding
+    owner_checker(project_id, owner_email, client=project_client)
+
+    app_settings["GOOGLE_SIGNIN_ENABLED"] = True
+    app_settings["BOOTSTRAP_ADMIN_EMAIL"] = account
+    print(
+        ui.success(wrap_text(
+            "Delegated installer application access is ready "
+            f"({account}; Google sign-in and temporary Administrator enabled)."
+        ))
+    )
+    return True

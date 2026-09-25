@@ -64,7 +64,7 @@ def direct_upload_records(form, input_name=None):
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_autofill_data
+# @covered-by lagniappe/web/routes/forms/main.py::update
 # @reason storage validation is covered by database asset helper tests
 def direct_upload_files(input_name=None, *, consumer=None):
     """Return verified file-like direct uploads for the current request."""
@@ -80,7 +80,7 @@ def direct_upload_files(input_name=None, *, consumer=None):
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_autofill_data
+# @covered-by lagniappe/web/routes/forms/main.py::update
 # @reason single-file convenience wrapper delegates to the list helper
 def direct_upload_file(input_name, *, consumer=None):
     """Return the first verified direct upload for a named field."""
@@ -89,8 +89,8 @@ def direct_upload_file(input_name, *, consumer=None):
 
 
 # @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_autofill_data
-# @reason best-effort temp cleanup is exercised through page/task autofill routes
+# @covered-by lagniappe/web/routes/forms/main.py::update
+# @reason best-effort temp cleanup is exercised through Form draft publication
 def cleanup_direct_uploads(form, input_name=None):
     """Best-effort delete submitted direct-upload temp objects."""
     for record in direct_upload_records(form, input_name=input_name):

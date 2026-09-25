@@ -10,7 +10,6 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Users
 from testing.resources import Page
-from testing.utility.polling import expect_poll_result
 from testing.utility.live_ai import run_hosted_autofill
 
 
@@ -74,32 +73,30 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     payload = response_info.value.json()
     job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
     assert job.status == DeferredJobStatus.QUEUED.value
-    progress = form.locator("[data-role='deferred-progress']")
+    assert job.parameters["upload_record"]
+    assert "autofill-context.txt" not in [file.filename for file in Entities.fetch_one(page.entity.key, request=Fetch.direct()).files]
+    progress = form.locator("[data-role='form-operation']")
     expect(progress).to_be_visible()
-    expect(progress.locator("[data-role='deferred-phase']")).not_to_have_text("")
-    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
-    expect(form).to_have_css("opacity", "0.5")
-
-    with expect_poll_result(
-        user.page,
-        subscription_id=f"lock:{page.key}",
-        timeout=25_000,
-    ):
-        user.page.reload()
+    expect(progress).to_contain_text("running")
+    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_enabled()
+    initial = user.page.reload()
+    assert payload["operation"] in initial.text()
     form = user.page.locator("[data-widget='PageInfo']")
     expect(form).to_have_attribute("initialized", "")
     expect(form).to_have_attribute("data-operation", payload["operation"])
-    expect(form.locator("[data-role='deferred-progress']")).to_be_visible()
-    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
-    expect(form).to_have_css("opacity", "0.5")
+    expect(form.locator("[data-role='form-operation']")).to_be_visible()
+    expect(form.locator(f"[name='{FIELD_ID}']")).to_be_enabled()
 
     update_path = f"/pages/{page.entity.urlsafe_key}/update"
     original_name = page.entity.name
     with browser_failures.expect_http_error(user, status=409, path=update_path):
-        locked_update = user.page.evaluate(
+        duplicate_start = user.page.evaluate(
             """async ({path, name}) => {
-                const body = new FormData();
+                const form = document.querySelector("[data-widget='PageInfo']");
+                const body = new FormData(form);
+                body.set("form-revision", JSON.parse(form.dataset.formState).revision);
                 body.set("name", name);
+                body.set("role", "autofill-submit");
                 const response = await fetch(path, {
                     method: "PUT",
                     credentials: "include",
@@ -109,11 +106,13 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
                     },
                     body,
                 });
-                return response.status;
+                return {status: response.status, body: await response.json()};
             }""",
-            {"path": update_path, "name": "Blocked while autofill owns the form"},
+            {"path": update_path, "name": "Unsaved duplicate autofill draft"},
         )
-    assert locked_update == 409
+    assert duplicate_start["status"] == 409
+    assert duplicate_start["body"]["already_running"] is True
+    assert duplicate_start["body"]["operation"] == job.urlsafe_key
     expect(form.locator("input[name='name']")).to_have_value(original_name)
 
     if CONFIG.hosted_e2e_runner or live_ai_job_quota:
@@ -143,8 +142,21 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
                 result = DeferredJobs.run(job.urlsafe_key)
         assert result.success is True
 
+    expect(form.locator("[data-role='edited-message']")).to_contain_text("Autofill is complete")
+    form.locator("[data-role='edited-reset']").click()
+    user.page.get_by_role("button", name="Use selected values", exact=True).click()
     expect(form.locator(f"[name='{FIELD_ID}']")).to_have_value(EXPECTED_VALUE)
-    expect(form.locator("[data-role='deferred-progress']")).not_to_be_attached()
+    expect(form.locator("[data-role='form-operation']")).to_be_hidden()
     expect(form.locator("[data-role='submit-group']")).to_be_attached()
     expect(form.locator("[data-role='autofill']")).to_be_attached()
     expect(form).to_have_css("opacity", "1")
+    assert FIELD_ID not in Entities.fetch_one(page.entity.key, request=Fetch.direct()).properties.submission.value
+    with user.page.expect_response("**/pages/*/update") as saved_response:
+        form.locator("[data-role='submit-group'] button[type='submit']").click()
+    assert saved_response.value.ok, saved_response.value.text()
+    saved_page = Entities.fetch_one(page.entity.key, request=Fetch.direct())
+    assert saved_page.properties.submission.value[FIELD_ID] == EXPECTED_VALUE
+    assert "autofill-context.txt" in [file.filename for file in saved_page.files]
+    with user.page.expect_response("**/pages/*/update") as repeated_update:
+        form.locator("[data-role='submit-group'] button[type='submit']").click()
+    assert repeated_update.value.ok, repeated_update.value.text()

@@ -1,6 +1,11 @@
 import { FormController } from "../../forms/controller.mjs";
 import { installMigrationNotice } from "../../forms/migrationNotice.mjs";
 import { compatibleField } from "../../forms/representation.mjs";
+import {
+	currentReviewOperation,
+	installReviewBar,
+	renderReviewBar,
+} from "../../forms/reviewBar.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
 /**
@@ -40,6 +45,7 @@ export class FormWidget {
 		this._replacementPromise = null;
 		this._replacementInert = null;
 		this._migrationNotice = null;
+		this._reviewBar = null;
 
 		this._deferredOperation = this.target?.dataset?.operation || null;
 
@@ -61,9 +67,29 @@ export class FormWidget {
 			target.dataset.operation = operation;
 			target.dataset.operationRevision = String(descriptor.revision ?? 0);
 			target.dataset.operationScope = descriptor.scope || "";
-			target.dataset.deferredLock = "form";
+			if (descriptor.blocks_edit === true || descriptor.scope === "form-change")
+				target.dataset.deferredLock = "form";
+			else delete target.dataset.deferredLock;
+			if (descriptor.status && typeof descriptor.status === "object") {
+				target.dataset.operationBootstrap = JSON.stringify(descriptor.status);
+				if (target.dataset.formState) {
+					const state = JSON.parse(target.dataset.formState);
+					state.operation = descriptor.status;
+					if (
+						descriptor.status.type === "autofill" &&
+						!descriptor.status.terminal
+					)
+						state.stale_autofill = false;
+					target.dataset.formState = JSON.stringify(state);
+				}
+			}
 		}
-		this.clearUnsavedState();
+		if (descriptor.status && typeof descriptor.status === "object") {
+			this.reviewState = { ...this.reviewState, operation: descriptor.status };
+			if (descriptor.status.type === "autofill" && !descriptor.status.terminal)
+				this.reviewState.stale_autofill = false;
+			renderReviewBar(this, descriptor.status);
+		}
 		return true;
 	}
 
@@ -75,6 +101,14 @@ export class FormWidget {
 			this.target instanceof HTMLFormElement
 				? new FormData(this.target)
 				: new FormData();
+		const state =
+			this.reviewState ?? JSON.parse(this.target?.dataset?.formState || "{}");
+		if (state.revision) data.set("form-revision", state.revision);
+		for (const operation of this._reviewedOperations ?? [])
+			data.append("reviewed-operation", operation);
+		for (const operation of this._usedAutofillOperations ?? [])
+			data.append("used-autofill-operation", operation);
+		if (this._autofillRetry) data.set("autofill-retry", this._autofillRetry);
 		return this.form?._subForm?.applyDirectUploads?.(data) ?? data;
 	}
 
@@ -90,6 +124,15 @@ export class FormWidget {
 		const grouped = new Map();
 		const entries = [...this.formData.entries(), ...this.revisionEntries];
 		for (const [name, rawValue] of entries) {
+			if (
+				[
+					"form-revision",
+					"reviewed-operation",
+					"used-autofill-operation",
+					"autofill-retry",
+				].includes(name)
+			)
+				continue;
 			let value = rawValue;
 			if (typeof File !== "undefined" && rawValue instanceof File) {
 				if (!rawValue.name && rawValue.size === 0) continue;
@@ -114,6 +157,9 @@ export class FormWidget {
 
 	commitRevisionBaseline({ clearUnsaved = false } = {}) {
 		this._revisionBaseline = this.revisionSnapshot();
+		this._baselineSubmission = structuredClone(
+			this.form?.renderer?._packageSubmission?.() ?? this.submission ?? {},
+		);
 		if (clearUnsaved) this.clearUnsavedState();
 		return this._revisionBaseline;
 	}
@@ -160,6 +206,7 @@ export class FormWidget {
 			fields,
 			files,
 			form_controls: formControls,
+			renderer_schema: structuredClone(this.schema),
 			renderer_submission: this.form?.renderer?._packageSubmission?.() ?? null,
 		};
 	}
@@ -171,11 +218,12 @@ export class FormWidget {
 	 */
 	buildLocalRevision(response, state = this.captureFormState()) {
 		const latestSchema = response.schema ?? [];
+		const localSchema = state.renderer_schema ?? this.schema ?? [];
 		const latestIds = new Set(
 			latestSchema.map((field) => field?.id).filter(Boolean),
 		);
 		const localIds = new Set(
-			(this.schema ?? []).map((field) => field?.id).filter(Boolean),
+			localSchema.map((field) => field?.id).filter(Boolean),
 		);
 		const remoteSubmission = response.submission ?? {};
 		const mergedSubmission = structuredClone(remoteSubmission);
@@ -185,7 +233,7 @@ export class FormWidget {
 				!latestIds.has(id) ||
 				!Object.hasOwn(localSubmission, id) ||
 				!compatibleField(
-					this.schema.find((field) => field.id === id),
+					localSchema.find((field) => field.id === id),
 					latestSchema.find((field) => field.id === id),
 				)
 			)
@@ -222,6 +270,10 @@ export class FormWidget {
 		commit();
 	}
 
+	/**
+	 * @testable true
+	 * @pair forms:autofill-review
+	 */
 	async prepareLocalRevision(
 		response,
 		{
@@ -250,6 +302,7 @@ export class FormWidget {
 			}
 
 			if (remoteSnapshot !== null) this._revisionBaseline = remoteSnapshot;
+			this._baselineSubmission = structuredClone(response.submission ?? {});
 			if (wasQueued) {
 				this.form?.queued();
 			} else if (wasUnsaved || markUnsaved) {
@@ -268,7 +321,7 @@ export class FormWidget {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_guarded_only_by_durable_autofill_lock
+	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_blocked_by_schema_migration_but_not_autofill
 	 * @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
 	 */
 	async prepareSubmit(options) {
@@ -302,6 +355,19 @@ export class FormWidget {
 		this.commitRevisionBaseline();
 		this.initialized = true;
 		this.target.setAttribute("initialized", "");
+		const queue = this.view?.offlineQueue;
+		if (
+			typeof queue?.presentFor === "function" &&
+			typeof this.handleOfflineQueue === "function"
+		) {
+			void queue.presentFor(this).catch((error) => {
+				this.view?.reportStartupError?.(
+					error,
+					this.target,
+					"offline-conflict-restore",
+				);
+			});
+		}
 	}
 
 	/** @testable infrastructure */
@@ -327,6 +393,12 @@ export class FormWidget {
 		}
 
 		for (const control of target.querySelectorAll("[name]")) {
+			if (
+				["form-generation", "form-revision", "reviewed-operation"].includes(
+					control.name,
+				)
+			)
+				continue;
 			const values = fields.get(control.name) || [];
 			if (control instanceof HTMLInputElement) {
 				if (["checkbox", "radio"].includes(control.type)) {
@@ -417,6 +489,7 @@ export class FormWidget {
 		this.target._lp_widget = this;
 		this.form = new FormController(this);
 		await this.form.init();
+		if (this.target.dataset.formState) installReviewBar(this);
 		if (
 			this.target.dataset.migrationNotice &&
 			this.target.dataset.migrationNotice !== "[]"
@@ -521,6 +594,7 @@ export class FormWidget {
 			loaded: this.loaded,
 			destroyables: [],
 			_migrationNotice: null,
+			_reviewBar: null,
 			...staged,
 		};
 		let adopted = false;
@@ -551,6 +625,11 @@ export class FormWidget {
 				adopt: Object.keys(stagedState),
 				state: stagedState,
 				revisionBaseline: stagedWidget.revisionSnapshot(),
+				baselineSubmission: structuredClone(
+					stagedWidget.form?.renderer?._packageSubmission?.() ??
+						stagedWidget.submission ??
+						{},
+				),
 				activate: () => {
 					adopted = true;
 				},
@@ -564,7 +643,8 @@ export class FormWidget {
 
 	commitReset() {
 		if (!this._preparedReset) return false;
-		const { adopt, state, revisionBaseline, activate } = this._preparedReset;
+		const { adopt, state, revisionBaseline, baselineSubmission, activate } =
+			this._preparedReset;
 		this._preparedReset = null;
 		const previousTarget = this.target;
 		const previousInert = this._replacementInert;
@@ -580,6 +660,7 @@ export class FormWidget {
 		activate?.();
 		this.target._lp_widget = this;
 		this._revisionBaseline = revisionBaseline;
+		this._baselineSubmission = baselineSubmission;
 		return true;
 	}
 
@@ -591,6 +672,8 @@ export class FormWidget {
 	}
 
 	_destroyFormState(state) {
+		state._reviewBar?.destroy();
+		state._reviewBar = null;
 		state._migrationNotice?.destroy();
 		state._migrationNotice = null;
 		state.form?.destroy?.();
@@ -664,6 +747,28 @@ export class FormWidget {
 		}
 		if (ownsRendererState && Object.hasOwn(response, "submission")) {
 			this.submission = response.submission;
+		}
+		if (
+			ownsRendererState &&
+			Object.hasOwn(response, "form_state") &&
+			this.initialTarget
+		) {
+			const operation = currentReviewOperation(
+				this,
+				response.form_state.operation,
+			);
+			this.initialTarget.dataset.formState = JSON.stringify({
+				...response.form_state,
+				operation,
+			});
+			if (operation?.key)
+				this.lockDeferredOperation({
+					operation: operation.key,
+					revision: operation.revision,
+					scope: operation.scope,
+					blocks_edit: operation.blocks_edit,
+					status: operation,
+				});
 		}
 		if (
 			ownsRendererState &&
@@ -744,6 +849,8 @@ export class FormWidget {
 	destroy() {
 		this.discardPreparedReset();
 		this._restoreInteractivity();
+		this._reviewBar?.destroy();
+		this._reviewBar = null;
 		this._migrationNotice?.destroy();
 		this._migrationNotice = null;
 		this.form?.destroy();

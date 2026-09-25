@@ -3,33 +3,42 @@ import { Modal } from "../shared/modal.mjs";
 
 /**
  * @testable true
- * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
+ * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
  * @matrix form-migration : informational-notice readonly-modal
  */
 export function installMigrationNotice(widget) {
 	widget._migrationNotice?.destroy();
-	if (widget.target?.dataset.completed === "true") return;
+	if (widget.revisionPreview || widget.target?.dataset.completed === "true")
+		return;
 	const values = JSON.parse(widget.target?.dataset.migrationNotice || "[]");
 	if (!values.length) return;
-	const banner = document.createElement("p");
-	banner.dataset.role = "migration-notice";
-	banner.className =
-		"rounded-md px-3 py-2 text-sm bg-amber-50 text-amber-900 ring-1 ring-amber-400";
-	banner.textContent = "This form was updated — ";
-	const trigger = banner.appendChild(document.createElement("button"));
-	trigger.type = "button";
-	trigger.className =
-		"font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2";
-	trigger.textContent = "View changes";
-	widget.target.prepend(banner);
+	let trigger = widget.target.querySelector("[data-role='migration-changes']");
+	let banner = null;
+	if (!trigger) {
+		banner = document.createElement("p");
+		banner.dataset.role = "migration-notice";
+		banner.className = STYLES.message;
+		banner.textContent = "This form was updated. ";
+		trigger = banner.appendChild(document.createElement("button"));
+		trigger.type = "button";
+		trigger.className = "font-semibold underline underline-offset-2";
+		trigger.textContent = "View changes";
+		widget.target.prepend(banner);
+	}
 	const modal = new Modal(widget.view, trigger);
 	widget._migrationNotice = {
 		destroy: () => {
 			modal.destroy();
-			banner.remove();
+			trigger.removeEventListener("click", click);
+			banner?.remove();
 		},
 	};
-	trigger.addEventListener("click", async () => {
+	/**
+	 * @testable false
+	 * @covered-by src/script/forms/migrationNotice.mjs::installMigrationNotice
+	 * @reason read-only comparison is owned by the installed notice
+	 */
+	const click = async () => {
 		const root = document.createElement("div");
 		root.id = "modal";
 		root.className = STYLES.modal.wrapper;
@@ -69,23 +78,30 @@ export function installMigrationNotice(widget) {
 			cells.className = "grid gap-2 sm:grid-cols-2";
 			for (const key of ["before", "after"]) {
 				const cell = cells.appendChild(document.createElement("div"));
+				cell.dataset.role = `migration-${key}`;
 				cell.className =
 					"min-w-0 rounded-md border border-base-light/50 bg-white p-3";
 				const label = cell.appendChild(document.createElement("h4"));
 				label.className = "mb-2 text-xs font-semibold text-base-medium";
-				label.textContent = key === "before" ? "Before" : "After";
+				label.textContent = key === "before" ? "Before" : "After the update";
 				const content = cell.appendChild(document.createElement("p"));
 				content.className = "whitespace-pre-wrap break-words text-sm";
 				if (key === "after" && value.reason === "invalid") {
 					content.dataset.kind = "error";
 					content.className += " italic text-kind-default";
 					content.textContent = "Value not able to be converted";
+				} else if (key === "after" && value.reason === "deleted") {
+					content.dataset.kind = "error";
+					content.className += " italic text-kind-default";
+					content.textContent = "Deleted from form";
 				} else {
+					if (key === "after") label.textContent = "Converted value";
 					content.textContent = value[key];
 				}
 			}
 		}
 		await modal.attach(root, widget.component);
 		close.focus();
-	});
+	};
+	trigger.addEventListener("click", click);
 }

@@ -7,7 +7,7 @@ import pytest
 from playwright.sync_api import expect
 
 from testing.definitions import Pages, Tasks, Uploads, Users
-from testing.elements import EditorGenerateText, EditorGenerateTextMode, Modal
+from testing.elements import EditorGenerateText, EditorGenerateTextMode
 from testing.resources import File
 from testing.utility.network import (
     expect_successful_response,
@@ -20,43 +20,28 @@ pytestmark = pytest.mark.e2e
 
 
 @contextmanager
-def _mock_generate_text(browser_page, key, markers=None, error=None):
+def _mock_generate_text(
+    browser_page, key, markers=None, error=None, expected_selected_text=None
+):
     path = f"/assets/{key}/document/generate"
     remaining_markers = list(markers or ["Generated text marker"])
-
-    def field_value(fields, name):
-        return next((value for field, value in fields if field == name), "")
 
     def fulfill_generate_text(route):
         assert route.request.method == "POST"
         fields = multipart_form_fields(route.request)
+        if expected_selected_text is not None:
+            assert ("selected_text", expected_selected_text) in fields
 
         if error:
             route.fulfill(status=422, content_type="text/plain", body=error)
             return
 
-        if field_value(fields, "role") == "explain":
-            prompt = escape(field_value(fields, "prompt"))
-            selected_text = escape(field_value(fields, "selected_text"))
-            modal = f"""
-                <div id="modal">
-                  <div id="modal-content">
-                    <button type="button" lp-control="close">Close</button>
-                    <section>
-                      <h2>Prompt</h2>
-                      <p>Prompt: {prompt}</p>
-                      <p>Selected text: {selected_text}</p>
-                    </section>
-                  </div>
-                </div>"""
-            body = {"modal": modal}
-        else:
-            marker = (
-                remaining_markers.pop(0)
-                if remaining_markers
-                else "Generated text marker"
-            )
-            body = {"markup": f"<p>{escape(marker)}</p>"}
+        marker = (
+            remaining_markers.pop(0)
+            if remaining_markers
+            else "Generated text marker"
+        )
+        body = {"markup": f"<p>{escape(marker)}</p>"}
 
         route.fulfill(
             status=200,
@@ -200,6 +185,7 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
         user.page,
         page.key,
         ["Generated selection marker"],
+        expected_selected_text=selected_text,
     ) as path:
         with expect_successful_response(
             user.page,
@@ -212,39 +198,6 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
         expect(editor.text_entry).to_contain_text("Generated selection marker")
         expect(editor.text_entry).not_to_contain_text(selected_text)
         expect(selection_highlight).to_have_count(0)
-
-
-# @matrix ai editor : explain generate-text selected-text
-def test_generate_text_explain_includes_selected_text_context(get_user):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_document_generation_selection_page)
-    editor = page.editor
-
-    selected_text = "Explain selected document text"
-
-    editor.clear_text()
-    editor.type_text(selected_text)
-    editor.select_text()
-
-    form = EditorGenerateText(editor)
-    form.fill_prompt("Explain the prompt that will be sent")
-    expect(form.form.locator(form.EXPLAIN)).to_have_accessible_name(
-        "Initial Prompt"
-    )
-
-    with _mock_generate_text(user.page, page.key) as path:
-        with expect_successful_response(
-            user.page,
-            method="POST",
-            path=path,
-        ):
-            form.explain()
-
-        modal = Modal(user.page)
-        expect(modal.element).to_be_visible()
-        expect(modal.element).to_contain_text(re.compile("selected text", re.I))
-        expect(modal.element).to_contain_text(selected_text)
-        modal.close()
 
 
 # @matrix ai editor : error generate-text

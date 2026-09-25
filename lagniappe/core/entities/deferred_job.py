@@ -37,6 +37,7 @@ class DeferredJob(Entity):
                 "task_identity",
                 "telemetry_id",
                 "start_completed",
+                "autofill_receipt",
             }
         )
 

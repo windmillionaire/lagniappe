@@ -128,7 +128,7 @@
                data-role="ai-run" data-job-id="{{ operation.key }}"
                data-operation-status="{{ operation.status }}">
         <summary class="cursor-pointer px-3 py-3 text-base-dark">
-          <span class="font-semibold">{{ operation.type|replace('-', ' ')|title }}</span>
+          <span class="font-semibold">{{ 'Report' if operation.type == 'report-ai' else operation.type|replace('-', ' ')|title }}</span>
           <span class="ml-2 text-sm text-base-medium">{{ operation.status|replace('_', ' ')|title }}{% if operation.recovering %} · recovering{% endif %}</span>
           {% if operation.created_at %}
             <time class="ml-2 text-sm text-base-medium" datetime="{{ operation.created_at }}">{{ operation.created_at[:19]|replace('T', ' ') }} UTC</time>

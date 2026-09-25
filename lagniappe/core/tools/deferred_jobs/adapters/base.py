@@ -35,6 +35,7 @@ class DeferredJobAdapter:
     notification_policy = "pending"
     max_lifetime_seconds = None
     resume_preparation = True
+    cancellable_provider = False
 
     # @testable infrastructure
     def authorization(self, spec):
@@ -126,6 +127,11 @@ class DeferredJobAdapter:
     # @testable infrastructure
     def inspect(self, context):
         return DeferredJobInspection.NOT_APPLIED
+
+    # @testable infrastructure
+    def committed_result(self, job):
+        """Return an atomically committed result, or None if work is unfinished."""
+        return None
 
     # @testable infrastructure
     def apply(self, context):

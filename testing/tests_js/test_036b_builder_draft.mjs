@@ -476,11 +476,7 @@ test("test_builder_option_and_column_labels_keep_ids", async () => {
 	assert.deepEqual(firstColumn.element.schema, {});
 });
 
-async function loadFormSettings({
-	request,
-	Modal = class {},
-	FormController = class {},
-}) {
+async function loadFormSettings({ request, FormController = class {} }) {
 	return await esmock.strict(
 		"../../src/script/views/builder/panels/formSettings.mjs",
 		{
@@ -488,7 +484,6 @@ async function loadFormSettings({
 			"../../src/script/shared/index.mjs": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/generate" },
-				Modal,
 				request,
 			},
 		},
@@ -1042,7 +1037,6 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 		querySelector: (selector) => (selector === "textarea" ? textarea : null),
 	};
 	let request;
-	let modal;
 	replaceGlobal(t, "crypto", webcrypto);
 	replaceGlobal(t, "document", {
 		createElement: () => ({ dataset: {}, replaceChildren() {} }),
@@ -1078,15 +1072,8 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
 		},
 	);
-	class Modal {
-		attach(content, form) {
-			modal = { content, form };
-		}
-		destroy() {}
-	}
 	const { FormSettings } = await loadFormSettings({
 		FormController,
-		Modal,
 		request: {
 			post(_route, data) {
 				return new Promise((resolve) => {
@@ -1244,16 +1231,6 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 	assert.equal(textarea.value, "Add another field");
 	assert.deepEqual(builder.draft.state, generated);
 
-	submitter.dataset.explain = "generate";
-	const explanation = generate();
-	request.resolve({ ok: true, modal: "<p>Initial prompt details</p>" });
-	await explanation;
-	assert.equal(modal.content, "<p>Initial prompt details</p>");
-	assert.equal(modal.form, form);
-	assert.equal(text.textContent, "Generate");
-	assert.equal(widget.unsavedState, true);
-	assert.equal(error.dataset.visible, "false");
-	assert.deepEqual(builder.draft.state, generated);
 	FormSettings.prototype._click.call(settings, {
 		target: { closest: () => ({ dataset: { role: "cancel" } }) },
 	});

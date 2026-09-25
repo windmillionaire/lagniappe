@@ -119,7 +119,7 @@ def test_create_project_manual_mode(get_user):
     expect(user.page).to_have_title(re.compile(project.definition.name))
 
 
-# @matrix projects : ai-create ai-form ai-generated explain-button
+# @matrix projects : ai-create ai-form ai-generated
 # @template home/projects.html::create
 # @template home/projects.html::project
 @pytest.mark.ai
@@ -142,17 +142,7 @@ def test_create_project_ai_mode(get_user, results, browser_failures, live_ai_quo
         project.definition.description_for_ai
     )
 
-    modal = Modal(user.page)
-    with expect_successful_response(
-        user.page,
-        method="POST",
-        path="/projects/create",
-        timeout=15000,
-    ):
-        create_form.locator(Buttons.EXPLAIN).click()
-    expect(modal.element).to_be_visible(timeout=15000)
-    modal.close()
-    expect(create_form).to_be_visible()
+    expect(create_form.locator("[data-role='explain']")).to_have_count(0)
 
     def fallback():
         create_form.locator(Buttons.MANUAL_MODE).click()

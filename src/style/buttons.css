@@ -51,6 +51,25 @@
 	}
 }
 
+/* @style button.submit */
+.action-button.review-revise-action {
+	background-color: var(--kind-bg);
+	color: var(--kind-dark);
+	font-size: 0.875rem;
+	outline: 1px solid var(--kind-light);
+	padding-block: 0.5rem;
+	box-shadow: none;
+	&:hover,
+	&:focus-visible {
+		background-color: var(--kind-bg);
+		outline: 2px solid var(--kind-default);
+		outline-offset: 2px;
+	}
+	&:disabled {
+		opacity: 0.5;
+	}
+}
+
 /* @style nav.button nav.mobileButton nav.desktopButton toggle.container toggle.plain */
 .action-icon-button {
 	color: var(--kind-default);

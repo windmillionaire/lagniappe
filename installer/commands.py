@@ -56,3 +56,42 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
             error,
             message=f"gcloud {' '.join(command)} timed out after {timeout} seconds.",
         ) from error
+
+
+GOOGLE_CLOUD_TERMS_URL = "https://console.developers.google.com/terms/cloud"
+
+
+# @testable false
+# @covered-by installer/create_config.py::verify_application_config
+# @reason small typed-failure adapter exercised through configuration validation
+def _fail(message="Setup configuration failed.", *, repair_action=None):
+    raise SetupError(message, repair_action=repair_action)
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
+# @matrix setup : error-guidance google-cloud-terms
+def _is_google_cloud_terms_error(detail):
+    """Recognize Google's account-level Cloud service-terms rejection."""
+    normalized = str(detail or "").casefold()
+    return any(
+        marker in normalized
+        for marker in (
+            "ureq_tos_not_accepted",
+            "tos_id=cloud",
+            "terms of service 'cloud' must be accepted",
+        )
+    )
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
+# @matrix setup : error-guidance google-cloud-terms identity
+def _google_cloud_terms_repair_action(account):
+    """Return safe first-use guidance for the exact selected Cloud identity."""
+    from runner.context import setup_command
+
+    return (
+        f"Sign in as '{account}' at {GOOGLE_CLOUD_TERMS_URL}, accept the "
+        f"Google Cloud service terms, then rerun {setup_command()}."
+    )

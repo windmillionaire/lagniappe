@@ -22,6 +22,7 @@ class Operation(DBProperty):
     def descriptor(lock, job):
         return {
             "locked": True,
+            "blocks_edit": lock.scope == Scope.FORM_CHANGE,
             "scope": lock.scope,
             "operation": job.urlsafe_key,
             "revision": int(job.status_revision or 0),

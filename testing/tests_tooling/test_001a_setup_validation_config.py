@@ -10,6 +10,8 @@ import types
 import pytest
 import yaml
 
+from installer import commands, credentials, project_bootstrap, setup_target
+
 from installer.errors import SetupCancelled, SetupError
 
 from testing.utility.setup_fakes import (
@@ -21,6 +23,10 @@ from testing.utility.setup_fakes import (
 pytestmark = pytest.mark.tooling
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _target(project_id, *, account="owner@example.com"):
+    return setup_target.SetupTarget("Demo", "demo", account, project_id)
 
 
 def _use_isolated_app_dir(monkeypatch, app_dir):
@@ -50,11 +56,38 @@ def _fake_formatter():
     )
 
 
-
-
 @pytest.fixture
 def isolated_setup_config(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
+
+
+@pytest.fixture
+def adc_transaction(tmp_path):
+    with credentials._adc_auth_transaction(tmp_path / "adc.json") as transaction:
+        yield transaction
+
+
+@pytest.fixture
+def generation_reload_isolation():
+    """Restore import state after exercising in-process configuration reloads."""
+    from installer import config_builders
+    from runner import deploy
+
+    namespaces = [(module, vars(module).copy()) for module in (config_builders, deploy)]
+    config_modules = {
+        name: module for name, module in sys.modules.items()
+        if name == "config" or name.startswith("config.")
+    }
+    try:
+        yield
+    finally:
+        for name in list(sys.modules):
+            if name == "config" or name.startswith("config."):
+                sys.modules.pop(name, None)
+        sys.modules.update(config_modules)
+        for module, namespace in namespaces:
+            vars(module).clear()
+            vars(module).update(namespace)
 
 
 def _stub_existing_install_preflight(
@@ -69,7 +102,7 @@ def _stub_existing_install_preflight(
         "project": {"state": "available", "details": {}, "error": None},
         "billing_account": "billing-1",
         "billing_enabled": True,
-        "enabled_apis": set(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+        "enabled_apis": set(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
         "missing_apis": [],
     }
     identity = {
@@ -80,32 +113,32 @@ def _stub_existing_install_preflight(
         "error": None,
     }
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_active_cli_identity",
         lambda: {
-            "configuration": create_config._gcloud_configuration_name(app_name),
+            "configuration": setup_target._gcloud_configuration_name(app_name),
             "account": account,
             "project": project_id,
         },
     )
-    monkeypatch.setattr(create_config, "_target_preflight", lambda target: preflight)
+    monkeypatch.setattr(project_bootstrap, "_target_preflight", lambda target: preflight)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_preflight_operator_authority",
         lambda selected_account, target, **kwargs: types.SimpleNamespace(),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_ensure_adc_principal",
-        lambda selected_account, target=None: identity,
+        lambda target, **kwargs: identity,
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_set_adc_quota_project",
-        lambda target, spinner: identity,
+        lambda target, spinner, **kwargs: identity,
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda target, **kwargs: {
             "installer": [],
@@ -119,7 +152,7 @@ def _stub_existing_install_preflight(
         lambda target_preflight, adc: None,
     )
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_apply_target_preflight",
         lambda target, target_preflight, project_ready=None: None,
     )
@@ -193,7 +226,6 @@ def test_validate_project_id_and_project_state_are_non_mutating(
     monkeypatch,
     isolated_setup_config,
 ):
-    from installer import create_config
 
     calls = []
 
@@ -201,13 +233,13 @@ def test_validate_project_id_and_project_state_are_non_mutating(
         calls.append((command, check))
         return completed_process(command, returncode=1, stderr="not found")
 
-    monkeypatch.setattr(create_config, "run_gcloud_command", fake_gcloud)
+    monkeypatch.setattr(setup_target, "run_gcloud_command", fake_gcloud)
 
-    assert not create_config.validate_project_id("BadProject")
+    assert not setup_target.validate_project_id("BadProject")
     assert not calls
-    assert create_config.validate_project_id("valid-project-1")
+    assert setup_target.validate_project_id("valid-project-1")
     assert not calls
-    assert create_config._project_state("valid-project-1") == {
+    assert setup_target._project_state("valid-project-1") == {
         "state": "absent",
         "details": None,
         "error": None,
@@ -220,21 +252,21 @@ def test_validate_project_id_and_project_state_are_non_mutating(
     ]
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, check=True: completed_process(
             command,
             stdout='{"projectId": "valid-project-1"}',
         ),
     )
-    assert create_config._project_state("valid-project-1") == {
+    assert setup_target._project_state("valid-project-1") == {
         "state": "available",
         "details": {"projectId": "valid-project-1"},
         "error": None,
     }
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, check=True: completed_process(
             command,
@@ -245,7 +277,7 @@ def test_validate_project_id_and_project_state_are_non_mutating(
             ),
         ),
     )
-    assert create_config._project_state("valid-project-1") == {
+    assert setup_target._project_state("valid-project-1") == {
         "state": "unverified",
         "details": None,
         "error": (
@@ -260,7 +292,6 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
     isolated_setup_config,
     capsys,
 ):
-    from installer import create_config
     from runner import gcloud
 
     checked = []
@@ -276,12 +307,12 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
             return completed_process(command, stdout="installer@example.com\n")
         return completed_process(command, stdout="short-lived-token")
 
-    monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
-    monkeypatch.setattr(create_config, "GCLOUD_CLI", "gcloud")
+    monkeypatch.setattr(setup_target, "run_gcloud_command", run_gcloud)
+    monkeypatch.setattr(setup_target, "GCLOUD_CLI", "gcloud")
     answers = iter(["maybe", "y"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
-    assert create_config._get_gcloud_account("") == "installer@example.com"
+    assert setup_target._get_gcloud_account("") == "installer@example.com"
     assert checked == ["installer@example.com"]
     assert commands == [
         (
@@ -308,7 +339,7 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
 
     commands.clear()
     checked.clear()
-    assert create_config._get_gcloud_account("saved@example.com") == (
+    assert setup_target._get_gcloud_account("saved@example.com") == (
         "saved@example.com"
     )
     assert checked == ["saved@example.com"]
@@ -316,12 +347,12 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
 
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
     with pytest.raises(SetupCancelled, match="account confirmation"):
-        create_config._get_gcloud_account("")
+        setup_target._get_gcloud_account("")
     assert "gcloud auth login" in capsys.readouterr().out
 
     monkeypatch.setattr("builtins.input", lambda prompt: "y")
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, **kwargs: (
             completed_process(command, stdout="installer@example.com\n")
@@ -330,7 +361,7 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
         ),
     )
     with pytest.raises(RuntimeError, match="could not be verified"):
-        create_config._get_gcloud_account("")
+        setup_target._get_gcloud_account("")
 
 
 # @matrix setup : interactive-input project-id
@@ -344,10 +375,10 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(create_config.secrets, "token_hex", lambda length: "abc123")
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_gcloud_debug_value",
         lambda command: {
-            "state": create_config.GCLOUD_VALUE_UNSET,
+            "state": setup_target.GCLOUD_VALUE_UNSET,
             "value": None,
             "error": None,
             "command": command,
@@ -355,7 +386,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     )
     inspected = []
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_project_state",
         lambda project_id: inspected.append(project_id)
         or {
@@ -371,9 +402,9 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         lambda prompt: prompts.append(prompt) or next(answers),
     )
 
-    assert create_config._get_gcloud_project("", "demo-app") == "demo-app"
+    assert setup_target._get_gcloud_project("", "demo-app") == "demo-app"
     assert inspected == ["demo-app"]
-    assert create_config.validate_project_id("demo-app")
+    assert setup_target.validate_project_id("demo-app")
     assert [" ".join(prompt.split()) for prompt in prompts] == [
         "? Google Cloud project ID (demo-app) [Enter to keep; or type a different project ID]",
         "? Create a new project 'demo-app' [y/N]",
@@ -386,19 +417,19 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
             else "demo-app"
         )
         return {
-            "state": create_config.GCLOUD_VALUE_SUCCESS,
+            "state": setup_target.GCLOUD_VALUE_SUCCESS,
             "value": value,
             "error": None,
             "command": command,
         }
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_gcloud_debug_value",
         matching_active_config,
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_project_state",
         lambda project_id: {
             "state": (
@@ -417,7 +448,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     prompts.clear()
     answers = iter(["y"])
     assert (
-        create_config._get_gcloud_project("", "demo-app")
+        setup_target._get_gcloud_project("", "demo-app")
         == "active-project-1"
     )
     assert [" ".join(prompt.split()) for prompt in prompts] == [
@@ -425,7 +456,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     ]
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_project_state",
         lambda project_id: {
             "state": (
@@ -443,7 +474,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     )
     prompts.clear()
     answers = iter(["n", "", "n", "", "y"])
-    assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
+    assert setup_target._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
         "? Use the existing project 'active-project-1' [y/N]",
         "? Google Cloud project ID (demo-app) [Enter to keep; or type a different project ID]",
@@ -459,13 +490,13 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         return result
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_gcloud_debug_value",
         matching_exact_active_config,
     )
     prompts.clear()
     answers = iter(["n", "", "y"])
-    assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
+    assert setup_target._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert [" ".join(prompt.split()) for prompt in prompts] == [
         "? Use the existing project 'demo-app' [y/N]",
         "? Google Cloud project ID (demo-app-abc123) [Enter to keep; or type a different project ID]",
@@ -479,14 +510,14 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         return result
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_gcloud_debug_value",
         mismatched_active_config,
     )
     prompts.clear()
     answers = iter(["", "y"])
     assert (
-        create_config._get_gcloud_project("", "new-lagniappe")
+        setup_target._get_gcloud_project("", "new-lagniappe")
         == "new-lagniappe"
     )
     assert not any("active-project-1" in prompt for prompt in prompts)
@@ -497,7 +528,7 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
         SetupCancelled,
         match="Installation cancelled during project selection",
     ):
-        create_config._get_gcloud_project("", "new-lagniappe")
+        setup_target._get_gcloud_project("", "new-lagniappe")
     assert (
         " ".join(prompts[-1].split())
         == "? Create a new project 'new-lagniappe' [y/N]"
@@ -510,7 +541,6 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
     isolated_setup_config,
     capsys,
 ):
-    from installer import create_config
 
     commands = []
     discovered = [
@@ -554,10 +584,10 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
             stdout=json.dumps({"bindings": [binding]}),
         )
 
-    monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
+    monkeypatch.setattr(setup_target, "run_gcloud_command", run_gcloud)
     inspected = []
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_project_state",
         lambda project_id: inspected.append(project_id)
         or {
@@ -569,7 +599,7 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
     answers = iter(["9", ""])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
-    assert create_config._select_existing_gcloud_project(
+    assert setup_target._select_existing_gcloud_project(
         "installer@example.com"
     ) == ("Zulu Project", "zulu-project-1")
     assert commands[0] == (
@@ -595,7 +625,7 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
     commands.clear()
     inspected.clear()
     monkeypatch.setattr("builtins.input", lambda prompt: "1")
-    assert create_config._select_existing_gcloud_project(
+    assert setup_target._select_existing_gcloud_project(
         "installer@example.com", direct_owner_required=False
     ) == ("Alpha Project", "alpha-project-1")
     assert commands == [
@@ -638,7 +668,7 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
         )
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         no_owner_projects,
     )
@@ -646,7 +676,7 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
         RuntimeError,
         match="direct, unconditional Project Owner role",
     ):
-        create_config._list_owned_projects("installer@example.com")
+        setup_target._list_owned_projects("installer@example.com")
 
 
 # @matrix setup : delegated-install interactive-input ordinary-install project-picker
@@ -655,7 +685,6 @@ def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
     isolated_setup_config,
     capsys,
 ):
-    from installer import create_config
 
     selections = []
 
@@ -664,17 +693,17 @@ def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
         return "Existing App", "existing-project-1"
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_select_existing_gcloud_project",
         select_existing,
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_app_name",
         lambda: pytest.fail("existing project should supply the app name"),
     )
     monkeypatch.setattr("builtins.input", lambda prompt: "y")
-    assert create_config._select_initial_target("installer@example.com") == (
+    assert setup_target._select_initial_target("installer@example.com") == (
         "Existing App",
         "existing-project-1",
     )
@@ -682,21 +711,21 @@ def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
 
     answers = iter(["n", "y"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
-    assert create_config._select_initial_target("installer@example.com") == (
+    assert setup_target._select_initial_target("installer@example.com") == (
         "Existing App",
         "existing-project-1",
     )
     assert selections[-1] == ("installer@example.com", False)
 
-    monkeypatch.setattr(create_config, "_get_app_name", lambda: "New App")
+    monkeypatch.setattr(setup_target, "_get_app_name", lambda: "New App")
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_gcloud_project",
         lambda project_id, sanitized_name: "new-app-project-1",
     )
     answers = iter(["maybe", "n", "maybe", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
-    assert create_config._select_initial_target("installer@example.com") == (
+    assert setup_target._select_initial_target("installer@example.com") == (
         "New App",
         "new-app-project-1",
     )
@@ -710,11 +739,10 @@ def test_adc_identity_reports_principal_project_and_quota(
     monkeypatch,
     isolated_setup_config,
 ):
-    from installer import create_config
     import installer.utils as setup_utils
     import google.auth
 
-    credentials = types.SimpleNamespace(quota_project_id="quota-project-1")
+    fake_credentials = types.SimpleNamespace(quota_project_id="quota-project-1")
     requested_scopes = []
 
     monkeypatch.setattr(setup_utils, "install_if_missing", lambda *args, **kwargs: None)
@@ -722,15 +750,15 @@ def test_adc_identity_reports_principal_project_and_quota(
         google.auth,
         "default",
         lambda scopes: requested_scopes.extend(scopes)
-        or (credentials, "adc-project-1"),
+        or (fake_credentials, "adc-project-1"),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_get_current_account_email",
         lambda selected_credentials: "owner@example.com",
     )
 
-    assert create_config._adc_identity() == {
+    assert credentials._adc_identity() == {
         "state": "success",
         "principal": "owner@example.com",
         "project": "adc-project-1",
@@ -744,9 +772,9 @@ def test_adc_identity_reports_principal_project_and_quota(
 def test_adc_principal_mismatch_requires_explicit_reauthentication(
     monkeypatch,
     isolated_setup_config,
+    adc_transaction,
 ):
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     identities = iter(
@@ -768,17 +796,17 @@ def test_adc_principal_mismatch_requires_explicit_reauthentication(
         ]
     )
     login_calls = []
-    monkeypatch.setattr(create_config, "_adc_identity", lambda: next(identities))
+    monkeypatch.setattr(credentials, "_adc_identity", lambda: next(identities))
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_run_adc_login",
-        lambda account, project_id=None: login_calls.append((account, project_id))
+        lambda account, project_id=None, **kwargs: login_calls.append((account, project_id))
         or completed_process(),
     )
 
-    identity = create_config._ensure_adc_principal(
-        "owner@example.com",
-        "target-project-1",
+    identity = credentials._ensure_adc_principal(
+        _target("target-project-1"),
+        transaction=adc_transaction,
     )
 
     assert identity["principal"] == "owner@example.com"
@@ -792,7 +820,6 @@ def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_ac
     isolated_setup_config,
 ):
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(
@@ -800,8 +827,8 @@ def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_ac
         lambda prompt: pytest.fail(f"billing selection should be deferred: {prompt}"),
     )
 
-    assert create_config._select_billing_account([]) is None
-    assert create_config._select_billing_account(
+    assert project_bootstrap._select_billing_account([]) is None
+    assert project_bootstrap._select_billing_account(
         [
             {
                 "name": "billingAccounts/closed-1",
@@ -820,12 +847,11 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     isolated_setup_config,
 ):
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     opened = []
     monkeypatch.setattr(
-        create_config.webbrowser,
+        project_bootstrap.webbrowser,
         "open_new_tab",
         lambda url: opened.append(url) or True,
     )
@@ -840,7 +866,7 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     )
     checks = []
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_load_gcloud_json",
         lambda command, description: checks.append((command, description))
         or next(billing_states),
@@ -853,7 +879,7 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     )
 
     assert (
-        create_config._authorize_project_billing("target-project-1")
+        project_bootstrap._authorize_project_billing("target-project-1")
         == "billing-1"
     )
     assert opened == [
@@ -876,7 +902,6 @@ def test_target_preflight_selects_billing_and_reports_required_apis(
     monkeypatch,
     isolated_setup_config,
 ):
-    from installer import create_config
 
     fake_config = types.SimpleNamespace(
         constants=types.SimpleNamespace(
@@ -888,7 +913,7 @@ def test_target_preflight_selects_billing_and_reports_required_apis(
     )
     monkeypatch.setitem(sys.modules, "config", fake_config)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_project_state",
         lambda project_id: {"state": "available", "details": {}, "error": None},
     )
@@ -911,9 +936,9 @@ def test_target_preflight_selects_billing_and_reports_required_apis(
         assert command[:3] == ["billing", "projects", "describe"]
         return {"billingEnabled": False}
 
-    monkeypatch.setattr(create_config, "_load_gcloud_json", fake_load)
+    monkeypatch.setattr(project_bootstrap, "_load_gcloud_json", fake_load)
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "run_gcloud_command",
         lambda command, check=False: completed_process(
             command,
@@ -927,7 +952,7 @@ def test_target_preflight_selects_billing_and_reports_required_apis(
         ),
     )
 
-    preflight = create_config._target_preflight("target-project-1")
+    preflight = project_bootstrap._target_preflight(_target("target-project-1"))
 
     assert preflight["billing_account"] == "billing-1"
     assert not preflight["billing_enabled"]
@@ -940,7 +965,6 @@ def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     monkeypatch,
     isolated_setup_config,
 ):
-    from installer import create_config
 
     fake_config = types.SimpleNamespace(
         constants=types.SimpleNamespace(
@@ -949,19 +973,19 @@ def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     )
     monkeypatch.setitem(sys.modules, "config", fake_config)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_project_state",
         lambda project_id: {"state": "absent", "details": None, "error": None},
     )
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_load_gcloud_json",
         lambda command, description: pytest.fail(
             f"provider discovery ran before the new project existed: {command}"
         ),
     )
 
-    preflight = create_config._target_preflight("target-project-1")
+    preflight = project_bootstrap._target_preflight(_target("target-project-1"))
 
     assert preflight["billing_account"] is None
     assert not preflight["billing_enabled"]
@@ -975,7 +999,6 @@ def test_apply_target_preflight_creates_and_bills_confirmed_project(
     isolated_setup_config,
 ):
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     events = []
@@ -984,9 +1007,9 @@ def test_apply_target_preflight_creates_and_bills_confirmed_project(
         events.append(command)
         return completed_process(command)
 
-    monkeypatch.setattr(create_config, "run_gcloud_command", fake_gcloud)
+    monkeypatch.setattr(project_bootstrap, "run_gcloud_command", fake_gcloud)
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_load_gcloud_json",
         lambda command, description: events.append(command)
         or {
@@ -1002,12 +1025,12 @@ def test_apply_target_preflight_creates_and_bills_confirmed_project(
         },
         "billing_account": "billing-1",
         "billing_enabled": False,
-        "enabled_apis": set(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+        "enabled_apis": set(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
         "missing_apis": ["one.googleapis.com"],
     }
 
-    create_config._apply_target_preflight(
-        "target-project-1",
+    project_bootstrap._apply_target_preflight(
+        _target("target-project-1"),
         preflight,
         project_ready=lambda: events.append("project-ready"),
     )
@@ -1045,25 +1068,24 @@ def test_apply_target_preflight_authorizes_billing_after_project_creation_when_c
     isolated_setup_config,
 ):
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     events = []
 
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "run_gcloud_command",
         lambda command, check=False, **kwargs: events.append(command)
         or completed_process(command),
     )
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_authorize_project_billing",
         lambda project_id: events.append(["authorize-billing", project_id])
         or "billing-1",
     )
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_load_gcloud_json",
         lambda command, description: (
             events.append(command)
@@ -1085,8 +1107,8 @@ def test_apply_target_preflight_authorizes_billing_after_project_creation_when_c
         "missing_apis": ["one.googleapis.com"],
     }
 
-    create_config._apply_target_preflight(
-        "target-project-1",
+    project_bootstrap._apply_target_preflight(
+        _target("target-project-1"),
         preflight,
         project_ready=lambda: events.append("project-ready"),
     )
@@ -1115,7 +1137,6 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
     isolated_setup_config,
 ):
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     events = []
@@ -1125,7 +1146,7 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
         if command[:3] == ["services", "list", "--enabled"]:
             return completed_process(
                 command,
-                stdout="\n".join(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+                stdout="\n".join(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
             )
         return completed_process(command)
 
@@ -1144,10 +1165,10 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
             "billingAccountName": "billingAccounts/billing-1",
         }
 
-    monkeypatch.setattr(create_config, "run_gcloud_command", fake_gcloud)
-    monkeypatch.setattr(create_config, "_load_gcloud_json", fake_load)
+    monkeypatch.setattr(project_bootstrap, "run_gcloud_command", fake_gcloud)
+    monkeypatch.setattr(project_bootstrap, "_load_gcloud_json", fake_load)
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_authorize_project_billing",
         lambda project_id: pytest.fail(
             "browser fallback should not run when the existing account is visible"
@@ -1164,11 +1185,11 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
         "billing_account": None,
         "billing_enabled": False,
         "enabled_apis": set(),
-        "missing_apis": sorted(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+        "missing_apis": sorted(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
     }
 
-    create_config._apply_target_preflight(
-        "target-project-1",
+    project_bootstrap._apply_target_preflight(
+        _target("target-project-1"),
         preflight,
         project_ready=lambda: events.append("project-ready"),
     )
@@ -1204,7 +1225,6 @@ def test_google_cloud_terms_failure_has_account_specific_repair(
 ):
     import config
     import installer as setup_pkg
-    from installer import create_config
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     config.SETTINGS.GCLOUD_CONFIG["ACCOUNT"] = "installer@business.example"
@@ -1214,7 +1234,7 @@ def test_google_cloud_terms_failure_has_account_specific_repair(
         "Help Token: do-not-repeat-this-token"
     )
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "run_gcloud_command",
         lambda command, **kwargs: completed_process(
             command,
@@ -1227,19 +1247,21 @@ def test_google_cloud_terms_failure_has_account_specific_repair(
         "billing_account": "billing-1",
         "billing_enabled": True,
         "enabled_apis": set(),
-        "missing_apis": sorted(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+        "missing_apis": sorted(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
     }
 
-    assert create_config._is_google_cloud_terms_error(provider_detail)
-    assert not create_config._is_google_cloud_terms_error("permission denied")
+    assert commands._is_google_cloud_terms_error(provider_detail)
+    assert not commands._is_google_cloud_terms_error("permission denied")
     with pytest.raises(SetupError) as error:
-        create_config._apply_target_preflight("project-1", preflight)
+        project_bootstrap._apply_target_preflight(
+            _target("project-1", account="installer@business.example"), preflight
+        )
 
     assert "installer@business.example" in str(error.value)
     assert "Help Token" not in str(error.value)
     assert error.value.repair_action == (
         "Sign in as 'installer@business.example' at "
-        f"{create_config.GOOGLE_CLOUD_TERMS_URL}, accept the Google Cloud "
+        f"{commands.GOOGLE_CLOUD_TERMS_URL}, accept the Google Cloud "
         "service terms, then rerun ./setup.sh."
     )
 
@@ -1248,15 +1270,14 @@ def test_google_cloud_terms_failure_has_account_specific_repair(
 def test_app_name_validation_rejects_control_characters_and_long_names(
     isolated_setup_config,
 ):
-    from installer import create_config
 
-    assert create_config._validate_app_name("My Installation")
-    assert not create_config._validate_app_name("")
-    assert not create_config._validate_app_name("bad\nname")
-    assert not create_config._validate_app_name("bad\x7fname")
-    assert not create_config._validate_app_name("x" * 81)
-    assert create_config._gcloud_configuration_name("🎉") == "lagniappe"
-    assert create_config._gcloud_configuration_name("A") == "a-setup"
+    assert setup_target._validate_app_name("My Installation")
+    assert not setup_target._validate_app_name("")
+    assert not setup_target._validate_app_name("bad\nname")
+    assert not setup_target._validate_app_name("bad\x7fname")
+    assert not setup_target._validate_app_name("x" * 81)
+    assert setup_target._gcloud_configuration_name("🎉") == "lagniappe"
+    assert setup_target._gcloud_configuration_name("A") == "a-setup"
 
 
 # @matrix setup : gcloud-config identity
@@ -1264,34 +1285,33 @@ def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
     monkeypatch,
     isolated_setup_config,
 ):
-    from installer import create_config
 
     results = iter(
         [
             {
-                "state": create_config.GCLOUD_VALUE_SUCCESS,
+                "state": setup_target.GCLOUD_VALUE_SUCCESS,
                 "value": "demo",
                 "error": None,
                 "command": [],
             },
             {
-                "state": create_config.GCLOUD_VALUE_UNSET,
+                "state": setup_target.GCLOUD_VALUE_UNSET,
                 "value": None,
                 "error": None,
                 "command": [],
             },
             {
-                "state": create_config.GCLOUD_VALUE_ERROR,
+                "state": setup_target.GCLOUD_VALUE_ERROR,
                 "value": None,
                 "error": "permission denied",
                 "command": [],
             },
         ]
     )
-    monkeypatch.setattr(create_config, "_gcloud_debug_value", lambda command: next(results))
+    monkeypatch.setattr(setup_target, "_gcloud_debug_value", lambda command: next(results))
 
     with pytest.raises(RuntimeError, match=r"account=\(unset\).*permission denied"):
-        create_config._active_cli_identity()
+        setup_target._active_cli_identity()
 
     values = {
         "configurations": "demo",
@@ -1302,14 +1322,14 @@ def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
     def successful_value(command):
         key = "configurations" if "configurations" in command else command[-1]
         return {
-            "state": create_config.GCLOUD_VALUE_SUCCESS,
+            "state": setup_target.GCLOUD_VALUE_SUCCESS,
             "value": values[key],
             "error": None,
             "command": command,
         }
 
-    monkeypatch.setattr(create_config, "_gcloud_debug_value", successful_value)
-    assert create_config._active_cli_identity() == {
+    monkeypatch.setattr(setup_target, "_gcloud_debug_value", successful_value)
+    assert setup_target._active_cli_identity() == {
         "configuration": "demo",
         "account": "owner@example.com",
         "project": "target-project-1",
@@ -1353,16 +1373,16 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
         }
     )
     monkeypatch.setattr(
-        create_config, "_get_gcloud_account", lambda account: "admin@example.com"
+        setup_target, "_get_gcloud_account", lambda account: "admin@example.com"
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_gcloud_project",
         lambda project_id, sanitized_app_name: "my-project-1",
     )
     monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
     monkeypatch.setattr(
-        create_config, "_set_adc_quota_project", lambda project, sp: None
+        credentials, "_set_adc_quota_project", lambda project, sp, **kwargs: None
     )
     _stub_existing_install_preflight(
         monkeypatch,
@@ -1428,16 +1448,16 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
         lambda length: f"url-token-{length}",
     )
     monkeypatch.setattr(
-        create_config, "_get_gcloud_account", lambda account: "owner@example.com"
+        setup_target, "_get_gcloud_account", lambda account: "owner@example.com"
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_gcloud_project",
         lambda project_id, sanitized_app_name: "fresh-project-1",
     )
     monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
     monkeypatch.setattr(
-        create_config, "_set_adc_quota_project", lambda project, sp: None
+        credentials, "_set_adc_quota_project", lambda project, sp, **kwargs: None
     )
     _stub_existing_install_preflight(
         monkeypatch,
@@ -1519,12 +1539,12 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     permission_checks = []
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_select_initial_target",
         lambda selected_account: ("Named App", project_id),
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_gcloud_project",
         lambda saved_project, sanitized_name: project_id,
     )
@@ -1536,10 +1556,10 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         )
         or True,
     )
-    monkeypatch.setattr(create_config, "_get_gcloud_account", lambda saved: account)
+    monkeypatch.setattr(setup_target, "_get_gcloud_account", lambda saved: account)
     monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_active_cli_identity",
         lambda: {
             "configuration": "named-app",
@@ -1555,18 +1575,18 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         assert draft["gcloud_config"]["PROJECT"] == project_id
         return preflight
 
-    monkeypatch.setattr(create_config, "_target_preflight", target_preflight)
+    monkeypatch.setattr(project_bootstrap, "_target_preflight", target_preflight)
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_ensure_adc_principal",
-        lambda selected_account, target=None: adc_events.append(
-            ("premature-adc", selected_account, target)
+        lambda target, **kwargs: adc_events.append(
+            ("premature-adc", target.account, target.project_id)
         ),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_set_adc_quota_project",
-        lambda target, spinner: adc_events.append(("project-adc", target))
+        lambda target, spinner, **kwargs: adc_events.append(("project-adc", target.project_id))
         or {
             **identity,
             "project": project_id,
@@ -1574,7 +1594,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         },
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda target, **kwargs: permission_checks.append((target, kwargs))
         or {
@@ -1588,7 +1608,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         persisted = config.File.APP_SETTINGS_YAML.load()
         cloud_boundary.append(
             {
-                "target": target,
+                "target": target.project_id,
                 "app_name": persisted["APP_NAME"],
                 "saved_project": persisted["GOOGLE_CLOUD_PROJECT"],
                 "dev_exists": config.File.DEV_YAML.exists(),
@@ -1600,7 +1620,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
         target_preflight["billing_account"] = "billing-1"
 
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_apply_target_preflight",
         apply_preflight,
     )
@@ -1642,7 +1662,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     )
 
     monkeypatch.setattr(
-        create_config,
+        project_bootstrap,
         "_apply_target_preflight",
         lambda *args, **kwargs: pytest.fail(
             "cloud mutation must not run after cancellation"
@@ -1686,15 +1706,15 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
             "GOOGLE_SIGNIN_ENABLED": True,
         }
     )
-    monkeypatch.setattr(create_config, "_get_gcloud_account", lambda saved: account)
+    monkeypatch.setattr(setup_target, "_get_gcloud_account", lambda saved: account)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_get_gcloud_project",
         lambda saved, generated: project_id,
     )
     monkeypatch.setattr(switcher, "config_gcloud", lambda: None)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_active_cli_identity",
         lambda: {
             "configuration": "existing-app",
@@ -1707,18 +1727,18 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
         "billing_account": "billing-1",
         "billing_enabled": True,
         "enabled_apis": set(),
-        "missing_apis": sorted(create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+        "missing_apis": sorted(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
     }
-    monkeypatch.setattr(create_config, "_target_preflight", lambda target: preflight)
+    monkeypatch.setattr(project_bootstrap, "_target_preflight", lambda target: preflight)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_preflight_operator_authority",
         lambda selected_account, target: object(),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_ensure_adc_principal",
-        lambda *args: events.append("principal") or identity,
+        lambda *args, **kwargs: events.append("principal") or identity,
     )
     events = []
     identity = {
@@ -1729,12 +1749,12 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
         "error": None,
     }
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_set_adc_quota_project",
-        lambda target, spinner: events.append("adc") or identity,
+        lambda target, spinner, **kwargs: events.append("adc") or identity,
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda target, **kwargs: events.append("permissions") or {},
     )
@@ -1748,11 +1768,11 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
         events.append("prepare-apis")
         assert project_ready is not None
         target_preflight["enabled_apis"].update(
-            create_config.BOOTSTRAP_GOOGLE_CLOUD_APIS
+            project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS
         )
         project_ready()
 
-    monkeypatch.setattr(create_config, "_apply_target_preflight", apply_preflight)
+    monkeypatch.setattr(project_bootstrap, "_apply_target_preflight", apply_preflight)
     monkeypatch.setattr("builtins.input", lambda prompt: "y")
 
     assert create_config.set_application_defaults()
@@ -1773,7 +1793,7 @@ def test_delegated_setup_automatically_enables_google_and_installer_bootstrap(
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
     import config
-    from installer import admin, create_config
+    from installer import admin
 
     monkeypatch.setattr(admin, "_get_admin_name", lambda: "Business Owner")
     monkeypatch.setattr(
@@ -1810,8 +1830,8 @@ def test_delegated_setup_automatically_enables_google_and_installer_bootstrap(
         "billing_enabled": False,
     }
     with pytest.raises(RuntimeError, match="existing Google Cloud project"):
-        create_config._configure_delegated_bootstrap(
-            new_project, "INSTALLER@business.example"
+        admin._configure_delegated_bootstrap(
+            new_project, "INSTALLER@business.example", app_settings=config.SETTINGS.APP
         )
 
     ready_project = {
@@ -1833,12 +1853,13 @@ def test_delegated_setup_automatically_enables_google_and_installer_bootstrap(
     )
     config.SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = False
     config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = ""
-    assert create_config._configure_delegated_bootstrap(
+    assert admin._configure_delegated_bootstrap(
         ready_project,
         "INSTALLER@business.example",
         project_id="project-1",
         project_client=project_client,
         owner_checker=check_owner,
+        app_settings=config.SETTINGS.APP,
     )
     assert config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] == (
         "installer@business.example"
@@ -1875,32 +1896,31 @@ def test_existing_project_checks_cli_installer_permissions_before_adc_authentica
     monkeypatch,
     capsys,
 ):
-    from installer import create_config
 
     events = []
     project_client = object()
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_gcloud_project_client",
         lambda account: events.append(("cli-token", account)) or project_client,
     )
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda project_id, **kwargs: events.append(
             ("permissions", project_id, kwargs.get("client"))
         ),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_ensure_adc_principal",
         lambda *args, **kwargs: pytest.fail(
             "CLI authority preflight must not read or authenticate ADC"
         ),
     )
 
-    assert create_config._preflight_operator_authority(
+    assert setup_target._preflight_operator_authority(
         "installer@example.test",
         "project-1",
     ) is project_client
@@ -1914,12 +1934,12 @@ def test_existing_project_checks_cli_installer_permissions_before_adc_authentica
         raise RuntimeError("missing required permission")
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         reject_permissions,
     )
     with pytest.raises(RuntimeError, match="before ADC authentication") as error:
-        create_config._preflight_operator_authority(
+        setup_target._preflight_operator_authority(
             "installer@example.test",
             "project-1",
             client=project_client,
@@ -1932,7 +1952,6 @@ def test_existing_project_checks_cli_installer_permissions_before_adc_authentica
 def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch):
     from google.cloud import resourcemanager_v3
     from google.oauth2 import credentials as oauth_credentials
-    from installer import create_config
     from installer import utils
 
     events = []
@@ -1941,7 +1960,7 @@ def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch
 
     monkeypatch.setattr(utils, "install_if_missing", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, **kwargs: events.append(
             ("gcloud", command, kwargs)
@@ -1960,7 +1979,7 @@ def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch
         or project_client,
     )
 
-    assert create_config._gcloud_project_client(
+    assert setup_target._gcloud_project_client(
         "installer@example.test"
     ) is project_client
     assert events == [
@@ -1974,7 +1993,7 @@ def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch
     ]
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, **kwargs: completed_process(
             command,
@@ -1983,11 +2002,13 @@ def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch
         ),
     )
     with pytest.raises(RuntimeError, match=r"setup\.sh auth"):
-        create_config._gcloud_project_client("installer@example.test")
+        setup_target._gcloud_project_client("installer@example.test")
 
 
 # @matrix setup : config-files config-version
-def test_update_config_sets_application_version_from_package(monkeypatch):
+def test_update_config_sets_application_version_from_package(monkeypatch, generation_reload_isolation):
+    import config
+    from config import constants
     from installer import create_config
 
     email = {"version": 1, "aliases": {"ai": "ai", "ask": "ask"}}
@@ -1997,14 +2018,8 @@ def test_update_config_sets_application_version_from_package(monkeypatch):
     )
     calls = []
 
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(
-            SETTINGS=settings,
-            constants=types.SimpleNamespace(DEFAULT_GOOGLE_SIGNIN_ENABLED=True),
-        ),
-    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(constants, "DEFAULT_GOOGLE_SIGNIN_ENABLED", True)
     def fake_set_default_config():
         calls.append(("defaults", settings.APP["VERSION"]))
         settings.APP.setdefault("AGENT_ACCESS_ENABLED", False)
@@ -2139,7 +2154,7 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
     app_dir = tmp_path
     _use_isolated_app_dir(monkeypatch, app_dir)
 
-    from installer import config_file_status, create_config
+    from installer import config_file_status
 
     (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
     config_dir = app_dir / "config" / "files"
@@ -2156,10 +2171,10 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
     assert config_file_status()["APP_SETTINGS_YAML"] is True
 
     assert (
-        create_config._adc_login_command("configured@example.com", "project-1")
-        == create_config.format_command(
+        credentials._adc_login_command("configured@example.com", "project-1")
+        == credentials.format_command(
             [
-                create_config.GCLOUD_CLI,
+                credentials.GCLOUD_CLI,
                 "auth",
                 "application-default",
                 "login",
@@ -2170,14 +2185,14 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
         )
     )
     assert (
-        create_config._adc_login_command(
+        credentials._adc_login_command(
             "configured@example.com",
             "project-1",
             force=True,
         )
-        == create_config.format_command(
+        == credentials.format_command(
             [
-                create_config.GCLOUD_CLI,
+                credentials.GCLOUD_CLI,
                 "auth",
                 "application-default",
                 "login",
@@ -2186,13 +2201,13 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
             ]
         )
     )
-    assert "sqlservice.login" not in create_config._adc_login_command(
+    assert "sqlservice.login" not in credentials._adc_login_command(
         "configured@example.com",
         "project-1",
     )
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, check=False: completed_process(
             command, returncode=1, stderr="permission denied"
@@ -2200,20 +2215,20 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
     )
 
     command = ["config", "get-value", "account"]
-    assert create_config._gcloud_debug_value(command) == {
-        "state": create_config.GCLOUD_VALUE_ERROR,
+    assert setup_target._gcloud_debug_value(command) == {
+        "state": setup_target.GCLOUD_VALUE_ERROR,
         "value": None,
         "error": "permission denied",
         "command": command,
     }
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "run_gcloud_command",
         lambda command, check=False: completed_process(command, stdout="(unset)\n"),
     )
-    assert create_config._gcloud_debug_value(command) == {
-        "state": create_config.GCLOUD_VALUE_UNSET,
+    assert setup_target._gcloud_debug_value(command) == {
+        "state": setup_target.GCLOUD_VALUE_UNSET,
         "value": None,
         "error": None,
         "command": command,
@@ -2467,23 +2482,104 @@ def test_verify_application_config_reports_invalid_redis_tls(monkeypatch, capsys
     assert "Missing configuration areas: Redis transport security" in output
 
 
-def _configure_adc_quota_test(monkeypatch, spinner):
-    from installer import create_config
+# @matrix setup : config-files config-version transactional-state
+# @matrix deploy : app-yaml pdf-preview static-assets
+@pytest.mark.parametrize("scaling", ["automatic", "basic"])
+def test_config_builders_preserve_inputs_and_generate_independent_documents(scaling, monkeypatch):
+    from config import constants
+    from installer import config_builders
+    from runner import deploy
 
+    monkeypatch.setattr(deploy, "SETTINGS", object())
+
+    app = {
+        "APP_NAME": "Independent App",
+        "DEPLOY_SCALING_TYPE": scaling,
+        "DEPLOY_INSTANCE_CLASS": "F2" if scaling == "automatic" else "B2",
+        "SITE_IMAGE_VERSION": 7,
+        "SECRET_KEY": "saved-secret",
+        "GIBBERISH": None,
+        "AGENT_ACCESS_CODE": "saved-code",
+        "AI_ENABLED": False,
+    }
+    gcloud = {"NAME": "independent", "ACCOUNT": "owner@example.test", "PROJECT": "project-1"}
+    deployment = {"custom": "preserved"}
+    dev, test = {"SERVER_PORT": 9001}, {"PREFIX": "custom-test"}
+    indexes = {"custom": "preserved"}
+    manifest = {"icons": [{"src": "/icon.png?v=2"}]}
+    inputs = copy.deepcopy((app, gcloud, deployment, dev, test, indexes, manifest))
+    templates = copy.deepcopy((constants.APP_HANDLERS, constants.INDEX_YAML, constants.MANIFEST))
+
+    built_app = config_builders.build_app_settings(
+        app, gcloud, version="9.9.9", secret_defaults={}
+    )
+    built_app, built_deploy = config_builders.build_deploy_yaml(built_app, deployment)
+    built_dev, built_test = config_builders.build_dev_yaml(dev, test)
+    built_indexes = config_builders.build_index_yaml(indexes)
+    built_manifest = config_builders.build_manifest(built_app, manifest)
+
+    assert built_app["VERSION"] == "9.9.9"
+    assert built_app["SECRET_KEY"] == "saved-secret"
+    assert built_app["GIBBERISH"] is None
+    assert built_app["AGENT_ACCESS_CODE"] == "saved-code"
+    assert built_app["AI_ENABLED"] is False
+    assert built_deploy["service_account"] == "independent@project-1.iam.gserviceaccount.com"
+    assert built_deploy["custom"] == "preserved"
+    assert f"{scaling}_scaling" in built_deploy
+    assert built_app["DEPLOY_WORKER_COUNT"] == "3"
+    assert "-w 3 " in built_deploy["entrypoint"]
+    urls = [handler["url"] for handler in built_deploy["handlers"]]
+    assert urls.index("/pdfjs/wasm/(.*\\.js)$") < urls.index("/(.*\\.m?js)$")
+    assert built_dev["SERVER_PORT"] == 9001
+    assert built_test["PREFIX"] == "custom-test"
+    assert built_indexes["custom"] == "preserved"
+    assert built_manifest["name"] == "Independent App"
+    assert built_manifest["icons"] == [{"src": "/icon.png?v=7"}]
+    assert (app, gcloud, deployment, dev, test, indexes, manifest) == inputs
+    assert config_builders.build_manifest(built_app, manifest) == built_manifest
+
+    built_deploy["handlers"][0]["url"] = "changed"
+    built_indexes["indexes"].append({"kind": "Changed"})
+    built_manifest["icons"][0]["src"] = "changed"
+    assert (constants.APP_HANDLERS, constants.INDEX_YAML, constants.MANIFEST) == templates
+    assert (app, gcloud, deployment, dev, test, indexes, manifest) == inputs
+
+
+# @matrix setup : config-files config-version git-upgrade
+def test_update_config_refreshes_preloaded_builders_and_current_settings(
+    monkeypatch, tmp_path, generation_reload_isolation
+):
+    _use_isolated_app_dir(monkeypatch, tmp_path)
+    import config
+    from installer import config_builders, create_config
+    from runner import deploy
+
+    config.SETTINGS.APP.update({"APP_NAME": "Refreshed App"})
+    config.SETTINGS.NODE["version"] = "9.9.9"
+    config.SETTINGS.GCLOUD_CONFIG.update(
+        {"NAME": "refreshed", "ACCOUNT": "owner@example.test", "PROJECT": "project-1"}
+    )
+    app = config.SETTINGS.APP
+    monkeypatch.setattr(
+        config_builders, "build_app_settings",
+        lambda *args, **kwargs: pytest.fail("stale pre-upgrade builder was used"),
+    )
+    monkeypatch.setattr(deploy, "SETTINGS", object())
+    monkeypatch.setattr(
+        deploy, "update_manifest",
+        lambda: pytest.fail("stale pre-upgrade manifest updater was used"),
+    )
+
+    assert create_config.update_config() == "9.9.9"
+    assert config.SETTINGS.APP is app
+    assert config.File.APP_SETTINGS_YAML.load()["VERSION"] == "9.9.9"
+    assert config.SETTINGS.MANIFEST["name"] == "Refreshed App"
+
+
+def _configure_adc_quota_test(monkeypatch, spinner):
     # The runner image intentionally does not install the gcloud CLI. These
     # tests exercise the rendered recovery command, not binary discovery.
-    monkeypatch.setattr(create_config, "GCLOUD_CLI", "gcloud")
-
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(
-            SETTINGS=types.SimpleNamespace(
-                APP={"APP_NAME": "Demo"},
-                GCLOUD_CONFIG={"ACCOUNT": "owner@example.com"},
-            ),
-        ),
-    )
+    monkeypatch.setattr(credentials, "GCLOUD_CLI", "gcloud")
 
     import installer as setup_pkg
 
@@ -2498,7 +2594,6 @@ def _configure_adc_quota_test(monkeypatch, spinner):
     )
     monkeypatch.setattr(setup_pkg, "FORMATTER", fake_formatter)
 
-    return create_config
 
 
 # @matrix setup : adc permissions transactional-state
@@ -2520,9 +2615,9 @@ def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
         adc_path.write_text(new_credentials, encoding="utf-8")
         return completed_process(command)
 
-    monkeypatch.setattr(create_config.subprocess, "run", authenticate)
+    monkeypatch.setattr(credentials.subprocess, "run", authenticate)
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda project_id, **kwargs: (_ for _ in ()).throw(
             RuntimeError("selected account lacks project permissions")
@@ -2531,28 +2626,30 @@ def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
 
     adc_path.write_text(previous_credentials, encoding="utf-8")
     with pytest.raises(RuntimeError, match="lacks project permissions"):
-        with create_config._adc_auth_transaction():
-            create_config._run_adc_login(
+        with credentials._adc_auth_transaction() as transaction:
+            credentials._run_adc_login(
                 "selected@example.com",
                 "selected-project-1",
+                transaction=transaction,
             )
-            create_config._confirm_operator_permissions("selected-project-1")
+            create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
     assert adc_path.read_text(encoding="utf-8") == previous_credentials
     assert "restored the Application Default Credentials" in capsys.readouterr().out
 
     adc_path.unlink()
     with pytest.raises(RuntimeError, match="lacks project permissions"):
-        with create_config._adc_auth_transaction():
-            create_config._run_adc_login(
+        with credentials._adc_auth_transaction() as transaction:
+            credentials._run_adc_login(
                 "selected@example.com",
                 "selected-project-1",
+                transaction=transaction,
             )
-            create_config._confirm_operator_permissions("selected-project-1")
+            create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
     assert not adc_path.exists()
     assert "next setup run will reopen authentication" in capsys.readouterr().out
 
     monkeypatch.setattr(
-        create_config,
+        setup_target,
         "_require_operator_permissions",
         lambda project_id, **kwargs: {
             "installer": [],
@@ -2560,19 +2657,61 @@ def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
             "deployer": [],
         },
     )
-    with create_config._adc_auth_transaction():
-        create_config._run_adc_login(
+    with credentials._adc_auth_transaction() as transaction:
+        credentials._run_adc_login(
             "selected@example.com",
             "selected-project-1",
+            transaction=transaction,
         )
-        create_config._confirm_operator_permissions("selected-project-1")
+        create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
     assert adc_path.read_text(encoding="utf-8") == new_credentials
 
 
+# @matrix setup : adc transactional-state
+@pytest.mark.parametrize("failure", [SetupCancelled, KeyboardInterrupt])
+@pytest.mark.parametrize("prior", [False, True])
+def test_adc_transaction_rolls_back_uncommitted_interruption(tmp_path, failure, prior):
+    path = tmp_path / "adc.json"
+    previous = '{"principal":"prior@example.test"}\n'
+    if prior:
+        path.write_text(previous)
+    with pytest.raises(failure):
+        with credentials._adc_auth_transaction(path) as transaction:
+            transaction.capture()
+            path.write_text('{"principal":"unconfirmed@example.test"}')
+            # Multiple browser attempts must retain the original snapshot.
+            transaction.capture()
+            raise failure()
+    if prior:
+        assert path.read_text() == previous
+        if sys.platform != "win32":
+            assert path.stat().st_mode & 0o777 == 0o600
+    else:
+        assert not path.exists()
+
+
+# @matrix setup : adc transactional-state
+def test_adc_transaction_rejects_existing_credentials_and_keeps_committed_identity(tmp_path):
+    path = tmp_path / "adc.json"
+    path.write_text("rejected existing ADC")
+    with credentials._adc_auth_transaction(path) as transaction:
+        transaction.reject_current()
+    assert not path.exists()
+
+    path.write_text("previous ADC")
+    with pytest.raises(SetupCancelled):
+        with credentials._adc_auth_transaction(path) as transaction:
+            transaction.capture()
+            path.write_text("confirmed ADC")
+            transaction.commit()
+            raise SetupCancelled()
+    assert path.read_text() == "confirmed ADC"
+
+
 # @matrix setup : adc new-project transactional-state
-def test_new_project_forces_transactional_adc_refresh(monkeypatch):
+def test_new_project_forces_transactional_adc_refresh(monkeypatch, tmp_path):
     spinner = SpinnerRecorder()
-    create_config = _configure_adc_quota_test(monkeypatch, spinner)
+    _configure_adc_quota_test(monkeypatch, spinner)
     quota_project_command = [
         "auth",
         "application-default",
@@ -2600,23 +2739,23 @@ def test_new_project_forces_transactional_adc_refresh(monkeypatch):
     )
 
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_run_adc_login",
-        lambda account, project_id, force=False: login_calls.append(
+        lambda account, project_id, force=False, **kwargs: login_calls.append(
             (account, project_id, force)
         )
         or completed_process(),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "run_gcloud_command",
         lambda command, check=True, timeout=None: (
             gcloud_calls.append((command, timeout)) or next(quota_results)
         ),
     )
-    monkeypatch.setattr(create_config.time, "sleep", delays.append)
+    monkeypatch.setattr(credentials.time, "sleep", delays.append)
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_adc_identity",
         lambda: {
             "state": "success",
@@ -2627,9 +2766,11 @@ def test_new_project_forces_transactional_adc_refresh(monkeypatch):
         },
     )
 
-    with create_config._adc_auth_transaction() as transaction:
+    with credentials._adc_auth_transaction(tmp_path / "adc.json") as transaction:
         transaction.refresh_required = True
-        assert create_config._set_adc_quota_project("project-1", spinner)[
+        assert credentials._set_adc_quota_project(
+            _target("project-1"), spinner, transaction=transaction
+        )[
             "project"
         ] == "project-1"
 
@@ -2639,17 +2780,17 @@ def test_new_project_forces_transactional_adc_refresh(monkeypatch):
         for message in spinner.messages
     )
     assert gcloud_calls == [
-        (quota_project_command, create_config.ADC_QUOTA_TIMEOUT),
-        (quota_project_command, create_config.ADC_QUOTA_TIMEOUT),
-        (quota_project_command, create_config.ADC_QUOTA_TIMEOUT),
+        (quota_project_command, credentials.ADC_QUOTA_TIMEOUT),
+        (quota_project_command, credentials.ADC_QUOTA_TIMEOUT),
+        (quota_project_command, credentials.ADC_QUOTA_TIMEOUT),
     ]
     assert delays == [2, 4]
 
 
-# @matrix setup : config-files gcloud-config interactive-input
-def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkeypatch):
+# @matrix setup : adc gcloud-config
+def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkeypatch, adc_transaction):
     spinner = SpinnerRecorder()
-    create_config = _configure_adc_quota_test(monkeypatch, spinner)
+    _configure_adc_quota_test(monkeypatch, spinner)
 
     quota_project_command = [
         "auth",
@@ -2676,15 +2817,15 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
 
     login_calls = []
 
-    monkeypatch.setattr(create_config, "run_gcloud_command", fake_run_gcloud_command)
+    monkeypatch.setattr(credentials, "run_gcloud_command", fake_run_gcloud_command)
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_run_adc_login",
-        lambda account, project_id: login_calls.append((account, project_id))
+        lambda account, project_id, **kwargs: login_calls.append((account, project_id))
         or completed_process(),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_adc_identity",
         lambda: {
             "state": "success",
@@ -2695,7 +2836,9 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
         },
     )
 
-    assert create_config._set_adc_quota_project("project-1", spinner) == {
+    assert credentials._set_adc_quota_project(
+        _target("project-1"), spinner, transaction=adc_transaction
+    ) == {
         "state": "success",
         "principal": "owner@example.com",
         "project": "project-1",
@@ -2704,8 +2847,8 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
     }
 
     assert gcloud_calls == [
-        (quota_project_command, create_config.ADC_QUOTA_TIMEOUT),
-        (quota_project_command, create_config.ADC_QUOTA_TIMEOUT),
+        (quota_project_command, credentials.ADC_QUOTA_TIMEOUT),
+        (quota_project_command, credentials.ADC_QUOTA_TIMEOUT),
     ]
     assert login_calls == [("owner@example.com", "project-1")]
     assert spinner.fails == []
@@ -2726,27 +2869,29 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
     )
 
 
-# @matrix setup : config-files gcloud-config interactive-input
-def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch):
+# @matrix setup : adc gcloud-config
+def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch, adc_transaction):
     spinner = SpinnerRecorder()
-    create_config = _configure_adc_quota_test(monkeypatch, spinner)
+    _configure_adc_quota_test(monkeypatch, spinner)
 
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "run_gcloud_command",
         lambda command, check=True, timeout=None: completed_process(
             command, returncode=1, stderr="quota project mismatch"
         ),
     )
     monkeypatch.setattr(
-        create_config,
+        credentials,
         "_run_adc_login",
-        lambda account, project_id: completed_process(
+        lambda account, project_id, **kwargs: completed_process(
             returncode=1, stderr="browser auth cancelled"
         ),
     )
     with pytest.raises(SetupError) as error:
-        create_config._set_adc_quota_project("project-1", spinner)
+        credentials._set_adc_quota_project(
+            _target("project-1"), spinner, transaction=adc_transaction
+        )
 
     assert len(spinner.fails) == 1
     assert any(
@@ -2761,7 +2906,7 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
     )
     assert any("Opening browser" in message for message in spinner.messages)
     assert any("ADC login did not complete" in message for message in spinner.messages)
-    assert create_config.GOOGLE_CLOUD_TERMS_URL in error.value.repair_action
+    assert commands.GOOGLE_CLOUD_TERMS_URL in error.value.repair_action
     assert "owner@example.com" in error.value.repair_action
     messages = " ".join(" ".join(spinner.messages).split())
     assert (

@@ -1,6 +1,6 @@
 from flask import abort, g
 
-from config import SETTINGS
+from config import read_saved_app_settings
 from lagniappe.core.definitions import Resource
 from lagniappe.core.tools.site.recovery import (
     RecoverySnapshotUnavailable,
@@ -30,7 +30,7 @@ def section(section):
 @permission(Resource.SITE)
 def environment_variables():
     """Return environment variables as YAML formatted HTML."""
-    env_data = SETTINGS.app_settings
+    env_data = read_saved_app_settings()
 
     return responses.reference_environment_variables(env_data)
 
@@ -45,7 +45,7 @@ def download_settings():
     """Download the complete canonical recovery snapshot."""
     g.NO_CACHE = True
     try:
-        env_vars = load_recovery_snapshot(SETTINGS.app_settings)
+        env_vars = load_recovery_snapshot(read_saved_app_settings())
     except RecoverySnapshotUnavailable as error:
         abort(503, error.public_message)
 

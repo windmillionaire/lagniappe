@@ -514,6 +514,16 @@ def test_ai_config_combines_search_tools_json_and_thinking_settings():
     assert config.tools[0].google_search is not None
     assert [fd.name for fd in config.tools[0].function_declarations] == ["get_entity"]
 
+    prompt.set_thinking_level("LOW")
+    level_config = ai_core.GenAI.create_config(prompt)
+    assert prompt.thinking_budget is None
+    assert level_config.thinking_config.thinking_level == ai_core.types.ThinkingLevel.LOW
+    assert level_config.thinking_config.thinking_budget is None
+
+    prompt.set_thinking_budget(0)
+    assert ai_core.GenAI.create_config(prompt).thinking_config.thinking_budget == 0
+    assert prompt.thinking_level is None
+
     with pytest.raises(ValueError, match="Service tier"):
         prompt.set_service_tier("fastest")
 
@@ -3697,12 +3707,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     started = []
-    actor = SimpleNamespace()
-    monkeypatch.setattr(
-        summarize,
-        "current_user",
-        SimpleNamespace(_get_current_object=lambda: actor),
-    )
+    actor = SimpleNamespace(is_authenticated=True)
     monkeypatch.setattr(
         DeferredJobs,
         "start",
@@ -3713,7 +3718,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert summarize.can_summarize_file(office_file) is True
     assert summarize.can_summarize_file(unsupported) is False
 
-    queued_summary = summarize.summarize_file(office_file)
+    queued_summary = summarize.summarize_file(office_file, actor=actor)
     assert queued_summary is office_file.properties.summarize
     assert queued_summary.status == "Summarizing file..."
     assert started[0].inputs == {"file": office_file}
@@ -3722,7 +3727,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert started[0].delay_seconds == 10
     assert len(started) == 1
 
-    result = summarize.summarize_file(unsupported)
+    result = summarize.summarize_file(unsupported, actor=actor)
 
     assert result.error == "Unsupported file type."
 

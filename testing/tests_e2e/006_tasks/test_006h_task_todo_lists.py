@@ -9,7 +9,6 @@ from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.resources import Task
-from testing.utility.network import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -95,14 +94,7 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         expect(todo).to_contain_text("Renamed step")
         expect(todo).to_contain_text("Third step")
 
-        with expect_successful_response(
-            user.page,
-            method="PUT",
-            path=f"/tasks/{task.key}/update",
-            entity_key=task.key,
-        ):
-            task_form.get_by_role("button", name="Update", exact=True).click()
-
+        # Completing submits the edited answers and records their history.
         parent.complete_task(task)
         parent.uncomplete_task(task)
         user.reload()
@@ -116,6 +108,8 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         history_fill.click()
 
         expect(todo.locator("li[data-index]")).to_have_count(2)
+        expect(todo).to_contain_text("Renamed step")
+        expect(todo).to_contain_text("Third step")
         restored_checkboxes = todo.locator("[data-role='todo-check']")
         expect(restored_checkboxes.first).not_to_be_checked()
         expect(restored_checkboxes.nth(1)).not_to_be_checked()

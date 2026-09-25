@@ -42,11 +42,11 @@ lazy imports and the single `core.ai_model` instance.
 - tool-round and per-turn file limits; and
 - stable-instructions-before-context ordering.
 
-`preview()` shows the system instruction and rendered prompt text. It does not
-show provider configuration, function schemas, response schema, file parts,
-future tool calls/results, or the structured-final request. The UI calls it
-**Initial Prompt** for that reason. On direct-upload forms, preparing a preview
-may upload or reuse selected files before rendering the prompt.
+`preview()` remains an internal prompt-inspection helper for tests and
+diagnostics. It shows the system instruction and rendered prompt text, but not
+provider configuration, function schemas, response schema, file parts, future
+tool calls/results, or the structured-final request. The application no longer
+exposes this partial view as a user-facing Initial Prompt action.
 
 ## Model selection
 
@@ -148,8 +148,8 @@ remain different arguments in the normal exact-call cache.
 
 For an existing-submission patch, the same tool accepts `task="form_autofill"`
 with `actions=["update_task"]` or `["update_page"]` and actual `field_types`; this returns
-patch-specific guidance in both native and external flows, without the blank-only
-Autofill/file-reading workflow. `get_schema(include_values=true)` joins current
+patch-specific guidance in both native and external flows, without the dedicated
+Autofill file-reading workflow. `get_schema(include_values=true)` joins current
 AI-readable values to exact schema ids in one read. Neither option adds a tool
 name or a required model round. Shared submission projections also preserve
 Table rows with exact column IDs, Todo `items` envelopes, numeric zero, and JSON
@@ -189,9 +189,11 @@ The response schema remains visible in the conversation while local validation
 enforces executable shapes. MCP lifecycle names and REST submission instructions
 do not belong in built-in provider prompts. The external schedule schema adds
 conditional requirements without changing Gemini's provider-compatible schema.
-The external `form_autofill` bundle permits grounded corrections and emits only
-selected field updates; built-in Autofill retains its blank-only completion
-policy and preserves non-empty partial values.
+Both external and built-in Autofill permit grounded corrections and emit
+selected field updates. A changed table/todo contains its complete proposed
+collection, retaining existing rows/items unless the request warrants changing
+them. Built-in guidance includes only field types in the actual schema, including
+nested table columns; shared type filtering is also used by `get_guidelines`.
 
 Summary-writing policy comes with the selected `summarize_file` action or the
 `file_summary` bundle, not with general filing guidance. The native planner
@@ -211,9 +213,12 @@ integer calls and exposes that choice through `effective_limit`.
 ## Files
 
 Initial attachments and tool-returned files use the `FileConsumer` boundary.
-Autofill receives readable files directly attached to its target. It prefers
-saved summaries, may request extracted text for an unresolved field, and may
-request an original file only when text is insufficient. The report planner starts
+Autofill receives a supplied original file directly and never waits for its
+summary. Other target attachments are listed with compact identifiers, filenames
+and MIME types; `get_file(include_original=true)` reads them when needed. Optional
+Page/Category background is referenced through `get_entity` instead of eagerly
+injecting documents and descriptions. Focused public web research remains
+available, including title-only requests. The report planner starts
 from saved summaries and file metadata, then reads further evidence
 as needed in the same conversation that authors the complete proposal.
 

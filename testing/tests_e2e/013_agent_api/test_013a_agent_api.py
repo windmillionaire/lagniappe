@@ -13,6 +13,9 @@ from lagniappe.core.definitions import AI
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_api
+from lagniappe.core.tools.ai.external import plans as external_plans
+from lagniappe.core.tools.ai.external import uploads as external_uploads
+from lagniappe.core.tools.ai.external import validation as external_validation
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.auth import agent_api as agent_auth
@@ -923,7 +926,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
     _allow_claimed_saves(monkeypatch)
     monkeypatch.setattr(
-        external_api,
+        external_uploads,
         "bind_upload_file_identities",
         lambda _report, manifest, *, upload_batch_id: [
             {
@@ -1063,7 +1066,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         ensure_active()
         current.upload_manifest = None
 
-    monkeypatch.setattr(external_api, "finalize_uploads", finalize)
+    monkeypatch.setattr(external_uploads, "finalize_uploads", finalize)
     invalid_finalization = client.post(
         "/api/v1/plans/report-key/uploads/finalize",
         headers={"Authorization": "Bearer valid-key"},
@@ -1255,9 +1258,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         current.agent_manifest["proposal_fingerprint"] = "normalized-proposal"
         return current
 
-    monkeypatch.setattr(external_api, "submit_plan", submit)
+    monkeypatch.setattr(external_plans, "submit_plan", submit)
     monkeypatch.setattr(
-        external_api,
+        external_validation,
         "_external_allowed_report_actions",
         lambda user: ("needs_review", "summarize_file"),
     )
@@ -1405,7 +1408,7 @@ def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
     )
     _allow_claimed_saves(monkeypatch)
     monkeypatch.setattr(
-        external_api,
+        external_uploads,
         "bind_upload_file_identities",
         lambda _report, manifest, *, upload_batch_id: [
             {
@@ -1506,7 +1509,7 @@ def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
         finalized_batches.append(current.upload_manifest[0]["upload_batch_id"])
         current.upload_manifest = None
 
-    monkeypatch.setattr(external_api, "finalize_uploads", finalize)
+    monkeypatch.setattr(external_uploads, "finalize_uploads", finalize)
     stale = client.post(
         "/api/v1/plans/report-key/uploads/finalize",
         headers=headers,
@@ -1600,7 +1603,7 @@ def test_claimed_upload_routes_reload_before_storage_side_effects(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        external_api,
+        external_uploads,
         "bind_upload_file_identities",
         lambda _report, manifest, *, upload_batch_id: [
             {
@@ -1644,7 +1647,7 @@ def test_claimed_upload_routes_reload_before_storage_side_effects(monkeypatch):
     fetched = iter((initial_finalize, canonical_finalize, canonical_finalize))
     finalized_reports = []
     monkeypatch.setattr(
-        external_api,
+        external_uploads,
         "finalize_uploads",
         lambda current, _user, **_kwargs: (
             finalized_reports.append(current),
@@ -1681,7 +1684,7 @@ def test_submission_is_serialized_with_upload_operations(monkeypatch):
 
     monkeypatch.setattr(agent_api_store, "claim_plan_operation", claim)
     monkeypatch.setattr(
-        external_api,
+        external_plans,
         "submit_plan",
         lambda *_args, **_kwargs: pytest.fail(
             "submission must not run while an upload operation owns the claim"
@@ -1787,8 +1790,8 @@ def test_external_plan_resources_hide_other_users_plans(monkeypatch):
     assert owned.json["id"] == "report-key"
 
 
-# @source lagniappe/web/routes/api/main.py::create_uploads
-# @source lagniappe/web/routes/api/main.py::submit_plan
+# @source lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
+# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
 # @pairs agent-api:ask-refinement agent-api:entitlement-independent agent-api:envelope-validation agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
 def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     class ProviderDisabledActor(Actor):
@@ -1912,7 +1915,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         current.agent_manifest["proposal_fingerprint"] = "normalized-answer"
         return current
 
-    monkeypatch.setattr(external_api, "submit_plan", submit)
+    monkeypatch.setattr(external_plans, "submit_plan", submit)
     submitted = client.post(
         "/api/v1/plans/report-key/submit",
         headers=headers,

@@ -1,5 +1,3 @@
-from flask_login import current_user
-
 from ..definitions import Action, Fetch
 from ..entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -17,7 +15,14 @@ class HomeProperty:
 
     _id = "home"
 
-    def __init__(self, *args, **kwargs):
+    # @testable true
+    # @tests tests_unit/test_002i_home_properties.py::test_home_requires_explicit_user
+    # @tests tests_unit/test_002i_home_properties.py::test_home_sections_keep_their_viewer_across_lazy_and_paginated_reads
+    # @matrix home : explicit-user validation
+    def __init__(self, *args, user, **kwargs):
+        if user is None:
+            raise ValueError("Home section requires a user")
+        self._user = user
         self._cursor = kwargs.get("cursor")
         self._back = True if self._cursor else False
 
@@ -63,7 +68,7 @@ class ProjectList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        hashes = current_user.properties.restrictions.project
+        hashes = self._user.properties.restrictions.project
         db = database_get.models(
             "project",
             start_cursor=self.cursor,
@@ -88,7 +93,7 @@ class CategoryList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        hashes = current_user.properties.restrictions.category
+        hashes = self._user.properties.restrictions.category
         db = database_get.models(
             "category",
             start_cursor=self.cursor,
@@ -111,12 +116,12 @@ class PageList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        hashes = current_user.properties.restrictions.page
+        hashes = self._user.properties.restrictions.page
         db = database_get.recent_pages(start_cursor=self.cursor, hashes=hashes)
         self._list = [
             page
             for page in Entities.fetch(*db.results, request=Fetch.direct())
-            if page.allowed(Action.VIEW)
+            if page.allowed(Action.VIEW, user=self._user)
         ]
         self.cursor = db.next_cursor
 
@@ -139,10 +144,10 @@ class TaskList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        hashes = current_user.properties.restrictions.task
+        hashes = self._user.properties.restrictions.task
         tasks = database_get.due_tasks(
             hashes=hashes,
-            assigned_to=current_user.page,
+            assigned_to=self._user.page,
         )
         task_pages = [
             page_key
@@ -156,14 +161,14 @@ class TaskList(HomeProperty):
             # so routine list rendering does not require a nested request.
             for t in Entities.fetch(*tasks, *task_pages, request=Fetch.direct())
             if getattr(t, "kind", None) == "task"
-            if t.allowed(Action.VIEW)
+            if t.allowed(Action.VIEW, user=self._user)
         ]
 
         return self._list
 
     @property
     def count(self):
-        return database_get.user_task_count(current_user.page)
+        return database_get.user_task_count(self._user.page)
 
 
 # @testable true
@@ -180,7 +185,7 @@ class StarredList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        starred_keys = current_user.properties.starred.keys
+        starred_keys = self._user.properties.starred.keys
         cursor = int(self.cursor) if self.cursor else 0
 
         if not self.cursor:
@@ -208,7 +213,7 @@ class StarredList(HomeProperty):
                     "message": "This starred item no longer exists.",
                 }
                 self._items.append(item)
-            elif entity.allowed(Action.VIEW, user=current_user):
+            elif entity.allowed(Action.VIEW, user=self._user):
                 self._list.append(entity)
                 self._items.append({"entity": entity, "key": urlsafe_key})
             else:
@@ -232,7 +237,7 @@ class StarredList(HomeProperty):
 
     @property
     def count(self):
-        return len(current_user.properties.starred.keys)
+        return len(self._user.properties.starred.keys)
 
 
 # @testable true
@@ -247,7 +252,7 @@ class NoteList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        notes = database_get.notes(current_user)
+        notes = database_get.notes(self._user)
         self._list = Entities.fetch(*notes, request=Fetch.direct())
         return self._list
 
@@ -284,6 +289,6 @@ class ToolsList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        reports = database_get.ai_reports(current_user)
+        reports = database_get.ai_reports(self._user)
         self._list = Entities.fetch(*reports, request=Fetch.direct())
         return self._list

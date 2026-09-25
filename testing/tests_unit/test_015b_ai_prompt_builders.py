@@ -18,7 +18,6 @@ from lagniappe.core.tools.ai import (
 )
 from lagniappe.core.tools.ai.guidelines import (
     FORM_ENTITY_BOUNDARIES,
-    SUBMISSION_OUTPUT_REQUIREMENTS,
 )
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.properties.schema import SchemaFields
@@ -104,6 +103,17 @@ def _ooxml_summary_file(filename="source.docx", mimetype=DOCX_MIMETYPE):
     )
     file.get_asset = lambda name: asset if name == "file" else None
     return file
+
+
+# @pair ai:autofill
+@pytest.mark.unit
+def test_autofill_uses_verified_staged_storage_part_without_reading_bytes():
+    prompt = autofill.form_autofill_prompt(
+        schema=[{"id": "subject", "type": "input", "input": "text", "title": "Subject"}],
+        original_file_parts=[{"uri": "gs://private-bucket/tmp/uploads/evidence.txt", "mime_type": "text/plain"}],
+    )
+    assert prompt.files == [{"uri": "gs://private-bucket/tmp/uploads/evidence.txt", "mime_type": "text/plain"}]
+    assert prompt.bytes == []
 
 
 # @matrix ai files : mimetype normalization
@@ -236,7 +246,7 @@ def test_prompt_tracks_context_output_examples_and_attachments():
         prompt.set_model_tier("tiny")
 
 
-# @matrix ai : file-context output-format project-context prompt-builders search structured-output submission thinking tools
+# @matrix ai : file-context output-format project-context prompt-builders search selected-text structured-output submission thinking tools
 @pytest.mark.unit
 def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     user = SimpleNamespace(email="owner@example.com")
@@ -365,18 +375,20 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
         "workflow": "autofill",
         "stage": "generation",
         "id": "form-autofill",
-        "version": 4,
+        "version": 5,
     }
     assert autofill_prompt.output_format["type"] == "JSON"
     assert (
         autofill_prompt.output_format["description"]
-        == SUBMISSION_OUTPUT_REQUIREMENTS
+        == autofill.AUTOFILL_OUTPUT_REQUIREMENTS
     )
     assert autofill_prompt.output_format["requirements"]
     assert autofill_prompt.response_schema is None
     assert "### JSON Output Requirements" in autofill_prompt.preview()
     assert "### Submission Output Requirements" in autofill_prompt.preview()
     assert autofill_prompt.model_tier == "primary"
+    assert autofill_prompt.thinking_level == "LOW"
+    assert autofill_prompt.thinking_budget is None
     assert autofill_prompt.bytes[0]["bytes"] == b"image"
     assert FORM_ENTITY_BOUNDARIES.strip() not in [
         block["content"] for block in autofill_prompt.instruction_blocks
@@ -407,7 +419,6 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     ]
     for unavailable_tool in (
         "search_entities",
-        "get_entity",
         "get_page_details",
         "get_page_file_list",
         "get_page_tasks",
@@ -420,12 +431,44 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     assert create_autofill_prompt.max_tool_iterations is None
     assert create_autofill_prompt.search is True
     assert create_autofill_prompt.response_schema is None
+    assert create_autofill_prompt.thinking_level == "LOW"
     assert create_autofill_prompt.bytes[0]["bytes"] == b"recipe-image"
     assert "Page Id" not in _context_labels(create_autofill_prompt)
     assert _context_json(create_autofill_prompt, "Category") == {
         "name": "Recipes",
         "description": "Recipes worth making again.",
     }
+
+
+# @matrix ai : file-context tools
+def test_autofill_original_file_uses_uri_without_redundant_get_file_tool():
+    stored = SimpleNamespace(
+        hash="fresh-evidence",
+        properties=SimpleNamespace(file=SimpleNamespace(uri_to_ai={
+            "uri": "gs://private-bucket/fresh-evidence.txt",
+            "mime_type": "text/plain",
+        })),
+    )
+    fresh = {"hash": "hash:fresh-evidence", "filename": "fresh-evidence.txt"}
+    other = {"hash": "hash:prior-evidence", "filename": "prior-evidence.pdf"}
+    options = {
+        "user": SimpleNamespace(email="owner@example.com"),
+        "schema": [{"id": "input-name", "type": "input"}],
+        "original_files": [stored],
+    }
+
+    fresh_only = autofill.form_autofill_prompt(**options, attached_files=[fresh])
+    assert fresh_only.files == [stored.properties.file.uri_to_ai]
+    assert fresh_only.tools is None
+    assert "Attached Files" not in _context_labels(fresh_only)
+    contents = ai_core.GenAI()._build_contents(fresh_only)
+    assert contents[1].file_data.file_uri == "gs://private-bucket/fresh-evidence.txt"
+
+    with_prior = autofill.form_autofill_prompt(
+        **options, attached_files=[fresh, other]
+    )
+    assert with_prior.tools == ["get_file"]
+    assert _context_json(with_prior, "Attached Files") == [other]
 
 
 # @matrix ai files pages tasks : attached-files autofill entity-specific partial-submission shared-context
@@ -449,6 +492,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
             self.key = key
             self.hash = key
             self.filename = filename
+            self.mimetype = "application/pdf"
             self.summary = summary
             self.can_view = can_view
 
@@ -492,6 +536,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         form=form,
         submission_schema=form.schema,
         files=[page_file],
+        allowed=lambda action, user=None: True,
         properties=SimpleNamespace(
             submission=Submission({"input-value": ""}),
             document=SimpleNamespace(ai_value="Assessment notes"),
@@ -522,24 +567,23 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
         {
             "hash": "hash:assessment-file",
             "filename": "assessment.pdf",
-            "summary": "Parcel 123 is assessed at $245,000.",
+            "mimetype": "application/pdf",
         }
     ]
     assert task_data["attached_files"] == [
         {
             "hash": "hash:tax-file",
             "filename": "tax-bill.pdf",
-            "summary": None,
+            "mimetype": "application/pdf",
         }
     ]
-    assert task_data["document"] == page_data["document"] == "Assessment notes"
+    assert "document" not in task_data and "document" not in page_data
+    assert task_data["context_references"] == {"page": "hash:page-key"}
     assert task_data["parent_page"] == {
         "name": "Pettis Trust",
-        "description": "Property assessment record",
     }
     assert task_data["category"] == page_data["category"] == {
         "name": "Properties",
-        "description": "Property records and obligations.",
     }
     assert _context_json(page_prompt, "Attached Files") == page_data["attached_files"]
     assert _context_json(task_prompt, "Attached Files") == task_data["attached_files"]
@@ -551,7 +595,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
     }
     assert "Task History" not in _context_labels(task_prompt)
     assert "Completed Tasks" not in _context_labels(task_prompt)
-    assert task_prompt.tools == page_prompt.tools == ["get_file"]
+    assert task_prompt.tools == page_prompt.tools == ["get_file", "get_entity"]
     assert page_file.to_ai(user) not in _context_json(task_prompt, "Attached Files")
 
 

@@ -139,6 +139,9 @@ checkbox. An attached Form's restrictions remain independent.
 
 A marked FormWidget retains an in-memory normalized snapshot of its form data.
 The baseline is refreshed after initialization and authoritative replacement.
+The saved renderer values are refreshed too, including explicit clears. If edits
+arrive during an ordinary save request, its accepted submission becomes the
+comparison baseline while the later draft remains available for reconciliation.
 Repeated values compare without order; Files compare by metadata; a widget may
 add state deliberately omitted from its HTTP payload.
 
@@ -169,7 +172,10 @@ widget continues to own snapshots, local-state capture/projection, and staged
 replacement; those operations do not import revision coordination.
 
 `forms/migrationNotice.mjs` independently installs the informational notice for
-values converted by a schema migration. Its banner/modal belong to FormWidget's
+saved values converted, cleared or removed by a schema migration. It binds **View
+changes** in the shared review bar when present. Its dialog is read-only. The
+notice persists through closing/reloading and clears on the next ordinary save/completion.
+Its banner/modal and the separately owned review bar belong to FormWidget's
 prepared state, not the revision watcher or reconciler. Polling, offline replay,
 deferred operations, and collaborative documents keep their existing owners.
 
@@ -195,6 +201,12 @@ that client directly. `elements/upload.mjs` owns upload controls and menus.
 `BaseUpload` prefers resumable browser-to-Storage upload and submits signed
 metadata after each object completes. The widget checkpoints successful files
 so retry resumes from the first unfinished selection.
+On drag-and-drop, `BaseUpload` snapshots the dropped `File` objects before its
+asynchronous directory check; browser `DataTransfer.files` need not remain
+available after the drop handler yields.
+Autofill start keeps the current form draft unsaved. Review acceptance records
+which AI operation supplied a selected value; the next ordinary Update sends
+that selection so the server can attach a staged original only when used.
 
 When direct upload cannot start, a bounded multipart request may carry at most
 five files and 30 MiB total. A selection outside those bounds is not collapsed

@@ -86,6 +86,7 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
             nonlocal declarations, finalized
             path = request.url.path
             if path.endswith("/contract"):
+                assert request.url.params["view"] == "summary"
                 return httpx.Response(
                     200,
                     json={
@@ -94,10 +95,8 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                         "timezone": "UTC",
                         "personal_page": {},
                         "file_usage_schema": {"type": "array"},
-                        "proposal_schema": {
-                            "type": "object",
-                            "additionalProperties": False,
-                        },
+                        "proposal_schema": None,
+                        "schema_scope": "summary",
                         "permissions": {},
                         "required_file_refs": [item["ref"] for item in inventory()],
                         "file_checklist": [],

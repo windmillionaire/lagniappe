@@ -107,6 +107,7 @@ def test_deferred_job_property_split_preserves_persisted_schema():
             "task_identity",
             "telemetry_id",
             "start_completed",
+            "autofill_receipt",
         }
     )
 
@@ -198,6 +199,7 @@ def test_deferred_job_lock_properties_own_identity_and_projection():
     job = SimpleNamespace(urlsafe_key="job-key", status_revision=4)
     assert deferred_job_lock.Operation.descriptor(lock, job) == {
         "locked": True,
+        "blocks_edit": False,
         "scope": "form-autofill",
         "operation": "job-key",
         "revision": 4,
@@ -682,6 +684,7 @@ def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
 
     assert deferred_job_lock_descriptor("target-key") == {
         "locked": True,
+        "blocks_edit": False,
         "scope": "form-autofill",
         "operation": "job-key",
         "revision": 7,
@@ -763,6 +766,31 @@ def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
     assert not_due["claimed"] is False
     assert not_due["reason"] == "not-due"
     assert recent["dispatch_state"] == "pending"
+
+
+# @source lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
+# @matrix deferred-jobs : maximum-age reconciliation
+def test_recovery_redispatches_committed_autofill_without_failing_it(monkeypatch):
+    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    entity = {
+        "status": "running", "status_revision": 4, "dispatch_state": "claimed",
+        "created": now - timedelta(hours=4), "modified": now - timedelta(minutes=6),
+        "lease_expires": now - timedelta(minutes=3),
+        "autofill_receipt": '{"applied_fields":["title"]}',
+    }
+    datastore = FakeDatastore(entity)
+    monkeypatch.setattr(deferred_database, "DATA", SimpleNamespace(datastore=datastore))
+    monkeypatch.setattr(deferred_database, "_deferred_job_key", lambda _value: "job")
+
+    result = deferred_database.claim_deferred_job_recovery(
+        "job", 4, now, grace_seconds=120, max_age_seconds=120,
+        stale_updates={"status": "failed"},
+    )
+
+    assert result["claimed"] is True
+    assert result["action"] == "redispatch"
+    assert entity["status"] == "running"
+    assert entity["autofill_receipt"] == '{"applied_fields":["title"]}'
 
 
 # @source lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
@@ -857,6 +885,17 @@ def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
 
     assert result["transitioned"] is True
     assert entity["status"] == "cancelled"
+
+    # A receipt is written in the answer-application transaction. Completion
+    # bookkeeping can still be running, but cancellation must lose this race.
+    entity.update(status="running", lease_token="worker-two", autofill_receipt='{"applied_fields":["title"]}')
+    committed = deferred_database.transition_active_deferred_job("job", {"status": "cancelled", "lease_token": None}, now)
+    assert committed["transitioned"] is False
+    assert committed["reason"] == "applied"
+    assert entity["status"] == "running" and entity["lease_token"] == "worker-two"
+    entity.pop("autofill_receipt")
+    entity.update(status="cancelled")
+    entity.pop("lease_token")
     assert "lease_token" not in entity
     assert "lease_expires" not in entity
     assert entity["status_revision"] == 8

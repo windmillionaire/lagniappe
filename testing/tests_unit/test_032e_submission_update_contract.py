@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from google.genai import types
 
-from lagniappe.core.tools.ai.external_api import _schema_errors
+from lagniappe.core.tools.ai.external.validation import _schema_errors
 from lagniappe.core.tools.ai.function_definitions.get_guidelines import (
     execute_external_get_guidelines,
 )

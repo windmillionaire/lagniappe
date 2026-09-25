@@ -181,6 +181,42 @@ test("test_directory_drop_is_rejected_before_file_processing", async (t) => {
 	assert.deepEqual(errors, ["Only individual files are supported"]);
 });
 
+/** @pair upload:async-file-snapshot */
+test("test_file_drop_survives_async_directory_check", async (t) => {
+	const { BaseUpload } = await setupBaseUpload(t);
+	let dropHandler;
+	const instance = new BaseUpload({});
+	instance.dropzone = {
+		element: {
+			addEventListener(name, handler) {
+				if (name === "drop") dropHandler = handler;
+			},
+		},
+	};
+	const received = [];
+	instance._processNewFiles = async (files) => received.push(...files);
+	instance._initDropZone();
+	const file = new File(["evidence"], "evidence.txt", { type: "text/plain" });
+	let reads = 0;
+	await dropHandler({
+		preventDefault() {},
+		dataTransfer: {
+			get files() {
+				return reads++ === 0 ? [file] : [];
+			},
+			items: [
+				{
+					kind: "file",
+					async getAsFileSystemHandle() {
+						return { kind: "file" };
+					},
+				},
+			],
+		},
+	});
+	assert.deepEqual(received, [file]);
+});
+
 /** @matrix direct-upload : aggregate-limit multipart-fallback partial-resume */
 test("test_large_multi_file_retry_preserves_completed_direct_uploads", async (t) => {
 	const { BaseUpload, directUpload, errors } = await setupBaseUpload(t);
