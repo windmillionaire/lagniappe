@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import json
@@ -7,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from types import MappingProxyType
 
 import yaml
 
@@ -409,32 +412,145 @@ def verify_generation_manifest():
     return True
 
 
-# @testable infrastructure
-class Settings:
-    DEPLOY = File.APP_YAML.load()
-    APP = File.APP_SETTINGS_YAML.load()
-    DEV = File.DEV_YAML.load()
-    NODE = File.PACKAGE_JSON.load()
-    INDEX = File.INDEX_YAML.load()
-    MANIFEST = File.MANIFEST_JSON.load()
-    BROWSER_PROTOCOL = File.BROWSER_PROTOCOL_JSON.load()
+# @testable false
+# @covered-by config/__init__.py::RuntimeSettings
+# @reason recursive value ownership is exercised through snapshot construction
+def _freeze_settings(value):
+    if isinstance(value, Mapping):
+        return MappingProxyType(
+            {key: _freeze_settings(item) for key, item in value.items()}
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_settings(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_freeze_settings(item) for item in value)
+    return value
 
-    GCLOUD_CONFIG = None
-    DEV_CONFIG = None
-    TEST_CONFIG = None
 
-    _DEV_SETTINGS = None
-    _TEST_SETTINGS = None
+# @testable false
+# @covered-by config/__init__.py::RuntimeSettings
+# @reason mutable consumer copies are exercised through the snapshot API
+def _copy_settings(value):
+    if isinstance(value, Mapping):
+        return {key: _copy_settings(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_copy_settings(item) for item in value]
+    if isinstance(value, frozenset):
+        return set(value)
+    return value
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_runtime_settings_own_nested_values_and_return_independent_copies
+# @matrix config : configuration transactional-state
+@dataclass(frozen=True)
+class RuntimeSettings:
+    """Owned, immutable settings for one environment; values stay out of repr."""
+
+    environment: Environment
+    values: Mapping[str, object] = field(repr=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "environment", Environment(self.environment))
+        object.__setattr__(self, "values", _freeze_settings(self.values))
+
+    def as_dict(self):
+        """Return plain containers owned by the caller for runtime normalization."""
+        return _copy_settings(self.values)
+
+
+# @testable false
+# @covered-by config/__init__.py::load_runtime_settings
+# @covered-by config/__init__.py::SettingsDraft.snapshot
+# @reason shared environment precedence is exercised by saved and draft projections
+def _project_runtime_settings(app_settings, overrides, environment):
+    environment = Environment(environment)
+    projected = dict(app_settings)
+    if environment == Environment.TESTING:
+        from . import constants
+
+        projected.update(
+            {
+                "AGENT_ACCESS_ENABLED": True,
+                "AGENT_ACCESS_EMAIL": constants.DEFAULT_AGENT_ACCESS_EMAIL,
+                "AGENT_ACCESS_NAME": constants.DEFAULT_AGENT_ACCESS_NAME,
+                "AGENT_ACCESS_CODE": constants.DEFAULT_AGENT_ACCESS_TEST_CODE,
+                "ANALYTICS": True,
+                "AI_OBSERVABILITY": True,
+                "PUBLIC_MANUAL": True,
+            }
+        )
+    projected.update(overrides)
+    if environment == Environment.TESTING:
+        from .hosted_e2e import hosted_e2e_settings_overrides
+
+        hosted_overrides = hosted_e2e_settings_overrides(projected)
+        if hosted_overrides:
+            projected.update(hosted_overrides)
+        else:
+            projected["BASE_URL"] = (
+                f"http://{projected['SERVER_NAME']}:{projected['SERVER_PORT']}"
+            )
+    return RuntimeSettings(environment, projected)
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_runtime_loading_is_independent_of_drafts_and_generated_documents
+# @tests tests_tooling/test_003_config.py::test_runtime_and_draft_projections_preserve_environment_precedence
+# @tests tests_tooling/test_003_config.py::test_hosted_runtime_projection_preserves_validated_overrides
+# @matrix config : config-files configuration parsing
+def load_runtime_settings(environment):
+    """Read saved settings for one process without constructing an installer draft."""
+    environment = Environment(environment)
+    app_settings = File.APP_SETTINGS_YAML.load()
+    overrides = {}
+    if environment != Environment.PRODUCTION:
+        development = File.DEV_YAML.load()
+        key = (
+            "dev_settings"
+            if environment == Environment.DEVELOPMENT
+            else "test_settings"
+        )
+        overrides = development.get(key, {})
+    return _project_runtime_settings(app_settings, overrides, environment)
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_saved_settings_reader_preserves_raw_values_without_loading_a_draft
+# @matrix config : config-files parsing
+def read_saved_app_settings():
+    """Read canonical persisted values for configuration display and recovery."""
+    with open(
+        File.APP_SETTINGS_YAML.value, "r", encoding="utf-8", newline=""
+    ) as stream:
+        data = yaml.safe_load(stream) or {}
+    data.pop("BUILD_ID", None)
+    return data
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_settings_drafts_own_documents_and_preserve_internal_aliases
+# @matrix config : configuration transactional-state
+class SettingsDraft:
+    """Mutable generated documents owned by one installer or runner session."""
 
     def __init__(self):
+        self.DEPLOY = File.APP_YAML.load()
+        self.APP = File.APP_SETTINGS_YAML.load()
+        self.DEV = File.DEV_YAML.load()
+        self.NODE = File.PACKAGE_JSON.load()
+        self.INDEX = File.INDEX_YAML.load()
+        self.MANIFEST = File.MANIFEST_JSON.load()
+        self.BROWSER_PROTOCOL = File.BROWSER_PROTOCOL_JSON.load()
         self.GCLOUD_CONFIG = self.DEV.get("gcloud_config", {})
         self.DEV_CONFIG = self.DEV.get("dev_settings", {})
         self.TEST_CONFIG = self.DEV.get("test_settings", {})
 
+    # @testable true
+    # @tests tests_tooling/test_003_config.py::test_draft_save_preserves_identity_and_publishes_only_selected_files
+    # @matrix config : config-files transactional-state
     def save(self, *file_refs):
         """Persist only changed selected files, then commit one generation manifest."""
-        self._DEV_SETTINGS = None
-        self._TEST_SETTINGS = None
         selected = tuple(file_refs) or GENERATION_FILES
         invalid = [
             file_ref for file_ref in selected if file_ref not in GENERATION_FILES
@@ -463,69 +579,66 @@ class Settings:
         return tuple(changed)
 
     @property
+    # @testable false
+    # @covered-by config/__init__.py::read_saved_app_settings
+    # @reason compatibility adapter for persisted configuration exports
     def app_settings(self):
-        with open(
-            File.APP_SETTINGS_YAML.value,
-            "r",
-            encoding="utf-8",
-            newline="",
-        ) as f:
-            data = yaml.safe_load(f) or {}
-        data.pop("BUILD_ID", None)
-        return data
+        return read_saved_app_settings()
+
+    # @testable true
+    # @tests tests_tooling/test_003_config.py::test_runtime_and_draft_projections_preserve_environment_precedence
+    # @tests tests_tooling/test_003_config.py::test_draft_projections_observe_edits_without_saving_or_aliasing
+    # @matrix config : configuration transactional-state
+    def snapshot(self, environment):
+        """Project current draft values without reading or writing saved settings."""
+        environment = Environment(environment)
+        overrides = {
+            Environment.PRODUCTION: {},
+            Environment.DEVELOPMENT: self.DEV_CONFIG,
+            Environment.TESTING: self.TEST_CONFIG,
+        }[environment]
+        return _project_runtime_settings(self.APP, overrides, environment)
 
     @property
+    # @testable false
+    # @covered-by config/__init__.py::SettingsDraft.snapshot
+    # @reason compatibility adapter for an independent production draft projection
     def app_config(self):
-        return self.APP
+        return self.snapshot(Environment.PRODUCTION).as_dict()
 
     @property
+    # @testable false
+    # @covered-by config/__init__.py::SettingsDraft.snapshot
+    # @reason compatibility adapter for an independent development draft projection
     def dev_config(self):
-        if self._DEV_SETTINGS is not None:
-            return self._DEV_SETTINGS
-
-        app_settings = File.APP_SETTINGS_YAML.load()
-        app_settings.update(self.DEV_CONFIG)
-
-        self._DEV_SETTINGS = app_settings
-
-        return self._DEV_SETTINGS
+        return self.snapshot(Environment.DEVELOPMENT).as_dict()
 
     @property
+    # @testable false
+    # @covered-by config/__init__.py::SettingsDraft.snapshot
+    # @reason compatibility adapter for an independent testing draft projection
     def test_config(self):
-        if self._TEST_SETTINGS is not None:
-            return self._TEST_SETTINGS
-
-        from . import constants
-
-        app_settings = File.APP_SETTINGS_YAML.load()
-        app_settings.update(
-            {
-                "AGENT_ACCESS_ENABLED": True,
-                "AGENT_ACCESS_EMAIL": constants.DEFAULT_AGENT_ACCESS_EMAIL,
-                "AGENT_ACCESS_NAME": constants.DEFAULT_AGENT_ACCESS_NAME,
-                "AGENT_ACCESS_CODE": constants.DEFAULT_AGENT_ACCESS_TEST_CODE,
-                "ANALYTICS": True,
-                "AI_OBSERVABILITY": True,
-                "PUBLIC_MANUAL": True,
-            }
-        )
-        app_settings.update(self.TEST_CONFIG)
-        from .hosted_e2e import hosted_e2e_settings_overrides
-
-        hosted_overrides = hosted_e2e_settings_overrides(app_settings)
-        if hosted_overrides:
-            app_settings.update(hosted_overrides)
-        else:
-            server_name = app_settings["SERVER_NAME"]
-            server_port = app_settings["SERVER_PORT"]
-            app_settings["BASE_URL"] = f"http://{server_name}:{server_port}"
-
-        self._TEST_SETTINGS = app_settings
-
-        return self._TEST_SETTINGS
+        return self.snapshot(Environment.TESTING).as_dict()
 
 
-SETTINGS = Settings()
+Settings = SettingsDraft
+# reload(config) is the source-upgrade boundary. Discard both the lazy instance
+# and any eagerly bound SETTINGS left by an older source generation.
+globals().pop("SETTINGS", None)
+_settings_draft = None
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_settings_singleton_is_lazy_and_reloads_saved_documents
+# @matrix config setup : config-files git-upgrade
+def __getattr__(name):
+    if name != "SETTINGS":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    global _settings_draft
+    if _settings_draft is None:
+        _settings_draft = SettingsDraft()
+    return _settings_draft
+
 
 from .deployment import apply_deployment_settings, normalize_deployment_settings
 
@@ -535,6 +648,11 @@ __all__ = [
     "apply_deployment_settings",
     "normalize_deployment_settings",
     "SETTINGS",
+    "Settings",
+    "SettingsDraft",
+    "RuntimeSettings",
+    "load_runtime_settings",
+    "read_saved_app_settings",
     "Environment",
     "Directory",
     "File",

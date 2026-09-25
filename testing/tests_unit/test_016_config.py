@@ -1,6 +1,5 @@
 """Unit tests for runtime application config behavior."""
 
-from enum import Enum
 import copy
 import importlib.util
 from pathlib import Path
@@ -9,14 +8,10 @@ import types
 
 import pytest
 
+from config import Environment as FakeEnvironment, RuntimeSettings
+
 
 pytestmark = pytest.mark.unit
-
-
-class FakeEnvironment(Enum):
-    DEVELOPMENT = "development"
-    TESTING = "testing"
-    PRODUCTION = "production"
 
 
 def _disabled_ai_email_config():
@@ -34,6 +29,41 @@ def _disabled_ai_email_config():
             "senderName": "Lagniappe",
         },
     }
+
+
+# @matrix config : configuration transactional-state
+def test_config_owns_values_from_an_explicit_runtime_snapshot(monkeypatch):
+    import lagniappe
+
+    app_settings = {
+        "CONFIG_KIND": "lagniappe-settings",
+        "CONFIG_SCHEMA_VERSION": 3,
+        "GOOGLE_CLOUD_PROJECT": "project-1",
+        "VERSION": "1.0",
+        "GIBBERISH": "bucket-seed",
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
+        "APP_ENGINE_LOCATION": "us-central",
+        "RESOURCE_REGION": "us-central1",
+        "IDENTITY_PLATFORM_CONFIG": {"providers": [{"enabled": True}]},
+        "AI_EMAIL_CONFIG": _disabled_ai_email_config(),
+    }
+    snapshot = RuntimeSettings(FakeEnvironment.PRODUCTION, app_settings)
+    monkeypatch.setenv("FLASK_ENV", "development")
+    monkeypatch.setattr(
+        lagniappe,
+        "load_runtime_settings",
+        lambda *args: pytest.fail("explicit snapshot caused a settings file read"),
+    )
+    first, second = lagniappe.Config(snapshot), lagniappe.Config(snapshot)
+    assert first.ENV is FakeEnvironment.PRODUCTION
+    assert first.AI_EMAIL_CONFIG["domain"] == "inbound.example.com"
+    assert snapshot.as_dict()["AI_EMAIL_CONFIG"]["domain"] == "INBOUND.Example.COM."
+    first.IDENTITY_PLATFORM_CONFIG["providers"][0]["enabled"] = False
+    first.AI_EMAIL_CONFIG["resend"]["senderName"] = "Changed"
+    assert second.IDENTITY_PLATFORM_CONFIG["providers"] == [{"enabled": True}]
+    assert second.AI_EMAIL_CONFIG["resend"]["senderName"] == "Lagniappe"
+    assert snapshot.as_dict() == app_settings
 
 
 # @matrix config : site-policy configuration validation
@@ -55,7 +85,7 @@ def test_config_loads_flat_mcp_settings_and_ai_switches(monkeypatch, ai_enabled,
     }
     monkeypatch.setitem(sys.modules, "config", types.SimpleNamespace(
         Environment=FakeEnvironment,
-        SETTINGS=types.SimpleNamespace(app_config=app_settings),
+        load_runtime_settings=lambda environment: RuntimeSettings(environment, app_settings),
         constants=types.SimpleNamespace(
             BUILD_ID="tracked-build", DEFAULT_SOURCE_URL="https://example.test/source",
             UNSUPPORTED_SETTING_KEYS=frozenset(),
@@ -105,7 +135,7 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch, email_po
     original_settings = copy.deepcopy(app_settings)
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
-        SETTINGS=types.SimpleNamespace(app_config=app_settings),
+        load_runtime_settings=lambda environment: RuntimeSettings(environment, app_settings),
         constants=types.SimpleNamespace(
             BUILD_ID="tracked-build",
             DEFAULT_SOURCE_URL="https://example.test/default-source",
@@ -183,7 +213,7 @@ def test_config_requires_hosted_build_id_to_match_built_source(monkeypatch):
     }
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
-        SETTINGS=types.SimpleNamespace(test_config=app_settings),
+        load_runtime_settings=lambda environment: RuntimeSettings(environment, app_settings),
         constants=types.SimpleNamespace(
             BUILD_ID="b1234567",
             DEFAULT_SOURCE_URL="https://example.test/default-source",
@@ -237,7 +267,7 @@ def test_config_honors_ai_observability_setting(monkeypatch):
     }
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
-        SETTINGS=types.SimpleNamespace(app_config=app_settings),
+        load_runtime_settings=lambda environment: RuntimeSettings(environment, app_settings),
         constants=types.SimpleNamespace(
             BUILD_ID="tracked-build",
             DEFAULT_SOURCE_URL="https://example.test/default-source",
@@ -311,12 +341,7 @@ def test_config_keeps_sentry_browser_destination_independent(
         **browser_settings,
     }
     original_settings = copy.deepcopy(app_settings)
-    monkeypatch.setattr(
-        lagniappe, "SETTINGS", types.SimpleNamespace(app_config=app_settings)
-    )
-    monkeypatch.setenv("FLASK_ENV", "production")
-
-    config = lagniappe.Config()
+    config = lagniappe.Config(RuntimeSettings(FakeEnvironment.PRODUCTION, app_settings))
 
     assert config.SENTRY_JS_DSN == expected
     assert config.SENTRY_DSN == "https://backend.example.test/1"
@@ -346,7 +371,9 @@ def test_config_normalizes_and_validates_sentry_sample_rates(monkeypatch):
     settings = types.SimpleNamespace(app_config=app_settings)
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
-        SETTINGS=settings,
+        load_runtime_settings=lambda environment: RuntimeSettings(
+            environment, settings.app_config
+        ),
         constants=types.SimpleNamespace(
             BUILD_ID="tracked-build",
             DEFAULT_SOURCE_URL="https://example.test/default-source",
@@ -400,7 +427,7 @@ def test_config_honors_configured_source_url(monkeypatch):
     }
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
-        SETTINGS=types.SimpleNamespace(app_config=app_settings),
+        load_runtime_settings=lambda environment: RuntimeSettings(environment, app_settings),
         constants=types.SimpleNamespace(
             BUILD_ID="tracked-build",
             DEFAULT_SOURCE_URL="https://example.test/default-source",

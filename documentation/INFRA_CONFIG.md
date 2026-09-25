@@ -1,8 +1,10 @@
 # Infrastructure Configuration
 
 `config/` is the runtime-safe configuration package uploaded with the Flask
-application. It reads fixed YAML/JSON files, validates settings shared by the
-application and local tooling, and exposes the `SETTINGS` singleton. It never
+application. It reads fixed YAML/JSON files and validates settings shared by the
+application and local tooling. Runtime startup consumes an immutable
+`RuntimeSettings` snapshot; installer and runner workflows use mutable
+`SettingsDraft` documents through the compatible `SETTINGS` singleton. It never
 imports `installer/` or `runner/`; both are local-only packages excluded from
 App Engine uploads.
 
@@ -39,15 +41,25 @@ configuration.
 
 ## Settings writes
 
-`SETTINGS` loads file data at import and keeps mutable dictionaries for setup
-and deployment workflows. `SETTINGS.save()` writes the generated set; passing a
-specific `File` writes only that target. Unchanged documents are not replaced.
+`from config import SETTINGS` lazily creates one `SettingsDraft` for setup and
+deployment workflows. Importing the configuration package or loading runtime
+settings does not construct that draft. Explicit `SettingsDraft()` instances
+load their own documents, including independent nested containers; `Settings`
+remains a compatibility alias for this class. Within a draft, dictionary
+identities remain stable while builders apply changes in place.
+
+`SETTINGS.save()` writes the generated set; passing a specific `File` writes
+only that target. Unchanged documents are not replaced. Saving affects future
+runtime loads, while existing snapshots retain their original values. The
+existing `reload(config)` source-upgrade boundary discards the lazy singleton;
+subsequent `SETTINGS` imports load the current saved files. As before, helpers
+holding old imported objects must be refreshed by the upgrade workflow.
 
 Installer generation uses `installer/config_builders.py` with explicit settings
 mappings, package version, and generated secret defaults. Builders return new
 document mappings; `installer/create_config.py` owns secret creation, applying
-those results in place, and persistence. This keeps the existing `SETTINGS`
-dictionary identities and runtime loading contract intact.
+those results in place, and persistence. This preserves the existing installer
+dictionary identities without sharing mutable documents with runtime startup.
 
 Writes use UTF-8/LF, a same-directory temporary file, flush/fsync,
 `os.replace`, and a parent-directory fsync where supported. Empty documents are
@@ -67,6 +79,30 @@ write `BUILD_ID` to `config/constants.py`; it is not an application setting.
 
 ## Runtime projections
 
+`load_runtime_settings(environment)` reads saved application settings once and,
+for development/testing, reads the matching saved overrides. Production does
+not load local development settings, package metadata, deployment descriptors,
+indexes, or PWA metadata. The returned `RuntimeSettings` owns recursively frozen
+containers; `as_dict()` returns independent plain containers for a consumer.
+Its representation omits configuration values.
+
+`Config(settings=None)` loads a snapshot at normal application startup, or uses
+an explicitly supplied snapshot and its environment. Validation and
+normalization operate on an independent dictionary copy. The `CONFIG`
+attribute API, credential caches, and live Datastore settings remain unchanged.
+File edits do not hot-reload an existing application process.
+
+`SettingsDraft.snapshot(environment)` uses the same projection rules with the
+draft's current in-memory application settings and overrides. Its compatible
+`app_config`, `dev_config`, and `test_config` properties return fresh mutable
+copies. There are no projection caches to clear: draft edits appear in the next
+projection without a save, and editing a returned projection cannot change the
+draft. In particular, dev/test previews now consistently use the current draft
+application settings rather than mixing saved application settings with draft
+overrides.
+
+Draft documents and convenience projections:
+
 | Projection | Source |
 | --- | --- |
 | `APP` | Application settings YAML. |
@@ -74,12 +110,22 @@ write `BUILD_ID` to `config/constants.py`; it is not an application setting.
 | `DEV` | Local development YAML. |
 | `GCLOUD_CONFIG` | Saved name, account, project, and billing account. |
 | `DEV_CONFIG`, `TEST_CONFIG` | Environment-specific overrides. |
-| `dev_config`, `test_config` | Runtime settings merged with the matching overrides. |
+| `app_config`, `dev_config`, `test_config` | Fresh projections of current draft values. |
 | `BROWSER_PROTOCOL` | Shared versioned browser protocol JSON. |
 
-Environments are `development`, `testing`, and `production`. Local testing may
-enable analytics/AI observability for deterministic E2E contracts; explicit
-test overrides still take precedence.
+Environments are `development`, `testing`, and `production`. Precedence is
+application settings, built-in testing defaults, explicit environment overrides,
+then validated hosted-test overrides. Local testing enables agent access,
+analytics, AI observability, and the public manual for deterministic E2E
+contracts; explicit test overrides still take precedence. Local test URLs use
+the final server name and port; hosted tests retain their validated HTTPS URL.
+
+Configuration display and recovery exports use `read_saved_app_settings()`.
+This reads fresh persisted YAML values without decoding their string format,
+excludes `BUILD_ID`, and does not construct a draft. The compatible
+`SettingsDraft.app_settings` property delegates to this reader. Existing
+owner/admin access checks and live-setting recovery overlays remain in their
+route and recovery-service owners.
 
 ## Identity and credentials
 

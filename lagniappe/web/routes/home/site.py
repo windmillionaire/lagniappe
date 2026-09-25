@@ -5,7 +5,7 @@ from flask import abort, render_template, request, session, g
 from flask_login import current_user
 from flask_wtf.csrf import generate_csrf
 
-from config import SETTINGS
+from config import read_saved_app_settings
 from config.ai_settings import normalize_ai_settings
 from config.deployment import normalize_deployment_settings
 from config.public_pages import normalize_public_page_settings
@@ -515,7 +515,7 @@ def set_public_page_settings():
 @owner_only
 def site_configuration():
     g.NO_CACHE = True
-    return responses.site_configuration(SETTINGS.app_settings)
+    return responses.site_configuration(read_saved_app_settings())
 
 
 # @testable true
