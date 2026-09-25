@@ -153,9 +153,7 @@ export class FormRevisionModal extends Modal {
 			},
 			...(state.reviews ?? []).map((review) => ({
 				id: `ai:${review.operation}`,
-				label: review.private
-					? "Revised suggestion"
-					: "Autofill suggestion",
+				label: review.private ? "Revised suggestion" : "Autofill suggestion",
 				...review,
 			})),
 		];

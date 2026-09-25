@@ -50,7 +50,10 @@ const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
  * @tests tests_js/test_014_direct_upload_retry.mjs::test_directory_drop_is_rejected_before_file_processing
  * @matrix upload : directory-rejection drag-drop
  */
-async function containsDroppedDirectory(dataTransfer, files = Array.from(dataTransfer?.files || [])) {
+async function containsDroppedDirectory(
+	dataTransfer,
+	files = Array.from(dataTransfer?.files || []),
+) {
 	const items = Array.from(dataTransfer?.items || []).filter(
 		(item) => item.kind === "file",
 	);
@@ -68,9 +71,7 @@ async function containsDroppedDirectory(dataTransfer, files = Array.from(dataTra
 		}
 	}
 
-	return files.some(
-		(file) => file.size === 0 && !file.type,
-	);
+	return files.some((file) => file.size === 0 && !file.type);
 }
 
 /**

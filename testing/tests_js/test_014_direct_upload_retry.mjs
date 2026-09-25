@@ -204,12 +204,14 @@ test("test_file_drop_survives_async_directory_check", async (t) => {
 			get files() {
 				return reads++ === 0 ? [file] : [];
 			},
-			items: [{
-				kind: "file",
-				async getAsFileSystemHandle() {
-					return { kind: "file" };
+			items: [
+				{
+					kind: "file",
+					async getAsFileSystemHandle() {
+						return { kind: "file" };
+					},
 				},
-			}],
+			],
 		},
 	});
 	assert.deepEqual(received, [file]);

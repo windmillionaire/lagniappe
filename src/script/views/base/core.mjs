@@ -874,10 +874,12 @@ export default class Core extends ShellView {
 					trigger.isConnected &&
 					component.elt.isConnected
 				) {
-					component.elt.dispatchEvent(new CustomEvent("component-opened", {
-						bubbles: true,
-						detail: { component, trigger },
-					}));
+					component.elt.dispatchEvent(
+						new CustomEvent("component-opened", {
+							bubbles: true,
+							detail: { component, trigger },
+						}),
+					);
 				}
 				return committed;
 			})

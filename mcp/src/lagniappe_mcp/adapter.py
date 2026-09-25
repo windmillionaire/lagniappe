@@ -25,7 +25,7 @@ from .catalog import (
     build_tool_registry,
 )
 from .configuration import ConnectionConfig
-from .errors import AdapterError, SchemaError, TransportError
+from .errors import AdapterError, TransportError
 from .limits import (
     CONTRACT_VERSION_MAX,
     MAX_MEDIA_RAW_BYTES,

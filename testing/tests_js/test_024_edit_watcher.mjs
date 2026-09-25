@@ -23,7 +23,9 @@ async function loadEditOwners({
 	loadRevisionPreview,
 	request = {},
 	withTransition = async (callback) => callback(),
-	captureError = (error) => { throw error; },
+	captureError = (error) => {
+		throw error;
+	},
 } = {}) {
 	const { EditReconciler } = await esmock.strict(
 		"../../src/script/forms/revisions/reconciler.mjs",
@@ -550,9 +552,12 @@ test("test_conflict_preview_failure_offers_reload_without_losing_draft", async (
 		_offlineConflict: { record: { id: "queued" } },
 	};
 	const reconciler = new EditReconciler({});
-	assert.equal(await reconciler.stageConflict(widget, {
-		response: { conflict: true, schema: [], submission: {} },
-	}), false);
+	assert.equal(
+		await reconciler.stageConflict(widget, {
+			response: { conflict: true, schema: [], submission: {} },
+		}),
+		false,
+	);
 	assert.equal(marker.dataset.visible, "true");
 	assert.equal(button.textContent, "Reload page");
 	assert.equal(button.hidden, false);
@@ -676,7 +681,11 @@ test("test_reloaded_saved_form_does_not_cancel_different_queued_answers", async 
 	widget.component = { active: widget };
 	const reconciler = new EditReconciler({
 		addFlash() {},
-		offlineQueue: { async cancel() { cancelled = true; } },
+		offlineQueue: {
+			async cancel() {
+				cancelled = true;
+			},
+		},
 	});
 	await reconciler._stageRevision(
 		marker,

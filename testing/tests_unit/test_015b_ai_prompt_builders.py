@@ -18,7 +18,6 @@ from lagniappe.core.tools.ai import (
 )
 from lagniappe.core.tools.ai.guidelines import (
     FORM_ENTITY_BOUNDARIES,
-    SUBMISSION_OUTPUT_REQUIREMENTS,
 )
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.properties.schema import SchemaFields
@@ -247,7 +246,7 @@ def test_prompt_tracks_context_output_examples_and_attachments():
         prompt.set_model_tier("tiny")
 
 
-# @matrix ai : file-context output-format project-context prompt-builders search structured-output submission thinking tools
+# @matrix ai : file-context output-format project-context prompt-builders search selected-text structured-output submission thinking tools
 @pytest.mark.unit
 def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     user = SimpleNamespace(email="owner@example.com")

@@ -13,10 +13,6 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
-from lagniappe.core.tools.deferred_jobs.errors import (
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
-)
 
 pytestmark = pytest.mark.unit
 

@@ -16,7 +16,6 @@ from lagniappe.core.tools.auth.references import (
     UNAVAILABLE_REFERENCE_ERROR,
 )
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
-from lagniappe.core.tools.polling.projections import page_tasks_revision
 from lagniappe.core.tools.forms import review as form_review
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (

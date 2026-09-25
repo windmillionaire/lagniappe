@@ -1,11 +1,11 @@
 import { FormController } from "../../forms/controller.mjs";
 import { installMigrationNotice } from "../../forms/migrationNotice.mjs";
+import { compatibleField } from "../../forms/representation.mjs";
 import {
 	currentReviewOperation,
 	installReviewBar,
 	renderReviewBar,
 } from "../../forms/reviewBar.mjs";
-import { compatibleField } from "../../forms/representation.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
 /**
