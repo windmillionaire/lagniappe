@@ -5,7 +5,7 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Categories, Pages, Submissions, Users
+from testing.definitions import Pages, Submissions, Users
 from testing.elements import SpinnerButtons
 from testing.utility.network import manual_mutation_headers
 
@@ -63,7 +63,10 @@ def test_basic_input_submission(get_user):
 @pytest.mark.parametrize("entity_kind", ["PAGE", "TASK"])
 def test_invalid_typed_submission_returns_error_without_saving(get_user, entity_kind):
     user = get_user(Users.OWNER)
-    category = Categories.acl_create_allowed.get(user)
+    # These cases register page forms; keep that state out of the shared ACL
+    # category used by the submitted-reference permission tests.
+    category = Entities.CATEGORY.create({"name": f"Typed validation {entity_kind}"})
+    category.save()
     form = Entities.FORM.create({
         "name": f"Typed validation {entity_kind}",
         "form-type": entity_kind.lower(),
@@ -78,7 +81,7 @@ def test_invalid_typed_submission_returns_error_without_saving(get_user, entity_
     form.save()
     page = Entities.PAGE.create({
         "name": f"Typed validation page {entity_kind}",
-        "model": category.entity,
+        "model": category,
         "categories": [],
         **({"form": form} if entity_kind == "PAGE" else {}),
     })
@@ -96,13 +99,14 @@ def test_invalid_typed_submission_returns_error_without_saving(get_user, entity_
     user.navigate(f"{SETTINGS.test_config['BASE_URL']}/pages/{page.urlsafe_key}")
     cookies = {cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()}
     headers = manual_mutation_headers(user.page.url, user.locate("#token").input_value())
-    before = Entities.fetch_one(entity.key, request=Fetch.root())
+    before = Entities.fetch_one(entity.key, request=Fetch.direct())
     saved = dict(before.db)
     assert saved["submission"]
     payload = {
         **answers, "note": "Do not save", "name": entity.name,
-        "category": category.key, "form": form.urlsafe_key,
+        "category": category.urlsafe_key, "form": form.urlsafe_key,
         "form-generation": str(form.generation), "active": "TaskForm",
+        "form-revision": before.autofill_revision,
     }
     route = "pages" if entity_kind == "PAGE" else "tasks"
 

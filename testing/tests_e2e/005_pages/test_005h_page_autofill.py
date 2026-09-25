@@ -90,9 +90,11 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     update_path = f"/pages/{page.entity.urlsafe_key}/update"
     original_name = page.entity.name
     with browser_failures.expect_http_error(user, status=409, path=update_path):
-        locked_update = user.page.evaluate(
+        duplicate_start = user.page.evaluate(
             """async ({path, name}) => {
-                const body = new FormData();
+                const form = document.querySelector("[data-widget='PageInfo']");
+                const body = new FormData(form);
+                body.set("form-revision", JSON.parse(form.dataset.formState).revision);
                 body.set("name", name);
                 body.set("role", "autofill-submit");
                 const response = await fetch(path, {
@@ -104,11 +106,13 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
                     },
                     body,
                 });
-                return response.status;
+                return {status: response.status, body: await response.json()};
             }""",
-            {"path": update_path, "name": "Blocked while autofill owns the form"},
+            {"path": update_path, "name": "Unsaved duplicate autofill draft"},
         )
-    assert locked_update == 409
+    assert duplicate_start["status"] == 409
+    assert duplicate_start["body"]["already_running"] is True
+    assert duplicate_start["body"]["operation"] == job.urlsafe_key
     expect(form.locator("input[name='name']")).to_have_value(original_name)
 
     if CONFIG.hosted_e2e_runner or live_ai_job_quota:

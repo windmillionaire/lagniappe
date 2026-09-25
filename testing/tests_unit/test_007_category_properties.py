@@ -300,6 +300,23 @@ def test_related_forms_add_skips_primary_form_and_registers_relation(primary_loa
     assert category.mutation_intents[0].entity is related
 
 
+# @matrix category form : add related-forms relation-registration
+@pytest.mark.unit
+def test_related_forms_add_existing_key_does_not_load_other_forms():
+    category = TestEntities.get("CATEGORY", {"name": "Stored form registry"})
+    current = TestEntities.get("FORM", {"name": "Current page form"})
+    other = TestEntities.get("FORM", {"name": "Another page's form"})
+    category.db["forms"] = [current.key, other.key]
+    forms = category.properties.forms
+    assert not forms.is_set
+
+    assert forms.add(current) is False
+
+    assert forms.keys == [current.key, other.key]
+    assert not forms.is_set
+    assert category.mutation_intents == []
+
+
 # @matrix category form : related-forms validation
 @pytest.mark.unit
 def test_related_forms_add_rejects_value_without_key():

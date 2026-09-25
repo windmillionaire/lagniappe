@@ -116,6 +116,7 @@ def test_owner_can_open_page_permissions_panel(get_user):
 
 # @pair pages:submitted-reference
 def test_page_submission_rejects_hidden_internal_link_target(get_user):
+    """A forged internal-link ID must not bypass the picker's visibility filter."""
     owner = get_user(Users.OWNER)
     category = Categories.acl_create_allowed.get(owner)
     hidden_file_resource = File.upload_from_page(
@@ -174,6 +175,8 @@ def test_page_submission_rejects_hidden_internal_link_target(get_user):
             "category": category.key,
             "form": form.urlsafe_key,
             "top_link": hidden_file.urlsafe_key,
+            "form-generation": str(form.generation),
+            "form-revision": before.autofill_revision,
         },
         cookies=cookies,
         headers=headers,

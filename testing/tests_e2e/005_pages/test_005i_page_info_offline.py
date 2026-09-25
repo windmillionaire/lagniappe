@@ -175,7 +175,8 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     )
 
 
-# @matrix forms : queued-conflict reload submission-choice
+# @matrix forms : queued-conflict submission-choice
+# @matrix offline : reload
 # @source src/script/forms/revisions/reconciler.mjs::EditReconciler
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
@@ -196,34 +197,34 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
 
     info = page.info_form
     _fill_form_element(info, "[id^='sync-text-renderer-']", queued_value)
-    with browser_failures.expect_offline(owner):
+    with browser_failures.expect_offline(owner, max_ping_count=3):
         owner.offline = True
         _main_submit(info).click()
         expect(_main_submit(info)).to_contain_text("Queued Sync")
         wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
-    collaborator.page.goto(page.url)
-    expect(collaborator.locate("[lp-view]")).to_have_attribute("initialized", "")
-    collaborator_info = collaborator.locate(Page.INFO_FORM)
-    expect(collaborator_info).to_have_attribute("rendered", "")
-    _fill_form_element(
-        collaborator_info,
-        "[id^='sync-text-renderer-']",
-        saved_value,
-    )
-    with expect_successful_response(
-        collaborator.page,
-        method="PUT",
-        path=f"/pages/{page.key}/update",
-        entity_key=page.key,
-    ):
-        _main_submit(collaborator_info).click()
-    expect(collaborator_info.locator("input[name='sync-text']")).to_have_value(
-        saved_value
-    )
+        collaborator.page.goto(page.url)
+        expect(collaborator.locate("[lp-view]")).to_have_attribute("initialized", "")
+        collaborator_info = collaborator.locate(Page.INFO_FORM)
+        expect(collaborator_info).to_have_attribute("rendered", "")
+        _fill_form_element(
+            collaborator_info,
+            "[id^='sync-text-renderer-']",
+            saved_value,
+        )
+        with expect_successful_response(
+            collaborator.page,
+            method="PUT",
+            path=f"/pages/{page.key}/update",
+            entity_key=page.key,
+        ):
+            _main_submit(collaborator_info).click()
+        expect(collaborator_info.locator("input[name='sync-text']")).to_have_value(
+            saved_value
+        )
 
-    with owner.page.expect_response("**/pages/*/update", timeout=15000):
-        owner.offline = False
+        with owner.page.expect_response("**/pages/*/update", timeout=15000):
+            owner.offline = False
 
     marker = info.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
@@ -254,6 +255,11 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
     saved_choice = modal.locator("[data-revision-source='server']").filter(
         has_text=saved_value
     )
+    queued_choice = modal.locator("[data-revision-source='local']").filter(
+        has_text=queued_value
+    )
+    expect(queued_choice).to_have_attribute("aria-checked", "true")
+    saved_choice.click()
     expect(saved_choice).to_have_attribute("aria-checked", "true")
     modal.get_by_role("button", name="Use selected values").click()
 

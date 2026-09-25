@@ -139,6 +139,11 @@ def test_browser_review_capture_cleans_failed_folder(
     review_dir = tmp_path / "failed-review"
     monkeypatch.setenv("FLASK_ENV", "tooling-test")
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "isolated-home")
+    monkeypatch.setattr(
+        browser_review,
+        "SETTINGS",
+        types.SimpleNamespace(test_config={"BASE_URL": "http://127.0.0.1:9876"}),
+    )
 
     def fake_create_review_dir(name):
         (review_dir / "screenshots").mkdir(parents=True)

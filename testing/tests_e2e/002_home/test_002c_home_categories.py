@@ -41,7 +41,6 @@ from testing.elements import (
     FormElements,
     Link,
     Modal,
-    SpinnerButtons,
 )
 from testing.utility.network import browser_fetch, expect_successful_response
 from testing.utility.live_ai import submit_live_ai
@@ -63,18 +62,20 @@ def _create_category(user, home, definition, *, results=None, browser_failures=N
 
     def manual_submit():
         with expect_successful_response(user.page, method="POST", path="/categories/create") as response:
-            SpinnerButtons.CREATE.click(create_form)
+            create_form.get_by_role("button", name="Create Category", exact=True).click()
         return response.value
 
     if definition.description_for_ai:
         def fallback():
             create_form.locator(Buttons.MANUAL_MODE).click()
-            create_form.locator(FormElements.NAME).fill(definition.name)
+            create_form.locator(FormElements.NAME).fill(definition.name or "Books quota fallback")
             results.record("alternate_verification", "Manual creation validates the same save and list workflow; AI content remains unverified.")
             return manual_submit()
         with live_ai_quota(user, "/categories/create"):
             response = submit_live_ai(
-                user, path="/categories/create", submit=lambda: SpinnerButtons.CREATE.click(create_form),
+                # A mocked quota response can finish before a spinner is observed.
+                # The response and resulting form/list state are the boundaries.
+                user, path="/categories/create", submit=lambda: create_form.get_by_role("button", name="Create Category", exact=True).click(),
                 results=results, browser_failures=browser_failures, fallback=fallback,
             )
     else:

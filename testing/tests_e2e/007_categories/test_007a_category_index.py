@@ -251,11 +251,9 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_a
 
     page_form = user.page.locator("[data-widget='PageInfo']")
     expect(page_form).to_have_attribute("data-operation", payload["operation"])
-    expect(page_form).to_have_attribute("data-deferred-lock", "form")
-    expect(page_form.locator("[data-role='deferred-progress']")).to_be_visible()
-    expect(page_form.locator("[data-role='deferred-phase']")).to_contain_text(
-        "Autofill"
-    )
+    expect(page_form).not_to_have_attribute("data-deferred-lock", "form")
+    expect(page_form.locator("[name='input-textab12']")).to_be_enabled()
+    expect(page_form.locator("[data-role='form-operation']")).to_contain_text("Autofill is running")
 
     job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
     if CONFIG.hosted_e2e_runner or live_ai_job_quota:
@@ -269,9 +267,6 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_a
         user.page.reload()
         page_form = user.page.locator("[data-widget='PageInfo']")
         expect(page_form).not_to_have_attribute("data-deferred-lock", "form")
-        expect(
-            user.page.locator("input[name='input-textab12']")
-        ).to_have_value(expected_text)
     else:
         from lagniappe.web import app as web_app
         from lagniappe.core.tools.deferred_jobs.adapters import (
@@ -282,7 +277,7 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_a
         monkeypatch.setattr(
             autofill_adapter.ai_autofill,
             "generate_autofilled_submission",
-            lambda prompt, *, entity, user: prompts.append(prompt)
+            lambda prompt, *, entity, user, schema: prompts.append(prompt)
             or {"input-textab12": expected_text},
         )
         with user.page.expect_response("**/pages/*/info/replace"):
@@ -293,6 +288,19 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_a
         assert page_name in preview
         assert expected_text in preview
         assert "input-textab12" in preview
+
+    expect(page_form.locator("[data-role='edited-message']")).to_contain_text("Autofill is complete")
+    page_form.locator("[data-role='edited-reset']").click()
+    user.page.get_by_role("button", name="Use selected values", exact=True).click()
+    expect(page_form.locator("[name='input-textab12']")).to_have_value(expected_text)
+    expect(page_form.locator("[data-role='form-operation']")).to_be_hidden()
+    page_key = job.inputs["target"]["id"]
+    before = Entities.fetch_one(page_key, request=Fetch.direct())
+    assert "input-textab12" not in before.properties.submission.value
+    with expect_successful_response(user.page, method="PUT", path=f"/pages/{page_key}/update"):
+        page_form.locator("[data-role='submit-group'] button[type='submit']").click()
+    saved = Entities.fetch_one(page_key, request=Fetch.direct())
+    assert saved.properties.submission.value["input-textab12"] == expected_text
 
 # @matrix categories : info-form update
 # @matrix web-headers : acknowledgement entity-revision local-save

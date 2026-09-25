@@ -345,6 +345,7 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_skips_primary_form_and_registers_relation
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_rejects_value_without_key
+    # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_existing_key_does_not_load_other_forms
     # @matrix category form : add duplicate-primary related-forms relation-registration validation
     def add(self, value):
         key = getattr(value, "key", None)
@@ -354,6 +355,11 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
             raise ValueError("Value must be a form")
 
         if key == self.entity.properties.form.key:
+            return False
+
+        # Ordinary Page saves re-register their attached form. Membership only
+        # needs stored keys; unrelated form entities need not be loaded.
+        if key in self.keys:
             return False
 
         if key not in [v.key for v in self.value]:

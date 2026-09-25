@@ -304,6 +304,8 @@ def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failu
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
+    page_state = json.loads(scenario.page.info_form.get_attribute("data-form-state"))
+    task = Entities.fetch_one(scenario.task.key, request=Fetch.direct())
     _assert_routes_forbidden(
         scenario.user,
         [
@@ -332,17 +334,18 @@ def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failu
             (
                 "PUT",
                 f"/pages/{page_key}/update",
-                {"role": "autofill-submit", "name": scenario.entity.page.name},
-            ),
-            (
-                "PUT",
-                f"/pages/{page_key}/update",
-                {"role": "explain", "name": scenario.entity.page.name},
+                {
+                    "role": "autofill-submit", "name": scenario.entity.page.name,
+                    "form-revision": page_state["revision"],
+                },
             ),
             (
                 "PUT",
                 f"/tasks/{task_key}/update",
-                {"explain": "autofill", "name": scenario.task.name},
+                {
+                    "role": "autofill-submit", "name": task.name,
+                    "form-revision": task.autofill_revision,
+                },
             ),
         ],
         browser_failures,

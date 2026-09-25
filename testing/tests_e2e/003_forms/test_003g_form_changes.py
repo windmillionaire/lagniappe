@@ -249,12 +249,14 @@ def test_direct_stale_generation_write_is_rejected_after_migration(get_user, mon
     resource = TaskResource(user=user)
     resource.entity = task
     user.go(resource)
+    revision = json.loads(resource.task_form.get_attribute("data-form-state"))["revision"]
     before = dict(Entities.fetch_one(task.key, request=Fetch.root()).db)
     headers = manual_mutation_headers(user.page.url, user.locate("#token").input_value())
     cookies = {cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()}
     url = f"{SETTINGS.test_config['BASE_URL']}/tasks/{task.urlsafe_key}/update"
     response = requests.put(url, headers=headers, cookies=cookies, timeout=20, data={
         "active": "TaskForm", "form-generation": "0", "quantity": "666",
+        "form-revision": revision,
     })
     assert response.status_code == 422
     assert response.headers["content-type"].startswith("text/plain")
@@ -262,6 +264,7 @@ def test_direct_stale_generation_write_is_rejected_after_migration(get_user, mon
     assert dict(Entities.fetch_one(task.key, request=Fetch.root()).db) == before
     response = requests.put(url, headers=headers, cookies=cookies, timeout=20, data={
         "active": "TaskForm", "form-generation": "1", "quantity": "12",
+        "form-revision": revision,
     })
     assert response.status_code == 200
     stored = Entities.fetch_one(task.key, request=Fetch.root())

@@ -224,7 +224,9 @@ def run_hosted_autofill(user, job, *, results, verify_submission):
         target_key = failed.inputs["target"]["id"]
         form = user.page.locator(f'form[data-operation="{failed.urlsafe_key}"]')
         button = form.get_by_role("button", name="Retry autofill", exact=True)
-        expect(button).to_be_visible()
+        # Operation polls back off to 30 seconds. The terminal poll must also
+        # reconcile the form before its retry action becomes available.
+        expect(button).to_be_visible(timeout=45_000)
         with user.page.expect_response(
             lambda response: response.request.method == "PUT"
             and urlsplit(response.url).path.endswith(f"/{target_key}/update")
