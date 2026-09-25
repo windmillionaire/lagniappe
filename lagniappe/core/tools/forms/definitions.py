@@ -470,9 +470,11 @@ def preload_definitions(records):
 
 # @testable true
 # @tests tests_unit/test_004i_form_definitions.py::test_history_html_uses_authorized_record_asset_urls
+# @tests tests_unit/test_004i_form_definitions.py::test_html_field_selection_reads_only_requested_content
 # @matrix task-completion html-field : schema-version owned-image missing-content
-def rendered_html_fields(entity, *, original=False, definition=None):
-    """Use current Task content unless its original completion was explicitly requested."""
+# @matrix html-field : authoritative-content
+def rendered_html_fields(entity, *, original=False, definition=None, only_field_id=None):
+    """Render the selected definition, optionally without reading unrelated fields."""
     if definition is None:
         definition = original_completion(entity)["definition"] if original else definition_for(entity)
     result = {}
@@ -480,6 +482,8 @@ def rendered_html_fields(entity, *, original=False, definition=None):
         if field.get("type") != "html":
             continue
         field_id = field["id"]
+        if only_field_id is not None and field_id != only_field_id:
+            continue
         if not definition.content_available:
             result[field_id] = "<p>Original static content is unavailable. Saved answers are preserved.</p>"
             continue

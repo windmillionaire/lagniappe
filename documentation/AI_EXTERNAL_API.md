@@ -16,8 +16,11 @@ permission-bounded read tools as the built-in AI workflows. Ordinary questions
 and task lookups use plan-free reads and are answered in the conversation. Only
 when the user requests saving an answer or workspace changes does the client
 create a Plan. All requests share one contract; the server derives output_kind
-from actions. Proposals require browser approval, and the API never executes
-workspace mutations or calls Lagniappe's model.
+from actions. Ordinary connections require browser approval of proposals. A
+dedicated [experiments installation](INFRA_EXPERIMENTS.md) can grant its admin
+agent the `execute_plan` tool through verified remote MCP; direct API keys
+remain on the browser review workflow. External requests do not call Lagniappe's
+model.
 
 Database operation claims and publication notifications use the shared
 `REPORT_FORMAT_VERSION`, just like report creation and availability checks.
@@ -601,7 +604,10 @@ Submitting actions saves a `ready` report and returns a compact
 receipt with the full `review_url`, shorter creator-session `preview_url`,
 `status_url`, and `proposal_fingerprint`. Present the preview and direct the
 user to review and approve it on the authenticated website. The
-external API deliberately has no `/execute` operation. The existing browser
+ordinary direct API connection cannot use `/execute`. A verified experiments
+MCP connection with `capabilities.execute_plan` may call
+`POST /api/v1/plans/{plan_id}/execute` with the submitted fingerprint and a stable
+operation ID; see [the experiments workflow](INFRA_EXPERIMENTS.md). The existing browser
 Execute control starts the normal deterministic runner and applies the exact
 validated proposal without a model call.
 
@@ -795,7 +801,8 @@ curl --fail-with-body --silent --show-error \
 ```
 
 Present the returned `preview_url` and direct the user to the authenticated
-website to review and approve the proposal there. The API performs no further
+website to review and approve the proposal there, unless the explicitly granted
+experiments `execute_plan` tool is available. Ordinary API connections perform no further
 write step. A client may fetch the plan later to observe its top-level state:
 
 ```bash

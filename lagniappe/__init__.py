@@ -188,6 +188,9 @@ class Config:
 
         for name, value in normalize_mcp_config(vars(self)).items():
             setattr(self, name, value)
+        from config.experiments import normalize_experiments_config
+        for name, value in normalize_experiments_config(vars(self)).items():
+            setattr(self, name, value)
         self.CLOUDFLARE_ACCOUNT_ID = str(
             getattr(self, "CLOUDFLARE_ACCOUNT_ID", "") or ""
         ).strip()

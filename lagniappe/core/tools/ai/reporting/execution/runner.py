@@ -1,5 +1,7 @@
 """Deterministic execution of stored AI report proposals."""
 
+from copy import deepcopy
+
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
@@ -61,7 +63,11 @@ def run_report(report, user, ensure_active=None):
     if not report.available:
         raise exceptions.ValidationError("this plan is no longer available")
     publish_pending_documents(report)
-    proposal = validate_proposal(report.proposal, allow_pending_submissions=False, user=user)
+    # Validation renders/removes authored Markdown. Keep the submitted proposal
+    # unchanged so request authorization and retries retain their original identity.
+    proposal = validate_proposal(
+        deepcopy(report.proposal), allow_pending_submissions=False, user=user
+    )
     fingerprint = proposal_fingerprint(proposal)
     existing = report.result if isinstance(report.result, dict) else {}
     if existing.get("ledger_version") == REPORT_LEDGER_VERSION:

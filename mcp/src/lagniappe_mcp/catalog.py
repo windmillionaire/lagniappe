@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import re
 from typing import Any
 
@@ -201,6 +201,17 @@ ACTOR_SCHEMA = {
             "required": ["plans"],
             "properties": {
                 "plans": {"type": "boolean"},
+                "execute_plan": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "installation": {
+            "type": "object",
+            "required": ["project", "experiments", "source_id"],
+            "properties": {
+                "project": {"type": "string"},
+                "experiments": {"type": "boolean"},
+                "source_id": {"type": ["string", "null"]},
             },
             "additionalProperties": False,
         },
@@ -981,8 +992,16 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-def build_tool_registry(catalog: dict[str, Any]) -> dict[str, ToolDefinition]:
-    tools = (*lifecycle_tools(), *catalog_tools(catalog))
+def build_tool_registry(catalog: dict[str, Any], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
+    tools = (*lifecycle_tools(), *catalog_tools(catalog), *((execution_tool(),) if execute_plan else ()))
+    if execute_plan:
+        tools = tuple(
+            replace(tool, description=tool.description.replace(
+                "Give preview_url for authenticated review, never claim a proposal was applied.",
+                "Use execute_plan with the returned fingerprint and a stable operation_id to apply it; poll get_plan for the outcome.",
+            )) if tool.name == "submit_plan" else tool
+            for tool in tools
+        )
     if len(tools) > MAX_TOOL_COUNT:
         raise TransportError(
             "catalog_too_large", "Published MCP catalog contains too many tools."
@@ -996,3 +1015,39 @@ def build_tool_registry(catalog: dict[str, Any]) -> dict[str, ToolDefinition]:
             "Published tool schemas exceed the aggregate adapter limit.",
         )
     return {tool.name: tool for tool in tools}
+
+
+# @testable true
+# @tests tests_unit/test_033_mcp_adapter.py::test_experiments_execution_is_advertised_only_when_authorized
+# @matrix mcp-adapter : product-contract
+def execution_tool() -> ToolDefinition:
+    return ToolDefinition(
+        "execute_plan",
+        "Execute an already submitted proposal on this experiments installation as its designated Administrator agent. Use the proposal_fingerprint returned by submit_plan and a stable operation_id. Retry an uncertain request with those same values; poll get_plan for outcomes and never recreate successful actions. Current permissions and the exact proposal are checked again. This applies app records, not shell commands or deployments.",
+        {
+            "type": "object",
+            "required": ["plan_id", "proposal_fingerprint", "operation_id"],
+            "properties": {
+                "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
+                "proposal_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                "operation_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"},
+            },
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "required": ["plan", "operation"],
+            "properties": {
+                "plan": SAFE_PLAN_SCHEMA,
+                "operation": {
+                    "type": "object",
+                    "required": ["id", "status"],
+                    "properties": {"id": {"type": "string"}, "status": {"type": "string"}},
+                    "additionalProperties": False,
+                },
+            },
+            "additionalProperties": False,
+        },
+        "execute_plan",
+        ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True),
+    )

@@ -7,6 +7,7 @@ import pytest
 from lagniappe.core.definitions import (
     AI,
     DeferredJobInspection,
+    DeferredJobSpec,
 )
 from lagniappe.core.tools.deferred_jobs.adapters import reports as report_adapters
 from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
@@ -271,7 +272,9 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         lambda *_args, **_kwargs: report,
     )
 
-    spec = SimpleNamespace(actor=actor, inputs={"report": report})
+    spec = DeferredJobSpec(
+        job_type=adapter.job_type, actor=actor, inputs={"report": report}
+    )
     job.authorization = adapter.authorization(spec)
     adapter.started(context)
     adapter.authorize(context)

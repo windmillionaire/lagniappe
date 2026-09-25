@@ -32,7 +32,7 @@ def _recovery_file_present(app_dir=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_only_prints_manual_deployment_steps_when_declined
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
 # @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
-def install():
+def install(*, experiments=False):
     print(ui.heading(wrap_text("Welcome to Lagniappe setup")))
     if _recovery_file_present():
         print(
@@ -63,11 +63,23 @@ def install():
 
     f = FORMATTER.initialize()
     first_install = not SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT") and not SETTINGS.APP.get("APP_URL")
+    pending_experiments = getattr(SETTINGS, "DEV", {}).get("experiments_requested", False)
+    if experiments and not first_install and not pending_experiments and not SETTINGS.APP.get("EXPERIMENTS_ENABLED"):
+        from installer.errors import SetupError
+        raise SetupError("--experiments requires a new installation.")
+    if experiments and first_install:
+        SETTINGS.DEV["experiments_requested"] = True
+        SETTINGS.save(File.DEV_YAML)
 
     from installer.create_config import set_application_defaults
 
     record_step("initialize application settings")
     set_application_defaults()
+    from installer import experiments as experiments_setup
+    experiments_enabled = experiments_setup.configure(
+        requested=experiments or pending_experiments,
+        first_install=first_install or pending_experiments,
+    )
 
     from installer import (
         admin,
@@ -124,12 +136,15 @@ def install():
         )
     else:
         optional.setup_error_monitoring()
-        if optional.configure_ai_features():
+        if not experiments_enabled and optional.configure_ai_features():
             record_step("configure AI email submissions")
             ai_email_config = ai_email.setup_ai_email()
 
     record_step("persist generated configuration")
     SETTINGS.save()
+
+    if experiments_enabled:
+        experiments_setup.prepare_toolchain()
 
     deployed = False
     consent = input(

@@ -24,6 +24,7 @@ from lagniappe.core.definitions import AI, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.measurements import timed
 
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
@@ -299,6 +300,7 @@ def _load_session_user_context(entity_identifier=None):
 # @matrix auth : fallback session-preload
 # @matrix permissions : resource-gates
 # @pair embedded-table:table-cell-expand
+@timed("auth", "context")
 def _load_request_context(entity_identifier=None):
     user, entity = _load_session_user_context(entity_identifier)
     if not user:

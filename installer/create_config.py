@@ -3,6 +3,7 @@
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 import secrets
+from config.experiments import normalize_experiments_config
 
 from runner.console import format_prompt
 from runner.context import setup_command
@@ -434,6 +435,7 @@ def verify_application_config(upgrade=False):
     f = FORMATTER.initialize()
 
     from config import constants, SETTINGS
+    normalize_experiments_config(SETTINGS.APP)
 
     required_settings = constants.REQUIRED_APPLICATION_SETTINGS
     missing_areas = list(

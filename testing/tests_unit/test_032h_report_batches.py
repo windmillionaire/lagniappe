@@ -209,8 +209,9 @@ def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
     actions = [create("category", "category")]
     for i in range(10):
         actions.extend([create("page", f"page{i}", category_action="category"),
-                        {"id": f"doc{i}", "type": "append_page_document", "data": {"page": f"$page{i}", "document": f"<p>Document {i}</p>"}}])
+                        {"id": f"doc{i}", "type": "append_page_document", "data": {"page": f"$page{i}", "document_markdown": f"Document {i}", "document": f"<p>Document {i}</p>"}}])
     state = setup_case(monkeypatch, actions)
+    submitted = deepcopy(state.report.proposal)
 
     def upload(document, *, html, ydoc):
         state.events.append("upload")
@@ -226,6 +227,10 @@ def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
     pages = [item for item in state.rows.values() if item.entity_kind == "page"]
     assert len(pages) == 10
     assert all(page.assets.get("document") for page in pages)
+    assert len([items for items in state.commits if len(items) > 1]) == 1
+    assert state.report.proposal == submitted
+    assert state.rows[state.report.urlsafe_key].proposal == submitted
+    assert runner.run_report(state.report, state.actor) == result
     assert len([items for items in state.commits if len(items) > 1]) == 1
 
 

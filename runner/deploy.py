@@ -467,6 +467,11 @@ def deploy(
     from installer.mcp import prepare_deployment, finish_deployment
 
     mcp_deployment = prepare_deployment(SETTINGS.APP, announce_progress=announce_progress)
+    if SETTINGS.APP.get("EXPERIMENTS_ENABLED"):
+        from config.experiments import normalize_experiments_config
+        from runner.experiments import source_identity
+        normalize_experiments_config(SETTINGS.APP)
+        SETTINGS.APP["EXPERIMENTS_SOURCE_ID"] = source_identity(Directory.APP.value)
     SETTINGS.save()
     if announce_progress:
         print(

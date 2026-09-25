@@ -140,3 +140,21 @@ These instructions apply to the whole repository unless a more specific
   the user asks for that detail.
 - Keep edits narrowly scoped to the user request.
 - Do not revert unrelated local changes.
+
+## Experiments Notebook
+
+- When working on `lagniappe-experiments`, the user has authorized recording
+  incidental bugs, ideas, observations, and papercuts in the app without asking
+  separately. Use that installation's MCP connection and keep the active task
+  moving; recording a note does not authorize unrelated implementation.
+- Use the [Agent Notebook](https://lagniappe-experiments.uc.r.appspot.com/categories/ahVsYWduaWFwcGUtZXhwZXJpbWVudHNyEwsSBm1vZGVscxiAgICE7IGICgw)
+  for subject Pages and [Agent Follow-up](https://lagniappe-experiments.uc.r.appspot.com/projects/ahVsYWduaWFwcGUtZXhwZXJpbWVudHNyEwsSBm1vZGVscxiAgID4wr2ECgw)
+  for the shared review queue. Read the [Notebook Guide](https://lagniappe-experiments.uc.r.appspot.com/pages/ahVsYWduaWFwcGUtZXhwZXJpbWVudHNyFgsSCWluc3RhbmNlcxiAgICYpf6fCgw)
+  for the capture and decision conventions.
+- Prefer a short Task on the relevant subject Page, using the Bug, Idea, or
+  Observation model task. Use Inbox when the subject is unclear. Check existing
+  active and completed notes, distinguish suspected issues from verified facts,
+  link evidence, and omit arbitrary deadlines or recurrence.
+- Preserve dated decisions and outcomes before completing notes. Keep secrets
+  and private session/download URLs out of the notebook. These instructions do
+  not route work from other installations into the experiments app.

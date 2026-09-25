@@ -38,7 +38,9 @@ def html_field(key, field_id, **kwargs):
         request=Fetch.direct(),
     )
     if isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
-        return responses.document_html(rendered_html_fields(entity).get(field_id, ""))
+        return responses.document_html(
+            rendered_html_fields(entity, only_field_id=field_id).get(field_id, "")
+        )
     form = entity if isinstance(entity, Entities.FORM) else entity.form
     html = form.get_html_field(field_id) if form else None
     return responses.document_html(

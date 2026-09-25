@@ -371,6 +371,55 @@ class _WorkflowREST:
         return None
 
 
+# @source mcp/src/lagniappe_mcp/catalog.py::build_tool_registry
+# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+# @matrix mcp-adapter : product-contract
+@pytest.mark.parametrize("allowed", [False, True])
+def test_experiments_execution_is_advertised_only_when_authorized(allowed):
+    class ExperimentsREST(_WorkflowREST):
+        revoked = False
+
+        async def startup(self):
+            discovery, actor, catalog = await super().startup()
+            actor["capabilities"]["execute_plan"] = allowed
+            actor["installation"] = {"project": "experiments-project", "experiments": True, "source_id": "d" * 64}
+            return discovery, actor, catalog
+
+        async def request_json(self, method, target, *, body=None, **kwargs):
+            if target.endswith("/execute"):
+                self.requests.append((method, target, body))
+                if self.revoked:
+                    raise TransportError("execution_disabled", "Execution is no longer enabled.")
+                return {"plan": _plan(), "operation": {"id": body["operation_id"], "status": "queued"}}, "execute-request"
+            return await super().request_json(method, target, body=body, **kwargs)
+
+    async def exercise():
+        rest = ExperimentsREST()
+        adapter = LagniappeAdapter(ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=rest)
+        await adapter.initialize()
+        assert ("execute_plan" in adapter.tools) is allowed
+        arguments = {"plan_id": "abcdefghijkl", "proposal_fingerprint": "f" * 64, "operation_id": "experiment-setup-1"}
+        if not allowed:
+            with pytest.raises(KeyError):
+                await adapter.execute("execute_plan", arguments)
+            assert rest.requests == []
+            return
+        result = await adapter.execute("execute_plan", arguments)
+        assert result.value["operation"] == {"id": "experiment-setup-1", "status": "queued"}
+        assert rest.requests == [("POST", "plans/abcdefghijkl/execute", {"proposal_fingerprint": "f" * 64, "operation_id": "experiment-setup-1"})]
+        assert "contract_url" not in result.value["plan"]
+        for overrides in ({"operation_id": ""}, {"proposal_fingerprint": "changed"}, {"operation_id": "arbitrary/path"}):
+            with pytest.raises(SchemaError):
+                await adapter.execute("execute_plan", {**arguments, **overrides})
+        assert len(rest.requests) == 1
+        rest.revoked = True
+        with pytest.raises(TransportError, match="no longer enabled"):
+            await adapter.execute("execute_plan", arguments)
+        assert len(rest.requests) == 2
+
+    asyncio.run(exercise())
+
+
 # @pair mcp-adapter:product-contract
 def test_schema_rejects_dangling_refs_and_non_finite_json() -> None:
     with pytest.raises(SchemaError, match="dangling"):

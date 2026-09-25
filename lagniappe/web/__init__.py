@@ -68,6 +68,9 @@ app = Flask(
 )
 configure_flask_security(app)
 
+from .experiments import initialize_measurements
+initialize_measurements(app, CONFIG)
+
 csrf = CSRFProtect()
 csrf.init_app(app)
 initialize_app(app, csrf)

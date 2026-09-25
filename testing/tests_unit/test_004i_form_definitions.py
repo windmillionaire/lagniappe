@@ -341,8 +341,42 @@ def test_history_html_uses_authorized_record_asset_urls():
         assert "/assets/completion-key/form-generation/0/image_intro_photo.png" in html
         assert "/assets/snapshot/" not in html
         assert "Original" in html
+        assert definitions.rendered_html_fields(record, only_field_id="intro") == {"intro": html}
         source.content_available = False
         assert "unavailable" in definitions.rendered_html_fields(record)["intro"]
+        assert "unavailable" in definitions.rendered_html_fields(record, only_field_id="intro")["intro"]
+
+
+# @matrix html-field : authoritative-content
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["task", "task_history"])
+def test_html_field_selection_reads_only_requested_content(kind):
+    record = _record(kind=kind, completed=kind == "task_history", generation=1)
+    reads = []
+
+    def read(field_id):
+        reads.append(field_id)
+        return {"intro": "<p>Welcome</p><script>untrusted()</script>",
+                "other": "<p>Other section</p>"}[field_id]
+
+    record.form.schema = [
+        {"id": "intro", "type": "html"},
+        {"id": "other", "type": "html"},
+        {"id": "answer", "type": "input"},
+    ]
+    record.form.get_html_field = read
+    record.form.assets = {}
+    selected = definitions.rendered_html_fields(record, only_field_id="intro")
+    assert selected == {"intro": "<p>Welcome</p>"}
+    assert reads == ["intro"], "A single-field response must not read unrelated content"
+    reads.clear()
+    for field_id in ("missing", "answer", ""):
+        assert definitions.rendered_html_fields(record, only_field_id=field_id) == {}
+    assert reads == [], "Unknown and non-HTML fields must not cause content reads"
+    assert definitions.rendered_html_fields(record) == {
+        "intro": "<p>Welcome</p>", "other": "<p>Other section</p>",
+    }
+    assert reads == ["intro", "other"], "Full original/history responses still need all sections"
 
 
 # @source lagniappe/core/entities/task.py::Task.complete

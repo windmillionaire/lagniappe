@@ -166,6 +166,8 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @matrix deferred-jobs : compare-and-set dispatch-worker-race mismatch no-apply operation-fingerprint start transactional-start transient-dispatch
     # @pair notifications:pending-state
     def start(self, spec):
+        from lagniappe.core.tools.measurements import link_job
+
         if not isinstance(spec, DeferredJobSpec):
             raise TypeError("DeferredJobs.start requires a DeferredJobSpec")
         adapter = self.adapter(spec.job_type)
@@ -216,6 +218,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                 or getattr(existing, "dispatch_state", None) == "delivery_pending"
             ):
                 self._sync_reconciler(required=True)
+            link_job(existing)
             return existing, existing.notification
 
         notification = None
@@ -282,7 +285,9 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                 or getattr(existing, "dispatch_state", None) == "delivery_pending"
             ):
                 self._sync_reconciler(required=True)
+            link_job(existing)
             return existing, existing.notification
+        link_job(job)
         self._sync_reconciler(
             required=True,
             control=creation.get("scheduler_control"),

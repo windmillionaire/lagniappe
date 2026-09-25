@@ -210,6 +210,39 @@ def build_openapi_document(*, app_name, server_url):
                 },
             }
         },
+        "/api/v1/plans/{plan_id}/execute": {
+            "post": {
+                "operationId": "executePlan",
+                "summary": "Execute a submitted plan on an experiments installation",
+                "description": (
+                    "Requires the designated Administrator agent, a verified remote MCP "
+                    "connection, and the installation's explicit execute_plan capability. "
+                    "Ordinary API keys cannot execute. Supply the fingerprint from submit "
+                    "and a stable operation_id; repeat the exact request after an ambiguous "
+                    "timeout, then poll getPlan. Uses the normal report execution ledger."
+                ),
+                "tags": ["Plans"],
+                "parameters": [plan_parameter],
+                "requestBody": {"required": True, **json_content({
+                    "type": "object", "additionalProperties": False,
+                    "required": ["proposal_fingerprint", "operation_id"],
+                    "properties": {
+                        "proposal_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                        "operation_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"},
+                    },
+                })},
+                "responses": {
+                    "202": {"description": "Durable operation accepted or recovered.", **json_content({
+                        "type": "object", "required": ["plan", "operation"],
+                        "properties": {
+                            "plan": {"$ref": "#/components/schemas/Plan"},
+                            "operation": {"type": "object", "required": ["id", "status"], "properties": {"id": {"type": "string"}, "status": {"type": "string"}}},
+                        },
+                    })},
+                    "default": error_response,
+                },
+            }
+        },
         "/api/v1/plans/{plan_id}": {
             "get": {
                 "operationId": "getPlan",

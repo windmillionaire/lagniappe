@@ -223,7 +223,10 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     assert july_page.properties.document.html.endswith(
         "<h1>Receipt notes</h1><ul><li>Review the total</li></ul>"
     )
-    assert "document_markdown" not in report.proposal["actions"][2]["data"]
+    # HTML is applied to the Page while the reviewed source stays unchanged.
+    assert report.proposal["actions"][2]["data"]["document_markdown"] == (
+        "# Receipt notes\n\n- Review the total"
+    )
     task_form = next(
         entity
         for entity in saved_entities

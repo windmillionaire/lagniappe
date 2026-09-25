@@ -17,6 +17,7 @@ Use the adjacent guides for configuration-producing workflows:
 | [INFRA_SETUP_RECOVERY.md](INFRA_SETUP_RECOVERY.md) | Recovery snapshot, doctor/repair, and checkout recovery. |
 | [INFRA_RUNNER.md](INFRA_RUNNER.md) | Repository-local command and gcloud/ADC boundary. |
 | [INFRA_DEPLOYMENT.md](INFRA_DEPLOYMENT.md) | Deployment, release preparation, handlers, and update/upgrade. |
+| [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md) | Opt-in experiments settings, account bootstrap, execution and measurements. |
 
 ## Fixed files
 

@@ -1,6 +1,7 @@
 """Execute authoritative mutation effects in durable-first order."""
 
 import json
+from lagniappe.core.tools.measurements import timed
 
 from ..definitions import (
     MutationEffectType,
@@ -254,6 +255,7 @@ def execute_post_commit(plan):
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
 # @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
+@timed("entity", "mutation")
 def execute_mutation(plan, *, guards=None):
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):

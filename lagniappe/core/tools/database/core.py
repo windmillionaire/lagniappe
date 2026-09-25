@@ -123,6 +123,10 @@ class DataServices:
         client_kwargs["credentials"] = credentials
         self._datastore_client = datastore.Client(**client_kwargs)
         self._storage_client = storage.Client(**client_kwargs)
+        if CONFIG.EXPERIMENTS_ENABLED and CONFIG.EXPERIMENTS_DIAGNOSTICS != "off":
+            from lagniappe.core.tools.measurements import instrument_datastore, instrument_storage
+            instrument_datastore(self._datastore_client)
+            instrument_storage(self._storage_client)
 
     @property
     def datastore(self):

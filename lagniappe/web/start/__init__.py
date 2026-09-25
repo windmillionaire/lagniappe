@@ -17,6 +17,8 @@ def initialize_app(app, csrf):
 
     ai.initialize()
     entities.initialize()
+    from lagniappe.core.tools.experiments import bootstrap
+    bootstrap()
 
     jinja.initialize(app)
     errors.initialize(app)

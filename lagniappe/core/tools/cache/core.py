@@ -21,12 +21,16 @@ from .keys import HELP_PREFIX, SEARCH_SCORE_FIELD, Keys, Search
 # @matrix cache : redis-connection redis-tls
 def _create_redis_client(settings=CONFIG):
     """Create the shared runtime Redis client from application settings."""
-    return redis.Redis(
+    client = redis.Redis(
         **redis_client_kwargs(
             settings,
             decode_responses=False,
         )
     )
+    if getattr(settings, "EXPERIMENTS_ENABLED", False) and settings.EXPERIMENTS_DIAGNOSTICS != "off":
+        from lagniappe.core.tools.measurements import instrument_redis
+        instrument_redis(client)
+    return client
 
 
 # @testable false

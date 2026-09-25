@@ -22,6 +22,7 @@ class _SetupArgumentParser(argparse.ArgumentParser):
 # @matrix setup : argument-validation cli-routing
 def _parser():
     parser = _SetupArgumentParser(description="Lagniappe setup")
+    parser.add_argument("--experiments", action="store_true", help="Create a dedicated experiments installation with an Administrator agent")
     commands = parser.add_subparsers(
         dest="command",
         metavar="COMMAND",
@@ -357,7 +358,7 @@ def _dispatch(args):
 
     from installer.install import install
 
-    return install()
+    return install(experiments=True) if getattr(args, "experiments", False) else install()
 
 
 # @testable true
@@ -368,6 +369,8 @@ def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = _parser()
     args = parser.parse_args(arguments)
+    if args.experiments and args.command:
+        parser.error("--experiments is an installation option; later commands retain the saved setting")
     if args.command == "archive":
         if args.archive_target == "validate":
             if not args.validation_path:

@@ -32,6 +32,7 @@ test_roots:
   - testing/tests_tooling/test_001i_setup_monitoring.py
   - testing/tests_tooling/test_001j_setup_ai_mcp.py
   - testing/tests_tooling/test_001k_setup_console.py
+  - testing/tests_tooling/test_001l_setup_experiments.py
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_004_reports.py
   - testing/tests_tooling/test_005_test_server_command.py
@@ -61,6 +62,7 @@ annotated_source_roots:
   - config/form_schema.py
   - config/public_pages.py
   - config/remote_mcp.py
+  - config/experiments.py
   - testing/utility/runtime_outbound_http.py
   - testing/utility/hosted_deferred_jobs.py
   - testing/utility/hosted_e2e_job.py
@@ -72,6 +74,7 @@ annotated_source_roots:
   - runner/terminal.py
   - runner/adc.py
   - runner/deploy.py
+  - runner/experiments.py
   - runner/development.py
   - runner/frontend_build.py
   - runner/gcloud.py
@@ -91,6 +94,7 @@ annotated_source_roots:
   - lagniappe/core/exceptions
   - lagniappe/web/__init__.py
   - lagniappe/web/auth.py
+  - lagniappe/web/experiments.py
   - lagniappe/web/deferred_autofill.py
   - lagniappe/web/direct_uploads.py
   - lagniappe/web/responses.py

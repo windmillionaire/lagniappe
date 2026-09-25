@@ -156,6 +156,9 @@ save mutation publishes staged content with the schema. Raw model `html`, non-st
 static content on generated Page forms, and static fields in additive report
 schema updates are rejected. Existing stored sidecars are not migrated; Form
 read projections apply the Form-content policy before browser `innerHTML` use.
+Single-field Task and TaskHistory HTML requests render only the requested field,
+using the same current or historical definition and sanitization rules. Complete
+original-submission responses still render all static sections.
 
 `tools/forms/drafts.py` validates builder drafts and guards every ordinary Form
 save against removal or representation changes to saved fields, options, and
