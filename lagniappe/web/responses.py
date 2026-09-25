@@ -854,7 +854,7 @@ def home_section(section):
 # @covered-by lagniappe/web/routes/tasks/main.py::update
 # @reason route response adapter is exercised through its owning task mutation
 def home_task_list():
-    home = Entities.HOME()
+    home = Entities.HOME(user=current_user._get_current_object())
     template = get_template_attribute("home/tasks.html", "list")
     task_list_html = template(home.section("tasks"))
 

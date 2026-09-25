@@ -397,6 +397,9 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
     """TaskIndex coordinates dated/undated task streams and row append URLs."""
     project = TestEntities.get("PROJECT", {"name": "Project", "hash": "prj010"})
     user = SimpleNamespace(
+        is_authenticated=True,
+        is_owner=True,
+        has_permission=lambda resource, action: True,
         properties=SimpleNamespace(restrictions=SimpleNamespace(task=["cat010"]))
     )
     dated_task = TestEntities.get(

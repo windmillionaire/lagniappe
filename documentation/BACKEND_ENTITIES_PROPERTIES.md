@@ -24,6 +24,11 @@ consumers use the property object itself.
 Do not use truthiness to decide whether a field was loaded or submitted. Use
 `is_set`, `value`, and the property's normalization contract.
 
+Home list sections are separate from the entity `Property` hierarchy. Their
+`HomeProperty` constructor requires `user=viewer`; Home binds that user into
+each section factory. Queries, visibility checks, and counts use the bound
+user instead of Flask-Login or a mutable test default.
+
 Entity descriptions and file summaries strip HTML tags while preserving internal
 line breaks, blank lines, and spacing from textarea input. File summaries also
 trim surrounding whitespace. The shared `strip_tags()` helper still collapses

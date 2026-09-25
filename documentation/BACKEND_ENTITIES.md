@@ -175,10 +175,24 @@ for Tasks and Users so their Page/Form dependencies are resolved), and
 publish cursors used by lazy row routes. Task pages combine two ordered query
 streams: due-dated tasks first, then undated tasks by recent modification.
 
+Pass `user=viewer` when constructing an index outside an ordinary browser
+request. Query restrictions and final entity visibility checks use that same
+viewer, including related Form categories/projects and User groups. The omitted
+user compatibility path resolves the request/test user at construction. Treat
+each populated index as scoped to one viewer; changing its user does not clear
+cached results.
+
 User table rows use their Page's key, hash, and cached fingerprint. The User
 still supplies columns and authorization. A changed Users collection revision
 refreshes those columns, including User-only fields such as groups and last login;
 an unchanged collection compares the existing Page projections in cache.
+
+`Entities.HOME(user=viewer)` requires an explicit non-`None` user. Browser
+routes resolve the concrete Flask-Login user before construction. Lazy sections
+such as `home.tasks` and fresh `home.section("tasks", cursor=...)` sections
+inherit that viewer for queries, permissions, and counts. The section method
+accepts a cursor, not a user override. Home lists can be exercised without a
+Flask request; their web routes retain authentication and public-user policy.
 
 ## Package imports
 

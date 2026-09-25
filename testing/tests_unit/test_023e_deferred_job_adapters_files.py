@@ -12,6 +12,8 @@ from lagniappe.core.definitions import (
     DeferredJobType,
 )
 from lagniappe.core.entities import Entities
+from lagniappe.core import exceptions
+from testing.utility.test_entities import TestEntities
 from lagniappe.core.tools.deferred_jobs.adapters import files as file_adapters
 from lagniappe.core.tools.deferred_jobs.errors import (
     DeferredJobDependencyFailedError,
@@ -21,6 +23,33 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.tools.files import extract as file_extract
 
 pytestmark = pytest.mark.unit
+
+
+# @matrix deferred-jobs file : authorization explicit-actor
+@pytest.mark.parametrize("permission", ["VIEW", "EDIT"])
+def test_file_adapter_requires_edit_permission_from_explicit_actor(permission):
+    actor = TestEntities.get(
+        "USER",
+        {
+            "hash": "file-worker",
+            "permissions": {"file-page": permission},
+        },
+    )
+    file = TestEntities.get(
+        "FILE",
+        {
+            "filename": "photo.png",
+            "page": {"hash": "file-page"},
+        },
+    )
+    context = SimpleNamespace(actor=actor, input=lambda _name: file)
+    adapter = file_adapters.FileExtractAdapter()
+
+    if permission == "VIEW":
+        with pytest.raises(exceptions.ValidationError, match="permission to process"):
+            adapter.authorize(context)
+    else:
+        adapter.authorize(context)
 
 
 # @matrix deferred-jobs files : inspection loaded-input no-database-read
@@ -216,7 +245,7 @@ def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
 
 # @matrix deferred-jobs file : extraction follow-up idempotency
 def test_start_file_extraction_uses_explicit_actor_and_identity(monkeypatch):
-    actor = SimpleNamespace(urlsafe_key="actor-key")
+    actor = SimpleNamespace(urlsafe_key="actor-key", is_authenticated=True)
     file = SimpleNamespace(urlsafe_key="file-key")
     started = []
     monkeypatch.setattr(

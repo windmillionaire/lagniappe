@@ -3,6 +3,90 @@ from types import SimpleNamespace
 import pytest
 
 import lagniappe.core.properties.home as home_properties
+from lagniappe import CONFIG
+from lagniappe.core.entities.home import Home
+from testing.utility.mock_restrictions import MockRestrictions
+from testing.utility.test_entities import TestEntities
+
+
+# @matrix home : explicit-user validation
+@pytest.mark.unit
+@pytest.mark.parametrize("constructor", [Home, home_properties.HomeProperty])
+def test_home_requires_explicit_user(constructor):
+    with pytest.raises(TypeError, match="user"):
+        constructor()
+    with pytest.raises(ValueError, match="requires a user"):
+        constructor(user=None)
+
+
+# @source lagniappe/core/properties/home.py::TaskList
+# @source lagniappe/core/properties/home.py::PageList
+# @matrix home : explicit-user pagination count permissions
+@pytest.mark.unit
+def test_home_sections_keep_their_viewer_across_lazy_and_paginated_reads(monkeypatch):
+    tasks = [
+        TestEntities.get(
+            "TASK",
+            {
+                "hash": f"task-{suffix}",
+                "page": {"hash": f"page-{suffix}"},
+            },
+        )
+        for suffix in ("a", "b")
+    ]
+    pages = [task.page for task in tasks]
+    viewers = [
+        TestEntities.get(
+            "USER",
+            {
+                "hash": f"viewer-{suffix}",
+                "page": {"hash": f"viewer-page-{suffix}"},
+                "permissions": {f"page-{suffix}": "VIEW"},
+            },
+        )
+        for suffix in ("a", "b")
+    ]
+    monkeypatch.setattr(CONFIG, "TEST_CURRENT_USER", None)
+    monkeypatch.setattr(
+        home_properties.database_get, "due_tasks", lambda **_kwargs: tasks
+    )
+    monkeypatch.setattr(
+        home_properties.database_get,
+        "recent_pages",
+        lambda **_kwargs: SimpleNamespace(
+            results=[page.key for page in pages],
+            next_cursor="next-page",
+        ),
+    )
+    monkeypatch.setattr(
+        home_properties.Entities,
+        "fetch",
+        lambda *_args, **_kwargs: (
+            [*tasks, *pages] if _args and hasattr(_args[0], "db") else pages
+        ),
+    )
+    counts = {viewers[0].page.key: 2, viewers[1].page.key: 7}
+    monkeypatch.setattr(
+        home_properties.database_get, "user_task_count", lambda page: counts[page.key]
+    )
+    first, second = [Home(user=viewer) for viewer in viewers]
+
+    with MockRestrictions().patch_cache():
+        assert first.tasks.list == [tasks[0]]
+        assert second.tasks.list == [tasks[1]]
+        assert first.tasks.count == 2
+        assert second.tasks.count == 7
+        assert first.pages.list == [pages[0]]
+        assert second.pages.list == [pages[1]]
+        assert second.section("tasks").list == [tasks[1]]
+        next_pages = first.section("pages", cursor="previous-page")
+        assert next_pages.back is True
+        assert next_pages.list == [pages[0]]
+        assert next_pages.cursor == "next-page"
+        assert first.tasks.list == [tasks[0]]
+
+    with pytest.raises(TypeError, match="user"):
+        first.section("tasks", user=viewers[1])
 
 
 # @matrix home : pagination projects restrictions
@@ -18,17 +102,18 @@ def test_home_project_list_restrictions_and_cursor(monkeypatch):
 
     def get_models(kind, **kwargs):
         model_requests.append((kind, kwargs))
-        return SimpleNamespace(results=["project-1", "project-2"], next_cursor="next-page")
+        return SimpleNamespace(
+            results=["project-1", "project-2"], next_cursor="next-page"
+        )
 
     def wrap_project(model):
         project_wrapped.append(model)
         return SimpleNamespace(key=f"wrapped-{model}")
 
-    monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.database_get, "models", get_models)
     monkeypatch.setattr(home_properties.Entities, "PROJECT", wrap_project)
 
-    section = home_properties.ProjectList(cursor="start-page")
+    section = home_properties.ProjectList(user=user, cursor="start-page")
     projects = section.list
 
     assert model_requests == [
@@ -75,11 +160,10 @@ def test_home_category_list_restrictions_and_cursor(monkeypatch):
         fetch_requests.append((models, request))
         return categories
 
-    monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.database_get, "models", get_models)
     monkeypatch.setattr(home_properties.Entities, "fetch", fetch_categories)
 
-    section = home_properties.CategoryList(cursor="category-start")
+    section = home_properties.CategoryList(user=user, cursor="category-start")
     loaded_categories = section.list
 
     assert model_requests == [
@@ -109,8 +193,8 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
             self.visible = visible
             self.allowed_actions = []
 
-        def allowed(self, action):
-            self.allowed_actions.append(action)
+        def allowed(self, action, *, user):
+            self.allowed_actions.append((action, user))
             return self.visible
 
     user = SimpleNamespace(
@@ -134,11 +218,10 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
         load_requests.append((keys, request))
         return pages
 
-    monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.database_get, "recent_pages", recent_pages)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
 
-    section = home_properties.PageList(cursor="p1")
+    section = home_properties.PageList(user=user, cursor="p1")
     visible_pages = section.list
 
     assert page_requests == [
@@ -152,9 +235,9 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
     ]
     assert visible_pages == [pages[0], pages[2]]
     assert [page.allowed_actions for page in pages] == [
-        [home_properties.Action.VIEW],
-        [home_properties.Action.VIEW],
-        [home_properties.Action.VIEW],
+        [(home_properties.Action.VIEW, user)],
+        [(home_properties.Action.VIEW, user)],
+        [(home_properties.Action.VIEW, user)],
     ]
     assert section.cursor == "p2"
     assert section.back is True
@@ -171,8 +254,8 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
             self.visible = visible
             self.allowed_actions = []
 
-        def allowed(self, action):
-            self.allowed_actions.append(action)
+        def allowed(self, action, *, user):
+            self.allowed_actions.append((action, user))
             return self.visible
 
     user = SimpleNamespace(
@@ -208,14 +291,13 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
         count_requests.append(page)
         return 7
 
-    monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.database_get, "due_tasks", due_tasks)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
     monkeypatch.setattr(
         home_properties.database_get, "user_task_count", user_task_count
     )
 
-    section = home_properties.TaskList()
+    section = home_properties.TaskList(user=user)
     visible_tasks = section.list
 
     assert due_requests == [
@@ -237,9 +319,9 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     ]
     assert visible_tasks == [tasks[0], tasks[2]]
     assert [task.allowed_actions for task in tasks] == [
-        [home_properties.Action.VIEW],
-        [home_properties.Action.VIEW],
-        [home_properties.Action.VIEW],
+        [(home_properties.Action.VIEW, user)],
+        [(home_properties.Action.VIEW, user)],
+        [(home_properties.Action.VIEW, user)],
     ]
     assert section.list is visible_tasks
     assert section.count == 7
@@ -286,7 +368,6 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
         loaded_requests.append((keys, request))
         return [FakeEntity(key) for key in keys if key != stale_key]
 
-    monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
     monkeypatch.setattr(
         home_properties.database_get,
@@ -294,7 +375,7 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
         lambda key: f"urlsafe:{key}",
     )
 
-    section = home_properties.StarredList()
+    section = home_properties.StarredList(user=user)
     loaded = section.list
 
     assert loaded_requests == [
@@ -321,7 +402,7 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
         for entity in loaded
     )
 
-    next_section = home_properties.StarredList(cursor="1")
+    next_section = home_properties.StarredList(user=user, cursor="1")
     next_loaded = next_section.list
 
     assert loaded_requests == [
@@ -346,7 +427,7 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
 
         def allowed(self, action, user=None):
             assert action is home_properties.Action.VIEW
-            assert user is current_user
+            assert user is viewer
             return self.visible
 
     class FakeStarred:
@@ -360,7 +441,7 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
             self.keys = [key for key in self.keys if key not in keys]
 
     starred = FakeStarred()
-    current_user = SimpleNamespace(
+    viewer = SimpleNamespace(
         properties=SimpleNamespace(starred=starred),
         save=lambda: None,
     )
@@ -372,7 +453,6 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
         load_requests.append((keys, request))
         return [visible, restricted]
 
-    monkeypatch.setattr(home_properties, "current_user", current_user)
     monkeypatch.setattr(
         home_properties.Entities,
         "fetch",
@@ -384,7 +464,7 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
         lambda key: f"urlsafe:{key}",
     )
 
-    section = home_properties.StarredList()
+    section = home_properties.StarredList(user=viewer)
 
     assert section.list == [visible]
     placeholders = [item for item in section.items if "entity" not in item]
@@ -433,7 +513,6 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
         load_requests.append((keys, request))
         return [SimpleNamespace(key=key) for key in keys]
 
-    monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.database_get, "notes", get_notes)
     monkeypatch.setattr(
         home_properties.database_get, "ingress_files", get_ingress_files
@@ -441,9 +520,9 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     monkeypatch.setattr(home_properties.database_get, "ai_reports", get_ai_reports)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
 
-    note_section = home_properties.NoteList()
-    ingress_section = home_properties.IngressList()
-    tools_section = home_properties.ToolsList()
+    note_section = home_properties.NoteList(user=user)
+    ingress_section = home_properties.IngressList(user=user)
+    tools_section = home_properties.ToolsList(user=user)
     notes = note_section.list
     ingress_files = ingress_section.list
     reports = tools_section.list

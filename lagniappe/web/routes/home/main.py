@@ -26,7 +26,7 @@ from . import home, internal
 @home.route("/")
 @home_permission(anonymous_endpoint="home.public_directory")
 def home_page():
-    home = Entities.HOME()
+    home = Entities.HOME(user=current_user._get_current_object())
     return responses.home_page(home)
 
 
@@ -42,8 +42,8 @@ def home_page():
 def get(kind):
     if kind == "tools" and getattr(current_user, "is_public", False):
         abort(403)
-    home = Entities.HOME()
-    section = home.section(kind, **request.args)
+    home = Entities.HOME(user=current_user._get_current_object())
+    section = home.section(kind, cursor=request.args.get("cursor"))
     if kind == "tools":
         render_operation_statuses(section.list, current_user)
 
@@ -65,7 +65,7 @@ def get(kind):
 @internal.route("/activity")
 @home_permission()
 def activity():
-    home = Entities.HOME()
+    home = Entities.HOME(user=current_user._get_current_object())
     return responses.activity(home.section("notes"))
 
 

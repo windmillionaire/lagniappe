@@ -102,6 +102,8 @@ class TaskIndex(Index):
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @matrix task-index : pagination restrictions undated
     # @pair task-index:assignee-visibility
+    # @tests tests_unit/test_010b_index_user_scope.py::test_task_index_visibility_uses_explicit_viewer
+    # @matrix task-index : explicit-user permissions
     def undated_tasks(self):
         db = database_get.tasks_without_due_dates(
             start_cursor=self.cursor,
@@ -123,7 +125,7 @@ class TaskIndex(Index):
                 *db.results,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
-            if task.allowed(Action.VIEW)
+            if task.allowed(Action.VIEW, user=self.user)
         ]
 
     # @testable true
@@ -131,6 +133,8 @@ class TaskIndex(Index):
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @matrix task-index : dated pagination restrictions undated
     # @pair task-index:assignee-visibility
+    # @tests tests_unit/test_010b_index_user_scope.py::test_task_index_visibility_uses_explicit_viewer
+    # @matrix task-index : explicit-user permissions
     def dated_tasks(self):
         db = database_get.tasks_with_due_dates(
             start_cursor=self.cursor,
@@ -153,7 +157,7 @@ class TaskIndex(Index):
                 *db.results,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
-            if task.allowed(Action.VIEW)
+            if task.allowed(Action.VIEW, user=self.user)
         ]
 
     # @testable true
@@ -238,6 +242,8 @@ class PageIndex(Index):
     # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_restricted_page_is_not_listed_for_outsider_on_category_index
     # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
     # @matrix pages : access-restrictions cursor-pagination index-filter
+    # @tests tests_unit/test_010b_index_user_scope.py::test_page_index_visibility_uses_explicit_viewer
+    # @matrix pages : explicit-user permissions
     @property
     def pages(self):
         if self._pages is not None:
@@ -257,7 +263,7 @@ class PageIndex(Index):
         self._pages = [
             page
             for page in Entities.fetch(*db.results, request=Fetch.direct())
-            if page.allowed(Action.VIEW)
+            if page.allowed(Action.VIEW, user=self.user)
         ]
 
         self.append = (
@@ -308,6 +314,10 @@ class FormIndex(Index):
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_lists_forms_but_hides_create_without_forms_create
     # @matrix forms : index-filter index-view
+    # @tests tests_unit/test_010b_index_user_scope.py::test_form_index_visibility_uses_explicit_viewer
+    # @matrix forms : explicit-user permissions
+    # @tests tests_unit/test_010b_index_user_scope.py::test_form_index_related_models_use_explicit_viewer
+    # @pair forms:related-entities
     @property
     def forms(self):
         if self._forms is not None:
@@ -328,7 +338,7 @@ class FormIndex(Index):
             for e in entities
             if isinstance(e, Entities.FORM)
             and not e.db.get("reserved")
-            and e.allowed(Action.VIEW)
+            and e.allowed(Action.VIEW, user=self.user)
         ]
 
         loaded_categories = [e for e in entities if isinstance(e, Entities.CATEGORY)]
@@ -340,7 +350,7 @@ class FormIndex(Index):
                 for e in loaded_categories
                 if (e.form and e.form.key == f.key)
                 or f.key in e.properties.forms.keys
-                and e.allowed(Action.VIEW)
+                and e.allowed(Action.VIEW, user=self.user)
             ]
             f.projects = [
                 p
@@ -349,7 +359,7 @@ class FormIndex(Index):
                     for e in loaded_model_tasks
                     if e.project and e.form and e.form.key == f.key
                 }.values()
-                if p.allowed(Action.VIEW)
+                if p.allowed(Action.VIEW, user=self.user)
             ]
 
         self.cursor = db.next_cursor
@@ -513,6 +523,8 @@ class UserIndex(Index):
     # @testable true
     # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
     # @matrix user-index : groups restrictions
+    # @tests tests_unit/test_010b_index_user_scope.py::test_user_index_groups_use_explicit_viewer
+    # @matrix user-index : explicit-user permissions
     @property
     def groups(self):
         if getattr(self, "_groups", None):
@@ -531,7 +543,7 @@ class UserIndex(Index):
         self._groups = [
             g
             for g in Entities.fetch(*groups, request=Fetch.direct())
-            if isinstance(g, Entities.USER_GROUP) and g.allowed(Action.VIEW)
+            if isinstance(g, Entities.USER_GROUP) and g.allowed(Action.VIEW, user=self.user)
         ]
 
         return self._groups

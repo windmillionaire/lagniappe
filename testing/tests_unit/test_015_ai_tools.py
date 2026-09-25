@@ -3707,12 +3707,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     started = []
-    actor = SimpleNamespace()
-    monkeypatch.setattr(
-        summarize,
-        "current_user",
-        SimpleNamespace(_get_current_object=lambda: actor),
-    )
+    actor = SimpleNamespace(is_authenticated=True)
     monkeypatch.setattr(
         DeferredJobs,
         "start",
@@ -3723,7 +3718,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert summarize.can_summarize_file(office_file) is True
     assert summarize.can_summarize_file(unsupported) is False
 
-    queued_summary = summarize.summarize_file(office_file)
+    queued_summary = summarize.summarize_file(office_file, actor=actor)
     assert queued_summary is office_file.properties.summarize
     assert queued_summary.status == "Summarizing file..."
     assert started[0].inputs == {"file": office_file}
@@ -3732,7 +3727,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert started[0].delay_seconds == 10
     assert len(started) == 1
 
-    result = summarize.summarize_file(unsupported)
+    result = summarize.summarize_file(unsupported, actor=actor)
 
     assert result.error == "Unsupported file type."
 

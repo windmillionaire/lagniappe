@@ -20,7 +20,7 @@ from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_upda
 from lagniappe.web import app
 from testing.definitions import SitePages, Uploads, Users
 from testing.definitions.user_definitions import UserDefinition
-from testing.elements import Buttons, List, Modal
+from testing.elements import List, Modal
 from testing.resources import Report
 from testing.utility.network import browser_fetch, expect_successful_response
 from testing.utility.polling import expect_poll_result
@@ -36,13 +36,11 @@ def _owner(user):
     return Entities.USER.load(user.email)
 
 
-def _tool_route_status(user, path):
+def _empty_tool_request(user, path):
     return user.page.evaluate(
         """async (path) => {
             const send = async () => {
                 const body = new FormData();
-                body.set("role", "explain");
-                body.set("instructions", "Explain the generated prompt.");
                 return fetch(path, {
                     method: "POST",
                     credentials: "include",
@@ -62,7 +60,7 @@ def _tool_route_status(user, path):
                 if (tokenElt) tokenElt.value = token;
                 response = await send();
             }
-            return response.status;
+            return {status: response.status, text: await response.text()};
         }""",
         path,
     )
@@ -534,10 +532,10 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         creator=owner,
     )
 
-    for tier, expected_statuses in (
-        (AI.NONE, (403,)),
-        (AI.ASK, (200,)),
-        (AI.CREATE, (200,)),
+    for tier, expected_status in (
+        (AI.NONE, 403),
+        (AI.ASK, 422),
+        (AI.CREATE, 422),
     ):
         entity = Entities.USER.load(user.email)
         if entity.ai_access != tier.name:
@@ -591,23 +589,17 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
             expect(form.locator("[data-role='tool-switcher']")).to_have_count(0)
             expect(form.locator("[data-role='dropzone']")).to_be_visible()
 
-        statuses = []
-        for path, expected_status in zip(
-            ("/tools/ai",),
-            expected_statuses,
-            strict=True,
+        # An empty request proves authorized users reach input validation
+        # without submitting a provider job or using the retired explain action.
+        with browser_failures.expect_http_error(
+            user,
+            status=expected_status,
+            path="/tools/ai",
         ):
-            if expected_status == 403:
-                with browser_failures.expect_http_error(
-                    user,
-                    status=403,
-                    path=path,
-                ):
-                    statuses.append(_tool_route_status(user, path))
-            else:
-                statuses.append(_tool_route_status(user, path))
-        statuses = tuple(statuses)
-        assert statuses == expected_statuses
+            response = _empty_tool_request(user, "/tools/ai")
+        assert response["status"] == expected_status
+        if tier is not AI.NONE:
+            assert response["text"] == "Add files or instructions before creating a report."
 
 
 # @matrix ai-report : delete deterministic-run entitlement-independent skip-action toggle

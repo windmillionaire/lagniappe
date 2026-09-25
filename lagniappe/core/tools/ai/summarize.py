@@ -1,7 +1,5 @@
 """AI-powered file summarization with async task queue support."""
 
-from flask_login import current_user
-
 from ... import exceptions
 from ...definitions import FileConsumer, enforce_file_consumer
 from ..database import assets as storage_assets
@@ -68,18 +66,20 @@ def can_summarize_file(file):
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
 # @matrix ai : eligibility ooxml summary-prompt task-queue
 # @pair file:summary-first
+# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
+# @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
+# @matrix file deferred-jobs : explicit-actor validation
 def summarize_file(
     file,
     *,
+    actor=None,
     dispatch=True,
     parameters=None,
     idempotency_key=None,
 ):
-    """Summarize a file synchronously in dev or via task queue in production.
-
-    Args:
-        file: The file entity to summarize.
-    """
+    """Prepare summary status and optionally queue work for an explicit actor."""
+    if dispatch and not getattr(actor, "is_authenticated", False):
+        raise exceptions.ValidationError("File processing requires an authenticated actor.")
     summarize = file.properties.summarize
     eligible = can_summarize_file(file)
 
@@ -92,7 +92,7 @@ def summarize_file(
             DeferredJobs.start(
                 DeferredJobSpec(
                     job_type=DeferredJobType.FILE_SUMMARIZE,
-                    actor=current_user._get_current_object(),
+                    actor=actor,
                     inputs={"file": file},
                     parameters=dict(parameters or {}),
                     notification_body=None,

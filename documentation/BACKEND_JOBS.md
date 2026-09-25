@@ -51,6 +51,21 @@ outside the transaction. Production requires a returned Cloud Task identity.
 An explicitly disabled queue fails and runs compensation; a transient enqueue
 error leaves the durable dispatch intent for recovery.
 
+File-processing entry points pass the actor explicitly:
+`file.dispatch_pending_processing(actor=user)` runs after the File is saved
+and forwards the actor through summary/extraction dispatch into `DeferredJobSpec`.
+`summarize_file` and `get_file_text` require an authenticated actor when dispatch
+is enabled; their `dispatch=False` option-preparation paths do not require one.
+`start_file_extraction` always requires `actor`. Missing/anonymous actors are
+rejected before processing status changes or job submission. Worker extraction
+follow-ups use `context.actor` and retain their stable idempotency key.
+
+These inputs establish identity; adapters still enforce current File edit
+permission and AI entitlement during execution. Summary-before-extraction
+ordering and post-save dispatch are unchanged. Failed dispatch leaves the
+File's pending processing request available for retry. Queue transport still
+uses Flask routing, and development dispatch still uses the application context.
+
 The job is added to `site/deferred-jobs-control` in the creation transaction.
 That record tracks all queued, running, retry-wait, and delivery-pending jobs,
 plus desired/applied Scheduler state and a generation-checked synchronization
