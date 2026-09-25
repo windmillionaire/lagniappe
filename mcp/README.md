@@ -21,11 +21,16 @@ requires at least one. Classify uploads with file_usage; only organize files nee
 summary and attachment actions, while evidence files support answers directly.
 The app and MCP service use contract version 10 with no previous starter aliases.
 
-The adapter validates the full current proposal contract before submitting,
-including actions the proposal does not use. Its bounded remote-schema subset
-supports `format: date` for calendar dates; other format names remain rejected.
-When an application contract introduces a keyword or format, check it through
-the adapter's submission path as well as the application's validator.
+The API owns proposal and file-usage validation for both REST and MCP clients.
+Before submitting, the adapter reads the summary contract to verify the current
+submission target, then forwards the candidate and its supplied contract version
+unchanged. API validation codes and field paths survive the adapter's bounded,
+credential-safe error projection. `get_plan_contract` defaults to `summary`,
+matching REST; request selected actions or `view="full"` when schemas are needed.
+The adapter still validates tool envelopes, URLs, transport extensions and schemas
+it exposes. Its bounded remote-schema subset supports `format: date`; other
+format names remain rejected on schema reads. A schema for an unused action does
+not gate proposal submission.
 
 Tests live in `testing/tests_unit/test_033*.py`; live API and OAuth workflows
 live in `testing/tests_e2e/013_agent_api/`. The normal repository runner selects

@@ -208,7 +208,7 @@ class AdapterResult:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper
+# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
 # @tests tests_unit/test_033_mcp_adapter.py::test_requested_unsupported_original_is_a_bounded_tool_error
 # @tests tests_unit/test_033_mcp_adapter.py::test_requested_missing_original_is_a_bounded_tool_error
 class LagniappeAdapter:
@@ -250,7 +250,7 @@ class LagniappeAdapter:
     # @testable true
     # @pair mcp-adapter:product-contract
     # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-    # @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper
+    # @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
     async def execute(self, name: str, arguments: Any) -> AdapterResult:
         """Validate, dispatch, project, and validate one known MCP tool call."""
         definition = self.tools.get(name)
@@ -275,7 +275,7 @@ class LagniappeAdapter:
                 result = await self._get_contract_projection(
                     value["plan_id"],
                     actions=value.get("actions"),
-                    view=value.get("view", "full"),
+                    view=value.get("view", "summary"),
                 )
             elif definition.kind == "submit":
                 result = await self._submit_plan(value)
@@ -409,7 +409,7 @@ class LagniappeAdapter:
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _load_contract(
-        self, plan_id: str, *, actions=None, view="full"
+        self, plan_id: str, *, view, actions=None
     ) -> dict[str, Any]:
         encoded = quote_path_segment(plan_id)
         method, route, _tool = PLAN_ROUTES["get_plan_contract"]
@@ -494,19 +494,15 @@ class LagniappeAdapter:
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _submit_plan(self, arguments: dict[str, Any]) -> AdapterResult:
         plan_id = arguments["plan_id"]
-        contract = await self._load_contract(plan_id)
-        if arguments["contract_version"] != contract["contract_version"]:
-            raise SchemaError(
-                "stale_contract_version",
-                "contract_version does not match the current Plan contract.",
-                details={"expected": contract["contract_version"]},
-            )
-        validate_value(
-            contract["proposal_schema"], arguments["proposal"], phase="proposal"
-        )
+        # The API validates the candidate against live permissions and state.
+        # Only fetch the transport contract here: interpreting every action's
+        # schema would add a second, potentially divergent rejection boundary.
+        contract = await self._load_contract(plan_id, view="summary")
         submission = contract["submission_format"]
         body = deepcopy(submission["body"])
-        validate_value(contract["file_usage_schema"], arguments["file_usage"], phase="file_usage")
+        # Preserve the submitted version so the API can reject stale clients;
+        # copying the current template's version would silently upgrade them.
+        body["contract_version"] = arguments["contract_version"]
         body["file_usage"] = deepcopy(arguments["file_usage"])
         body["proposal"] = deepcopy(arguments["proposal"])
         for field in ("name", "instructions"):
@@ -525,7 +521,7 @@ class LagniappeAdapter:
         from .files import upload_local_files
 
         plan_id = arguments["plan_id"]
-        contract = await self._load_contract(plan_id)
+        contract = await self._load_contract(plan_id, view="summary")
         if contract["uploads_supported"] is not True:
             raise AdapterError(
                 "uploads_not_supported", "This Plan does not accept file uploads."

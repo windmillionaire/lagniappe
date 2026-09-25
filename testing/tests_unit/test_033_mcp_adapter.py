@@ -187,6 +187,9 @@ def _contract() -> dict[str, Any]:
 def test_plan_free_reads_compact_contracts_and_revised_brief():
     class ConversationalREST(_WorkflowREST):
         async def request_json(self, method, target, *, body=None, **kwargs):
+            if target.endswith("/submit") and "wrong" in body["proposal"]:
+                self.requests.append((method, target, body))
+                raise AdapterError("validation_failed", "Invalid proposal.", status=422)
             if target == "answer-context":
                 self.requests.append((method, target, body))
                 return {
@@ -202,7 +205,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
                 contract["permissions"] = {
                     "allowed_actions": ["create_task", "create_page"]
                 }
-                if target.endswith("view=summary"):
+                if target.endswith("view=summary") and "actions=" not in target:
                     contract.update(proposal_schema=None, schema_scope="summary")
                 elif "actions=" in target:
                     assert "actions=create_task" in target
@@ -252,7 +255,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
         assert compact.value["mcp_submission"] == selected.value["mcp_submission"]
         assert "workflow_rules" not in compact.value
         assert "submission_format" not in compact.value
-        with pytest.raises(SchemaError):
+        with pytest.raises(AdapterError) as invalid:
             await adapter.execute(
                 "submit_plan",
                 {"file_usage": [],
@@ -261,6 +264,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
                     "proposal": {"wrong": "shape"},
                 },
             )
+        assert (invalid.value.code, invalid.value.status) == ("validation_failed", 422)
         receipt = await adapter.execute(
             "submit_plan",
             {"file_usage": [],
@@ -272,7 +276,7 @@ def test_plan_free_reads_compact_contracts_and_revised_brief():
             },
         )
         assert receipt.value["status"] == "ready"
-        assert rest.requests[-2][1] == "plans/abcdefghijkl/contract?view=full"
+        assert rest.requests[-2][1] == "plans/abcdefghijkl/contract?view=summary"
         assert rest.requests[-1][2] == {"file_usage": [],
             "contract_version": CONTRACT_VERSION_MAX,
             "proposal": {"title": "Task"},
@@ -345,7 +349,10 @@ class _WorkflowREST:
         if target == "plans/abcdefghijkl":
             return _plan(), "request-plan"
         if target.split("?", 1)[0] == "plans/abcdefghijkl/contract":
-            return _contract(), "request-contract"
+            contract = _contract()
+            if parse_qs(urlsplit(target).query).get("view") == ["summary"]:
+                contract.update(proposal_schema=None, schema_scope="summary")
+            return contract, "request-contract"
         if target in {"plans/abcdefghijkl/tools/search", "tools/search"}:
             return {"result": ["first", "second"]}, "request-search"
         if target == "https://example.com/api/v1/plans/abcdefghijkl/submit":
@@ -1822,7 +1829,8 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
         return rest, projected.value
 
     rest, projected = asyncio.run(exercise())
-    assert projected["proposal_schema"]["required"] == ["title"]
+    assert projected["proposal_schema"] is None
+    assert projected["schema_scope"] == "summary"
     assert (
         "POST",
         "plans",
@@ -1956,7 +1964,7 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
 
     rejected = asyncio.run(reject_submission())
     assert [target for _, target, _ in rejected.requests].count(
-        "plans/abcdefghijkl/contract?view=full"
+        "plans/abcdefghijkl/contract?view=summary"
     ) == 1
 
 
@@ -2016,21 +2024,35 @@ def test_lifecycle_responses_reject_values_outside_the_frozen_contract() -> None
 
 
 # @pair mcp-adapter:product-contract
-def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> None:
+def test_submit_refetches_summary_and_preserves_candidate_and_api_errors() -> None:
+    details = {"errors": [{"code": "contract_version", "path": "$.contract_version", "message": "Unsupported plan contract version.", "expected": CONTRACT_VERSION_MAX}]}
+
+    class ValidatingREST(_WorkflowREST):
+        async def request_json(self, method, target, *, body=None, **kwargs):
+            if target.endswith("/submit") and body["contract_version"] == 5:
+                self.requests.append((method, target, body))
+                raise AdapterError("validation_failed", "Submission failed validation.", status=422, details=details)
+            if target.endswith("/submit") and body["proposal"] == {"title": 7}:
+                self.requests.append((method, target, body))
+                raise AdapterError("validation_failed", "Submission failed validation.", status=422)
+            assert not target.endswith("view=full"), "submission must not load or interpret action schemas"
+            return await super().request_json(method, target, body=body, **kwargs)
+
     async def exercise() -> _WorkflowREST:
-        rest = _WorkflowREST()
+        rest = ValidatingREST()
         adapter = LagniappeAdapter(
             ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
             rest=rest,  # type: ignore[arg-type]
         )
         await adapter.initialize()
-        with pytest.raises(SchemaError) as stale:
+        with pytest.raises(AdapterError) as stale:
             await adapter.execute(
                 "submit_plan",
                 {"file_usage": [], "plan_id": "abcdefghijkl", "contract_version": 5, "proposal": {}},
             )
-        assert stale.value.code == "stale_contract_version"
-        with pytest.raises(SchemaError):
+        assert (stale.value.code, stale.value.status, stale.value.details) == ("validation_failed", 422, details)
+        assert rest.requests[-1][2]["contract_version"] == 5
+        with pytest.raises(AdapterError) as invalid:
             await adapter.execute(
                 "submit_plan",
                 {"file_usage": [],
@@ -2039,7 +2061,8 @@ def test_submit_refetches_contract_and_posts_only_a_valid_exact_wrapper() -> Non
                     "proposal": {"title": 7},
                 },
             )
-        assert not any(target.endswith("/submit") for _, target, _ in rest.requests)
+        assert invalid.value.code == "validation_failed"
+        assert rest.requests[-1][2]["proposal"] == {"title": 7}
 
         receipt = await adapter.execute(
             "submit_plan",
@@ -2099,7 +2122,7 @@ def test_remote_schema_rejects_unreviewed_formats(format_name, monkeypatch) -> N
     ("due_date", "", False),
     ("due_date", False, False),
 ])
-def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(field, value, valid) -> None:
+def test_submit_forwards_date_candidates_and_preserves_api_validation_errors(field, value, valid) -> None:
     definitions = {"update_task": {
         "type": "object", "additionalProperties": False,
         "properties": {
@@ -2123,12 +2146,19 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(f
 
     class DateContractREST(_WorkflowREST):
         async def request_json(self, method, target, *, body=None, **kwargs):
+            if target.endswith("/submit") and not valid:
+                self.requests.append((method, target, body))
+                raise AdapterError(
+                    "validation_failed", "Submission failed validation.", status=422,
+                    details={"errors": [{"code": "format", "path": "$.proposal.actions[0].data.changes.due_date", "message": "Invalid date."}]},
+                )
             result, request_id = await super().request_json(
                 method, target, body=body, **kwargs
             )
             if target.split("?", 1)[0].endswith("/contract"):
+                assert parse_qs(urlsplit(target).query)["view"] == ["summary"]
                 result["permissions"] = {"allowed_actions": list(definitions)}
-                result["proposal_schema"] = {
+                unused_schema = {
                     "type": "object", "$defs": definitions,
                     "properties": {
                         "summary": {"type": "string"},
@@ -2140,6 +2170,11 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(f
                     "required": ["summary", "confidence", "actions"],
                     "additionalProperties": False,
                 }
+                # An unused action may use keywords this MCP release cannot
+                # safely expose. Submission does not need that schema at all.
+                unused_schema["properties"]["summary"]["pattern"] = r"\S"
+                with pytest.raises(SchemaError):
+                    validate_schema_document(unused_schema)
             return result, request_id
 
     task = "hash:abcdefghijkl"
@@ -2164,10 +2199,13 @@ def test_submit_checks_full_date_contract_for_due_dates_and_field_only_updates(f
                 "POST", "https://example.com/api/v1/plans/abcdefghijkl/submit", body,
             )
         else:
-            with pytest.raises(SchemaError) as error:
+            with pytest.raises(AdapterError) as error:
                 await adapter.execute("submit_plan", {"plan_id": "abcdefghijkl", **body})
-            assert error.value.code == "proposal_validation_failed"
-            assert not any(target.endswith("/submit") for _, target, _ in rest.requests)
+            assert (error.value.code, error.value.status) == ("validation_failed", 422)
+            assert error.value.details["errors"][0]["path"] == "$.proposal.actions[0].data.changes.due_date"
+            assert rest.requests[-1] == (
+                "POST", "https://example.com/api/v1/plans/abcdefghijkl/submit", body,
+            )
         assert sum(target.split("?", 1)[0].endswith("/contract") for _, target, _ in rest.requests) == 1
         await adapter.aclose()
 
@@ -2565,6 +2603,11 @@ class _SelectedStartREST(_WorkflowREST):
         self.failure = None
 
     async def request_json(self, method, target, *, body=None, **kwargs):
+        if target.endswith("/submit") and any(
+            action["type"] not in self.allowed for action in body["proposal"]["actions"]
+        ):
+            self.requests.append((method, target, body))
+            raise AdapterError("validation_failed", "Action is no longer allowed.", status=422)
         if target.split("?", 1)[0] != "plans/abcdefghijkl/contract":
             return await super().request_json(method, target, body=body, **kwargs)
         self.requests.append((method, target, body))
@@ -2666,8 +2709,8 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
         )
         assert receipt.value["id"] == plan_id
         assert receipt.value["status"] == "ready"
-        # The only subsequent schema read is the adapter's fresh submission check.
-        assert rest.requests[-2] == ("GET", f"plans/{plan_id}/contract?view=full", None)
+        # Submission needs only the current target and envelope, not action schemas.
+        assert rest.requests[-2] == ("GET", f"plans/{plan_id}/contract?view=summary", None)
         assert rest.requests[-1][2]["proposal"] == proposal
         assert sum(target == "plans" for _, target, _ in rest.requests) == 1
         if not actions:
@@ -2680,7 +2723,7 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
                 validate_value(compact.value["proposal_schema"], {"actions": [{"type": "create_task"}]}, phase="proposal")
             return
         rest.allowed = ["create_page"]
-        with pytest.raises(SchemaError):
+        with pytest.raises(AdapterError) as denied:
             await adapter.execute(
                 "submit_plan",
                 {"file_usage": [],
@@ -2689,7 +2732,8 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
                     "proposal": proposal,
                 },
             )
-        assert sum(target.endswith("/submit") for _, target, _ in rest.requests) == 1
+        assert (denied.value.code, denied.value.status) == ("validation_failed", 422)
+        assert sum(target.endswith("/submit") for _, target, _ in rest.requests) == 2
         # The same Plan remains usable for later schemas and proposal revisions.
         later = await adapter.execute(
             "get_plan_contract", {"plan_id": plan_id, "actions": ["create_page"]}

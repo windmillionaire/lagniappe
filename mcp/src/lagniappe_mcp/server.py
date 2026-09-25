@@ -311,7 +311,7 @@ class HostedAdapter(LagniappeAdapter):
     async def _upload_files(self, arguments):
         try:
             async with asyncio.timeout(UPLOAD_OPERATION_TIMEOUT_SECONDS):
-                contract = await self._load_contract(arguments["plan_id"])
+                contract = await self._load_contract(arguments["plan_id"], view="summary")
                 _preflight_requested_count(contract, arguments["files"])
                 max_file, max_total = _preflight_contract(contract, ())
                 async with spool_attachments(

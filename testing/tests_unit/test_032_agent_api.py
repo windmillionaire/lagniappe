@@ -13,6 +13,10 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.entities.ai_report import AIReport, REPORT_FORMAT_VERSION
 from lagniappe.core.tools.ai import external_api
+from lagniappe.core.tools.ai.external import contracts as external_contracts
+from lagniappe.core.tools.ai.external import validation as external_validation
+from lagniappe.core.tools.ai.external import plans as external_plans
+from lagniappe.core.tools.ai.external import uploads as external_uploads
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import references as ai_references
@@ -68,9 +72,9 @@ def test_external_entity_links_use_the_site_origin_without_rewriting_evidence():
     assert json.dumps(raw, sort_keys=True) == snapshot
 
 
-# @source lagniappe/core/tools/ai/external_api.py::plan_contract
-# @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/external_api.py::submit_plan
+# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
+# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external/plans.py::submit_plan
 # @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @source lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
 # @matrix agent-api ai-report : proposal-contract proposal-validation remote-update
@@ -93,10 +97,10 @@ def test_fileless_organize_creates_task_and_moves_existing_file(monkeypatch, ori
     file.page = page
     entities = {entity.urlsafe_key: entity for entity in (page, file)}
     saved = []
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
-    monkeypatch.setattr(external_api.Entities, "fetch", lambda *ids, request: [entities[key] for key in ids])
-    monkeypatch.setattr(external_api.Entities, "fetch_one", _fetch_one_from(entities))
-    monkeypatch.setattr(external_api.cache, "get_details_by_hash", lambda hashes: {
+    monkeypatch.setattr(external_validation.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(external_validation.Entities, "fetch", lambda *ids, request: [entities[key] for key in ids])
+    monkeypatch.setattr(external_validation.Entities, "fetch_one", _fetch_one_from(entities))
+    monkeypatch.setattr(external_validation.cache, "get_details_by_hash", lambda hashes: {
         entity.hash: {"id": entity.urlsafe_key, "name": entity.name, "kind": entity.entity_kind}
         for entity in entities.values() if entity.hash in hashes
     })
@@ -189,7 +193,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     )
     saved = []
     monkeypatch.setattr(
-        external_api.Entities, "save", lambda *items: saved.extend(items)
+        external_validation.Entities, "save", lambda *items: saved.extend(items)
     )
 
     report = external_api.create_plan(
@@ -211,7 +215,7 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     assert report.note == "Waiting for external plan"
 
 
-# @source lagniappe/core/tools/ai/external_api.py::create_plan
+# @source lagniappe/core/tools/ai/external/plans.py::create_plan
 # @pair agent-api:entitlement-independent
 @pytest.mark.unit
 @pytest.mark.parametrize("source_origin", ["web", "api"])
@@ -220,7 +224,7 @@ def test_external_correction_does_not_require_provider_access(monkeypatch, sourc
     actor = _test_user("external-correction-owner")
     actor.ai_access = "NONE"
     actor.access = lambda _required: pytest.fail("External correction checked site AI access")
-    source = external_api.Entities.REPORT.create({
+    source = external_validation.Entities.REPORT.create({
         "user": actor,
         "origin": source_origin,
         "status": "complete",
@@ -229,8 +233,8 @@ def test_external_correction_does_not_require_provider_access(monkeypatch, sourc
         "result": {"status": "complete", "actions": []},
     })
     saved = []
-    monkeypatch.setattr(external_api.Entities, "fetch_one", _fetch_one_from({source.urlsafe_key: source}))
-    monkeypatch.setattr(external_api.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(external_validation.Entities, "fetch_one", _fetch_one_from({source.urlsafe_key: source}))
+    monkeypatch.setattr(external_validation.Entities, "save", lambda *items: saved.extend(items))
 
     correction = external_api.create_plan(
         actor, instructions="Adjust the completed work", remote_mcp=True,
@@ -1024,12 +1028,12 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         input_files=[SimpleNamespace(hash="aaaaaaaaaaaa")],
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "allowed_report_actions",
         lambda user: ("create_page", "move_page"),
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "external_report_proposal_response_schema",
         lambda **options: {
             "allowed": options["allowed_actions"],
@@ -1037,12 +1041,12 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "report_action_permission_context",
         lambda user, allowed: {"allowed": allowed},
     )
     monkeypatch.setattr(
-        external_api.dates,
+        external_contracts.dates,
         "user_today",
         lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
     )
@@ -1087,7 +1091,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
 @pytest.mark.unit
 def test_answer_context_is_plan_free(monkeypatch):
     monkeypatch.setattr(
-        external_api.Entities,
+        external_validation.Entities,
         "save",
         lambda *_: pytest.fail("Answer context must not persist anything"),
     )
@@ -1101,18 +1105,18 @@ def test_answer_context_is_plan_free(monkeypatch):
 
 
 # @pair agent-api:proposal-contract
-# @source lagniappe/core/tools/ai/external_api.py::plan_contract
+# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
 # @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 @pytest.mark.unit
 def test_contract_selection_preserves_permissions_and_full_validation(monkeypatch):
     actor = _contract_actor()
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "allowed_report_actions",
         lambda _: ("create_page", "create_task", "needs_review"),
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "report_action_permission_context",
         lambda _, allowed: {"allowed_actions": list(allowed)},
     )
@@ -1194,7 +1198,7 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
         reads.append(identifiers)
         return [visible, hidden, history]
 
-    monkeypatch.setattr(external_api.Entities, "fetch", fetch)
+    monkeypatch.setattr(external_validation.Entities, "fetch", fetch)
     report = SimpleNamespace(
         available=True, file_usage=[], instructions="Create",
         status="complete",
@@ -1389,9 +1393,9 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         return proposal
 
     monkeypatch.setattr(
-        external_api, "allowed_report_actions", lambda user: ("create_page",)
+        external_contracts, "allowed_report_actions", lambda user: ("create_page",)
     )
-    monkeypatch.setattr(external_api, "validate_proposal", validate)
+    monkeypatch.setattr(external_validation, "validate_proposal", validate)
 
     proposal = {
         "summary": "Create a page for the uploaded file.",
@@ -1443,7 +1447,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         ],
     }
     monkeypatch.setattr(
-        external_api.cache,
+        external_validation.cache,
         "get_details_by_hash",
         lambda hashes: {"bbbbbbbbbbbb": {"id": "opaque-id"}},
     )
@@ -1452,7 +1456,7 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         allowed=lambda action, user: False,
     )
     monkeypatch.setattr(
-        external_api.Entities,
+        external_validation.Entities,
         "fetch",
         lambda *identifiers, request: [denied],
     )
@@ -1559,12 +1563,12 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
 
     report.properties = SimpleNamespace(process=Process())
     monkeypatch.setattr(
-        external_api,
+        external_plans,
         "validate_external_proposal",
         lambda value, current_report, user, **_options: value,
     )
     monkeypatch.setattr(
-        external_api.Entities, "save", lambda *items: saved.extend(items)
+        external_validation.Entities, "save", lambda *items: saved.extend(items)
     )
 
     submitted = external_api.submit_plan(
@@ -1657,7 +1661,7 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
     report.properties = SimpleNamespace(process=Process())
     saved = []
     monkeypatch.setattr(
-        external_api.Entities, "save", lambda *items: saved.extend(items)
+        external_validation.Entities, "save", lambda *items: saved.extend(items)
     )
 
     submitted = external_api.submit_plan(
@@ -1701,7 +1705,7 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
         "get_details_by_hash",
         lambda hashes: {"8328b23bef92": {"id": "canonical-cypress-page-key"}},
     )
-    monkeypatch.setattr(external_api.Entities, "fetch", lambda *args, **kwargs: [SimpleNamespace(hash="8328b23bef92", allowed=lambda *a, **k: True)])
+    monkeypatch.setattr(external_validation.Entities, "fetch", lambda *args, **kwargs: [SimpleNamespace(hash="8328b23bef92", allowed=lambda *a, **k: True)])
     report = SimpleNamespace(available=True, file_usage=[], instructions="Answer", input_files=[])
     proposal = {
         "summary": "Cypress Hive has an open follow-up task.",
@@ -1778,13 +1782,13 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
 
     report.properties = SimpleNamespace(process=Process())
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "allowed_report_actions",
         lambda user: ("create_page", "needs_review"),
     )
     saved = []
     monkeypatch.setattr(
-        external_api.Entities, "save", lambda *items: saved.extend(items)
+        external_validation.Entities, "save", lambda *items: saved.extend(items)
     )
 
     submitted = external_api.submit_plan(
@@ -1835,12 +1839,12 @@ def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypat
         hash="abcdef123456",
     )
     monkeypatch.setattr(
-        external_api.database_get,
+        external_uploads.database_get,
         "is_urlsafe_key",
         lambda value: value == entity.urlsafe_key,
     )
     monkeypatch.setattr(
-        external_api.Entities,
+        external_validation.Entities,
         "fetch",
         lambda *identifiers, request: [entity],
     )
@@ -1901,7 +1905,7 @@ def test_public_plan_omits_preview_references_before_loading_entities(monkeypatc
         assert preview not in identifiers
         return [entity]
 
-    monkeypatch.setattr(external_api.Entities, "fetch", fetch)
+    monkeypatch.setattr(external_validation.Entities, "fetch", fetch)
     report = SimpleNamespace(agent_manifest={}, proposal={"actions": [{
         "id": "update", "type": "update_page",
         "data": {"entity": saved, "changes": {"form": "$new_form"}},
@@ -1931,17 +1935,17 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
         for index in range(7)
     ]
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "allowed_report_actions",
         lambda user: ("attach_file",),
     )
     monkeypatch.setattr(
-        external_api,
+        external_contracts,
         "report_action_permission_context",
         lambda user, allowed: {"allowed_actions": list(allowed)},
     )
     monkeypatch.setattr(
-        external_api.dates,
+        external_contracts.dates,
         "user_today",
         lambda _user=None: datetime(2026, 9, 2, tzinfo=timezone.utc),
     )
@@ -2198,21 +2202,21 @@ def test_external_upload_finalization_binds_report_user(monkeypatch):
         )
         return [captured["file"]]
 
-    monkeypatch.setattr(external_api, "finalize_report_upload_manifest", finalize)
+    monkeypatch.setattr(external_uploads, "finalize_report_upload_manifest", finalize)
     monkeypatch.setattr(
         credential_store,
         "upload_file_key",
         lambda current_report_key, current_batch_id, index: file_key,
     )
     monkeypatch.setattr(
-        external_api.Entities.FILE,
+        external_validation.Entities.FILE,
         "create",
         lambda **options: SimpleNamespace(**options),
     )
     active_checks = []
     deleted_generations = []
     monkeypatch.setattr(
-        external_api.storage_assets,
+        external_uploads.storage_assets,
         "delete_file_generation",
         lambda path, visibility, generation: deleted_generations.append(
             (path, visibility, generation)
@@ -2259,19 +2263,19 @@ def test_external_upload_finalization_binds_report_user(monkeypatch):
     ]
 
 
-# @source lagniappe/core/tools/ai/external_api.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/external_api.py::submit_plan
+# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
+# @source lagniappe/core/tools/ai/external/plans.py::submit_plan
 # @matrix ai-report agent-api : answer-only proposal-validation file-placement
 @pytest.mark.unit
 def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
     _patch_fake_keys(monkeypatch)
     actor = _test_user("evidence-owner")
     actor.access = lambda _required: False  # External generation uses the client's model.
-    monkeypatch.setattr(external_api.Entities, "save", lambda *entities: None)
+    monkeypatch.setattr(external_validation.Entities, "save", lambda *entities: None)
     report = external_api.create_plan(actor, instructions="What does the receipt say?")
     file = TestEntities.get("FILE", {"hash": "evidencefile", "filename": "receipt.txt"})
     report.input_files = [file]
-    monkeypatch.setattr(external_api.cache, "get_details_by_hash", lambda hashes: {"evidencefile": {"id": file.urlsafe_key, "kind": "file"}})
+    monkeypatch.setattr(external_validation.cache, "get_details_by_hash", lambda hashes: {"evidencefile": {"id": file.urlsafe_key, "kind": "file"}})
     usage = [{"file": "hash:evidencefile", "usage": "evidence"}]
     answer = {"summary": "Receipt read", "answer_markdown": "The purchase was recorded.", "confidence": 1, "issues": [], "actions": []}
     external_api.submit_plan(report, actor, answer, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)

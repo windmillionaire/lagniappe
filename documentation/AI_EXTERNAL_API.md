@@ -206,7 +206,7 @@ returns a compact saved-answer schema that requires an empty `actions` array.
 Startup uses its
 existing contract read, so no additional client schema fetch is needed. The
 selection does not narrow future proposals or broaden permissions; submission
-still checks the full current contract. Omitting `actions` preserves the summary
+still uses the API's full current validation. Omitting `actions` preserves the summary
 startup behavior. If the post-start schema read fails, keep the returned Plan
 and follow `context.recovery`; its arguments retain the requested selection.
 For rejected selections, read that Plan's summary to see current allowed actions
@@ -227,8 +227,8 @@ on organizing uploaded or existing workspace files. Upload classification rules
 appear in the contract only after uploads exist; otherwise it requires
 `file_usage=[]`. General proposal rules accompany selected `report_actions`
 guidance, while summary-writing rules accompany `summarize_file` guidance or the
-`file_summary` bundle. `submit_plan` privately checks the full current contract
-before saving. Consume one complete result representation when the client
+`file_summary` bundle. `submit_plan` sends the candidate to the API for validation
+and saving. Consume one complete result representation when the client
 provides both text and structured content. Legacy protocol clients receive an
 object wrapper for non-object results, with matching schemas and result paths.
 
@@ -238,11 +238,21 @@ to its exact records and destinations; use the read tools' record permissions
 and the selected action guidance. The actor endpoint's separate
 `capabilities.plans` indicates whether the external plan service is enabled.
 
-The MCP adapter accepts a bounded JSON Schema subset. Remote schemas may use
-`format: date` for calendar dates; other formats remain unsupported. Check new
-contract keywords through the adapter's full submission path, including a
-proposal that does not use the new action: an unsupported keyword in any allowed
-action can block submission even when a selected-schema read succeeds.
+The API owns proposal and file-usage validation for both REST and MCP clients.
+MCP fetches the summary contract before submission to verify the canonical
+submission target and envelope, then forwards the supplied contract version,
+proposal and file usage unchanged. API errors retain their codes, HTTP status
+and field paths through MCP's bounded, credential-safe error projection.
+`get_plan_contract` defaults to `summary` on both paths. Select actions or request
+`view="full"` when action schemas are needed. `revises_plan_id` accepts omission
+or null on both paths for an independent Plan.
+
+MCP still validates tool envelopes, transport URLs, credential boundaries, and
+schemas it exposes. Its bounded remote-schema subset supports `format: date`
+for calendar dates; other formats remain unsupported on schema reads. Check new
+keywords through schema exposure and real API submissions. An unsupported
+keyword in an unused action no longer blocks submission through a separate MCP
+proposal validator.
 
 For task discovery or duplicate-work checks on a known Page, use
 `get_page_tasks(id=..., compact=true)`. It returns active `tasks` and
@@ -664,6 +674,41 @@ use the same JSON error envelope and request ID. A `405` preserves the HTTP
 handler are preserved under `error.details` with the selected tool name.
 When diagnosing a cURL failure, use `--fail-with-body` so the JSON envelope is
 not discarded by cURL's nonzero exit behavior.
+
+## Contract and lifecycle code ownership
+
+`lagniappe/core/tools/ai/external_api.py` remains the public import facade.
+Its implementations live in `lagniappe/core/tools/ai/external/`:
+
+- `definitions.py` owns envelope fields, limits, defaults and fresh schema
+  factories used by runtime checks and OpenAPI.
+- `openapi.py` builds the document from explicit application name and server URL;
+  it does not read a Flask request or global application configuration.
+- `contracts.py` assembles actor-specific plan contracts and guidance.
+- `validation.py` collects bounded field errors and runs semantic validation.
+- `plans.py` owns plan creation, access checks and submission orchestration.
+- `uploads.py` owns batch identity, session creation and finalization.
+- `presentation.py` projects public references and execution receipts.
+
+The shared `external_operations.py` owns operation claims' guarded mutation
+writer, checkpoint failure classification and best-effort claim release. Services
+receive the actor and request ID explicitly. Upload and submission services reload
+authoritative state after acquiring a claim, recheck eligibility, and commit with
+the exact claim token and expected report revision. Definite checkpoint rejection
+and ambiguous transaction failure retain distinct cleanup behavior.
+
+The REST module owns authentication, rate limits, body parsing, domain-to-HTTP
+error translation and response/URL construction. MCP remains a separate package
+that calls REST; it does not import application validators.
+
+The server's schema collector is intentionally a bounded subset, not a general
+JSON Schema engine: local references, discriminator-selected actions,
+`allOf`/`anyOf`/`oneOf`, `if`/`then`/`else`, JSON types, constants/enums, object
+fields, required/additional properties, `minProperties`, array bounds/uniqueness,
+string lengths, calendar dates and numeric bounds. Semantic validation separately
+enforces byte limits, reference notation/visibility, permissions, file disposition,
+action normalization and record-specific rules. Preserve the stable diagnostic
+codes and paths when extending either layer.
 
 ## File organization cURL example
 

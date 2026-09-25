@@ -595,7 +595,7 @@ def test_schema_preparation_assigns_missing_ids_without_collisions(scope):
 # @matrix ai-report : structured-output
 @pytest.mark.parametrize("external", [False, True])
 def test_report_conversion_schema_rejects_flattened_items(external):
-    from lagniappe.core.tools.ai.external_api import _schema_errors
+    from lagniappe.core.tools.ai.external.validation import _schema_errors
     from lagniappe.core.tools.ai.reporting.contracts.schema import (
         external_report_proposal_response_schema,
         report_proposal_response_schema,
