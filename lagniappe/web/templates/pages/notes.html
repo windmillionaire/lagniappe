@@ -3,6 +3,7 @@
 {% macro note_list(page, notes=None) %}
   <ul data-widget="BaseList"
       lp-prefetch
+      {% if notes is not none or not page.has_notes %}loaded{% endif %}
       data-persistent="true"
       data-visible="false"
       data-route="{{ url_for('pages.get_notes', key=page.urlsafe_key) }}"

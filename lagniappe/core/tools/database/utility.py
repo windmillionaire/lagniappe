@@ -131,7 +131,9 @@ def _advances_site_fingerprint(entity, mask):
     fields = set(mask or ())
     if entity.db.get("type") == "notification":
         return False
-    if entity.db.get("type") == "page" and fields and fields.issubset({"deferred_job"}):
+    if entity.db.get("type") == "page" and fields and fields.issubset({
+        "deferred_job", "has_notes", "notes_checked_revision",
+    }):
         return False
     if not fields:
         return True

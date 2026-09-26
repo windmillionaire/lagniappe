@@ -39,10 +39,16 @@ verification delivery, account states, and recovery behavior are documented in
 ### `sentry.mjs` (conditional production monitoring)
 
 A separate local bundle for `@sentry/browser`. Production templates load it
-only when error reporting is enabled. It initializes from the rendered
+only when error reporting is enabled and a browser DSN is configured. It loads
+as an async, low-priority module so a slow or unavailable SDK cannot hold up
+the app or login module. Reporting before the SDK is ready is best effort.
+It initializes from the rendered
 installation `SENTRY_JS_DSN`, explicitly disables default PII, and applies the
 shared browser event sanitizer. Browser events can therefore use a separate
 Sentry project from backend events.
+The entry exposes only the five APIs used by the shared reporting helpers;
+unused SDK exports can be removed by Rollup without changing default error
+integrations or the sanitizer.
 
 ## View registry
 

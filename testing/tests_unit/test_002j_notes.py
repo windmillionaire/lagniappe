@@ -23,6 +23,41 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
+# @matrix notes : empty-presence revision-bound
+def test_empty_notes_hint_is_bound_to_the_page_revision(monkeypatch):
+    page = TestEntities.get("PAGE", {"name": "Empty notes", "hash": "empty-notes"})
+    saved = []
+    monkeypatch.setattr(Entities, "save_root", lambda entity, **kwargs: saved.append(
+        (dict(entity.db), kwargs["property_mask"])
+    ))
+    assert page.has_notes is True  # absent/legacy never means empty
+    page.db.pop("modified", None)
+    page.remember_empty_notes()
+    assert saved == []
+
+    revision = datetime.now(timezone.utc)
+    page.db["modified"] = revision
+    page.remember_empty_notes()
+    assert page.has_notes is False
+    assert saved[0][1] == ("has_notes", "notes_checked_revision")
+    assert saved[0][0]["notes_checked_revision"] == revision
+    assert page.modified == revision
+    page.remember_empty_notes()
+    assert len(saved) == 1
+    assert {"has_notes", "notes_checked_revision"} <= page.exclude_from_index
+
+    # Note save/delete and ordinary Page saves already advance this authority.
+    # Old hints, including a late masked write from the old snapshot, fail open.
+    page.modified = revision + timedelta(seconds=1)
+    assert page.has_notes is True
+    page.db["has_notes"] = False
+    page.db["notes_checked_revision"] = revision
+    assert page.has_notes is True
+    page.db["has_notes"] = "false"
+    page.db["notes_checked_revision"] = page.modified
+    assert page.has_notes is True
+
+
 def _user(name, key, *, owner=False, admin=False, permissions=None):
     user = TestEntities.get(
         "USER",

@@ -445,6 +445,10 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
         key=("instances", "deferred-reference"),
         db={"type": "page", "deferred_job": '{"key":"operation"}'},
     )
+    notes_hint = SimpleNamespace(
+        key=("instances", "notes-hint"),
+        db={"type": "page", "has_notes": False, "notes_checked_revision": "observed"},
+    )
     fingerprint = {"type": "site", "fingerprint": "next"}
     fingerprinted = []
 
@@ -461,6 +465,7 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
             (masked, ("modified", "forms")),
             (document, ("assets", "document_history")),
             (deferred_reference, ("deferred_job",)),
+            (notes_hint, ("has_notes", "notes_checked_revision")),
         )
     )
 
@@ -478,7 +483,9 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     ]
     assert batch.mutations[3].update is deferred_reference.db
     assert batch.mutations[3].property_mask.paths == ["deferred_job"]
-    assert batch.mutations[4].upsert is fingerprint
+    assert batch.mutations[4].update is notes_hint.db
+    assert batch.mutations[4].property_mask.paths == ["has_notes", "notes_checked_revision"]
+    assert batch.mutations[5].upsert is fingerprint
 
 
 # @matrix forms mutations : archive atomic-delete concurrency

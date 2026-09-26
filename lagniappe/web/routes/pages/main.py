@@ -59,6 +59,14 @@ def _load_page_settings_relations(page, *, restrictions=False):
 
 
 # @testable true
+# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
+# @matrix notes : empty-presence etag
+def _page_view_fingerprint(page, user):
+    """Empty-notes discovery changes initial HTML, not the Page's content revision."""
+    return f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
+
+
+# @testable true
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_can_read_document_content
@@ -66,7 +74,7 @@ def _load_page_settings_relations(page, *, restrictions=False):
 # @matrix pages : document-tab load permission-gates readonly tabs
 # @matrix pages : access-restrictions source-summary
 @pages.route("<key>", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=_page_view_fingerprint)
 def view(key, **kwargs):
     page = _load_page_settings_relations(
         kwargs["entity"],

@@ -94,6 +94,20 @@ creation follows Page edit access.
 Note mutations touch the parent and author. Page and User deletion cascade
 through their Notes and photo assets.
 
+Page loading skips the notes request only after an unfiltered query has proved
+the list empty. The unindexed `has_notes: false` hint is paired with
+`notes_checked_revision` (the observed Page `modified` value). Unknown, legacy,
+or changed Pages keep the ordinary fetch; the first empty read learns the hint
+without a migration. Note creation/deletion already touches the parent, so a
+late empty-reader write or stale full Page save cannot hide newer notes.
+Private notes count as present even when the current viewer cannot see them.
+
+The hint uses a masked root save, leaves content and collection fingerprints
+unchanged, and participates only in the initial Page HTML validator. The list
+still mounts as loaded for creation and normal collection refresh. Any Page
+revision change conservatively costs one fresh notes read before empty Pages
+can skip again.
+
 ## Notification email
 
 Managed Users choose `NONE`, `IMMEDIATE`, or `DAILY`; public Users use their

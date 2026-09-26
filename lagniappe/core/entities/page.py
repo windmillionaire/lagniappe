@@ -43,6 +43,8 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             "deferred_job",
             "autofill_reviews",
             "public_settings",
+            "has_notes",
+            "notes_checked_revision",
         }
         return frozenset(exclude)
 
@@ -165,6 +167,33 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             self._load_tasks()
 
         return self._completed
+
+    # @testable true
+    # @tests tests_unit/test_002j_notes.py::test_empty_notes_hint_is_bound_to_the_page_revision
+    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
+    # @matrix notes : empty-presence revision-bound
+    @property
+    def has_notes(self):
+        """Unknown or stale presence requires a read; only proven empty skips it."""
+        return not (
+            self.db.get("has_notes") is False
+            and self.modified is not None
+            and self.db.get("notes_checked_revision") == self.modified
+        )
+
+    # @testable true
+    # @tests tests_unit/test_002j_notes.py::test_empty_notes_hint_is_bound_to_the_page_revision
+    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
+    # @matrix notes : empty-presence revision-bound
+    def remember_empty_notes(self):
+        """Cache an unfiltered empty query without changing content or revisions."""
+        if not self.has_notes or self.modified is None:
+            return
+        self.db["has_notes"] = False
+        self.db["notes_checked_revision"] = self.modified
+        # A racing note mutation advances modified. This old observation then
+        # cannot suppress its notes, even when this masked write commits last.
+        Entities.save_root(self, property_mask=("has_notes", "notes_checked_revision"))
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match

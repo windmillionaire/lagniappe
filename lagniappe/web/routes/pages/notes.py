@@ -19,8 +19,11 @@ from . import pages
 def get_notes(key, **kwargs):
     page = kwargs["entity"]
 
+    rows = database_get.page_notes(page)
+    if not rows:
+        page.remember_empty_notes()
     loaded = Entities.fetch(
-        *database_get.page_notes(page),
+        *rows,
         request=Fetch.direct(),
     )
     notes = [
