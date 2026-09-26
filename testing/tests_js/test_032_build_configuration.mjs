@@ -186,6 +186,11 @@ test("test_templates_preload_registered_view_and_interaction_foundations", () =>
 	assert.match(base, /\/chunks\/foundation\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/);
 	assert.match(
 		base,
+		/if not public_page\|default\(false\)[\s\S]*?\/chunks\/combobox\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}[\s\S]*?endif/,
+	);
+	assert.doesNotMatch(base, /\/chunks\/combobox-fields\.js/);
+	assert.match(
+		base,
 		/view_entry in \['project',[\s\S]*\/chunks\/core-foundation\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/,
 	);
 	assert.match(
@@ -283,7 +288,121 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		);
 	}
 	assert.equal(interactionFoundationChunk(`${root}views/home.mjs`), undefined);
+	for (const module of [
+		"elements/editor/collaborative.mjs",
+		"elements/editor/toolbar.mjs",
+		"elements/editor/editor.mjs",
+	]) {
+		assert.equal(interactionFoundationChunk(`${root}${module}`), "document");
+	}
+	for (const module of [
+		"@tiptap/core/dist/index.js",
+		"prosemirror-model/dist/index.js",
+		"yjs/dist/yjs.mjs",
+	]) {
+		assert.equal(
+			interactionFoundationChunk(`/checkout/node_modules/${module}`),
+			"document",
+		);
+	}
+	assert.equal(
+		interactionFoundationChunk(`${root}widgets/user.mjs`),
+		"user-tools",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}widgets/userPermissions.mjs`),
+		"user-tools",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}forms/controller.mjs`),
+		"forms",
+	);
+	// Optional editor dialogs and specialized form fields keep their lazy boundary.
+	assert.equal(
+		interactionFoundationChunk(`${root}elements/editor/options/addLink.mjs`),
+		"editor-dialogs",
+	);
+	assert.equal(
+		interactionFoundationChunk(
+			`${root}elements/editor/options/toolbarButtons.mjs`,
+		),
+		"document",
+	);
+	assert.equal(
+		interactionFoundationChunk(
+			`${root}elements/editor/options/documentHistory.mjs`,
+		),
+		undefined,
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}widgets/uploadFile.mjs`),
+		"uploads",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}shared/directUpload.mjs`),
+		undefined,
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}elements/table.mjs`),
+		"form-complex",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}elements/todo.mjs`),
+		"form-complex",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}elements/select.mjs`),
+		"forms",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}elements/facetedSearch.mjs`),
+		"forms",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}elements/primitives.mjs`),
+		"ui-controls",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}forms/controls/accessRestrictions.mjs`),
+		"permissions",
+	);
+	assert.equal(
+		interactionFoundationChunk(`${root}forms/controls/loader.mjs`),
+		"forms",
+	);
 	assert.equal(interactionFoundationChunk("\0virtual:styles"), undefined);
+	for (const module of [
+		"combobox",
+		"dropdown",
+		"remote",
+		"results",
+		"search",
+	]) {
+		assert.equal(
+			interactionFoundationChunk(`${root}elements/combobox/${module}.mjs`),
+			"combobox",
+		);
+	}
+	for (const module of ["facets", "select", "submitter"]) {
+		assert.equal(
+			interactionFoundationChunk(`${root}elements/combobox/${module}.mjs`),
+			"forms",
+		);
+	}
+	for (const module of ["dom", "core", "utils"]) {
+		assert.equal(
+			interactionFoundationChunk(
+				`/checkout/node_modules/@floating-ui/${module}/dist/index.mjs`,
+			),
+			"combobox",
+		);
+	}
+	for (const module of ["combobox/index", "combobox/location"]) {
+		assert.equal(
+			interactionFoundationChunk(`${root}elements/${module}.mjs`),
+			undefined,
+		);
+	}
 });
 
 // @source build/publication.mjs::recordBuildArtifacts

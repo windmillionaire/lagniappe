@@ -32,6 +32,8 @@ const constantsPath = "./config/constants.py";
 const browserProtocolPath = "./config/browser_protocol.json";
 const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
+	"shared/storage.mjs",
+	"shared/queryLifecycle.mjs",
 	"shared/endpoints.mjs",
 	"shared/errors.mjs",
 	"shared/notificationState.mjs",
@@ -53,6 +55,162 @@ const INDEX_FOUNDATION_MODULES = new Set([
 	"views/base/index.mjs",
 	"widgets/tables/visibilityState.mjs",
 ]);
+const USER_INDEX_MODULES = new Set([
+	"widgets/user.mjs",
+	"widgets/userPermissions.mjs",
+]);
+const COMBOBOX_MODULES = new Set([
+	"elements/entityMenu.mjs",
+	"elements/combobox/combobox.mjs",
+	"elements/combobox/dropdown.mjs",
+	"elements/combobox/remote.mjs",
+	"elements/combobox/results.mjs",
+	"elements/combobox/search.mjs",
+]);
+// Both collaborative and independent editors use the same engine and toolbar.
+// Keep optional toolbar forms in their lazy modules.
+const DOCUMENT_MODULES = new Set([
+	"elements/editor/collaborative.mjs",
+	"elements/editor/editor.mjs",
+	"elements/editor/toolbar.mjs",
+	"elements/editor/users.mjs",
+	"elements/editor/config.mjs",
+	"elements/editor/dropdowns.mjs",
+	"elements/editor/options/registry.mjs",
+	"elements/editor/options/markdownPaste.mjs",
+	"elements/editor/options/menuItems.mjs",
+	"elements/editor/options/toolbarButtons.mjs",
+]);
+const DOCUMENT_PACKAGES = new Set([
+	"lib0",
+	"yjs",
+	"orderedmap",
+	"w3c-keyname",
+	"linkifyjs",
+	"rope-sequence",
+]);
+// Form infrastructure, small fields and picker adapters are used together by
+// Page Info and Task forms. Complex fields and upload UI remain lazy.
+const FORM_MODULES = new Set([
+	"elements/select.mjs",
+	"elements/link.mjs",
+	"elements/bookmark.mjs",
+	"elements/facetedSearch.mjs",
+	"elements/combobox/submitter.mjs",
+	"elements/combobox/facets.mjs",
+	"elements/combobox/select.mjs",
+	"widgets/form.mjs",
+	"forms/controller.mjs",
+	"forms/renderer.mjs",
+	"forms/controls/loader.mjs",
+	"forms/migrationNotice.mjs",
+	"forms/representation.mjs",
+	"forms/reviewBar.mjs",
+	"widgets/base/formWidget.mjs",
+	"elements/loader.mjs",
+	"elements/base/baseElement.mjs",
+	"elements/input.mjs",
+	"elements/textarea.mjs",
+	"elements/checkbox.mjs",
+	"elements/radio.mjs",
+	"elements/html.mjs",
+	"elements/status.mjs",
+]);
+// Explicit feature boundaries keep optional tools lazy without fragmenting each
+// tool into a request per source module. Shared libraries remain single-copy.
+const FEATURE_CHUNK_MODULES = {
+	"ui-resources": [
+		"generated/styles.mjs",
+		"generated/icons.mjs",
+		"shared/icons.mjs",
+	],
+	"form-sections": [
+		"elements/sectionToggle.mjs",
+		"elements/dueDate.mjs",
+		"elements/sections.mjs",
+		"elements/autofill.mjs",
+	],
+	account: ["shared/user.mjs", "shared/logout.mjs"],
+	"offline-replay": ["shared/offlineQueue.mjs", "views/base/offlineReplay.mjs"],
+	"admin-tools": [
+		"widgets/siteSettings.mjs",
+		"widgets/siteSettings/administrators.mjs",
+		"widgets/siteSettings/aiModels.mjs",
+		"widgets/siteSettings/base.mjs",
+		"widgets/siteSettings/deployment.mjs",
+		"widgets/siteSettings/image.mjs",
+		"widgets/siteSettings/installationAccess.mjs",
+		"widgets/siteSettings/maintenance.mjs",
+		"widgets/siteSettings/providers.mjs",
+		"widgets/siteSettings/publicPages.mjs",
+	],
+	"builder-controls": [
+		"views/builder/conditions/base.mjs",
+		"views/builder/conditions/columns.mjs",
+		"views/builder/conditions/modify.mjs",
+		"views/builder/conditions/options.mjs",
+		"views/builder/conditions/status.mjs",
+		"views/builder/conditions/visibility.mjs",
+	],
+	"index-tools": [
+		"widgets/tables/indexTable.mjs",
+		"widgets/tables/mobileControls.mjs",
+		"widgets/tables/sorting.mjs",
+		"widgets/tables/visibility.mjs",
+	],
+	filters: ["widgets/filters.mjs", "widgets/filterResults.mjs"],
+	"page-tools": [
+		"widgets/documentSettings.mjs",
+		"widgets/pagePhoto.mjs",
+		"widgets/pageInfo.mjs",
+		"widgets/pagePermissions.mjs",
+		"widgets/note.mjs",
+	],
+	"project-tools": ["widgets/projectInfo.mjs", "widgets/modelTasks.mjs"],
+	"task-tools": [
+		"widgets/taskForm.mjs",
+		"widgets/taskHistory.mjs",
+		"widgets/taskSettings.mjs",
+		"widgets/pageTaskList.mjs",
+	],
+	"home-tools": [
+		"widgets/home/activity.mjs",
+		"widgets/home/lists.mjs",
+		"widgets/home/tasks.mjs",
+	],
+	uploads: [
+		"widgets/tools.mjs",
+		"elements/base/baseUpload.mjs",
+		"elements/upload.mjs",
+		"elements/taskUpload.mjs",
+		"widgets/uploadFile.mjs",
+		"widgets/ingressUpload.mjs",
+	],
+	"editor-dialogs": [
+		"elements/editor/options/generateText.mjs",
+		"elements/editor/options/pinVersion.mjs",
+		"elements/editor/options/setColor.mjs",
+		"elements/editor/options/setFontFamily.mjs",
+		"elements/editor/options/setImage.mjs",
+		"elements/editor/options/addLink.mjs",
+		"elements/editor/options/addImage.mjs",
+		"elements/editor/options/addYouTube.mjs",
+	],
+	"ui-controls": [
+		"elements/primitives.mjs",
+		"elements/buttons.mjs",
+		"elements/formatting.mjs",
+	],
+	permissions: [
+		"forms/controls/permissionSections.mjs",
+		"forms/controls/accessRestrictions.mjs",
+	],
+	"form-complex": [
+		"elements/table.mjs",
+		"elements/todo.mjs",
+		"elements/signature.mjs",
+	],
+};
 
 /**
  * @testable false
@@ -84,6 +242,18 @@ const atomicWriteFileSync = (pathValue, content) => {
  */
 const interactionFoundationChunk = (id) => {
 	const normalized = id.replaceAll("\\", "/");
+	// Toolbar options also import Tiptap helpers; share the editor implementation
+	// with them without extracting a second engine chunk or copying its code.
+	const dependency = normalized.split("/node_modules/").at(-1);
+	if (dependency !== normalized && dependency.startsWith("@floating-ui/"))
+		return "combobox";
+	if (
+		dependency !== normalized &&
+		(dependency.startsWith("@tiptap/") ||
+			dependency.startsWith("prosemirror-") ||
+			DOCUMENT_PACKAGES.has(dependency.split("/")[0]))
+	)
+		return "document";
 	if (normalized.endsWith("/config/browser_protocol.json")) {
 		return "connectivity";
 	}
@@ -91,10 +261,21 @@ const interactionFoundationChunk = (id) => {
 	const sourceIndex = normalized.lastIndexOf(marker);
 	if (sourceIndex === -1) return undefined;
 	const relative = normalized.slice(sourceIndex + marker.length);
+	for (const [chunk, modules] of Object.entries(FEATURE_CHUNK_MODULES)) {
+		if (modules.includes(relative)) return chunk;
+	}
 	if (relative === BOOT_CONNECTIVITY_MODULE) return "connectivity";
 	if (relative === "views/base/entity.mjs") return "entity-foundation";
 	if (INDEX_FOUNDATION_MODULES.has(relative)) return "index-foundation";
 	if (CORE_FOUNDATION_MODULES.has(relative)) return "core-foundation";
+	if (FORM_MODULES.has(relative)) return "forms";
+	if (USER_INDEX_MODULES.has(relative)) return "user-tools";
+	if (COMBOBOX_MODULES.has(relative)) return "combobox";
+	if (
+		DOCUMENT_MODULES.has(relative) ||
+		relative.startsWith("elements/editor/extensions/")
+	)
+		return "document";
 	return INTERACTION_FOUNDATION_MODULES.has(relative)
 		? "foundation"
 		: undefined;

@@ -193,6 +193,15 @@
   {{ page.name }}
 {% endblock title %}
 
+{% block extras %}
+  <link rel="modulepreload"
+        href="/chunks/page-tools.js?v={{ CONFIG.BUILD_ID }}">
+  <link rel="modulepreload"
+        href="/chunks/forms.js?v={{ CONFIG.BUILD_ID }}">
+  <link rel="modulepreload"
+        href="/chunks/document.js?v={{ CONFIG.BUILD_ID }}">
+{% endblock extras %}
+
 {% block content %}
   {{ main() }}
 {% endblock content %}

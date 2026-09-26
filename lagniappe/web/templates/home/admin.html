@@ -1,5 +1,9 @@
 {% set view_entry = "admin" %}
 {% extends "layouts/base.html" %}
+{% block extras %}
+  <link rel="modulepreload"
+        href="/chunks/admin-tools.js?v={{ CONFIG.BUILD_ID }}">
+{% endblock extras %}
 {% from 'home/site_settings.html' import site_settings %}
 {% from 'manual/macros.html' import card as manual_card, code as command_block, subheading as manual_subheading with context %}
 {% import 'home/ingress.html' as ingress %}

@@ -51,6 +51,14 @@
         <link rel="modulepreload"
               href="/chunks/index-foundation.js?v={{ CONFIG.BUILD_ID }}">
       {% endif %}
+      {% if view_entry in ['index', 'user'] %}
+        <link rel="modulepreload"
+              href="/chunks/index-tools.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
+    {% endif %}
+    {% if not public_page|default(false) %}
+      <link rel="modulepreload"
+            href="/chunks/combobox.js?v={{ CONFIG.BUILD_ID }}">
     {% endif %}
     {% if CONFIG.capture_errors and CONFIG.SENTRY_JS_DSN %}
       <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_JS_DSN }}">

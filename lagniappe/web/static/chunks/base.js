@@ -1,2 +1,0 @@
-class o{constructor(t){Object.assign(this,t),this.destroyables=[]}updateSummary(t){const e=this.target.closest("[data-role='site-settings-section']")?.querySelector("[data-role='section-summary']");e&&(e.textContent=t||"")}syncSelectBox(t,e){const s=t.closest("[lp-select]")?._lp_combobox;s&&(s.values.clear(),e&&s.values.add(e),s.updateSelect(!0))}destroy(){this.destroyables.forEach(t=>{t.destroy?.()}),this.destroyables=[]}}export{o as S};
-/*! Third-party licenses: /third-party-licenses.txt */

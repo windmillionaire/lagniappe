@@ -1,5 +1,9 @@
 {% set view_entry = "home" %}
 {% extends "layouts/base.html" %}
+{% block extras %}
+  <link rel="modulepreload"
+        href="/chunks/home-tools.js?v={{ CONFIG.BUILD_ID }}">
+{% endblock extras %}
 {% import 'home/pages.html' as pages %}
 {% import 'home/projects.html' as project %}
 {% import 'home/categories.html' as category %}

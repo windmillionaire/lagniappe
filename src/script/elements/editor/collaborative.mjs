@@ -41,10 +41,13 @@ export class CollaborativeDocument {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_renders_before_initial_state
-	 * @matrix sync : editor-readiness loader-free state-only
+	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
+	 * @matrix sync : editor-readiness state-only
+	 * @matrix editor : loading-feedback
 	 */
 	init() {
 		this._initContainer();
+		if (!this.headless) this._startLoading();
 		this._initEditor();
 		if (!this.headless) this._initToolbar();
 
@@ -64,8 +67,12 @@ export class CollaborativeDocument {
 			if (!this._destroyed && syncManager) {
 				this.remote = await syncManager.state(this);
 			}
+			if (!this._destroyed && !this.remote && !this.offlineRecord?.ydoc) {
+				this._initialStateError = true;
+			}
 			return this.remote;
 		} catch (error) {
+			this._initialStateError = true;
 			this.view?.reportStartupError?.(
 				error,
 				this.target,
@@ -75,6 +82,49 @@ export class CollaborativeDocument {
 		} finally {
 			if (!this._destroyed) this.container.setAttribute("loaded", "");
 		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
+	 * @matrix editor : loading-feedback lifecycle
+	 */
+	_startLoading() {
+		this.container.inert = true;
+		this.container.setAttribute("aria-busy", "true");
+		this.loadingStatus = document.createElement("div");
+		this.loadingStatus.dataset.role = "document-status";
+		this.loadingStatus.className = "px-6 py-2 text-sm text-base-light";
+		this.loadingStatus.setAttribute("role", "status");
+		this.loadingStatus.hidden = true;
+		this.target.insertBefore(this.loadingStatus, this.container);
+		this._loadingTimer = setTimeout(() => {
+			if (this._destroyed) return;
+			this.loadingStatus.textContent = "Loading document…";
+			this.loadingStatus.hidden = false;
+		}, 150);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
+	 * @matrix editor : loading-feedback empty-content failure lifecycle
+	 */
+	_finishLoading() {
+		clearTimeout(this._loadingTimer);
+		if (this._destroyed || this.headless) return;
+		this.container.removeAttribute("aria-busy");
+		this.toolbar?.element?.removeAttribute("aria-busy");
+		if (this._initialStateError) {
+			this.loadingStatus.textContent =
+				"Unable to load document. Reload to try again.";
+			this.loadingStatus.hidden = false;
+			return;
+		}
+		this.loadingStatus?.remove();
+		this.container.inert = false;
+		this.container.classList.remove("opacity-50", "pointer-events-none");
+		if (this.toolbar?.element) this.toolbar.element.inert = false;
 	}
 
 	get fingerprint() {
@@ -124,18 +174,25 @@ export class CollaborativeDocument {
 						this.offlineRecord?.update ||
 						Object.hasOwn(this.offlineRecord ?? {}, "html"),
 				);
-				await this.sync();
-				await this.waitForRender();
-				if (hadOfflineChanges) this._dirty = true;
-				else this._commitInitialBaseline();
+				try {
+					await this.sync();
+					await this.waitForRender();
+					if (this._destroyed) return;
+					if (hadOfflineChanges) this._dirty = true;
+					else this._commitInitialBaseline();
+				} catch (error) {
+					this._initialStateError = true;
+					this.view?.reportStartupError?.(
+						error,
+						this.target,
+						"document-initial-render",
+					);
+				}
 			}
 
+			if (this._destroyed) return;
 			this.container.setAttribute("initialized", "");
-			if (!this.headless) {
-				this.container.classList.remove("opacity-50", "pointer-events-none");
-				this.toolbar?.element?.removeAttribute("aria-busy");
-				if (this.toolbar?.element) this.toolbar.element.inert = false;
-			}
+			this._finishLoading();
 			this.initialized = true;
 		});
 
@@ -231,7 +288,12 @@ export class CollaborativeDocument {
 	 * @matrix sync : collaboration document offline-replay replay-order response-contract
 	 */
 	get syncData() {
-		if (!this.initialized || this.updateQueue.length === 0) return null;
+		if (
+			!this.initialized ||
+			this._initialStateError ||
+			this.updateQueue.length === 0
+		)
+			return null;
 
 		return {
 			update: this._packageUpdates(),
@@ -246,7 +308,8 @@ export class CollaborativeDocument {
 	 * @matrix sync : empty-content intentional-clear parent-modified save-guard
 	 */
 	get saveData() {
-		if (!this.initialized || !this._dirty) return null;
+		if (!this.initialized || this._initialStateError || !this._dirty)
+			return null;
 
 		const ydoc = this._packageState();
 		if (ydoc === this.snapshot) return null;
@@ -275,6 +338,7 @@ export class CollaborativeDocument {
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
+	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
 	 * @matrix sync : collaboration concurrency document lifecycle merge offline-replay presence replay-order
 	 */
 	async sync() {
@@ -346,10 +410,20 @@ export class CollaborativeDocument {
 		if (this.remote.fingerprint) this.fingerprint = this.remote.fingerprint;
 
 		this.remote = null;
+		// A later successful poll can recover an initial transport failure.
+		if (this.initialized && this._initialStateError) {
+			await this.waitForRender();
+			if (this._destroyed) return;
+			if (!this._dirty) this._commitInitialBaseline();
+			this._initialStateError = false;
+			this._finishLoading();
+		}
 	}
 
 	destroy() {
 		this._destroyed = true;
+		clearTimeout(this._loadingTimer);
+		this.loadingStatus?.remove();
 		this.mentionSuggestions?.destroy();
 		this.editor?.destroy();
 		this.toolbar?.destroy();

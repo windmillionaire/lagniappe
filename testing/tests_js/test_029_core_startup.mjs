@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import esmock from "esmock";
+import { createBrowser } from "../utility/js/environment.mjs";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -804,10 +805,17 @@ test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	assert.equal(presented, true);
 });
 
-async function loadCollaborativeDocument({ editor } = {}) {
+async function loadCollaborativeDocument({
+	editor,
+	waitForAttribute = async () => {},
+} = {}) {
 	const Y = {
-		Doc: class {},
+		Doc: class {
+			on() {}
+			destroy() {}
+		},
 		encodeStateAsUpdate: () => null,
+		applyUpdate() {},
 		mergeUpdates: () => null,
 	};
 	const { CollaborativeDocument } = await esmock.strict(
@@ -820,7 +828,7 @@ async function loadCollaborativeDocument({ editor } = {}) {
 			"../../src/script/shared/utilities.mjs": {
 				base64ToUint8Array: () => null,
 				uint8ArrayToBase64: () => "",
-				waitForAttribute: async () => {},
+				waitForAttribute,
 			},
 			"../../src/script/elements/editor/editor.mjs": {
 				collaborativeEditor: () => editor,
@@ -834,30 +842,14 @@ async function loadCollaborativeDocument({ editor } = {}) {
 	return CollaborativeDocument;
 }
 
-/** @matrix sync : editor-readiness loader-free state-only */
+/** @matrix sync : editor-readiness state-only */
 test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	let resolveSync;
-	let loaderAppends = 0;
-	const loadedAttributes = [];
+	const dom = createBrowser(t, { html: "<section></section>" });
+	const target = dom.window.document.querySelector("section");
 	const syncReady = new Promise((resolve) => {
 		resolveSync = resolve;
 	});
-	const document = {
-		createElement() {
-			return {
-				dataset: {},
-				className: "",
-				classList: { add() {} },
-				appendChild() {
-					loaderAppends += 1;
-				},
-				setAttribute(name) {
-					loadedAttributes.push(name);
-				},
-			};
-		},
-	};
-	replaceGlobal(t, "document", document);
 	const CollaborativeDocument = await loadCollaborativeDocument();
 	let stateCalls = 0;
 	const shellCalls = [];
@@ -867,12 +859,7 @@ test("test_collaborative_document_renders_before_initial_state", async (t) => {
 		remote: null,
 		syncId: "page-1:document",
 		view: { syncReady },
-		target: {
-			replaceChildren(container) {
-				shellCalls.push("container");
-				this.container = container;
-			},
-		},
+		target,
 		_initEditor() {
 			shellCalls.push("editor");
 		},
@@ -881,9 +868,11 @@ test("test_collaborative_document_renders_before_initial_state", async (t) => {
 		},
 	});
 	const result = documentWidget.init();
+	t.after(() => documentWidget.destroy());
 	assert.equal(result, undefined);
-	assert.deepEqual(shellCalls, ["container", "editor", "toolbar"]);
-	assert.equal(loaderAppends, 0);
+	assert.deepEqual(shellCalls, ["editor", "toolbar"]);
+	assert.ok(target.querySelector("[data-role=editor]"));
+	assert.equal(documentWidget.loadingStatus.hidden, true);
 	let stateSettled = false;
 	documentWidget.initialStateReady.then(() => {
 		stateSettled = true;
@@ -891,7 +880,7 @@ test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	await Promise.resolve();
 	assert.equal(stateCalls, 0);
 	assert.equal(stateSettled, false);
-	assert.equal(loadedAttributes.includes("loaded"), false);
+	assert.equal(documentWidget.container.hasAttribute("loaded"), false);
 	resolveSync({
 		async state(widget) {
 			stateCalls += 1;
@@ -902,7 +891,128 @@ test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	await documentWidget.initialStateReady;
 	assert.equal(stateCalls, 1);
 	assert.equal(documentWidget.remote?.fingerprint, "remote-fingerprint");
-	assert.equal(loadedAttributes.includes("loaded"), true);
+	assert.equal(documentWidget.container.hasAttribute("loaded"), true);
+});
+
+/** @matrix editor : loading-feedback empty-content failure lifecycle */
+/** @matrix sync : lifecycle */
+test("test_document_loading_status_tracks_content_and_teardown", async (t) => {
+	const dom = createBrowser(t);
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const frames = [];
+	replaceGlobal(t, "requestAnimationFrame", (callback) =>
+		frames.push(callback),
+	);
+	for (const scenario of [
+		"slow",
+		"fast-empty",
+		"failed",
+		"missing",
+		"offline-cached",
+		"destroy-fetch",
+		"destroy-render",
+	]) {
+		let widget;
+		try {
+			dom.window.document.body.innerHTML =
+				'<section lp-sync="page-1:document"></section>';
+			const state = Promise.withResolvers();
+			let create;
+			let rendered = null;
+			const editor = {
+				on(name, callback) {
+					if (name === "create") create = callback;
+				},
+				commands: {
+					setContent(markup) {
+						rendered = markup;
+					},
+				},
+				view: { updateState() {} },
+				destroy() {},
+			};
+			const Widget = await loadCollaborativeDocument({
+				editor,
+				waitForAttribute: () => widget.initialStateReady,
+			});
+			widget = new Widget({
+				target: dom.window.document.querySelector("section"),
+				readonly: true,
+				view: {
+					SyncManager: { state: () => state.promise },
+					reportStartupError() {},
+				},
+			});
+			widget.init();
+			const initializing = create();
+			const status = widget.target.querySelector('[role="status"]');
+			assert.equal(status.hidden, true);
+			assert.equal(widget.container.inert, true);
+			assert.equal(widget.saveData, null);
+			if (scenario !== "fast-empty") {
+				t.mock.timers.tick(150);
+				assert.equal(status.hidden, false);
+				assert.equal(status.textContent, "Loading document…");
+			}
+			if (scenario === "destroy-fetch") widget.destroy();
+			if (scenario === "offline-cached")
+				widget.offlineRecord = { ydoc: "cached-state" };
+			if (scenario === "failed")
+				state.reject(new Error("transport unavailable"));
+			else
+				state.resolve(
+					["missing", "offline-cached"].includes(scenario)
+						? null
+						: {
+								mode: "snapshot",
+								markup: scenario === "fast-empty" ? "" : "<p>Saved text</p>",
+							},
+				);
+			await widget.initialStateReady;
+			// Let the create handler reach its first rendering frame.
+			await Promise.resolve();
+			await Promise.resolve();
+			if (scenario === "destroy-render") widget.destroy();
+			if (!scenario.startsWith("destroy")) {
+				assert.equal(widget.container.inert, true);
+				assert.equal(status.isConnected, true);
+			}
+			while (frames.length) frames.shift()();
+			await initializing;
+			t.mock.timers.tick(1000);
+			if (scenario.startsWith("destroy")) {
+				assert.equal(status.isConnected, false);
+				assert.equal(widget.initialized, false);
+			} else if (["failed", "missing"].includes(scenario)) {
+				assert.match(status.textContent, /Unable to load document/);
+				assert.equal(widget.container.inert, true);
+				assert.equal(widget.container.hasAttribute("aria-busy"), false);
+				widget._dirty = true;
+				widget.updateQueue.push("setup-update");
+				assert.equal(widget.saveData, null);
+				assert.equal(widget.syncData, null);
+				widget._dirty = false;
+				widget.remote = { mode: "snapshot", markup: "<p>Recovered text</p>" };
+				const recovering = widget.sync();
+				while (frames.length) frames.shift()();
+				await recovering;
+				assert.equal(status.isConnected, false);
+				assert.equal(widget.container.inert, false);
+				assert.equal(rendered, "<p>Recovered text</p>");
+				assert.equal(widget.saveData, null);
+			} else {
+				assert.equal(status.isConnected, false);
+				assert.equal(widget.container.inert, false);
+				assert.equal(widget.initialized, true);
+				if (scenario === "fast-empty") assert.equal(status.textContent, "");
+				if (scenario === "slow") assert.equal(rendered, "<p>Saved text</p>");
+			}
+		} catch (error) {
+			throw new Error(scenario, { cause: error });
+		} finally {
+			widget?.destroy();
+		}
+	}
 });
 
 /** @matrix editor : empty-content initialization save-guard */

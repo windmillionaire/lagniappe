@@ -111,3 +111,12 @@
 {% block content %}
   {{ view() }}
 {% endblock content %}
+
+{% block extras %}
+  {% if Resource.USERS.allowed(Action.CREATE) or Resource.USER_GROUPS.allowed(Action.VIEW) %}
+    <link rel="modulepreload"
+          href="/chunks/user-tools.js?v={{ CONFIG.BUILD_ID }}">
+    <link rel="modulepreload"
+          href="/chunks/forms.js?v={{ CONFIG.BUILD_ID }}">
+  {% endif %}
+{% endblock extras %}

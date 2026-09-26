@@ -38,7 +38,7 @@ from testing.elements import (
     Tabs,
 )
 from testing.resources import Project
-from testing.utility.network import expect_successful_response
+from testing.utility.network import expect_successful_response, scoped_browser_route
 from testing.utility.polling import expect_poll_result
 
 
@@ -115,6 +115,51 @@ def test_editor_loads_and_saves_text(get_user):
     user.go(project)
     editor = project.editor
     assert editor.get_text() == test_text
+
+
+# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument
+# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument._startLoading
+# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument._finishLoading
+# @matrix editor : loading-feedback reload text-save
+def test_document_loading_status_waits_for_saved_content(get_user):
+    user = get_user(Users.OWNER)
+    project = Project(
+        user=user,
+        definition=ProjectDefinition(name=f"Document loading {uuid4().hex[:8]}"),
+    ).create()
+    user.go(project)
+    editor = project.editor
+    text = "This saved document must appear after the loading message."
+    editor.type_text(text)
+    editor.blur()
+    sync_id = project.entity.sync_ids["document"]["id"]
+    observed = []
+
+    def hold_initial_document_response(route):
+        payload = route.request.post_data_json or {}
+        if not any(
+            item.get("sync_id") == sync_id
+            for item in payload.get("subscriptions", [])
+        ) or observed:
+            route.continue_()
+            return
+        response = route.fetch()
+        assert response.status == 200
+        status = user.locate("[data-role='document-status']")
+        expect(status).to_have_text("Loading document…")
+        expect(status).to_be_visible()
+        expect(user.locate("[data-role='editor']")).to_have_attribute("inert", "")
+        expect(user.locate("[data-role='toolbar']")).to_have_attribute("inert", "")
+        observed.append(True)
+        route.fulfill(response=response)
+
+    with scoped_browser_route(user.page.context, "**/l/poll", hold_initial_document_response):
+        user.go(project, query_params={"tab": "document"})
+        expect(user.locate("[data-role='editor']")).to_contain_text(text)
+        expect(user.locate("[data-role='document-status']")).to_have_count(0)
+        expect(user.locate("[data-role='editor']")).not_to_have_attribute("inert", "")
+        expect(user.locate("[data-role='toolbar']")).not_to_have_attribute("inert", "")
+    assert observed == [True]
 
 
 # @matrix editor : formatting reload

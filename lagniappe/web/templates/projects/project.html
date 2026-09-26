@@ -139,3 +139,10 @@
 {% block content %}
   {{ main() }}
 {% endblock content %}
+
+{% block extras %}
+  <link rel="modulepreload"
+        href="/chunks/project-tools.js?v={{ CONFIG.BUILD_ID }}">
+  <link rel="modulepreload"
+        href="/chunks/document.js?v={{ CONFIG.BUILD_ID }}">
+{% endblock extras %}

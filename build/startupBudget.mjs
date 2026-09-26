@@ -4,8 +4,10 @@ export const STARTUP_BUDGETS = Object.freeze({
 	// Includes the application-owned upstream failure and recovery boundary.
 	main: 40 * KIB,
 	shell: 64 * KIB,
-	core: 120 * KIB,
-	builder: 288 * KIB,
+	// Shared UI resources and choice fields exchange modest extra bytes for fewer
+	// requests. The independent heavy-service exclusions below still apply.
+	core: 128 * KIB,
+	builder: 304 * KIB,
 });
 
 export const SHELL_VIEW_ENTRIES = Object.freeze([

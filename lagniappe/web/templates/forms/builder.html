@@ -1,5 +1,9 @@
 {% set view_entry = "builder" %}
 {% extends "layouts/base.html" %}
+{% block extras %}
+  <link rel="modulepreload"
+        href="/chunks/builder-controls.js?v={{ CONFIG.BUILD_ID }}">
+{% endblock extras %}
 {% from 'common.html' import desktop %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}

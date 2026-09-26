@@ -1,2 +1,0 @@
-const p=(t,i)=>{if(!t||!i)return!1;const o=n=>n.type==="input"?n.input||"text":n.type==="link"?n.location||"out":n.type;return o(t)!==o(i)||!!t.multiple!=!!i.multiple||t.options?.some(({value:n})=>!i.options?.some(s=>s.value===n))?!1:!t.columns?.some(n=>!p(n,i.columns?.find(s=>s.id===n.id)))},l=(t,i)=>(t||[]).some(o=>!p(o,(i||[]).find(n=>n.id===o.id)));export{p as c,l as i};
-/*! Third-party licenses: /third-party-licenses.txt */
