@@ -460,10 +460,12 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations
+    # @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
     # @pair task:create
+    # @matrix ai-report : id-allocation identity
     @classmethod
-    def create(cls, data):
-        new_task = cls()
+    def create(cls, data, *, key=None):
+        new_task = cls(key)
         new_task.kind = cls.entity_kind
         new_task.completed = False
 

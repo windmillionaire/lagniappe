@@ -1,12 +1,13 @@
 """Versioned adaptive polling for mounted browser state."""
 
-from flask import request
+from flask import g, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
 from lagniappe.core.tools.polling.contract import (
     POLL_TYPES,
@@ -15,6 +16,7 @@ from lagniappe.core.tools.polling.contract import (
 )
 from lagniappe.core.tools.polling.projections import (
     channel_revisions as _channel_revisions,
+    channel_paths,
     filter_revision,
     lock_result as _project_lock_result,
     operation_statuses as _operation_statuses,
@@ -33,6 +35,32 @@ POLL_AFTER_MS = {
     "operation": 4_000,
     "ingress": 2_500,
 }
+
+
+# @testable true
+# @tests tests_e2e/001_site/test_001j_poll_batching.py::test_poll_batches_auth_entities_and_channels
+# @tests tests_e2e/001_site/test_001j_poll_batching.py::test_poll_batching_preserves_validation_and_stale_session_recovery
+# @matrix polling auth : batching session-preload fallback validation
+def _poll_context():
+    """Share only validated, bounded polling roots with the fresh auth lookup."""
+    try:
+        parsed = parse_poll_request(request.get_json(silent=True))
+    except PollContractError:
+        # Authentication still precedes reporting a malformed polling payload.
+        return {}
+    g.poll_request = parsed
+    descriptors = parsed.subscriptions
+    paths = [
+        path for descriptor in descriptors if descriptor["type"] == "channel"
+        for path in channel_paths(descriptor["channel"])
+    ]
+    return {
+        "context_keys": tuple(set(database_utility.site_fingerprint_keys(paths).values())),
+        "context_entity_keys": tuple(dict.fromkeys(
+            descriptor["key"] for descriptor in descriptors
+            if descriptor["type"] in {"entity", "form-lock", "document", "ingress"}
+        )),
+    }
 
 
 # @testable false
@@ -141,13 +169,14 @@ def _document_result(descriptor, entity, client_id):
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
 # @matrix notifications : cold-seed ping redis-projection
 # @matrix polling : authorization batching channel entity fingerprint identifiers operation owner permissions personal-state piggyback progress protocol revision timing unavailable validation
+# @matrix permissions : batching authorization
 # @pairs notifications:deferred sync:presence web-headers:notification-state
 @internal.route("/poll", methods=["POST"])
-@logged_in
+@logged_in(context=_poll_context)
 def poll():
     """Resolve every due browser subscription through one typed contract."""
     try:
-        parsed = parse_poll_request(request.get_json(silent=True))
+        parsed = g.get("poll_request") or parse_poll_request(request.get_json(silent=True))
     except PollContractError as error:
         return responses.json_response(
             {
@@ -179,12 +208,14 @@ def poll():
         for subscription_type in ("entity", "form-lock", "document", "ingress")
         for descriptor in grouped[subscription_type]
     ]
-    entities = {
-        entity.urlsafe_key: entity
-        for entity in Entities.fetch(
-            *dict.fromkeys(entity_keys), request=Fetch.direct()
-        )
-    }
+    prefetched = g.get("request_context_entities")
+    entities = (
+        {key: prefetched[key] for key in entity_keys if key in prefetched}
+        if prefetched is not None else {
+            entity.urlsafe_key: entity
+            for entity in Entities.fetch(*dict.fromkeys(entity_keys), request=Fetch.direct())
+        }
+    )
     Entities.fetch(
         *(entity for entity in entities.values()
           if isinstance(entity, (Entities.TASK, Entities.FILE))),
@@ -252,6 +283,9 @@ def poll():
     channel_revisions = _channel_revisions(
         channels,
         current_user,
+        fingerprint_loader=lambda paths: database_utility.site_fingerprints(
+            paths, records=g.get("request_context_records"),
+        ),
         **({"notification_state": notification_state} if notification_polled else {}),
     )
 

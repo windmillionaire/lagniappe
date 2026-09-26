@@ -240,7 +240,7 @@ def _session_protection_failed():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
 # @matrix auth : batch-load canonical-page clear flask-login-skip page-key session-keys session-preload stale-session user-key
 # @pair cache:invalidation-acknowledgement
-def _load_session_user_context(entity_identifier=None, *, context_keys=()):
+def _load_session_user_context(entity_identifier=None, *, context_keys=(), context_entity_keys=()):
     if not session.get("_user_id"):
         clear_login_session()
         return None, None
@@ -254,7 +254,7 @@ def _load_session_user_context(entity_identifier=None, *, context_keys=()):
     if not user_identifier or not user_page_identifier:
         return None, None
 
-    identifiers = (user_identifier, user_page_identifier, entity_identifier)
+    identifiers = (user_identifier, user_page_identifier, entity_identifier, *context_entity_keys)
     if context_keys:
         # Route-specific raw revision records share the root lookup. Only
         # entity rows enter the typed loader; relations still load normally.
@@ -292,6 +292,8 @@ def _load_session_user_context(entity_identifier=None, *, context_keys=()):
         clear_login_session()
         return None, None
 
+    if context_entity_keys:
+        g.request_context_entities = {entity.urlsafe_key: entity for entity in loaded}
     g._login_user = user
     if user.invalidate_cache:
         request_client_cache_invalidation(user)
@@ -306,12 +308,15 @@ def _load_session_user_context(entity_identifier=None, *, context_keys=()):
 # @matrix permissions : resource-gates
 # @pair embedded-table:table-cell-expand
 @timed("auth", "context")
-def _load_request_context(entity_identifier=None, *, context_keys=()):
-    user, entity = _load_session_user_context(entity_identifier, context_keys=context_keys)
+def _load_request_context(entity_identifier=None, *, context_keys=(), context_entity_keys=()):
+    user, entity = _load_session_user_context(
+        entity_identifier, context_keys=context_keys, context_entity_keys=context_entity_keys,
+    )
     if not user:
         # A stale session preload must not supply validation state for the
         # fallback identity. Its route resolves revisions normally instead.
         g.pop("request_context_records", None)
+        g.pop("request_context_entities", None)
         user = current_user
         if user.is_authenticated:
             seed_login_session(user)
@@ -462,15 +467,18 @@ def home_permission(*, anonymous_endpoint=None):
 # @testable true
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_page_requires_login
 # @pair search:anonymous-access
-def logged_in(f):
-    """Simple authentication check with no entity loading or ETag."""
+# @matrix polling auth : batching session-preload fallback validation
+def logged_in(f=None, *, context=None):
+    """Authenticate, optionally sharing a bounded route preload with auth roots."""
+    if f is None:
+        return lambda function: logged_in(function, context=context)
 
     # @testable false
     # @covered-by lagniappe/web/auth.py::logged_in
     # @reason route wrapper behavior is owned by the parent decorator contract
     @wraps(f)
     def wrapped(*args, **kwargs):
-        user, _entity = _load_request_context()
+        user, _entity = _load_request_context(**(context() if context else {}))
         if not user.is_authenticated:
             abort(401)
 

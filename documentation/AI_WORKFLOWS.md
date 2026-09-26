@@ -342,6 +342,13 @@ Groups commit at 50 actions or approximately 4 MiB of prepared root data. These
 are general size boundaries, not boundaries between entity types or dependencies.
 Form migrations flush prepared work before starting their asynchronous child job.
 
+Ordinary creations reserve numeric Datastore IDs in bounded groups of at most
+50, grouped by physical kind and resolved parent. Entity factories receive the
+reserved key at construction, so they do not allocate a second unused identity.
+Unresolved Project parents wait until available. Reservations do not write
+entities; unused IDs after a skipped or rejected batch are harmless. Committed
+receipts remain the authority for retry identities.
+
 The report and its action results commit with the workspace writes in a guarded
 transaction. A batch receipt distinguishes rejected writes from a lost commit
 response. Retry resumes uncommitted groups; it does not replay successful creates

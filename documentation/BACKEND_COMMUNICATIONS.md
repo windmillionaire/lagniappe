@@ -137,6 +137,13 @@ best-effort Redis activity hint; `capture.py` creates delivery rows;
 `dispatch.py` schedules Cloud Tasks; `presentation.py` renders provider-neutral
 multipart email; `delivery.py` owns send-time suppression and terminal state.
 
+Authenticated requests record activity at most once per minute in Redis, with
+a ten-minute expiry. A bounded per-worker timing memo skips redundant Redis
+checks between successful observations; failures are retried on the next
+request. This is only an email-suppression hint. If Redis loses a presence key,
+an active worker may take up to one minute to recreate it; permission checks
+never use this memo.
+
 ## Browser surfaces
 
 `views/messages.mjs` owns the Messages page. `MessageComposer` is shared with

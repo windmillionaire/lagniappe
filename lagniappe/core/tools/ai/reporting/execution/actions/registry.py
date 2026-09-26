@@ -11,10 +11,10 @@ from .task_completion import _complete_task
 
 REPORT_ACTION_ADAPTERS = {adapter.action_type: adapter for adapter in (
     *(ReportActionAdapter(name, execute_update_action, uses_context=True) for name in UPDATE_TARGETS),
-    ReportActionAdapter("create_form", _create_form),
-    ReportActionAdapter("create_category", _create_category),
-    ReportActionAdapter("create_project", _create_project),
-    ReportActionAdapter("create_model_task", _create_model_task),
+    ReportActionAdapter("create_form", _create_form, uses_context=True),
+    ReportActionAdapter("create_category", _create_category, uses_context=True),
+    ReportActionAdapter("create_project", _create_project, uses_context=True),
+    ReportActionAdapter("create_model_task", _create_model_task, uses_context=True),
     ReportActionAdapter("create_page", _create_page, uses_context=True),
     ReportActionAdapter("create_task", _create_task, uses_context=True),
     ReportActionAdapter("append_page_document", _append_page_document, uses_context=True),

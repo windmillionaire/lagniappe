@@ -38,8 +38,49 @@ from .completed_tasks import (
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
+# @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
+# @tests tests_unit/test_032h_report_batches.py::test_create_key_batches_are_bounded_and_keep_parent_groups_separate
 # @matrix ai-report : create idempotency post-commit-checkpoint recovery
+# @matrix ai-report : id-allocation batching parent bounded
 def _allocate_action_output_key(action, created, context):
+    spec = _creation_key_spec(action, created, context)
+    if spec is None:
+        return None
+    record = context.get("action_records", {}).get(action.get("id")) or {}
+    prepared = context.setdefault("prepared_keys", {})
+    identity = record.get("idempotency_key")
+    if identity in prepared:
+        return prepared[identity]
+    actions = context.get("allocation_actions", [])
+    index = next((i for i, item in enumerate(actions) if item.get("id") == action.get("id")), None)
+    if identity is None or index is None:
+        return database_utility.create_key(*spec)
+
+    # Reserve only a bounded lookahead with the same physical kind and parent.
+    # Unresolved parents are deferred until their creation has been applied.
+    group = []
+    kind, parent = spec
+    for item in actions[index:index + 50]:
+        pending = context["action_records"].get(item.get("id")) or {}
+        pending_id = pending.get("idempotency_key")
+        if (not pending_id or pending_id in prepared or pending.get("prepared")
+                or pending.get("output_key") or pending.get("status") in {"complete", "skipped"}
+                or item.get("skip")):
+            continue
+        candidate = _creation_key_spec(item, created, context)
+        if candidate and (database_utility.KINDS[candidate[0]], candidate[1]) == (database_utility.KINDS[kind], parent):
+            group.append(pending_id)
+    if not group:
+        return database_utility.create_key(*spec)
+    keys = database_utility.create_keys(kind, parent, len(group))
+    prepared.update(zip(group, keys))
+    return prepared[identity]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/checkpoints.py::_allocate_action_output_key
+# @reason eligible output kinds and resolved parents are exercised through Plan creation
+def _creation_key_spec(action, created, context):
     action_type = action.get("type")
     if not action_type.startswith("create_"):
         return None
@@ -78,7 +119,19 @@ def _allocate_action_output_key(action, created, context):
             if parent is None:
                 parent = database_get.datastore_key(reference)
 
-    return database_utility.create_key(kind, parent)
+        if parent is None:
+            return None
+    return kind, parent
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
+# @reason construction uses the same identity that is persisted with the action receipt
+def _prepared_output_key(context):
+    context = context or {}
+    record = context.get("action_record") or {}
+    return (context.get("prepared_keys", {}).get(record.get("idempotency_key"))
+            or database_get.datastore_key(record.get("output_key")))
 
 
 # @testable false

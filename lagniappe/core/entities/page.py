@@ -216,9 +216,12 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                     return False
         return super().allowed(action, user=user)
 
+    # @testable true
+    # @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
+    # @matrix ai-report : id-allocation identity
     @classmethod
-    def create(cls, data):
-        new_page = cls()
+    def create(cls, data, *, key=None):
+        new_page = cls(key)
         new_page.kind = cls.entity_kind
 
         new_page.update(data)

@@ -77,6 +77,11 @@ def _patch_fake_keys(monkeypatch):
         return FakeKey(f"{kind}-{counter['value']}")
 
     monkeypatch.setattr(entity_module.database_utility, "create_key", create_key)
+    monkeypatch.setattr(entity_module.database_utility, "create_keys", lambda kind, parent, count: [create_key(kind, parent) for _ in range(count)])
+    datastore_key = entity_module.database_get.datastore_key
+    monkeypatch.setattr(entity_module.database_get, "datastore_key", lambda value: value if isinstance(value, FakeKey) else datastore_key(value))
+    get_entity = entity_module.database_get.entity
+    monkeypatch.setattr(entity_module.database_get, "entity", lambda value: None if isinstance(value, FakeKey) else get_entity(value))
     monkeypatch.setattr(
         entity_module.database_get,
         "urlsafe_key",

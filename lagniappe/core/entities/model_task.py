@@ -57,9 +57,12 @@ class ModelTask(Entity):
     def order(self, value):
         self.db["order"] = int(value)
 
+    # @testable true
+    # @tests tests_unit/test_032h_report_batches.py::test_create_key_batches_are_bounded_and_keep_parent_groups_separate
+    # @matrix ai-report : id-allocation parent
     @classmethod
-    def create(cls, project, data):
-        new_task = cls(parent=project)
+    def create(cls, project, data, *, key=None):
+        new_task = cls(key, parent=project)
         new_task.project = project
         new_task.kind = cls.entity_kind
 

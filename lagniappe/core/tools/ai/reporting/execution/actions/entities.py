@@ -12,12 +12,13 @@ from .results import (
 from .references import (
     _resolve_entity,
 )
+from .checkpoints import _prepared_output_key
 
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
-def _create_form(action, _report, user, _created):
+def _create_form(action, _report, user, _created, context=None):
     _require_allowed(
         Resource.FORMS.allowed(Action.CREATE, user),
         "You do not have permission to create forms.",
@@ -34,7 +35,7 @@ def _create_form(action, _report, user, _created):
         raise exceptions.ValidationError(
             "Create form actions require at least one schema field."
         )
-    form = Entities.FORM.create({"name": name, "form-type": form_type})
+    form = Entities.FORM.create({"name": name, "form-type": form_type}, key=_prepared_output_key(context))
     form.properties.schema.validate_ai(schema)
     form.ai_generated = True
     return form, [form]
@@ -43,7 +44,7 @@ def _create_form(action, _report, user, _created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
-def _create_category(action, _report, user, created):
+def _create_category(action, _report, user, created, context=None):
     _require_allowed(
         Resource.CATEGORY.allowed(Action.CREATE, user),
         "You do not have permission to create categories.",
@@ -63,7 +64,7 @@ def _create_category(action, _report, user, created):
             "name": data.get("name") or "Generated category",
             "description": data.get("description"),
             "form": form,
-        }
+        }, key=_prepared_output_key(context),
     )
     category.ai_generated = True
     return category, [category]
@@ -72,7 +73,7 @@ def _create_category(action, _report, user, created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
-def _create_project(action, _report, user, _created):
+def _create_project(action, _report, user, _created, context=None):
     _require_allowed(
         Resource.PROJECT.allowed(Action.CREATE, user),
         "You do not have permission to create projects.",
@@ -82,7 +83,7 @@ def _create_project(action, _report, user, _created):
         {
             "name": data.get("name") or "Generated project",
             "description": data.get("description"),
-        }
+        }, key=_prepared_output_key(context),
     )
     project.ai_generated = True
     return project, [project]
@@ -91,7 +92,7 @@ def _create_project(action, _report, user, _created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
-def _create_model_task(action, _report, user, created):
+def _create_model_task(action, _report, user, created, context=None):
     data = _data(action)
     project = _resolve_entity(
         data.get("project")
@@ -120,6 +121,7 @@ def _create_model_task(action, _report, user, created):
             "name": data.get("name") or "Generated model task",
             "form": form,
         },
+        key=_prepared_output_key(context),
     )
     return model_task, [model_task]
 
@@ -165,7 +167,7 @@ def _create_page(action, _report, user, created, context=None):
             "model": category,
             "categories": data.get("categories") or [],
             "form": page_form,
-        }
+        }, key=_prepared_output_key(context),
     )
     if page_form is not None and "submission" in data:
         page.ai_submission(data.get("submission") or {})

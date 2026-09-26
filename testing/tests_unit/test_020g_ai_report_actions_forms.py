@@ -155,8 +155,8 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     )
     create_page = report_runner.Entities.PAGE.create
 
-    def create_page_with_in_memory_assets(data):
-        page = create_page(data)
+    def create_page_with_in_memory_assets(data, **kwargs):
+        page = create_page(data, **kwargs)
         page.save_asset = lambda content, *_args, **_kwargs: SimpleNamespace(updated=False)
         return page
 
@@ -167,8 +167,8 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     )
     create_form = report_runner.Entities.FORM.create
 
-    def create_form_with_in_memory_assets(data):
-        form = create_form(data)
+    def create_form_with_in_memory_assets(data, **kwargs):
+        form = create_form(data, **kwargs)
         form.generated_static_content = {}
         form.set_html_field = lambda field_id, content: (
             form.generated_static_content.__setitem__(field_id, content)

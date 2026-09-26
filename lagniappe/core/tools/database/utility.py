@@ -60,6 +60,16 @@ def create_entity(key):
 # @testable infrastructure
 def create_key(entity_kind, parent):
     """Allocate a new Datastore key for the given entity kind and optional parent."""
+    return create_keys(entity_kind, parent, 1)[0]
+
+
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_create_keys_retains_kind_parent_and_numeric_ids
+# @matrix database : id-allocation batching parent
+def create_keys(entity_kind, parent, count):
+    """Allocate a bounded group of numeric keys with one kind and parent."""
+    if not 1 <= count <= 50:
+        raise ValueError("Allocate between 1 and 50 keys at a time.")
     kind = KINDS[entity_kind].value
     if parent and isinstance(parent, Key):
         partial = DATA.datastore.key(kind, parent=parent)
@@ -67,8 +77,7 @@ def create_key(entity_kind, parent):
         partial = DATA.datastore.key(kind, parent=parent.key)
     else:
         partial = DATA.datastore.key(kind)
-    key = DATA.datastore.allocate_ids(partial, 1)[0]
-    return key
+    return DATA.datastore.allocate_ids(partial, count)
 
 
 # @testable infrastructure
@@ -395,8 +404,8 @@ def site_fingerprint(path):
 # @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
 # @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_batch_reads_only_resolved_paths
 # @matrix polling : batching channel mounted-scope
-def site_fingerprints(paths):
-    """Return fingerprints for ``paths`` through one bounded multi-read."""
+def site_fingerprint_keys(paths):
+    """Resolve channel paths to their canonical durable revision keys."""
     paths = tuple(dict.fromkeys(path for path in paths if isinstance(path, str)))
     indexes = {}
     for path in paths:
@@ -413,17 +422,32 @@ def site_fingerprints(paths):
         index: DATA.datastore.key("site", index)
         for index in dict.fromkeys(indexes.values())
     }
+    return {path: keys_by_index[index] for path, index in indexes.items()}
+
+
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_batch_reads_only_resolved_paths
+# @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_reuses_supplied_records
+# @matrix polling : batching channel mounted-scope
+def site_fingerprints(paths, *, records=None):
+    """Read channel revisions once, or reuse this request's durable root batch."""
+    path_keys = site_fingerprint_keys(paths)
+    keys = list(dict.fromkeys(path_keys.values()))
     missing = []
-    records = DATA.datastore.get_multi(list(keys_by_index.values()), missing=missing)
+    if records is None:
+        rows = DATA.datastore.get_multi(keys, missing=missing)
+    else:
+        rows = [records[key] for key in keys if key in records]
+        missing = [Entity(key) for key in keys if key not in records]
     for record in missing:
         record["fingerprint"] = str(uuid.uuid4())
     if missing:
         DATA.datastore.put_multi(missing)
-    by_key = {record.key: record for record in [*records, *missing] if record}
+    by_key = {record.key: record for record in [*rows, *missing] if record}
 
     return {
-        path: by_key[keys_by_index[index]].get("fingerprint")
-        for path, index in indexes.items()
+        path: by_key[key].get("fingerprint")
+        for path, key in path_keys.items()
     }
 
 

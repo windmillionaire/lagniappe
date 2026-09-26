@@ -14,6 +14,30 @@ from lagniappe.core.tools.database import filter as database_filter
 from lagniappe.core.tools.database.filter import Filter, Query, Results
 
 
+# @matrix database : id-allocation batching parent
+def test_create_keys_retains_kind_parent_and_numeric_ids(monkeypatch):
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    calls = []
+
+    def allocate(partial, count):
+        calls.append((partial, count))
+        return [partial.completed_key(i + 101) for i in range(count)]
+
+    monkeypatch.setattr(client, "allocate_ids", allocate)
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=client))
+    parent = client.key(utility.KINDS.project.value, 42)
+    keys = utility.create_keys("model", parent, 3)
+    assert len(calls) == 1
+    assert [key.id for key in keys] == [101, 102, 103]
+    assert all(key.parent == parent and key.kind == utility.KINDS.model.value for key in keys)
+    assert utility.create_key("page", None).parent is None
+    assert calls[-1][1] == 1
+    for count in (0, 51):
+        with pytest.raises(ValueError):
+            utility.create_keys("page", None, count)
+    assert len(calls) == 2
+
+
 @pytest.fixture
 def reference_datastore(monkeypatch):
     """Run real query construction against an explicit Datastore RPC boundary."""
@@ -465,6 +489,25 @@ def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
         "/tasks/index": "tasks-created",
     }
     assert [record.key for record in saved] == [("site", "tasks")]
+
+
+# @matrix polling : batching channel mounted-scope
+def test_site_fingerprints_reuses_supplied_records(monkeypatch):
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    saved = []
+    client.get_multi = Mock(side_effect=AssertionError("Already read with auth roots"))
+    client.put_multi = saved.extend
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=client))
+    existing = Entity(client.key("site", "pages"))
+    existing["fingerprint"] = "current"
+    revisions = utility.site_fingerprints(
+        ["/pages/index", "/tasks/index", "/pages/index"],
+        records={existing.key: existing},
+    )
+    assert revisions["/pages/index"] == "current"
+    assert len(saved) == 1 and saved[0].key == client.key("site", "tasks")
+    assert saved[0]["fingerprint"] == revisions["/tasks/index"]
+    assert utility.site_fingerprints([], records={}) == {}
 
 
 # @matrix notifications : mutation site-fingerprint-isolation

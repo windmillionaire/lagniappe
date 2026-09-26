@@ -17,6 +17,7 @@ from lagniappe.core.tools.cache import documents
 from lagniappe.core.tools.document_crdt import append_fragment
 from lagniappe.core.properties.common_assets import Document
 from lagniappe.core.mutations import plan_mutation
+from lagniappe.core.tools.database import utility as database_utility
 from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
@@ -88,6 +89,62 @@ def setup_case(monkeypatch, actions, initial=()):
 
 def create(kind, name, **data):
     return {"id": name, "type": "create_" + kind, "data": {"name": name, **data}}
+
+
+# @matrix ai-report : id-allocation batching identity recovery
+def test_create_batch_reserves_one_key_per_output_and_reuses_receipts(monkeypatch):
+    actions = []
+    for i in range(10):
+        actions.extend([create("page", f"page{i}"),
+                        create("task", f"task{i}a", page_action=f"page{i}"),
+                        create("task", f"task{i}b", page_action=f"page{i}")])
+    state = setup_case(monkeypatch, actions)
+    allocate = database_utility.create_keys
+    reservations = []
+
+    def reserve(kind, parent, count):
+        keys = allocate(kind, parent, count)
+        reservations.append(keys)
+        return keys
+
+    monkeypatch.setattr(database_utility, "create_keys", reserve)
+    monkeypatch.setattr(database_utility, "create_key", lambda *_: pytest.fail("Construction allocated an extra key"))
+    result = runner.run_report(state.report, state.actor)
+    assert result["status"] == "complete", state.report.error
+    assert [len(keys) for keys in reservations] == [30]
+    assert {record["output_key"] for record in result["actions"]} == {key.name for key in reservations[0]}
+    for i in range(10):
+        page_id = result["actions"][i * 3]["entity"]["id"]
+        for record in result["actions"][i * 3 + 1:i * 3 + 3]:
+            assert state.rows[record["entity"]["id"]].page.urlsafe_key == page_id
+    assert runner.run_report(state.report, state.actor) == result
+    assert len(reservations) == 1
+
+
+# @source lagniappe/core/entities/project.py::Project.create
+# @matrix ai-report : id-allocation batching parent bounded
+def test_create_key_batches_are_bounded_and_keep_parent_groups_separate(monkeypatch):
+    actions = [create("project", "first"), create("project", "second"),
+               create("model_task", "first_model", project_action="first"),
+               create("model_task", "second_model", project_action="second")]
+    actions.extend(create("page", f"page{i}") for i in range(60))
+    actions.append({**create("page", "skipped"), "skip": True})
+    state = setup_case(monkeypatch, actions)
+    allocate = database_utility.create_keys
+    calls = []
+
+    def reserve(kind, parent, count):
+        calls.append((kind, parent, count))
+        return allocate(kind, parent, count)
+
+    monkeypatch.setattr(database_utility, "create_keys", reserve)
+    result = runner.run_report(state.report, state.actor)
+    assert result["status"] == "complete", state.report.error
+    assert sum(count for _, _, count in calls) == 64
+    assert max(count for _, _, count in calls) <= 50
+    parents = {parent.name for kind, parent, count in calls if kind == "model"}
+    assert parents == {result["actions"][i]["output_key"] for i in (0, 1)}
+    assert result["actions"][-1]["status"] == "skipped"
 
 
 # @matrix ai-report files : batching attachments recovery

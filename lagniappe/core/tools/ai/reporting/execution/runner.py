@@ -230,4 +230,4 @@ def _fail_batch(report, result, batch, error):
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason run-scoped report context setup is verified through report execution
 def _build_report_run_context(proposal):
-    return {}
+    return {"allocation_actions": proposal.get("actions", [])}
