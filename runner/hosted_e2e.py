@@ -1358,7 +1358,7 @@ def _sync_settings_secret(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_job_grants_only_job_scoped_ci_permissions
-# @matrix hosted-e2e : identity invocation-overrides least-privilege
+# @matrix hosted-e2e : identity invocation-overrides least-privilege secret-mounts
 def _update_job(infrastructure, state, *, environment="standard"):
     selected = _environment(environment)
     job_service_account = infrastructure.runtime_email
@@ -1392,12 +1392,12 @@ def _update_job(infrastructure, state, *, environment="standard"):
         }
     )
     secret_mounts = [
-        "/workspace/config/files/lagniappe_settings.yaml="
+        "/var/run/secrets/lagniappe-settings/lagniappe_settings.yaml="
         f"{infrastructure.settings_secret}:latest"
     ]
     if SETTINGS.APP.get("REDIS_TLS"):
         secret_mounts.append(
-            "/workspace/config/files/redis_ca.pem="
+            "/var/run/secrets/lagniappe-redis-ca/redis_ca.pem="
             f"{infrastructure.redis_ca_secret}:latest"
         )
     secret_argument = f"--set-secrets={','.join(secret_mounts)}"

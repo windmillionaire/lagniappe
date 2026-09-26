@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 import hashlib
 import json
+from pathlib import Path
 import subprocess
 import sys
 
@@ -2190,8 +2191,9 @@ def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
     ]
 
 
-# @matrix hosted-e2e : identity invocation-overrides least-privilege
-def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
+# @matrix hosted-e2e : identity invocation-overrides least-privilege secret-mounts
+@pytest.mark.parametrize("redis_tls", [False, True], ids=["plain", "tls"])
+def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch, redis_tls):
     calls = []
     monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
     monkeypatch.setattr(
@@ -2199,7 +2201,7 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
         "_deployer_member",
         lambda: "user:operator@example.test",
     )
-    monkeypatch.setattr(hosted_e2e.SETTINGS, "APP", {"REDIS_TLS": True})
+    monkeypatch.setattr(hosted_e2e.SETTINGS, "APP", {"REDIS_TLS": redis_tls})
     monkeypatch.setattr(
         hosted_e2e,
         "_gcloud",
@@ -2249,8 +2251,19 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
     secret_argument = next(
         argument for argument in job_update if argument.startswith("--set-secrets=")
     )
-    assert "lagniappe_settings.yaml=lagniappe-e2e-settings:latest" in secret_argument
-    assert "redis_ca.pem=lagniappe-e2e-redis-ca:latest" in secret_argument
+    mounts = dict(value.split("=", 1) for value in secret_argument.removeprefix("--set-secrets=").split(","))
+    expected = {
+        "/var/run/secrets/lagniappe-settings/lagniappe_settings.yaml": "lagniappe-e2e-settings:latest",
+    }
+    if redis_tls:
+        expected["/var/run/secrets/lagniappe-redis-ca/redis_ca.pem"] = "lagniappe-e2e-redis-ca:latest"
+    assert mounts == expected
+    # Cloud Run rejects two secrets in one directory and hides existing contents.
+    assert len({Path(path).parent for path in mounts}) == len(mounts)
+    dockerfile = " ".join((hosted_e2e.CONTAINER_ROOT / "Dockerfile").read_text().split())
+    for mounted_path in mounts:
+        canonical_path = f"config/files/{Path(mounted_path).name}"
+        assert f"ln -s {mounted_path} {canonical_path}" in dockerfile
 
 
 # @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed

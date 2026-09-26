@@ -36,7 +36,10 @@ Its invoker can execute the exact Cloud Run job and read only the dedicated
 seven-day result bucket.
 
 The runner image excludes `config/files/`. Secret Manager mounts the settings
-and optional Redis CA into the Cloud Run job. The App Engine version receives
+and optional Redis CA into separate directories under `/var/run/secrets/` in
+the Cloud Run job. Image symlinks expose the fixed `config/files/` paths;
+mounting both secrets directly there would make their directory volumes collide.
+The App Engine version receives
 settings through the trusted local deployment boundary.
 
 Dynamic application/testing routes are gated. A run exchanges an ID token for

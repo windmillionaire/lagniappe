@@ -44,4 +44,10 @@ COPY . .
 COPY --from=mcp-builder /workspace/mcp/.venv /workspace/mcp/.venv
 COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore
 
+# Cloud Run mounts each secret as a directory. Keep those directories separate
+# and expose the application's fixed config paths without embedding secret data.
+RUN mkdir -p config/files \
+    && ln -s /var/run/secrets/lagniappe-settings/lagniappe_settings.yaml config/files/lagniappe_settings.yaml \
+    && ln -s /var/run/secrets/lagniappe-redis-ca/redis_ca.pem config/files/redis_ca.pem
+
 ENTRYPOINT ["/workspace/venv/bin/python", "-m", "testing.utility.hosted_e2e_job"]
