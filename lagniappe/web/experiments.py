@@ -5,11 +5,27 @@ import time
 
 from flask import before_render_template, g, request, template_rendered
 
+from lagniappe import CONFIG
 from lagniappe.core.tools import measurements
+from lagniappe.core.tools.polling import task_lists
+
+
+# @testable true
+# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_experiments_compare_task_list_paths_without_changing_content_or_access
+# @matrix experiments : task-list-comparison
+def task_list_context_keys():
+    """Select equivalent read schedules for an opt-in, same-instance trial."""
+    variant = request.headers.get("X-Lagniappe-Experiments-Task-List")
+    if CONFIG.EXPERIMENTS_ENABLED and variant in ("batched", "unbatched"):
+        g.experiments_variant = f"p5-01:{variant}"
+        if variant == "unbatched":
+            return ()
+    return task_lists.snapshot_keys()
 
 
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013g_experiments.py::test_experiments_request_headers_and_private_log_summary
+# @tests tests_e2e/013_agent_api/test_013g_experiments.py::test_experiments_comparison_metadata_survives_304
 # @matrix experiments : request-measurements
 def initialize_measurements(app, config):
     """Register first so the timing response hook runs after all other hooks."""
@@ -46,6 +62,9 @@ def initialize_measurements(app, config):
             version=os.environ.get("GAE_VERSION"),
             instance=os.environ.get("GAE_INSTANCE"),
         )
+        if variant := g.get("experiments_variant"):
+            summary.update(experiment=variant, process=os.getpid())
+            response.headers["X-Lagniappe-Experiment"] = variant
         response.headers["X-Lagniappe-Request-ID"] = measurement.request_id
         response.headers["Server-Timing"] = f"lagniappe;dur={summary['app_ms']}"
         if config.EXPERIMENTS_SOURCE_ID:

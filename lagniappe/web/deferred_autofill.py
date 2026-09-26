@@ -4,7 +4,7 @@ import hashlib
 import json
 from uuid import uuid4
 
-from flask import g, url_for
+from flask import g, request, url_for
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -18,6 +18,7 @@ from lagniappe.core.tools.deferred_jobs.autofill import start_autofill_job
 from lagniappe.core.tools.database.assets import DirectUploadError
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.polling import task_lists
 from lagniappe.core.tools.deferred_jobs.errors import DeferredJobLockedError
 from lagniappe.core.tools.deferred_jobs.locks import (
     AUTOFILL_FORM_LOCK_SCOPE,
@@ -146,15 +147,55 @@ def form_fingerprint(entity, user):
     ], default=str).encode()).hexdigest()
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_unchanged_task_list_skips_loading_and_invalidates_on_save
+# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_job_boundaries_and_render_race
+# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_rechecks_restrictions_for_cached_viewer
+# @matrix tasks cache : conditional-response durable-revision job-lifecycle viewer-scope
+# @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
 def page_tasks_fingerprint(page, user):
-    """A cached task-list fragment must not seed an obsolete operation state."""
+    """Validate proven quiet fragments before loading their Task graph."""
+    from lagniappe.web.auth import _etag_fingerprint
     from lagniappe.core.tools.polling.projections import page_tasks_revision
     if not page.allowed(Action.VIEW, user=user):
         return page.fingerprint
+    snapshot = task_lists.quiet_snapshot(g.get("request_context_records"))
+    if snapshot is not None:
+        fingerprint = task_lists.quiet_fingerprint(snapshot, page, user)
+        if request.if_none_match.contains_weak(_etag_fingerprint(fingerprint, user)):
+            # Only a fully rendered and checked response can issue this ETag.
+            # The permission wrapper still checks authorization and Range.
+            g.task_list_snapshot = snapshot
+            return fingerprint
     prepare_form_states(page.tasks, user)
+    g.task_list_prepared = True
+    if snapshot is not None and not (
+        task_lists.has_operation_dependencies([*page.tasks, *page.completed_tasks])
+        or any(g.get("autofill_bootstrap_locks", {}).values())
+        or g.get("autofill_bootstrap_statuses")
+    ):
+        g.task_list_snapshot = snapshot
+        return fingerprint
     operations = sorted((key, status["revision"]) for key, status in g.get("autofill_bootstrap_statuses", {}).items())
-    return hashlib.sha256(json.dumps([page_tasks_revision(page, user), operations]).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(["full-task-list-v1", page_tasks_revision(page, user), user.urlsafe_key, operations]).encode()).hexdigest()
+
+
+# @testable true
+# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_job_boundaries_and_render_race
+# @matrix tasks cache : conditional-response concurrent-render
+def finish_task_list_validation(page):
+    """Do not label a raced render as reusable quiet HTML."""
+    snapshot = g.get("task_list_snapshot")
+    if snapshot is None:
+        return
+    if (
+        task_lists.has_operation_dependencies([*page.tasks, *page.completed_tasks])
+        or any(g.get("autofill_bootstrap_locks", {}).values())
+        or g.get("autofill_bootstrap_statuses")
+        or task_lists.quiet_snapshot() != snapshot
+    ):
+        g.pop("fingerprint", None)
+        g.NO_CACHE = True
 
 
 # @testable infrastructure

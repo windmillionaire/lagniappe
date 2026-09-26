@@ -13,7 +13,7 @@ from lagniappe.core.tools import measurements
 from lagniappe.core.tools.ai.reporting.execution import request as execution
 from lagniappe.core.tools.auth import agent_api, remote_mcp
 from lagniappe.web import app
-from lagniappe.web.experiments import initialize_measurements
+from lagniappe.web.experiments import initialize_measurements, task_list_context_keys
 from lagniappe.web.routes.api import main as api
 
 pytestmark = pytest.mark.e2e
@@ -145,3 +145,36 @@ def test_experiments_request_headers_and_private_log_summary(
     assert ("trace" in summary) == (mode == "trace")
     client.get("/fixture/second")
     assert records[1]["request_id"] != summary["request_id"]
+
+
+# @source lagniappe/web/experiments.py::task_list_context_keys
+# @matrix experiments : task-list-comparison request-measurements
+def test_experiments_comparison_metadata_survives_304(monkeypatch):
+    flask_app = Flask("experiments-comparison-test")
+    config = SimpleNamespace(
+        EXPERIMENTS_ENABLED=True, EXPERIMENTS_DIAGNOSTICS="summary",
+        EXPERIMENTS_SOURCE_ID="d" * 64,
+    )
+    records = []
+    monkeypatch.setattr(measurements, "emit", records.append)
+    initialize_measurements(flask_app, config)
+
+    @flask_app.get("/fixture")
+    def fixture():
+        task_list_context_keys()
+        return "", 304
+
+    client = flask_app.test_client()
+    for enabled, variant, expected in (
+        (True, "unbatched", "p5-01:unbatched"),
+        (True, "batched", "p5-01:batched"),
+        (True, "invalid-private-value", None),
+        (False, "unbatched", None),
+    ):
+        monkeypatch.setattr(CONFIG, "EXPERIMENTS_ENABLED", enabled)
+        response = client.get("/fixture", headers={"X-Lagniappe-Experiments-Task-List": variant})
+        assert response.status_code == 304 and response.data == b""
+        assert response.headers.get("X-Lagniappe-Experiment") == expected
+        assert records[-1].get("experiment") == expected
+        assert (isinstance(records[-1].get("process"), int)) == bool(expected)
+        assert "invalid-private-value" not in json.dumps(records[-1])

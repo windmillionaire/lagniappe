@@ -128,6 +128,17 @@ truncated coverage. Compare diagnostics off/summary overhead separately. Keep
 instrumentation mode, browser conditions, region, instance class and workers
 consistent across baseline/candidate samples.
 
+For the P5-01 read-batching comparison, authenticated requests to
+`GET /pages/<key>/tasks` may send `X-Lagniappe-Experiments-Task-List: batched`
+or `unbatched`. Both use the same permissions, validators and render path;
+the control reads revisions separately instead of with the initial auth roots.
+The selector is ignored outside experiments installations; ordinary requests
+use batching. With diagnostics enabled, `X-Lagniappe-Experiment` confirms the
+selection and the summary adds `experiment` and worker `process` identifiers.
+Alternate request order and verify version/instance (and worker distribution)
+from joined logs; a shared hostname alone does not prove a shared instance.
+This selector changes no content or HTTP cache semantics.
+
 ## Local measurement libraries
 
 The development dependencies include

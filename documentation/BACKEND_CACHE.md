@@ -5,6 +5,34 @@ polling, collaborative documents, rate limits, and short-lived presence. It is
 never the sole authority for entity content, permissions, notifications, or
 background jobs.
 
+## Page task-list HTTP validation
+
+`GET /pages/<key>/tasks` can validate unchanged HTML before loading Tasks.
+On the normal session path, the initial User/User-Page/Page lookup also reads
+the existing Categories, Projects, Pages, Tasks, Forms and Users channel revisions
+plus the deferred-job Scheduler control. The route declares these extra raw keys
+through `permission(context_keys=...)`; only entity records enter the typed
+loader, and durable authorization relations still load normally. Invalid or
+missing session preload state uses the ordinary login fallback and a separate
+revision read. Other routes add no keys. A current, explicitly empty recovery membership
+permits a quiet validator scoped to the viewer, preloaded authorization graph,
+deployment and build. The control generation detects jobs that both start and
+finish between requests; active jobs and unfinished terminal delivery use the
+full Task/form/operation validation path.
+
+Only a fully rendered list without retained job/review references or pending
+Form migration state may issue a quiet ETag. Revisions are checked again after
+rendering; a concurrent change removes the ETag and makes that response
+`no-store`. Missing/legacy control or channel records use the full path without
+creating records. Operation-bearing lists retain full validation because job
+retention and private review state can change independently of Page content.
+
+This conservative shortcut adds no writes or descendant maintenance. Global
+channel changes and unrelated background jobs can prevent reuse. Cache misses
+retain the final revision check; the initial snapshot shares the root read
+instead of adding a serial lookup. It does not change
+collection polling, form-lock polling, or the authority of Datastore.
+
 ## Filter result responses
 
 Filter previews and saved-filter runs use normal permission-scoped ETags.

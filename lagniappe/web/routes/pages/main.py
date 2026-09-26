@@ -27,6 +27,7 @@ from lagniappe.web.auth import (
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web import deferred_autofill
+from lagniappe.web import experiments
 
 from . import pages
 
@@ -129,12 +130,22 @@ def document_settings(key, **kwargs):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @matrix tasks : basic create
+# @matrix tasks cache : conditional-response durable-revision viewer-scope job-lifecycle concurrent-render
+# @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
 @pages.route("<key>/tasks", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.page_tasks_fingerprint)
+@permission(
+    Resource.PAGE, Action.VIEW,
+    fingerprint=deferred_autofill.page_tasks_fingerprint,
+    context_keys=experiments.task_list_context_keys,
+)
 def tasks(key, **kwargs):
     page = kwargs["entity"]
-
-    return responses.page_tasks(page)
+    if not g.get("task_list_prepared"):
+        # Range/login invalidation may require a body after a matching ETag.
+        deferred_autofill.prepare_form_states(page.tasks, current_user)
+    response = responses.page_tasks(page)
+    deferred_autofill.finish_task_list_validation(page)
+    return response
 
 
 # @testable true
