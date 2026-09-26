@@ -82,5 +82,5 @@ def execute_get_page_tasks(args, user):
             "name": page.name,
         },
         "tasks": [t.to_ai(user) for t in page.tasks],
-        "completed_tasks": [t.to_ai(user) for t in page.completed],
+        "completed_tasks": [t.to_ai(user) for t in page.completed_tasks],
     }

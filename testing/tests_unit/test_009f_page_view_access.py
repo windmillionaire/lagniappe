@@ -218,12 +218,16 @@ def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
             return_value=[t_hide, page, t_show],
         ) as fetch,
     ):
-        page._tasks = None
-        page._completed = None
-        visible = page.tasks
+        for completed in (False, True):
+            t_show.completed = completed
+            t_hide.completed = completed
+            page._tasks = None
+            page._completed = None
+            fetch.reset_mock()
 
-    assert visible == [t_show]
-    fetch.assert_called_once_with(
-        *keys, page,
-        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
-    )
+            assert page.tasks == ([] if completed else [t_show])
+            assert page.completed_tasks == ([t_show] if completed else [])
+            fetch.assert_called_once_with(
+                *keys, page,
+                request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+            )

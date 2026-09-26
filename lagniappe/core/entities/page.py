@@ -156,8 +156,11 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
         return self._tasks
 
+    # @testable false
+    # @covered-by lagniappe/core/entities/page.py::Page._load_tasks
+    # @reason shares the permission-filtered task collection load
     @property
-    def completed(self):
+    def completed_tasks(self):
         if self._completed is None:
             self._load_tasks()
 

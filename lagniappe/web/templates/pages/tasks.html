@@ -56,7 +56,7 @@
   <ul data-role="completed-tasks"
       class="divide-y divide-base-light/50"
       data-visible="false">
-    {% for t in page.completed %}{{ task(t, page) }}{% endfor %}
+    {% for t in page.completed_tasks %}{{ task(t, page) }}{% endfor %}
   </ul>
 {% endmacro %}
 
@@ -195,7 +195,7 @@
         data-nav="false"
         data-controls="true"
         data-task="{{ t.hash }}:TaskSettings"
-        data-history="{{ t.hash }}:TaskHistory"
+        {% if t.has_history %}data-history="{{ t.hash }}:TaskHistory"{% endif %}
         data-deferred-route="{{ url_for('tasks.get', key=t.urlsafe_key) }}"
         data-destination="{{ t.hash }}:TaskForm"
         data-form-state='{{ review_state|tojson }}'

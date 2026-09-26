@@ -1,7 +1,9 @@
 from dataclasses import replace
+import json
 from uuid import uuid4
 
 import pytest
+from bs4 import BeautifulSoup
 from playwright.sync_api import expect
 
 from lagniappe import CONFIG
@@ -17,6 +19,55 @@ pytestmark = pytest.mark.e2e
 FIELD_ID = "input-textab12"
 FILE_SUMMARY = "Parcel 123 is assessed at $245,000 from the attached report."
 EXPECTED_VALUE = "$245,000"
+
+
+# @source lagniappe/web/deferred_autofill.py::form_state
+# @source lagniappe/web/deferred_autofill.py::form_fingerprint
+# @pair ai:autofill
+# @template pages/info.html::info_form
+@pytest.mark.parametrize("task_state", ["none", "active", "completed"])
+def test_page_form_state_does_not_load_task_collection(get_user, monkeypatch, task_state):
+    """Page form state survives completed Tasks without reading the collection."""
+    from lagniappe.core.tools.database import get as database_get
+    from lagniappe.web import app
+
+    user = get_user(Users.OWNER)
+    page = Page(
+        user=user,
+        definition=replace(
+            Pages.test_page_autofill.value.definition,
+            name=f"Page form state {task_state} {uuid4().hex}",
+        ),
+    ).create()
+    if task_state != "none":
+        task = Entities.TASK.create({"name": "Unrelated Task", "page": page.entity})
+        if task_state == "completed":
+            task.complete(user=user.entity)
+        task.save()
+
+    task_queries = []
+    original = database_get.page_tasks
+
+    def record_page_tasks(target):
+        if target.key == page.entity.key:
+            task_queries.append(target.key)
+        return original(target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(database_get, "page_tasks", record_page_tasks)
+        with app.test_client() as client:
+            for cookie in user.page.context.cookies():
+                client.set_cookie(cookie["name"], cookie["value"])
+            response = client.get(f"/pages/{page.key}")
+            assert response.status_code == 200
+            form = BeautifulSoup(response.get_data(as_text=True), "html.parser").select_one(
+                "[data-widget='PageInfo']"
+            )
+            state = json.loads(form["data-form-state"])
+            assert state["revision"]
+            assert state["operation"] is None
+            assert state["reviews"] == []
+            assert task_queries == [], "Page form validation must not query its Tasks"
 
 
 def _attach_evidence(page):

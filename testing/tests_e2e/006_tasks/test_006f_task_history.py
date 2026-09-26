@@ -697,7 +697,21 @@ def test_task_form_field_fills_from_latest_history(get_user):
         name: task.entity.db.get(name)
         for name in ("form", "page", "name", "description")
     }
-    user.go(task)
+    assert not task.entity.has_history
+    history_requests = []
+
+    def record_history_request(request):
+        if f"/tasks/{task.key}/history/latest-submission" in request.url:
+            history_requests.append(request.url)
+
+    user.page.context.on("request", record_history_request)
+    try:
+        user.go(task)
+        expect(task.task_form).to_have_attribute("initialized", "")
+        expect(task.task_form.locator("[data-role='history-fill']")).to_have_count(0)
+        assert history_requests == [], "A Task without history must not fetch it"
+    finally:
+        user.page.context.remove_listener("request", record_history_request)
 
     _complete_then_uncomplete(task, reload=False)
 

@@ -113,6 +113,11 @@ to pass a key or an already-typed entity.
 
 ## Entity types
 
+Pages expose lazy, permission-filtered Task collections as `page.tasks` (active)
+and `page.completed_tasks` (completed). Both share one collection load per Page
+instance. `task.completed` is the individual Task's boolean completion state;
+shared Page/Task helpers must apply completion guards only to Tasks.
+
 `EntityType` in `entities/types.py` maps persisted type names to classes.
 Several names share a class or act as reserved variants.
 

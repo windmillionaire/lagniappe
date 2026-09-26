@@ -89,7 +89,9 @@ def prepare_form_states(entities, user):
 def form_state(entity, user=None):
     """Bootstrap the same editor state used by subsequent operation polling."""
     user = user or current_user
-    if not entity.allowed(Action.EDIT, user=user) or getattr(entity, "completed", False):
+    if not entity.allowed(Action.EDIT, user=user) or (
+        isinstance(entity, Entities.TASK) and entity.completed
+    ):
         return {}
     cache = g.setdefault("autofill_form_states", {})
     # Do not reuse a pre-save projection when a route returns the accepted draft.
