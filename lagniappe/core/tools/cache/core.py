@@ -7,6 +7,7 @@ from redis import ResponseError
 from redis.commands.search.field import NumericField, TagField, TextField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
+from redis.commands.search.result import Result
 
 from config.redis import redis_client_kwargs
 from lagniappe import CONFIG
@@ -360,10 +361,11 @@ class CacheJSON:
         refresh_members = self.redis.json().get(cache_key, "$..[?(@refresh == 1)].id")
         return refresh_members if refresh_members else []
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/add.py::update_json_index
-    # @covered-by lagniappe/core/tools/cache/utility.py::delete
-    # @reason parent-index lookup is owned by cache update/delete workflows
+    # @testable true
+    # @tests tests_unit/test_017_cache_query.py::test_existing_filter_parents_execute_before_pipeline_closes
+    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
+    # @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
+    # @matrix cache : parent-index redis-protocol pipeline
     def get_existing_parents(self, hashes):
         """Return a mapping of hashes to their parent JSON key IDs."""
         with self.redis.pipeline() as pipe:
@@ -371,13 +373,14 @@ class CacheJSON:
                 key_query = Query(f"@cache_key:{{{h}}}").no_content()
                 pipe.ft(self.INDEX).search(key_query)
 
-        results = pipe.execute()
+            results = pipe.execute()
 
-        return {
-            h: [doc_id.decode("utf-8") for doc_id in r[1:]]
-            for h, r in zip(hashes, results)
-            if r and len(r) > 1
-        }
+        parents = {}
+        for entity_hash, raw in zip(hashes, results):
+            result = Result.from_resp3(raw) if isinstance(raw, dict) else Result(raw, hascontent=False)
+            if result.docs:
+                parents[entity_hash] = [doc.id for doc in result.docs]
+        return parents
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_json_parent_lookup_skips_empty_parent_query

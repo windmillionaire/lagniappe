@@ -17,6 +17,45 @@ KIND_SEARCH_SCORES = {
     "file": "0.55",
 }
 
+# Only revision validity changes: preserve cached display/permission fields,
+# including any concurrent refresh, and never create an incomplete cache row.
+_INVALIDATE_REVISIONS = """
+for _, field in ipairs(ARGV) do
+    local value = redis.call('HGET', KEYS[1], field)
+    if value then
+        local row = cjson.decode(value)
+        if not row.revision_stale then
+            -- Append to the serialized root object, retaining JSON arrays
+            -- exactly (Lua cjson re-encodes empty arrays as objects).
+            local separator = next(row) and ',' or ''
+            local marked = string.gsub(value, '}%s*$', separator .. '"revision_stale":true}', 1)
+            redis.call('HSET', KEYS[1], field, marked)
+        end
+    end
+end
+"""
+
+
+# @testable true
+# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
+# @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
+def invalidate_revisions(*entities):
+    """Invalidate modified-only owners without rebuilding their relation graph."""
+    owners = {entity.hash: entity for entity in entities if entity.hash}
+    if not owners:
+        return
+    parents = filter_cache.get_existing_parents(owners.keys())
+    with cache.pipeline() as pipe:
+        pipe.eval(_INVALIDATE_REVISIONS, 1, Keys.ENTITY_HASHES.value, *owners)
+        for entity_hash, indexes in parents.items():
+            for index in indexes:
+                pipe.json().set(
+                    index, f"$.{entity_hash}",
+                    {"refresh": 1, "id": owners[entity_hash].urlsafe_key},
+                    xx=True,
+                )
+        pipe.execute()
+
 
 # @testable false
 # @covered-by lagniappe/core/tools/cache/query.py::_add_snippet

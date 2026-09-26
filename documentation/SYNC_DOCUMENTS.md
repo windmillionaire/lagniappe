@@ -146,6 +146,18 @@ publication without replaying already committed actions.
 
 ## Offline document records
 
+Successful document reads are retained separately in the browser's
+`response-cache`, scoped by User hash, authorization fingerprint, and document
+sync ID. Snapshots and compact remote deltas are available on offline reload;
+an online read remains authoritative, including an empty document. An explicit
+unavailable/permission result clears the retained read rather than falling back
+to it. Cached reads create no pending edit, checkpoint, history, or parent touch.
+They share the response cache's logout, permission/build invalidation, and quota
+eviction. Cache storage is best effort; a document never read in this browser
+still needs an online visit before it can be opened offline.
+Pending edits already contain a complete Yjs state and take precedence over
+retained reads when offline, avoiding duplicate nodes from legacy HTML seeds.
+
 IndexedDB stores one coalesced record per document: compact Yjs state/update,
 latest HTML checkpoint, originating generation/revision, mention occurrences,
 and pending parent-lifecycle intent. It is not an edit log.

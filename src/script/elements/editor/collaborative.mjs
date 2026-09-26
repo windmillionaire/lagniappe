@@ -7,6 +7,7 @@ import {
 } from "../../shared/utilities.mjs";
 import { collaborativeEditor } from "./editor.mjs";
 import { MentionSuggestions } from "./extensions/index.mjs";
+import { DocumentReadCache } from "./readCache.mjs";
 import { Toolbar } from "./toolbar.mjs";
 
 /**
@@ -25,6 +26,10 @@ export class CollaborativeDocument {
 		this.updateQueue = [];
 		this.pendingMentions = new Map();
 		this.syncId = this.target.getAttribute("lp-sync");
+		this.readCache = new DocumentReadCache(
+			this.target.dataset.cacheScope,
+			this.syncId,
+		);
 		this.initialized = false;
 
 		this._applyingRemote = false;
@@ -379,10 +384,10 @@ export class CollaborativeDocument {
 			Y.applyUpdate(this.ydoc, base64ToUint8Array(this.remote.ydoc), "remote");
 			this.snapshot = this.remote.ydoc;
 			this.fingerprint = this.remote.fingerprint;
-		} else if (this.remote.mode === "snapshot" && this.remote.markup) {
+		} else if (this.remote.mode === "snapshot") {
 			this._applyingRemote = true;
 			try {
-				this.editor.commands.setContent(this.remote.markup, {
+				this.editor.commands.setContent(this.remote.markup || "", {
 					emitUpdate: false,
 				});
 			} finally {

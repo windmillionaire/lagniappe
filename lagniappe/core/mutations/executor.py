@@ -105,7 +105,10 @@ def prepare_durable_writes(plan):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_public_discovery_invalidation_runs_after_durable_write
+# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
 # @matrix mutations : durable-first
+# @matrix mutations : full-root masked-touch cache
+# @matrix mutations notes : delete photo-cleanup post-commit
 # @matrix public-pages public-directory sitemap : invalidation
 def execute_post_commit(plan):
     """Execute declared post-commit effects and return types plus errors."""
@@ -132,6 +135,17 @@ def execute_post_commit(plan):
         dispatch_changes(changes)
         cache.update_owner_projection(*refresh)
         complete(MutationEffectType.CACHE_REFRESH)
+
+    refreshed = {entity.key for entity in refresh}
+    invalidated = [
+        effect.entity for effect in post_commit
+        if effect.effect is MutationEffectType.CACHE_INVALIDATE
+        and effect.entity.key not in refreshed
+    ]
+    if invalidated:
+        cache.invalidate_revisions(*invalidated)
+    if any(effect.effect is MutationEffectType.CACHE_INVALIDATE for effect in post_commit):
+        complete(MutationEffectType.CACHE_INVALIDATE)
 
     deleted = [
         effect.entity

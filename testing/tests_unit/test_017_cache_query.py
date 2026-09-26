@@ -614,6 +614,8 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
                 "name": "Page",
                 "parent_key": "category-hash",
                 "form_hash": "own-form-hash",
+                "revision_stale": True,
+                "fingerprint": "stale-page",
             },
             "category-hash": {
                 "id": "category-id",
@@ -621,6 +623,8 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
                 "hash": "category-hash",
                 "name": "Fresh Category",
                 "form_hash": "internal-pointer",
+                "revision_stale": True,
+                "fingerprint": "stale-parent",
             },
             "orphan-hash": {
                 "id": "orphan-id",
@@ -642,6 +646,9 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
     assert "parent_key" not in details["page-hash"]["parent"]
     assert "form_hash" not in details["page-hash"]
     assert "form_hash" not in details["page-hash"]["parent"]
+    for item in (details["page-hash"], details["page-hash"]["parent"]):
+        assert "revision_stale" not in item
+        assert "fingerprint" not in item
 
     fake_cache.hmget_calls.clear()
     details = cache_details.get_details_by_hash(["page-hash", "category-hash"])
@@ -1286,3 +1293,28 @@ def test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption(monkeypatch):
         adopter.assert_active()
     assert e2e_lease.current_e2e_lease(client=client) == owner
     assert e2e_lease.release_e2e_lease(owner, client=client)
+
+
+# @matrix cache : parent-index redis-protocol pipeline
+@pytest.mark.parametrize("protocol", [2, 3])
+def test_existing_filter_parents_execute_before_pipeline_closes(monkeypatch, protocol):
+    from redis.client import Pipeline
+
+    class ProviderPipeline(Pipeline):
+        def execute(self, *args, **kwargs):
+            commands = self.command_stack[:]
+            self.reset()
+            if protocol == 2:
+                return [[1, b"JSON:parent:all-v2"] for _command in commands]
+            return [{b"total_results": 1, b"results": [{b"id": b"JSON:parent:all-v2"}]} for _command in commands]
+
+    provider = SimpleNamespace(
+        pipeline=lambda: ProviderPipeline(None, {}, True, None),
+    )
+    cache = CacheJSON()
+    cache._redis = provider
+    assert cache.get_existing_parents(["page-one", "page-two"]) == {
+        "page-one": ["JSON:parent:all-v2"],
+        "page-two": ["JSON:parent:all-v2"],
+    }
+    assert cache.get_existing_parents([]) == {}

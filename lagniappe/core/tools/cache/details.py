@@ -91,11 +91,15 @@ def _hydrate_details(details, requested_hashes):
             continue
 
         hydrated_item = dict(details_item)
+        if hydrated_item.pop("revision_stale", False):
+            hydrated_item.pop("fingerprint", None)
         hydrated_item.pop("form_hash", None)
         parent_key = hydrated_item.pop("parent_key", None)
         parent = details.get(parent_key)
         if parent:
             hydrated_parent = dict(parent)
+            if hydrated_parent.pop("revision_stale", False):
+                hydrated_parent.pop("fingerprint", None)
             hydrated_parent.pop("parent_key", None)
             hydrated_parent.pop("form_hash", None)
             hydrated_item["parent"] = hydrated_parent

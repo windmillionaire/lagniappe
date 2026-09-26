@@ -290,6 +290,7 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	assert.equal(interactionFoundationChunk(`${root}views/home.mjs`), undefined);
 	for (const module of [
 		"elements/editor/collaborative.mjs",
+		"elements/editor/readCache.mjs",
 		"elements/editor/toolbar.mjs",
 		"elements/editor/editor.mjs",
 	]) {

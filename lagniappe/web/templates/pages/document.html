@@ -32,6 +32,7 @@
        data-parent-nav="tabs">
     {% if page.allowed(Action.PUBLISH) %}{{ document_settings(page, public_context) }}{% endif %}
     <div data-widget="CollaborativeDocument"
+         data-cache-scope="{{ current_user.hash }}:{{ current_user.authorization_fingerprint }}"
          data-fullscreen="false"
          data-readonly="{{ page.readonly|yesno }}"
          data-public-limited="{{ current_user.is_public|yesno }}"

@@ -71,6 +71,7 @@ const COMBOBOX_MODULES = new Set([
 // Keep optional toolbar forms in their lazy modules.
 const DOCUMENT_MODULES = new Set([
 	"elements/editor/collaborative.mjs",
+	"elements/editor/readCache.mjs",
 	"elements/editor/editor.mjs",
 	"elements/editor/toolbar.mjs",
 	"elements/editor/users.mjs",

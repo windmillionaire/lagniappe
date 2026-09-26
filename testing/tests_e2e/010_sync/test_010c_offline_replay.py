@@ -5,7 +5,9 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.web import app
 from testing.definitions import Projects, SitePages, Users
+from testing.resources.core import SiteResource
 from testing.utility.network import expect_successful_response
 from testing.utility.offline import (
     expect_offline_sync_replay,
@@ -17,6 +19,70 @@ pytestmark = pytest.mark.e2e
 
 SYNC_TEXT_FIELD = "sync-text"
 OFFLINE_INDICATOR = "[data-role='offline']"
+
+
+# @matrix offline sync : cached-read empty-content reload save-guard
+# @template pages/document.html::document_tab
+# @template projects/document.html::document_tab
+@pytest.mark.parametrize("kind,content", [("page", "Read without editing"), ("project", "")])
+def test_read_document_survives_offline_reload_without_saving(get_user, browser_failures, kind, content):
+    user = get_user(Users.OWNER)
+    with app.test_request_context("/"):
+        entity = getattr(Entities, kind.upper()).create({"name": _unique("offline-read")})
+        if content:
+            entity.properties.document.html = f"<p>{content}</p>"
+        Entities.save(entity)
+    before = dict(Entities.fetch_one(entity.key, request=Fetch.root()).db)
+    url = f"{kind}s/{entity.urlsafe_key}?tab=document"
+    sync_id = entity.sync_ids["document"]["id"]
+    writes = []
+
+    def observe(request):
+        if request.method == "POST" and request.url.endswith("/l/sync"):
+            writes.extend((request.post_data_json or {}).get("updates", []))
+
+    user.page.on("request", observe)
+    user.go(SiteResource(url=url, user=user))
+    editor = user.locate("#document [data-role='editor']")
+    expect(editor).to_have_attribute("initialized", "")
+    expect(editor).to_have_text(content)
+    user.page.wait_for_function("Boolean(navigator.serviceWorker.controller)")
+    # Repeat under worker control so the HTML and its used assets are cached.
+    user.page.reload()
+    expect(editor).to_have_attribute("initialized", "")
+    expect(editor).to_have_text(content)
+    user.page.wait_for_function("""async () => {
+        const cache = await caches.open('response-cache');
+        const entries = await cache.keys();
+        const document = entries.find(key => new URL(key.url).pathname.startsWith('/offline-document/'));
+        if (!document || !await cache.match(location.href)) return false;
+        const assets = performance.getEntriesByType('resource').map(entry => entry.name)
+            .filter(url => new URL(url).origin === location.origin && /\\.(js|css)(\\?|$)/.test(url));
+        return (await Promise.all(assets.map(url => caches.match(url)))).every(Boolean);
+    }""", timeout=60000)
+    try:
+        with (
+            browser_failures.expect_offline(user, ping_count=2, max_ping_count=3),
+            browser_failures.expect_http_error(user, status=503, path="/analytics/track", count=1, max_count=1),
+            browser_failures.expect_http_error(user, status=503, path="/l/poll", count=0, max_count=2),
+        ):
+            _go_offline(user)
+            user.page.reload()
+            expect(editor).to_have_attribute("initialized", "", timeout=30000)
+            expect(editor).to_have_text(content)
+            expect(user.locate("[data-role='document-status']")).not_to_be_attached()
+            wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
+        user.offline = False
+        wait_for_connectivity_replay(user)
+        expect(editor).to_have_text(content)
+        assert not any(update.get("save") or update.get("touch_parent") or update.get("update") for update in writes)
+        after = Entities.fetch_one(entity.key, request=Fetch.root()).db
+        # Page reads may populate the unrelated empty-notes hint.
+        for field in ("modified", "assets", "document_history"):
+            assert after.get(field) == before.get(field)
+    finally:
+        user.offline = False
+        user.page.remove_listener("request", observe)
 
 
 def _unique(label):

@@ -1,5 +1,7 @@
 from urllib.parse import urlsplit
 from uuid import uuid4
+import json
+from types import SimpleNamespace
 
 import pytest
 from playwright.sync_api import expect
@@ -8,6 +10,10 @@ from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.web import app
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.cache.core import cache as redis_cache
+from lagniappe.core.tools.database.core import DATA
+from werkzeug.datastructures import FileStorage
 from testing.definitions import Pages, Users
 from testing.elements import Buttons, Modal
 from testing.utility.test_file import TestFile as _TestFile
@@ -18,6 +24,68 @@ pytestmark = pytest.mark.e2e
 
 def _unique(label):
     return f"{label} {uuid4().hex[:8]}"
+
+
+# @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
+# @matrix mutations notes : delete photo-cleanup post-commit
+def test_note_delete_completes_with_root_only_owners(get_user, monkeypatch):
+    owner = get_user(Users.OWNER)
+    with app.test_request_context("/"):
+        entity = Entities.PAGE.create({"name": _unique("Note owner")})
+        Entities.save(entity)
+        page = SimpleNamespace(entity=entity, key=entity.urlsafe_key)
+        with open(_TestFile("editor_test_image.jpeg").path, "rb") as stream:
+            note = Entities.NOTE.create({
+                "parent": Entities.fetch_one(page.key, request=Fetch.root()),
+                "user": Entities.fetch_one(owner.key, request=Fetch.root()),
+                "body": "Disposable note with a photo", "scope": "page",
+                "photo": FileStorage(stream=stream, filename="note.jpeg", content_type="image/jpeg"),
+            })
+            assert Entities.save(note).post_commit_complete
+        photo_path = note.photo.path
+        assert DATA.private_bucket.blob(photo_path).exists()
+        cache.update(page.entity)
+        before = json.loads(redis_cache.redis.hget(cache.Keys.ENTITY_HASHES.value, page.entity.hash))
+        # Invalidation must retain even empty arrays in optional detail fields.
+        before["optional_items"] = []
+        redis_cache.redis.hset(cache.Keys.ENTITY_HASHES.value, page.entity.hash, json.dumps(before))
+        filter_key = cache.Keys.FILTER.value.format(f"note-delete-{uuid4().hex}", "all-v2")
+        cache.filter_cache.create(filter_key, {
+            page.entity.hash: {"cache_key": page.entity.hash, "id": page.key, "name": "Before"},
+        })
+        incoming = Entities.fetch_one(note.key, request=Fetch.direct())
+        original_page = dict(incoming.parent.db)
+        original_user = dict(incoming.user.db)
+
+        def unexpected_fetch(*_args, **_kwargs):
+            raise AssertionError("Note deletion must not fetch the owner's relations")
+
+        try:
+            assert filter_key in cache.filter_cache.get_existing_parents([page.entity.hash]).get(page.entity.hash, [])
+            with monkeypatch.context() as patch:
+                patch.setattr(Entities, "fetch", unexpected_fetch)
+                outcome = Entities.delete(incoming)
+            assert outcome.durable_committed and outcome.post_commit_complete, outcome.errors
+            assert Entities.fetch_one(note.key, request=Fetch.root()) is None
+            assert not DATA.private_bucket.blob(photo_path).exists()
+            after = json.loads(redis_cache.redis.hget(cache.Keys.ENTITY_HASHES.value, page.entity.hash))
+            assert after == {**before, "revision_stale": True}
+            assert cache.filter_cache.get(filter_key)[page.entity.hash] == {
+                "refresh": 1, "id": page.key,
+            }
+            for key, old in ((page.key, original_page), (owner.key, original_user)):
+                current = Entities.fetch_one(key, request=Fetch.root())
+                assert current.modified > old["modified"]
+                assert {k: v for k, v in current.db.items() if k != "modified"} == {
+                    k: v for k, v in old.items() if k != "modified"
+                }
+            # A normal authoritative refresh repairs the revision marker.
+            cache.update(Entities.fetch_one(page.key, request=Fetch.direct()))
+            assert "revision_stale" not in json.loads(redis_cache.redis.hget(
+                cache.Keys.ENTITY_HASHES.value, page.entity.hash,
+            ))
+        finally:
+            cache.filter_cache.delete(filter_key)
 
 
 def _save_page_note(page, user, body, visibility="private"):

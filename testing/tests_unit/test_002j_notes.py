@@ -405,6 +405,10 @@ def test_note_save_touches_parent_and_author():
     assert writes[author.key].property_updates == ("modified",)
     assert writes[page.key].reasons == ("note-list-owner",)
     assert writes[author.key].reasons == ("note-list-owner",)
+    effects = {(effect.effect, effect.entity.key) for effect in plan.effects if effect.entity}
+    for owner in (page, author):
+        assert (MutationEffectType.CACHE_INVALIDATE, owner.key) in effects
+        assert (MutationEffectType.CACHE_REFRESH, owner.key) not in effects
 
 
 # @matrix mutations notes : delete owner-invalidation page-cascade user-cascade
@@ -418,6 +422,9 @@ def test_note_delete_repairs_owners_and_parent_cascades(monkeypatch):
     assert (MutationEffectType.DELETE, note.key) in effects
     assert (MutationEffectType.UNLINK, page.key) in effects
     assert (MutationEffectType.UNLINK, author.key) in effects
+    for owner in (page, author):
+        assert (MutationEffectType.CACHE_INVALIDATE, owner.key) in effects
+        assert (MutationEffectType.CACHE_REFRESH, owner.key) not in effects
 
     monkeypatch.setattr(database_get, "page_notes", lambda _page: [note])
     monkeypatch.setattr(database_get, "page_files", lambda _page: [])

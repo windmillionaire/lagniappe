@@ -223,7 +223,8 @@ class NoteMutation(StandardMutation):
         )
         for owner in (entity.parent, entity.user):
             if owner:
-                builder.touch(owner, reason="note-list-owner")
+                builder.touch(owner, refresh_cache=False, reason="note-list-owner")
+                builder.cache_invalidate(owner, reason="note-list-owner")
 
 
 # @testable infrastructure

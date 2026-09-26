@@ -26,6 +26,7 @@ class MutationEffectType(Enum):
     UNLINK = "unlink"
     DELETE = "delete"
     CACHE_REFRESH = "cache-refresh"
+    CACHE_INVALIDATE = "cache-invalidate"
     CACHE_DELETE = "cache-delete"
     CACHE_STATE_DELETE = "cache-state-delete"
     CACHE_SEARCH_DELETE = "cache-search-delete"

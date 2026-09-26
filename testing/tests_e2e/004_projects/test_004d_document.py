@@ -144,6 +144,9 @@ def test_document_loading_status_waits_for_saved_content(get_user):
         ) or observed:
             route.continue_()
             return
+        # Playwright can dispatch another route while fetch/assertions yield.
+        # Claim this interception before waiting on the network or the DOM.
+        observed.append(True)
         response = route.fetch()
         assert response.status == 200
         status = user.locate("[data-role='document-status']")
@@ -153,7 +156,6 @@ def test_document_loading_status_waits_for_saved_content(get_user):
         expect(user.locate("[data-role='toolbar']")).to_have_attribute("inert", "")
         for role in ("editor", "toolbar"):
             loading_bounds[role] = user.locate(f"[data-role='{role}']").bounding_box()
-        observed.append(True)
         route.fulfill(response=response)
 
     with scoped_browser_route(user.page.context, "**/l/poll", hold_initial_document_response):

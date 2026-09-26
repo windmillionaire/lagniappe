@@ -94,6 +94,13 @@ creation follows Page edit access.
 Note mutations touch the parent and author. Page and User deletion cascade
 through their Notes and photo assets.
 
+These owner touches write only `modified`. Their post-commit cache effect marks
+existing detail revisions stale and existing filter rows for refresh, preserving
+display and permission projections without loading the owners' relations.
+Normal authorized reads rebuild stale revisions; a full owner save in the same
+mutation takes precedence. Note deletion can then finish cache/photo cleanup
+with the direct Note fetch used by the route.
+
 Page loading skips the notes request only after an unfiltered query has proved
 the list empty. The unindexed `has_notes: false` hint is paired with
 `notes_checked_revision` (the observed Page `modified` value). Unknown, legacy,

@@ -9,6 +9,7 @@
        data-open="false"
        data-parent-nav="tabs">
     <div data-widget="CollaborativeDocument"
+         data-cache-scope="{{ current_user.hash }}:{{ current_user.authorization_fingerprint }}"
          lp-sync="{{ project.sync_ids.document.id }}"
          {% if project.sync_ids.document.fingerprint %}lp-fingerprint="{{ project.sync_ids.document.fingerprint }}"{% endif %}
          data-fullscreen="false"
