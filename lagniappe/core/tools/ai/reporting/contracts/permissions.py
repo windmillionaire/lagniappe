@@ -22,7 +22,7 @@ def allowed_report_actions(user):
     if capabilities["can_create_pages"]:
         allowed.add("create_page")
     if capabilities["can_update_pages"]:
-        allowed.add("append_page_document")
+        allowed.update({"append_page_document", "replace_page_document"})
     if capabilities["can_update_pages"] or capabilities["can_update_tasks"]:
         allowed.add("attach_file")
         allowed.add("move_file")
@@ -44,7 +44,7 @@ def report_action_permission_context(user, allowed_actions=None):
     allowed_set = set(allowed)
     rules = ["Only return action types listed in allowed_actions."]
     if {"update_page", "update_task", "update_project", "update_model_task"} & allowed_set:
-        rules.append("Cohesive updates require exact editable targets. Use data.entity and data.changes. Omitted fields remain unchanged; form reassignment requires complete target submission. Existing-form submission patches preserve unmentioned answer IDs. Completed tasks cannot be restructured. Model-task form changes affect future tasks only. Project model_tasks ordering includes every model exactly once. Use $action_id for earlier creations. Documents support append only; inline replacement or deletion requires the editor.")
+        rules.append("Cohesive updates require exact editable targets. Use data.entity and data.changes. Omitted fields remain unchanged; form reassignment requires complete target submission. Existing-form submission patches preserve unmentioned answer IDs. Completed tasks cannot be restructured. Model-task form changes affect future tasks only. Project model_tasks ordering includes every model exactly once. Use $action_id for earlier creations. Documents support append or explicit whole-document replacement with a recovery pin; inline edits require the editor.")
     if "create_page" in allowed_set:
         rules.append("Creating pages requires an editable category.")
     if "create_model_task" in allowed_set:
@@ -55,6 +55,8 @@ def report_action_permission_context(user, allowed_actions=None):
         rules.append("Completing tasks requires an exact editable Task and its required fields.")
     if "append_page_document" in allowed_set:
         rules.append("Document appends require an exact editable Page and preserve existing content.")
+    if "replace_page_document" in allowed_set:
+        rules.append("Document replacement requires an exact editable Page, explicit user intent, and the complete replacement text. The previous document is pinned before the collaborative edit.")
     if "attach_file" in allowed_set:
         rules.append("Attaching files requires an editable target.")
     if "move_task" in allowed_set:

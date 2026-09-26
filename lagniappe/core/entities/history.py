@@ -356,11 +356,14 @@ class DocumentHistory(AssetMixin, Entity):
         return EntityProperties(self, properties)
 
     @classmethod
-    def create(cls, entity, *, name=None, html=None, key=None):
+    def create(cls, entity, *, name=None, html=None, key=None, allow_empty=False):
         named = name is not None or html is not None
         if named:
             name = cls.validate_name(name)
-            cls.validate_html(html)
+            if not allow_empty:
+                cls.validate_html(html)
+            elif not isinstance(html, str):
+                raise ValidationError("Document content must be text")
 
         new_history = cls(key, parent=entity)
         new_history.kind = cls.entity_kind
@@ -369,7 +372,7 @@ class DocumentHistory(AssetMixin, Entity):
 
         if named:
             new_history.name = name
-            new_history.save_asset(html, cls.DOCUMENT_ASSET, "html")
+            new_history.save_asset(html or "<p></p>", cls.DOCUMENT_ASSET, "html")
             return new_history
 
         doc = entity.properties.document

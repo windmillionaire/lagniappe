@@ -27,15 +27,17 @@ def page_details(details, data, action=None):
 # @testable infrastructure
 def document_details(details, data, action=None):
     details.reference("Page", data, "page")
+    replacing = (action or {}).get("type") == "replace_page_document"
     details.add(
-        "Append", data.get("document_markdown") or data.get("document"),
+        "Replacement" if replacing else "Append", data.get("document_markdown") or data.get("document"),
         preview="document",
     )
-    details.add("Attribution", "Server-recorded time and source; existing text is preserved.")
+    details.add("Recovery" if replacing else "Attribution", "The previous document will be pinned; this replaces its content as a collaborative edit." if replacing else "Server-recorded time and source; existing text is preserved.")
 
 
 ENTITY_ACTION_DISPLAYS = (
     ProposalActionDisplay("append_page_document", "Append Page Document", document_details),
+    ProposalActionDisplay("replace_page_document", "Replace Page Document", document_details),
     ProposalActionDisplay("create_category", "Category", category_details),
     ProposalActionDisplay("create_project", "Project"),
     ProposalActionDisplay(

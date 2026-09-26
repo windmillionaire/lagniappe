@@ -37,6 +37,13 @@ The recovery bucket has no browser CORS and no runtime-account access. The
 human installer/deployer has object administration. `GIBBERISH` deterministically
 locates the bucket; keep the encrypted settings snapshot and its key off-machine.
 
+Document History can browse the private runtime bucket's retained noncurrent
+HTML generations by date. Listing and reads require current view access to that
+Page or Project and fetch only its document objects. These checkpoints expire
+under the existing 14-week lifecycle; restoring one creates an ordinary live
+edit after pinning the current version. This does not expose the recovery bucket
+or full-installation backup contents to the application.
+
 ## Automatic and manual backups
 
 `backup create` chooses one whole-minute PITR timestamp, exports every kind and

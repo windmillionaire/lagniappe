@@ -837,6 +837,14 @@ async function loadCollaborativeDocument({
 				MentionSuggestions: class {},
 			},
 			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
+			"../../src/script/elements/editor/versions.mjs": {
+				DocumentVersions: class {
+					beforeSync() {
+						return true;
+					}
+					destroy() {}
+				},
+			},
 		},
 	);
 	return CollaborativeDocument;

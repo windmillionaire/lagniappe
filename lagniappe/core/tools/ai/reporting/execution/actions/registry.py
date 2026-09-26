@@ -18,6 +18,7 @@ REPORT_ACTION_ADAPTERS = {adapter.action_type: adapter for adapter in (
     ReportActionAdapter("create_page", _create_page, uses_context=True),
     ReportActionAdapter("create_task", _create_task, uses_context=True),
     ReportActionAdapter("append_page_document", _append_page_document, uses_context=True),
+    ReportActionAdapter("replace_page_document", _append_page_document, uses_context=True),
     ReportActionAdapter("complete_task", _complete_task, uses_context=True),
     ReportActionAdapter("move_task", _move_task),
     ReportActionAdapter("move_file", _move_file),

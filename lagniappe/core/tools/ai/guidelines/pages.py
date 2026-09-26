@@ -24,7 +24,9 @@ REPORT_DOCUMENT_GUIDELINES = """
 - Use create_page.document_markdown for a new Page, or append_page_document
   for an existing Page's document (including a missing document). For an append,
   read the existing content and supply only the requested addition, never a
-  rewritten copy. Arbitrary replacement/deletion is not supported.
+  rewritten copy. For an explicitly requested whole-document replacement, use
+  replace_page_document with the complete replacement; the previous version is
+  pinned before the collaborative edit. Read the current document first.
 - The server begins each new document/addition with a source and UTC timestamp
   quote. Do not invent or supply that header yourself. Manual editing is unchanged.
 - Use headings, paragraphs, emphasis, links, block quotes, tables, fenced code,

@@ -17,7 +17,6 @@ class DocumentHistoryButton {
 		this.active = false;
 		this.button = null;
 		this._dropdown = null;
-		this._restore = this._restore.bind(this);
 		this._loadEntries = this._loadEntries.bind(this);
 		this.refresh = this.refresh.bind(this);
 	}
@@ -54,6 +53,12 @@ class DocumentHistoryButton {
 				icon: "pin",
 				onClick: () => this.toolbar.openForm("pinVersion"),
 			},
+			{
+				name: "Storage backups",
+				closeOnClick: false,
+				icon: "history",
+				onClick: () => this._showBackups(),
+			},
 		];
 
 		if (response.unpinned_count > 0) {
@@ -72,7 +77,7 @@ class DocumentHistoryButton {
 				return {
 					name: entry.pinned ? `${entry.name} — ${date}` : date,
 					icon: entry.pinned ? "pin" : "history",
-					onClick: () => this._restore(entry.key),
+					onClick: () => this.toolbar.document.versions.preview(entry),
 				};
 			}),
 		);
@@ -112,15 +117,47 @@ class DocumentHistoryButton {
 		deleteButton.focus();
 	}
 
-	async _restore(historyKey) {
-		const endpoint = this.toolbar.endpoints.history;
-		const response = await request.get(`${endpoint}/${historyKey}`);
-		if (!response?.markup) return;
-
-		const doc = this.toolbar.document;
-		doc.editor.commands.setContent(response.markup, {
-			emitUpdate: false,
+	async _showBackups(cursor = null, entries = []) {
+		const response = await request.get(
+			`${this.toolbar.endpoints.history}/backups`,
+			{ ...(cursor ? { cursor } : {}), refresh: Date.now() },
+		);
+		if (!response?.ok) {
+			this.toolbar.document.versions.notice(
+				response?.error || "Unable to list storage backups.",
+			);
+			return;
+		}
+		const loaded = [...entries, ...(response.entries || [])].sort((a, b) =>
+			b.created.localeCompare(a.created),
+		);
+		const items = loaded.map((entry) => ({
+			name: `Storage backup — ${new Date(entry.created).toLocaleString()}`,
+			icon: "history",
+			onClick: () => this.toolbar.document.versions.preview(entry),
+		}));
+		if (response.cursor)
+			items.push({
+				name: "Load more storage backups",
+				closeOnClick: false,
+				icon: "history",
+				onClick: () => this._showBackups(response.cursor, loaded),
+			});
+		if (!items.length)
+			this.toolbar.document.versions.notice(
+				"No retained storage backups are available for this document.",
+			);
+		items.unshift({
+			name: "Back to pinned versions",
+			closeOnClick: false,
+			icon: "pin",
+			onClick: () => this._showPins(),
 		});
+		this._dropdown.updateOptions(items);
+	}
+
+	async _showPins() {
+		await this.refresh();
 	}
 
 	destroy() {

@@ -89,6 +89,59 @@ def _unique(label):
     return f"test-sync-{label}-{uuid4().hex[:8]}"
 
 
+# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument.sync
+# @source lagniappe/core/tools/document_history.py::recovery_pin
+# @matrix editor sync : replacement recovery offline-replay
+# @matrix document-history : recovery
+# @template projects/document.html::document_tab
+@pytest.mark.parametrize("headless", [False, True])
+def test_offline_draft_is_pinned_before_document_replacement(get_user, browser_failures, headless):
+    from lagniappe.core.tools.document_crdt import append_fragment, replace_fragment
+    from lagniappe.core.tools.document_updates import save_checkpoint
+    from lagniappe.core.tools.database import get as database_get
+    from testing.resources import Project
+
+    owner = get_user(Users.OWNER)
+    entity = Entities.PROJECT.create({"name": _unique("replacement-recovery")})
+    baseline, _ = append_fragment(None, "<p>Original paragraph</p>", "seed")
+    entity.properties.document.save(html="<p>Original paragraph</p>", ydoc=baseline)
+    Entities.save(entity)
+    project = Project(user=owner)
+    project.entity = entity
+    owner.go(project)
+    editor = project.editor
+    expect(editor.text_entry).to_have_text("Original paragraph")
+    sync_id = entity.sync_ids["document"]["id"]
+    draft = _unique("unsent-local-text")
+    _offline_document_edit(owner, browser_failures, editor, draft, sync_id=sync_id)
+
+    current = Entities.fetch_one(entity.key, request=Fetch.direct())
+    previous = Entities.DOCUMENT_HISTORY.create(current)
+    previous.name = "Before replacement"
+    Entities.save(previous)
+    replacement, _ = replace_fragment(current.properties.document.ydoc, "<p>Replacement shared text</p>", "replace", previous_version=previous.urlsafe_key, name=previous.name)
+    save_checkpoint(current, html="<p>Replacement shared text</p>", ydoc=replacement)
+
+    if headless:
+        _replace_page(owner)
+    with owner.page.expect_response("**/document/history/pin") as recovery_response:
+        if headless:
+            owner.go(SitePages.HOME)
+        else:
+            owner.offline = False
+            wait_for_connectivity_replay(owner)
+    assert recovery_response.value.ok
+    recovered = recovery_response.value.json()["entry"]
+    assert recovered["name"].startswith("Recovered local edits")
+    wait_for_offline_sync_records(owner, sync_id=sync_id, exact=0)
+    owner.go(project)
+    expect(project.editor.text_entry).to_have_text("Replacement shared text")
+    versions = Entities.fetch(*database_get.document_history(current), request=Fetch.root())
+    saved_drafts = [version for version in versions if version.urlsafe_key == recovered["key"]]
+    assert len(saved_drafts) == 1
+    assert draft in saved_drafts[0].get_asset("document").get()
+
+
 def _document_save_response(*parts):
     def predicate(response):
         post_data = response.request.post_data or ""

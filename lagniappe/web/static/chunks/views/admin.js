@@ -1,2 +1,2 @@
-import{E as s}from"../entity-foundation.js?v=ba7541de";import"../core-foundation.js?v=ba7541de";import"../connectivity.js?v=ba7541de";import"../foundation.js?v=ba7541de";import"../upstreamUnavailable.js?v=ba7541de";class a extends s{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{a as default};
+import{E as s}from"../entity-foundation.js?v=b3451dc0";import"../core-foundation.js?v=b3451dc0";import"../connectivity.js?v=b3451dc0";import"../foundation.js?v=b3451dc0";import"../upstreamUnavailable.js?v=b3451dc0";class a extends s{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{a as default};
 /*! Third-party licenses: /third-party-licenses.txt */

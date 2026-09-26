@@ -8,6 +8,7 @@ from lagniappe.core.tools.ai import images as ai_images
 from lagniappe.core.tools.ai import references as ai_references
 from lagniappe.core.tools.ai import text as ai_text
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools import document_history
 from lagniappe.core.tools.files.html import sanitize_form_content_html
 from lagniappe.core.tools.forms.definitions import (
     definition_for,
@@ -272,16 +273,54 @@ def pin_document_history(key, **kwargs):
     )
     payload = request.get_json(silent=True) or {}
     try:
-        history = Entities.DOCUMENT_HISTORY.create(
-            entity,
-            name=payload.get("name"),
-            html=payload.get("html"),
-        )
+        if payload.get("recovery_id"):
+            history = document_history.recovery_pin(
+                entity, current_user, name=payload.get("name"), html=payload.get("html"),
+                operation_id=payload["recovery_id"],
+            )
+        else:
+            history = Entities.DOCUMENT_HISTORY.create(
+                entity, name=payload.get("name"), html=payload.get("html"),
+            )
+            Entities.save(history)
     except exceptions.ValidationError as error:
         return responses.error(str(error))
 
-    Entities.save(history)
     return responses.json_response({"entry": history.entry})
+
+
+# @testable true
+# @tests tests_e2e/004_projects/test_004h_document_history.py::test_storage_backup_preview_is_read_only
+# @matrix editor document-history : backups permissions preview
+@assets.route("<key>/document/history/backups", methods=["GET"])
+@permission(requested=Action.VIEW, no_store=True)
+def list_document_backups(key, **kwargs):
+    entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
+    if not isinstance(entity, (Entities.PAGE, Entities.PROJECT)):
+        abort(404)
+    try:
+        return responses.json_response(document_history.list_backups(entity, request.args.get("cursor")))
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+
+
+# @testable true
+# @tests tests_e2e/004_projects/test_004h_document_history.py::test_storage_backup_preview_is_read_only
+# @matrix editor document-history : backups permissions preview
+@assets.route("<key>/document/history/backups/<token>", methods=["GET"])
+@permission(requested=Action.VIEW, no_store=True)
+def get_document_backup(key, token, **kwargs):
+    from google.api_core.exceptions import NotFound
+
+    entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
+    if not isinstance(entity, (Entities.PAGE, Entities.PROJECT)):
+        abort(404)
+    try:
+        return responses.shared_document(html=document_history.read_backup(entity, token))
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+    except NotFound:
+        return responses.error("This storage backup has expired. Reopen the backup list.")
 
 
 # @testable true

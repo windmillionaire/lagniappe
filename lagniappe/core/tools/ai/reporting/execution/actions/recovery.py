@@ -68,7 +68,7 @@ def _inspect_action_applied(action, report, user, record):
     }:
         return ACTION_APPLIED
 
-    if action_type == "append_page_document":
+    if action_type in {"append_page_document", "replace_page_document"}:
         from .documents import inspect_document_append
 
         return inspect_document_append(record, user)
@@ -179,7 +179,7 @@ def _is_recoverable_action_error(_action, error):
         return False  # A rejected atomic write must remain retryable.
     if _action.get("type") in {"update_form_schema"}:
         return False
-    if _action.get("type") == "append_page_document":
+    if _action.get("type") in {"append_page_document", "replace_page_document"}:
         return False  # A document conflict must remain retryable, not be skipped.
     return isinstance(error, exceptions.ValidationError) and not str(error).startswith(
         "You do not have permission"

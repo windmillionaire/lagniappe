@@ -165,3 +165,17 @@ export const independentEditor = (target, content = "") => {
 
 	return editor;
 };
+
+/** @testable infrastructure */
+export const previewEditor = (target, content) =>
+	new Editor({
+		element: target,
+		injectCSS: false,
+		editable: false,
+		content,
+		extensions: [
+			StarterKit.configure({ link: false, underline: true, undoRedo: false }),
+			...createFormattingExtensions(),
+			LagniappeMention,
+		],
+	});

@@ -14,7 +14,7 @@ from pycrdt import Doc, Map, XmlElement, XmlFragment, XmlText
 # @matrix editor sync : document append idempotency offline-replay
 def load_document(snapshot=None):
     doc = Doc(
-        {"default": XmlFragment(), "lagniappeReports": Map()},
+        {"default": XmlFragment(), "lagniappeReports": Map(), "lagniappeReplacements": Map()},
         client_id=secrets.randbits(32),
     )
     if snapshot:
@@ -84,7 +84,7 @@ def document_state(snapshot):
         raise ValueError("Invalid document state vector")
 
     vector = sorted((integer(), integer()) for _ in range(integer()))
-    return vector, document_structure(snapshot), dict(doc["lagniappeReports"])
+    return vector, document_structure(snapshot), dict(doc["lagniappeReports"]), dict(doc["lagniappeReplacements"])
 
 
 # @testable false
@@ -253,4 +253,27 @@ def append_fragment(snapshot, html, operation_id, *, html_after=None):
             ).hexdigest(),
         }
     receipts[operation_id] = receipt
+    return encode_document(doc), receipt
+
+
+# @testable true
+# @tests tests_unit/test_010b_document_append.py::test_replacement_preserves_crdt_lineage_and_retry_receipts
+# @matrix editor sync : document replacement idempotency offline-replay
+def replace_fragment(snapshot, html, operation_id, *, previous_version, name):
+    """Replace visible nodes as one edit, retaining tombstones and all receipts."""
+    doc = load_document(snapshot)
+    if operation_id in doc["lagniappeReports"]:
+        return snapshot, doc["lagniappeReports"][operation_id]
+    with doc.transaction():
+        root = doc["default"]
+        del root.children[:]
+        _append_nodes(root, BeautifulSoup(html, "html.parser").contents)
+        doc["lagniappeReplacements"][operation_id] = {
+            "key": previous_version, "name": name,
+        }
+        receipt = {"state": "applied", "signature": {
+            "html": hashlib.md5(html.strip().encode()).hexdigest() if html.strip() else None,
+            "structure": hashlib.sha256(document_structure(encode_document(doc)).encode()).hexdigest(),
+        }}
+        doc["lagniappeReports"][operation_id] = receipt
     return encode_document(doc), receipt

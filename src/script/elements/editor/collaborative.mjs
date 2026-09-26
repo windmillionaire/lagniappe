@@ -9,6 +9,7 @@ import { collaborativeEditor } from "./editor.mjs";
 import { MentionSuggestions } from "./extensions/index.mjs";
 import { DocumentReadCache } from "./readCache.mjs";
 import { Toolbar } from "./toolbar.mjs";
+import { DocumentVersions } from "./versions.mjs";
 
 /**
  * @testable true
@@ -23,6 +24,7 @@ export class CollaborativeDocument {
 	constructor(attributes) {
 		Object.assign(this, attributes);
 		this.ydoc = new Y.Doc();
+		this.versions = new DocumentVersions(this);
 		this.updateQueue = [];
 		this.pendingMentions = new Map();
 		this.syncId = this.target.getAttribute("lp-sync");
@@ -184,7 +186,10 @@ export class CollaborativeDocument {
 						Object.hasOwn(this.offlineRecord ?? {}, "html"),
 				);
 				try {
-					await this.sync();
+					if ((await this.sync()) === false)
+						throw new Error(
+							"Unable to preserve local document edits. Retry when online.",
+						);
 					await this.waitForRender();
 					if (this._destroyed) return;
 					if (hadOfflineChanges) this._dirty = true;
@@ -297,6 +302,7 @@ export class CollaborativeDocument {
 	 * @matrix sync : collaboration document offline-replay replay-order response-contract
 	 */
 	get syncData() {
+		if (this._versionBusy) return null;
 		if (
 			!this.initialized ||
 			this._initialStateError ||
@@ -317,6 +323,7 @@ export class CollaborativeDocument {
 	 * @matrix sync : empty-content intentional-clear parent-modified save-guard
 	 */
 	get saveData() {
+		if (this._versionBusy) return null;
 		if (!this.initialized || this._initialStateError || !this._dirty)
 			return null;
 
@@ -351,6 +358,11 @@ export class CollaborativeDocument {
 	 * @matrix sync : collaboration concurrency document lifecycle merge offline-replay presence replay-order
 	 */
 	async sync() {
+		if (
+			(this.remote?.ydoc || this.remote?.updates?.length) &&
+			(await this.versions?.beforeSync(this.remote)) === false
+		)
+			return false;
 		this.pendingMentions ||= new Map();
 		for (const mention of this.offlineRecord?.mentions || []) {
 			if (mention?.occurrence_id) {
@@ -431,6 +443,7 @@ export class CollaborativeDocument {
 
 	destroy() {
 		this._destroyed = true;
+		this.versions?.destroy();
 		clearTimeout(this._loadingTimer);
 		this.loadingStatus?.remove();
 		this.mentionSuggestions?.destroy();

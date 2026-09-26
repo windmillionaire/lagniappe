@@ -68,6 +68,11 @@ REPORT_ACTION_DATA_CONTRACTS = {
         ),
         "required": ("name",),
     },
+    "replace_page_document": {
+        "fields": ("page", "page_action", "page_name", "document_markdown"),
+        "required": ("document_markdown",),
+        "required_groups": (("page", "page_action"),),
+    },
     "append_page_document": {
         "fields": ("page", "page_action", "page_name", "document_markdown"),
         "required": ("document_markdown",),

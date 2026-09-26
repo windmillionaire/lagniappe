@@ -21,7 +21,8 @@ pytestmark = pytest.mark.e2e
 # @matrix ai-report editor sync : document append browser-review persistence source-attribution
 # @matrix asset-storage : copy metadata visibility
 # @template tools/report.html::proposal_action_item
-def test_reviewed_document_append_updates_open_editor(get_user):
+@pytest.mark.parametrize("action_type", ["append_page_document", "replace_page_document"])
+def test_reviewed_document_append_updates_open_editor(get_user, action_type):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)
     actor = Entities.USER.load(owner.email)
@@ -52,7 +53,7 @@ def test_reviewed_document_append_updates_open_editor(get_user):
                 "actions": [
                     {
                         "id": "append",
-                        "type": "append_page_document",
+                        "type": action_type,
                         "data": {
                             "page": page.urlsafe_key,
                             "document_markdown": "Added **reviewed** notes.",
@@ -79,14 +80,18 @@ def test_reviewed_document_append_updates_open_editor(get_user):
         report_page.result.get_by_role("link", name=page.name, exact=True)
     ).to_have_attribute("href", f"/pages/{page.urlsafe_key}")
     expect(editor.text_entry).to_contain_text("Added reviewed notes.", timeout=15000)
-    expect(editor.text_entry).to_contain_text("Keep the original notes.")
+    if action_type == "replace_page_document":
+        expect(editor.text_entry).not_to_contain_text("Keep the original notes.")
+        expect(collaborator.page.locator('[data-role="document-version-notice"]')).to_contain_text("Document replaced")
+    else:
+        expect(editor.text_entry).to_contain_text("Keep the original notes.")
     expect(editor.text_entry.locator("blockquote")).to_contain_text("UTC · Remote MCP")
     saved = Entities.fetch_one(page.urlsafe_key, request=Fetch.direct())
     assert "Added <strong>reviewed</strong> notes." in saved.properties.document.html
     assert saved.properties.document.ydoc
     versions = Entities.fetch(*database_get.document_history(saved), request=Fetch.root())
     assert len(versions) == 1
-    assert versions[0].pinned and versions[0].name.startswith("Before report append")
+    assert versions[0].pinned and versions[0].name.startswith("Before document replacement" if action_type == "replace_page_document" else "Before report append")
     version_asset = versions[0].get_asset("document")
     assert version_asset.get() == html
     assert version_asset.generation and version_asset.path != before_document.path

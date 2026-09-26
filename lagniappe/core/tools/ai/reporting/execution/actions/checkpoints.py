@@ -105,7 +105,7 @@ def _capture_action_before(action, report, user, created, context=None):
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
 # @matrix ai-report : completed-task idempotency recovery
 def _prepare_action_checkpoint(action, report, user, created, context, record):
-    if action.get("type") == "append_page_document":
+    if action.get("type") in {"append_page_document", "replace_page_document"}:
         prepare_document_append(action, report, user, created, record)
         return
     if action.get("type") == "create_page" and _data(action).get("document"):

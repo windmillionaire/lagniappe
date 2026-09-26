@@ -133,7 +133,6 @@ export class SyncManager {
 					!this._activating.has(widget.syncId)
 				)
 					return false;
-				this._rememberCursor(widget.syncId);
 				if (result.status === "unavailable") {
 					await current.readCache?.clear();
 				}
@@ -143,7 +142,8 @@ export class SyncManager {
 				// completing. Any later result must wait for the mounted widget.
 				if (!current.initialized) return this._activating.has(widget.syncId);
 				current.remote = result.payload;
-				await current.sync();
+				if ((await current.sync()) === false) return false;
+				this._rememberCursor(widget.syncId);
 				await current.readCache?.accept(result.payload);
 				if (
 					!current.readonly &&
@@ -348,7 +348,6 @@ export class SyncManager {
 				generation: descriptor.generation,
 				revision: descriptor.revision,
 			};
-			this._rememberCursor(offline.sync_id, cursor);
 			return { cursor, payload: result.payload ?? null };
 		} finally {
 			unsubscribe();
@@ -406,7 +405,11 @@ export class SyncManager {
 				}
 				widget.remote = current.payload;
 				widget.offlineRecord = offline;
-				await widget.sync();
+				if ((await widget.sync()) === false) {
+					unresolved = true;
+					continue;
+				}
+				this._rememberCursor(offline.sync_id, current.cursor);
 				await widget.waitForRender();
 
 				const saveData = widget.saveData;

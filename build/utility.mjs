@@ -72,6 +72,7 @@ const COMBOBOX_MODULES = new Set([
 const DOCUMENT_MODULES = new Set([
 	"elements/editor/collaborative.mjs",
 	"elements/editor/readCache.mjs",
+	"elements/editor/versions.mjs",
 	"elements/editor/editor.mjs",
 	"elements/editor/toolbar.mjs",
 	"elements/editor/users.mjs",

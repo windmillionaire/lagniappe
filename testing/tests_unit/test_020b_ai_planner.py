@@ -273,12 +273,12 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         (
             {"page-one": "EDIT"},
             {"can_update_pages", "can_update_tasks"},
-            {"append_page_document", "attach_file", "move_file", "move_task"},
+            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task"},
         ),
         (
             {"cat-one": "EDIT"},
             {"can_create_pages", "can_update_pages", "can_update_tasks"},
-            {"create_page", "append_page_document", "attach_file", "move_file", "move_task"},
+            {"create_page", "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task"},
         ),
         (
             {"project-one": "EDIT"},
@@ -294,19 +294,19 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         (
             {"page-one": "DELETE"},
             {"can_update_pages", "can_update_tasks", "can_delete_pages"},
-            {"append_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
+            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
         ),
         (
             {"models": "EDIT"},
             {"can_create_pages", "can_create_model_tasks", "can_update_pages", "can_update_tasks"},
-            {"create_page", "create_model_task", "append_page_document", "attach_file", "move_file", "move_task"},
+            {"create_page", "create_model_task", "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task"},
         ),
         (
             {"models": "CREATE"},
             {"can_create_categories", "can_create_projects", "can_create_pages",
              "can_create_model_tasks", "can_update_pages", "can_update_tasks", "can_delete_pages"},
             {"create_category", "create_project", "create_page", "create_model_task",
-             "append_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
+             "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
         ),
     ],
     ids=["viewer", "page-editor", "category-editor", "project-editor", "form-editor",

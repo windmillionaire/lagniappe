@@ -137,7 +137,7 @@ def report_prompt(report, user, feedback=None):
     prompt.add_context("user_instructions", report.instructions)
     if report.db.get("correction"):
         prompt.add_context("corrected_execution", report.db["correction"])
-        prompt.add_instructions("This is a corrective plan. Read current workspace state. Propose only additional changes needed; do not replay successful creations. Automatic deletion is unsupported; identify manual cleanup. Documents are append-only; existing text must be edited manually.")
+        prompt.add_instructions("This is a corrective plan. Read current workspace state. Propose only additional changes needed; do not replay successful creations. Automatic deletion is unsupported; identify manual cleanup. Append document additions; replace a whole document only when explicitly requested, preserving its previous version. Selective inline edits remain manual.")
     prompt.add_context("personal_page", personal_page_reference(user))
     prompt.add_instructions(PERSONAL_PAGE_GUIDELINES)
     prompt.add_context(

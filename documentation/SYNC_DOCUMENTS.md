@@ -92,20 +92,33 @@ documents retain Yjs tombstones to prevent offline resurrection.
 - Named/pinned versions remain explicit HTML snapshots in DocumentHistory.
   Existing automatic entries remain readable, restorable, and removable with
   Clear Unpinned Versions; no upgrade migration deletes them.
+- Selecting a version opens a separate read-only preview. Back to current
+  reveals the live editor, which continues syncing while hidden. Restore this
+  version first saves a named recovery pin of the current content (including
+  empty content), then replaces the visible nodes within the same Yjs document.
+  Subsequent edits remain ordinary collaborative edits; the recovery pin is the
+  way back to the content that preceded restoration.
 - A reviewed append to an existing document saves one named "Before report
   append" version per execution batch in that same history, atomically with
   the append's metadata and Report receipt. Retrying a committed batch does
   not append content or create the version again.
   The version remains available for manual inspection or restoration in the editor.
-- Disaster recovery continues to use the existing Storage object generations
-  and backup configuration. Retiring a live object allows the existing
-  noncurrent-version lifecycle to reclaim it; no new retention policy is added.
+- Reviewed replacements preserve a named "Before document replacement" version
+  for each action, atomically with the document and Report receipt.
+- History's Storage backups command lists retained noncurrent HTML generations
+  in the private runtime bucket, on demand and in pages of 50 objects. Each
+  entry shows its creation date; selecting one fetches that exact generation
+  into the same read-only preview. Tokens are signed, expire after one hour,
+  and bind both listing cursors and objects to the authorized Page or Project.
+  Ordinary history and document polling do not list Storage. These are retained
+  document checkpoints, not the operator-only full-installation backups. Normal
+  noncurrent-version retention still applies; no new retention policy is added.
 
 Cleanup is post-commit best-effort and failures use the existing mutation outcome
 reporting. A provider failure or interrupted write can leave an unreferenced
 blob; failed/ambiguous writes never trigger deletion of the accepted pair.
 
-## Reviewed document appends
+## Reviewed document edits
 
 `append_page_document` uses `pycrdt` to append editor-compatible nodes to the
 existing Yjs `default` fragment without reconstructing old nodes. Only new,
@@ -118,10 +131,25 @@ Explicit paragraphs, nested lists, and code-block whitespace are preserved.
 The action requires a saved baseline: pending Redis edits or an older HTML-only
 document stop execution rather than guessing or replacing a draft. The latter
 needs one ordinary editor save. A durable `lagniappeReports` Yjs map records the
-operation receipt, including the expected post-append content signature, so a
-retry after a Report checkpoint failure does not append twice. AI/MCP document
-actions remain append-only. Inline edits, replacement and deletion belong in the
-editor; corrective plans do not automatically remove previously appended content.
+operation receipt, including the expected post-edit content signature, so a
+retry after a Report checkpoint failure does not apply the change twice.
+`replace_page_document` uses the same execution path and saved-baseline guard,
+but deletes the existing visible nodes and inserts the full supplied document
+within the existing CRDT. It preserves tombstones and previous receipts rather
+than resetting the document. Inline edits still belong in the editor.
+
+Both reviewed replacements and browser restorations record the previous pin's
+key/name in the `lagniappeReplacements` Yjs map in the same transaction as the
+edit. Before merging a newly observed marker, a browser with local edits saves
+its current HTML and any distinct offline draft as named recovery pins. This
+also runs during headless offline replay. Recovery writes are retry-idempotent,
+scoped to the document, User, operation, and content. A failed recovery write
+leaves the incoming edit unapplied and the draft/cursor available for retry.
+New readers hydrate silently; existing readers receive a small notice linking
+the previous and recovered versions. No extra epoch or sync endpoint is needed.
+Normal CRDT merge rules apply: concurrent new nodes can survive a replacement,
+while edits inside deleted nodes may disappear from the visible result. Recovery
+pins preserve that local content for inspection and explicit restoration.
 
 An applied receipt is final evidence that its operation committed, even if a user
 later edits or deletes the appended content. Its signature describes the historical

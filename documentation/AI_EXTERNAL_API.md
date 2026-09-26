@@ -592,18 +592,23 @@ or the on-site builder. There is no external candidate-upload endpoint.
 creation action). `entity_name` is display context only. This creates a file
 link, not document text. Completed-occurrence evidence stays on that occurrence.
 
-`append_page_document` takes `page` or `page_action` and `document_markdown`.
-Supply only the requested addition; it starts a missing document but never
-replaces existing text. New AI-created Page documents and each addition begin
+`append_page_document` and `replace_page_document` take `page` or `page_action`
+and `document_markdown`. Append takes only the requested addition and never
+replaces existing text. Replace takes the full new document and preserves a
+pinned previous version, including an empty starting document. Use replacement
+only when the requested change explicitly replaces the document. New AI-created
+Page documents and each reviewed addition/replacement begin
 with a server-generated UTC timestamp/source quote. Sources distinguish
 Application, Email, Remote MCP, and External API / skill using trusted intake,
 not proposal fields. Manual editor typing receives no header.
 
-Document append execution requires a checkpointed collaborative baseline. Unsaved
+Document edit execution requires a checkpointed collaborative baseline. Unsaved
 edits stop execution for a retry; HTML-only older documents must be opened and
-saved once first. Retry receipts prevent duplicate additions. Edit or remove
-existing text in the document editor.
-See [document sync](SYNC_DOCUMENTS.md#reviewed-document-appends) for persistence.
+saved once first. Retry receipts prevent duplicate application, even if users
+later edit the result. Replacement is a normal CRDT edit, so active/offline
+editors use their ordinary sync path and preserve local drafts before merging.
+Use the editor for selective inline changes.
+See [document sync](SYNC_DOCUMENTS.md#reviewed-document-edits) for persistence.
 
 Pending uploads always block submission. Finalized files classified as
 `organize` require summaries and placements; `evidence` files do not. Uploads

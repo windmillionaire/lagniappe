@@ -319,7 +319,7 @@ def _report_action_data_properties():
         },
         "document_markdown": {
             "type": "string",
-            "description": "Markdown for the new document or requested addition only. append_page_document preserves existing content; the server prefixes trusted source/time attribution.",
+            "description": "Markdown for the new document, requested addition, or complete explicit replacement. append_page_document preserves existing text; replace_page_document pins it before replacement. The server prefixes trusted source/time attribution.",
         },
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
