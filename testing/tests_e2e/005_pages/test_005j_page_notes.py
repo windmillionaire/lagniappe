@@ -322,6 +322,7 @@ def test_empty_notes_skip_fetch_without_hiding_new_notes(get_user):
         other = owner.page.context.new_page()
         try:
             other.goto(url)
+            other.bring_to_front()
             other.get_by_role("button", name="Page actions").click()
             other.get_by_role("menuitem", name="Add note", exact=True).click()
             other_composer = other.locator("#page-notes [data-widget='CreateNote']")
@@ -330,7 +331,6 @@ def test_empty_notes_skip_fetch_without_hiding_new_notes(get_user):
             other_composer.locator("button[type='submit']").click()
             expect(other.locator("#page-notes li[data-kind='note']").filter(has_text=cross_tab_body)).to_be_visible()
             owner.page.bring_to_front()
-            owner.page.evaluate("window.dispatchEvent(new Event('focus'))")
             expect(_page_note(owner, cross_tab_body)).to_be_visible(timeout=20000)
         finally:
             other.close()
