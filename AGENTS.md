@@ -124,15 +124,10 @@ These instructions apply to the whole repository unless a more specific
 - Use `rg` or `rg --files` for search when available.
 - It is okay to run `npm run dev` to rebuild generated frontend assets after
   source changes.
-- Treat `lagniappe/web/static/` as disposable generated output. Ignore its
-  worktree state completely during normal development: do not inspect, search,
-  diff, review, summarize, restore, clean, preserve, or report its changes, and
-  never treat its churn as a conflict or a reason to ask the user what to do.
-  Tests, builds, and deploys may freely create, modify, or remove files there.
 - Do not hand-edit generated static files as source. Change the corresponding
-  source files and run the normal build or test workflow when relevant; generated
-  static changes and accompanying build-managed `BUILD_ID` churn require no
-  special handling or mention.
+  source files and run the normal build or test workflow when relevant. Include
+  generated static files and build-managed `BUILD_ID` changes in commits,
+  including newly generated files that `git commit -a` would not stage.
 - When the user asks to write a version message, write a concise release-note
   style summary of what changed. Prefer short entries like "Fixed category
   ownership sync" or "Added build IDs to asset cache busting"; do not write a

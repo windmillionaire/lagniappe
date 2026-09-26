@@ -15,8 +15,8 @@
       "type": "image/png"
     }
   ],
-  "name": "Lagniappe",
+  "name": "lagniappe-experiments",
   "scope": "/",
-  "short_name": "Lagniappe",
+  "short_name": "lagniappe-experiments",
   "start_url": "/"
 }
