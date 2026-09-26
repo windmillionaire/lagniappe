@@ -110,7 +110,7 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 		StarterKit.configure({
 			link: false,
 			underline: true,
-			history: false,
+			undoRedo: false,
 		}),
 		...createFormattingExtensions(),
 		Collaboration.configure({
@@ -147,7 +147,6 @@ export const independentEditor = (target, content = "") => {
 		StarterKit.configure({
 			link: false,
 			underline: true,
-			history: true,
 		}),
 		...createFormattingExtensions(),
 		...createEditingExtensions(),

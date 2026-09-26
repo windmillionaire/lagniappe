@@ -182,6 +182,7 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     )
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
     assert result["status"] == "complete", [(record.get("id"), record.get("error")) for record in result["actions"]]
     assert report.status == "complete"

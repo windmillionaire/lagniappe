@@ -17,7 +17,7 @@ from lagniappe.core.tools.cache import documents
 from lagniappe.core.tools.document_crdt import append_fragment
 from lagniappe.core.properties.common_assets import Document
 from lagniappe.core.mutations import plan_mutation
-from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
+from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
 pytestmark = pytest.mark.unit
@@ -88,6 +88,36 @@ def setup_case(monkeypatch, actions, initial=()):
 
 def create(kind, name, **data):
     return {"id": name, "type": "create_" + kind, "data": {"name": name, **data}}
+
+
+# @matrix ai-report files : batching attachments recovery
+def test_report_inputs_isolate_attachment_changes_from_retries(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    page = TestEntities.get("PAGE", {"hash": "input-owner-page"})
+    task = TestEntities.get("TASK", {"hash": "input-owner-task"})
+    task.page = page
+    file = _test_file("batch-input.pdf")
+    file.move_to(task)
+    file._mutation_intents = []
+    target = TestEntities.get("PAGE", {"hash": "input-destination"})
+    workspace = batches.WorkingEntities()
+
+    staged = workspace.copy_input(file)
+    assert staged is workspace.copy_input(file)
+    assert staged.task is not task
+    assert staged.task.page is not page
+    assert staged.task.files == [staged]
+    staged.summary = "Uncommitted summary"
+    staged.move_to(target)
+
+    assert file.summary is None
+    assert file.owner is task
+    assert task.files == [file]
+    assert file.mutation_intents == []
+    retried = batches.WorkingEntities().copy_input(file)
+    assert retried.owner.key == task.key
+    assert retried.task.files == [retried]
+    assert retried.summary is None
 
 
 # @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report

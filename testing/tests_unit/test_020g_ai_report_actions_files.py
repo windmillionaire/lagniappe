@@ -1,19 +1,128 @@
 """Focused AI-report characterization coverage."""
 
+from copy import deepcopy
+from types import SimpleNamespace
+
 import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.ai.reporting.execution.actions import (
+    files as file_actions,
     references as report_references,
 )
 from testing.utility.ai_report_fakes import (
+    FakeKey,
     _fetch_one_from,
     _patch_fake_keys,
     _test_file,
     _test_user,
 )
 from testing.utility.test_entities import TestEntities
+
+
+# @matrix ai-report files : attachment validation task-attachment
+@pytest.mark.unit
+@pytest.mark.parametrize("source_kind", ["page", "task"])
+@pytest.mark.parametrize("target_kind", ["page", "task", "task_history"])
+def test_attach_file_preserves_single_owner(monkeypatch, source_kind, target_kind):
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("attachment-owner")
+    page = TestEntities.get("PAGE", {"hash": "owner-page", "name": "Owner"})
+    source = page if source_kind == "page" else TestEntities.get(
+        "TASK", {"hash": "owner-task", "name": "Owner task"}, page=page,
+    )
+    target_page = TestEntities.get("PAGE", {"hash": "target-page", "name": "Target"})
+    target_task = TestEntities.get("TASK", {"hash": "target-task", "name": "Target task"}, page=target_page)
+    if target_kind == "task_history":
+        target = report_runner.Entities.TASK_HISTORY(testing=True)
+        target._key = FakeKey("target-history")
+        target.task, target.page = target_task, target_page
+    else:
+        target = target_page if target_kind == "page" else target_task
+    file = _test_file("owned-evidence.pdf")
+    file.move_to(source)
+    records = (file, source, target_page, target_task, target)
+    before = [(deepcopy(item.db), list(item.mutation_intents)) for item in records]
+
+    with pytest.raises(exceptions.ValidationError, match="one owner.*move_file"):
+        file_actions._attach_file(
+            {"data": {"file": file.urlsafe_key, "entity": "destination"}},
+            SimpleNamespace(input_files=[file]), user, {"destination": target},
+        )
+
+    assert file.owner is source
+    assert [(item.db, item.mutation_intents) for item in records] == before
+
+
+# @matrix ai-report files : attachment deterministic-run task-attachment
+@pytest.mark.unit
+@pytest.mark.parametrize("target_kind", ["page", "task", "task_history"])
+def test_attach_file_repeated_destination_is_noop(monkeypatch, target_kind):
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("repeat-attachment-owner")
+    page = TestEntities.get("PAGE", {"hash": "repeat-page", "name": "Page"})
+    task = TestEntities.get("TASK", {"hash": "repeat-task", "name": "Task"}, page=page)
+    if target_kind == "task_history":
+        target = report_runner.Entities.TASK_HISTORY(testing=True)
+        target._key = FakeKey("repeat-history")
+        target.task, target.page = task, page
+    else:
+        target = page if target_kind == "page" else task
+    file = _test_file("repeat-evidence.pdf")
+    report = SimpleNamespace(input_files=[file])
+    action = {"data": {"file": file.urlsafe_key, "entity": "destination"}}
+    references = {"destination": target}
+
+    _, writes, _ = file_actions._attach_file(action, report, user, references)
+    assert file.owner is (page if target_kind == "page" else task)
+    assert writes == ([file, target] if target_kind == "task_history" else [file])
+    if target_kind == "task_history":
+        assert target.files == [file]
+        assert task.files == []
+    elif target_kind == "task":
+        assert task.files == [file]
+    records = (file, page, task, target)
+    before = [(deepcopy(item.db), list(item.mutation_intents)) for item in records]
+
+    entity, writes, metadata = file_actions._attach_file(action, report, user, references)
+
+    assert entity is file and writes == []
+    assert metadata["target"]["id"] == target.urlsafe_key
+    assert [(item.db, item.mutation_intents) for item in records] == before
+    # Idempotence does not bypass the destination's current permissions.
+    target.allowed = lambda *_args, **_kwargs: False
+    with pytest.raises(exceptions.ValidationError, match="permission"):
+        file_actions._attach_file(action, report, user, references)
+
+
+# @matrix ai-report files : attachment validation deterministic-run partial-result
+@pytest.mark.unit
+def test_run_report_rejects_second_file_owner(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("multiple-attachment-owner")
+    pages = [TestEntities.get("PAGE", {"hash": f"attach-page-{i}", "name": f"Page {i}"}) for i in range(2)]
+    file = _test_file("shared-evidence.pdf")
+    report = TestEntities.get("REPORT", {
+        "hash": "multiple-attachment-report", "parent": user, "user": user,
+        "status": "ready", "input_files": [file],
+        "proposal": {"summary": "File one upload twice.", "confidence": 1, "actions": [
+            {"id": f"attach-{i}", "type": "attach_file", "data": {
+                "entity": page.urlsafe_key, "file": file.urlsafe_key,
+            }} for i, page in enumerate(pages)
+        ]},
+    })
+    monkeypatch.setattr(report_runner.Entities, "save", lambda *_entities: None)
+    monkeypatch.setattr(report_runner.Entities, "fetch_one", _fetch_one_from({p.urlsafe_key: p for p in pages}))
+
+    result = report_runner.run_report(report, user)
+    file = report.input_files[0]
+
+    assert result["status"] == "failed"
+    assert result["actions"][0]["status"] == "complete"
+    assert result["actions"][1]["status"] == "failed"
+    assert "move_file" in result["actions"][1]["error"]
+    assert file.owner.key == pages[0].key
 
 
 # @matrix ai-report files : execution-inputs initial-load staged-inputs
@@ -26,6 +135,7 @@ def test_run_report_loads_attached_inputs_only_for_pending_file_work(monkeypatch
     user = _test_user("execution-input-owner")
     page = TestEntities.get("PAGE", {"hash": "input-page", "restricted_to": ["page-group"]})
     task = TestEntities.get("TASK", {"hash": "input-task"}, page=page)
+    task.page = page
     task.form = TestEntities.get("FORM", {"hash": "input-task-form", "restricted_to": ["task-group"]})
     file = _test_file("execution-input.pdf")
     if attached:
@@ -56,9 +166,10 @@ def test_run_report_loads_attached_inputs_only_for_pending_file_work(monkeypatch
 
     result = report_runner.run_report(report, user)
 
-    assert result["status"] == "complete"
+    assert result["status"] == "complete", report.error
     assert loaded == ([file] if attached and not skip else [])
     if not skip:
+        file = report.input_files[0]
         assert file.summary == "Reviewed summary."
         assert file.restricted_to == ({"page": ["page-group"], "task_form": ["task-group"]} if attached else {})
 
@@ -118,8 +229,9 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
     )
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
-    assert result["status"] == "complete"
+    assert result["status"] == "complete", result
     assert [action["status"] for action in result["actions"]] == [
         "complete",
         "complete",
@@ -200,7 +312,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup(monkeypatch):
 
     result = report_runner.run_report(report, user)
 
-    assert result["status"] == "complete"
+    assert result["status"] == "complete", result
     assert [action["type"] for action in result["actions"]] == [
         "move_file",
         "suggest_page_deletion",
@@ -280,7 +392,7 @@ def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
 
     result = report_runner.run_report(report, user)
 
-    assert result["status"] == "complete"
+    assert result["status"] == "complete", result
     assert result["actions"][0]["type"] == "move_file"
     assert file.db["page"] == target_page.key
     assert result["actions"][0]["moved"]["from"]["id"] == source_page.urlsafe_key
@@ -472,6 +584,7 @@ def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypat
     )
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
     assert result["status"] == "failed"
     assert result["failed_at"] == 3

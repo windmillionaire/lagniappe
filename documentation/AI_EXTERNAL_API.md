@@ -589,8 +589,13 @@ or the on-site builder. There is no external candidate-upload endpoint.
 
 `attach_file` takes `file` (the exact report upload reference) and either `entity`
 (an existing Page, Task, or TaskHistory) or `entity_action` (an earlier Page/Task
-creation action). `entity_name` is display context only. This creates a file
-link, not document text. Completed-occurrence evidence stays on that occurrence.
+creation action). `entity_name` is display context only. Each File has one owning
+Page or Task. An unowned upload acquires that owner; repeating the same attachment
+is a no-op without File writes. An attachment to another owner fails with guidance
+to use `move_file` for an explicit ownership change, or to reference the existing
+File URL elsewhere. Attaching does not convert the File into document text.
+Completed-occurrence evidence stays on that occurrence, owned by its live Task;
+it cannot implicitly move a File from another Page or Task.
 
 `append_page_document` and `replace_page_document` take `page` or `page_action`
 and `document_markdown`. Append takes only the requested addition and never

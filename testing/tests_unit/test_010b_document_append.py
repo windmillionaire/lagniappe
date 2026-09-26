@@ -535,7 +535,7 @@ def test_report_append_retry_preserves_content(monkeypatch, existing, action_typ
     snapshot = page.properties.document.ydoc
     assert len(histories) == int(existing or action_type == "replace_page_document")
     if existing:
-        assert histories["saved-version"].name.startswith("Before report append" if action_type == "append_page_document" else "Before document replacement")
+        assert histories["saved-version"].name == ("Before report append" if action_type == "append_page_document" else "Before document replacement")
         assert histories["saved-version"].get_asset("document").html() == "<p>Keep</p>"
     actions._append_page_document(action, report, user, {}, {"action_record": prepared, "batch": batch})
     assert page.properties.document.ydoc == snapshot

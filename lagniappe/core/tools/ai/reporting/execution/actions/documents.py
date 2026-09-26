@@ -92,8 +92,7 @@ def _append_page_document(action, report, user, created, context):
             )
             if history is None or history.get_asset("document") is None:
                 raise exceptions.ValidationError("Could not preserve the document version; edit stopped.")
-            label = "Before document replacement" if replacing else "Before report append"
-            history.name = f"{label} — {record['document_at']}"
+            history.name = "Before document replacement" if replacing else "Before report append"
             page.add_mutation_intents(
                 MutationIntent.standard(history, reason="report-document-version")
             )

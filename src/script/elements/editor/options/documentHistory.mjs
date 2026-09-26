@@ -56,7 +56,7 @@ class DocumentHistoryButton {
 			{
 				name: "Storage backups",
 				closeOnClick: false,
-				icon: "history",
+				icon: "database",
 				onClick: () => this._showBackups(),
 			},
 		];
@@ -133,14 +133,14 @@ class DocumentHistoryButton {
 		);
 		const items = loaded.map((entry) => ({
 			name: `Storage backup — ${new Date(entry.created).toLocaleString()}`,
-			icon: "history",
+			icon: "database",
 			onClick: () => this.toolbar.document.versions.preview(entry),
 		}));
 		if (response.cursor)
 			items.push({
 				name: "Load more storage backups",
 				closeOnClick: false,
-				icon: "history",
+				icon: "database",
 				onClick: () => this._showBackups(response.cursor, loaded),
 			});
 		if (!items.length)

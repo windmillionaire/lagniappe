@@ -101,7 +101,7 @@ export class DocumentVersions {
 				for (const html of drafts) {
 					recovery = await this.pin(
 						html,
-						`Recovered local edits — ${new Date().toLocaleString()}`,
+						"Recovered local edits",
 						changes.map(([id]) => id).sort(),
 					);
 				}
@@ -136,6 +136,7 @@ export class DocumentVersions {
 		this.banner.className =
 			"flex flex-wrap items-center gap-3 px-4 py-2 text-sm bg-base-bg";
 		this.banner.setAttribute("role", "status");
+		this.banner.hidden = Boolean(this.previewPanel && previous);
 		const text = document.createElement("span");
 		text.textContent = message;
 		this.banner.append(text);
@@ -176,7 +177,7 @@ export class DocumentVersions {
 		if (!doc.readonly)
 			controls.append(
 				this.button("Restore this version", () =>
-					this.restore(response.markup, entry),
+					this.restore(response.markup),
 				),
 			);
 		this.previewPanel.append(controls);
@@ -186,6 +187,7 @@ export class DocumentVersions {
 		this.previewPanel.append(surface);
 		this.previewInstance = previewEditor(surface, response.markup);
 		doc.target.insertBefore(this.previewPanel, doc.container);
+		if (this.banner) this.banner.hidden = true;
 		doc.container.hidden = true;
 		if (doc.toolbar?.element) doc.toolbar.element.hidden = true;
 	}
@@ -196,11 +198,12 @@ export class DocumentVersions {
 		this.previewInstance = null;
 		this.previewPanel?.remove();
 		this.previewPanel = null;
+		if (this.banner) this.banner.hidden = false;
 		this.doc.container.hidden = false;
 		if (this.doc.toolbar?.element) this.doc.toolbar.element.hidden = false;
 	}
 
-	async restore(markup, entry) {
+	async restore(markup) {
 		const doc = this.doc;
 		if (doc._versionBusy || doc._destroyed || doc.readonly) return;
 		if (!doc.view?.online) {
@@ -215,7 +218,7 @@ export class DocumentVersions {
 		try {
 			const previous = await this.pin(
 				doc.editor.getHTML(),
-				`Before restoring ${entry.name || "saved version"} — ${new Date().toLocaleString()}`,
+				"Before document restore",
 				operation,
 			);
 			if (doc._destroyed) return;

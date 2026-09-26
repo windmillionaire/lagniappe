@@ -98,6 +98,10 @@ documents retain Yjs tombstones to prevent offline resurrection.
   empty content), then replaces the visible nodes within the same Yjs document.
   Subsequent edits remain ordinary collaborative edits; the recovery pin is the
   way back to the content that preceded restoration.
+  Current-document notices are hidden during preview and return with the live
+  editor; preview and restore errors remain visible.
+  Generated recovery names are short (for example, "Before document restore");
+  History displays the creation date separately, once per entry.
 - A reviewed append to an existing document saves one named "Before report
   append" version per execution batch in that same history, atomically with
   the append's metadata and Report receipt. Retrying a committed batch does

@@ -94,6 +94,7 @@ test("test_recovery_failure_preserves_draft_before_merge", async (t) => {
 		requests[1].payload.recovery_id,
 	);
 	assert.equal(requests[0].payload.html, "<p>Unsent work</p>");
+	assert.equal(requests[0].payload.name, "Recovered local edits");
 	assert.equal(requests[0].url, "/assets/page/document/history/pin");
 	doc.initialized = false;
 	doc._dirty = false;
