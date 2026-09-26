@@ -91,7 +91,9 @@ export class IndexTable extends BaseTable {
 
 	/**
 	 * @testable true
-	 * @matrix table-controls : quick-edit row-replacement teardown
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_delta_preserves_unchanged_rows_and_focus
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_delta_reorders_adds_removes_and_restores_sort
+	 * @matrix table-controls : quick-edit row-replacement teardown delta-order unchanged-rows focus hidden-rows sentinel-rows insertion removal empty-row sorting quick-edit-teardown
 	 */
 	refreshDelta(delta) {
 		const editor = this.component?.widgets?.TableEditor;
@@ -124,10 +126,17 @@ export class IndexTable extends BaseTable {
 		}
 
 		const order = Array.isArray(delta.order) ? delta.order : [];
+		let next = this.target.querySelector("tr[lp-entity]");
 		for (const key of order) {
 			const row = existing.get(key);
 			if (!row) throw new Error("Table refresh order references a missing row");
-			this.target.append(row);
+			if (row !== next) this.target.insertBefore(row, next);
+			else {
+				next = next.nextElementSibling;
+				while (next && !next.matches("tr[lp-entity]")) {
+					next = next.nextElementSibling;
+				}
+			}
 		}
 		if (added.length) this.view.addFlash(...added);
 

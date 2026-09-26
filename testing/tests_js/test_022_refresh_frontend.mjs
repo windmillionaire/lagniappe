@@ -226,6 +226,156 @@ test("test_index_table_row_updates_rebuild_active_sort", async (t) => {
 	);
 });
 
+async function deltaTable(t, html) {
+	createBrowser(t, { html: `<table><tbody>${html}</tbody></table>` });
+	class BaseTable {}
+	const { IndexTable } = await esmock.strict(
+		"../../src/script/widgets/tables/indexTable.mjs",
+		{ "../../src/script/elements/base/baseTable.mjs": { BaseTable } },
+	);
+	const target = document.querySelector("tbody");
+	const released = [];
+	const flashed = [];
+	const table = Object.create(IndexTable.prototype);
+	Object.assign(table, {
+		target,
+		view: { mobile: false, addFlash: (...rows) => flashed.push(...rows) },
+		component: {
+			widgets: {
+				TableEditor: {
+					releaseRows: (rows) => released.push(...rows),
+					async refreshCheckboxes() {},
+				},
+			},
+		},
+	});
+	return { table, target, released, flashed };
+}
+
+/**
+ * @matrix table-controls : delta-order unchanged-rows focus hidden-rows sentinel-rows
+ */
+test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
+	const { table, target, released } = await deltaTable(
+		t,
+		`
+		<tr data-role="empty"><td>Empty</td></tr>
+		<tr lp-entity data-key="a"><td>Before</td></tr>
+		<tr lp-entity data-key="b"><td><input value="unsaved"></td></tr>
+		<tr data-role="sentinel"><td></td></tr>
+		<tr lp-entity data-key="c" hidden><td>Filtered</td></tr>
+		<tr lp-load><td></td></tr>
+	`,
+	);
+	const before = [...target.children];
+	const input = target.querySelector("input");
+	input.focus();
+	input.setSelectionRange(2, 4);
+	const observer = new MutationObserver(() => {});
+	observer.observe(target, { childList: true });
+	t.after(() => observer.disconnect());
+	table.refreshDelta({
+		upsert: [
+			{ key: "a", html: '<tr lp-entity data-key="a"><td>After</td></tr>' },
+		],
+		order: ["a", "b", "c"],
+	});
+	assert.equal(target.querySelector('[data-key="a"]').textContent, "After");
+	assert.deepEqual(released, [before[1]]);
+	assert.deepEqual([...target.children].slice(2), before.slice(2));
+	assert.equal(document.activeElement, input);
+	assert.equal(input.value, "unsaved");
+	assert.equal(input.selectionStart, 2);
+	assert.equal(input.selectionEnd, 4);
+	const changes = observer.takeRecords();
+	assert.deepEqual(
+		changes.flatMap((entry) => [...entry.removedNodes]),
+		[before[1]],
+	);
+	assert.equal(changes.flatMap((entry) => [...entry.addedNodes]).length, 1);
+	assert.equal(target.querySelector('[data-key="c"]').hidden, true);
+	table.refreshDelta({ order: ["a", "b", "c"] });
+	assert.deepEqual(
+		observer.takeRecords(),
+		[],
+		"An unchanged order must not detach rows",
+	);
+});
+
+/**
+ * @matrix table-controls : delta-order insertion removal empty-row sorting quick-edit-teardown
+ */
+test("test_index_delta_reorders_adds_removes_and_restores_sort", async (t) => {
+	const { table, target, released, flashed } = await deltaTable(
+		t,
+		`
+		<tr lp-entity data-key="a"><td>Alpha</td></tr>
+		<tr lp-entity data-key="b"><td>Bravo</td></tr>
+		<tr lp-entity data-key="c"><td>Charlie</td></tr>
+	`,
+	);
+	const [a, b, c] = target.children;
+	const keys = () =>
+		[...target.querySelectorAll("tr[lp-entity]")].map((row) => row.dataset.key);
+	table.refreshDelta({ order: ["c", "a", "b"] });
+	assert.deepEqual(keys(), ["c", "a", "b"]);
+	assert.deepEqual([...target.children], [c, a, b]);
+	table.refreshDelta({
+		remove: ["a"],
+		upsert: [
+			{ key: "d", html: '<tr lp-entity data-key="d"><td>Delta</td></tr>' },
+			{
+				key: "b",
+				html: '<tr lp-entity data-key="b"><td>Bravo updated</td></tr>',
+			},
+		],
+		order: ["c", "d", "b"],
+	});
+	assert.deepEqual(keys(), ["c", "d", "b"]);
+	assert.equal(target.firstElementChild, c);
+	assert.deepEqual(released.filter(Boolean), [a, b]);
+	assert.deepEqual(
+		flashed.map((row) => row.dataset.key),
+		["d"],
+	);
+	let refreshed = 0;
+	table.sortingWidget = {
+		refreshRows() {
+			refreshed += 1;
+			assert.deepEqual(keys(), ["d", "c", "b"]);
+			target.prepend(target.querySelector('[data-key="b"]'));
+		},
+	};
+	table.refreshDelta({ order: ["d", "c", "b"] });
+	assert.equal(refreshed, 1);
+	assert.deepEqual(
+		keys(),
+		["b", "d", "c"],
+		"Active sorting still owns final order",
+	);
+	table.sortingWidget = null;
+	table.refreshDelta({
+		remove: ["b", "c", "d"],
+		order: [],
+		empty: '<tr data-role="empty"><td>No pages</td></tr>',
+	});
+	assert.deepEqual(keys(), []);
+	const empty = target.querySelector('[data-role="empty"]');
+	assert.equal(empty.dataset.visible, "true");
+	table.refreshDelta({
+		upsert: [
+			{ key: "e", html: '<tr lp-entity data-key="e"><td>Echo</td></tr>' },
+		],
+		order: ["e"],
+	});
+	assert.deepEqual(keys(), ["e"]);
+	assert.equal(empty.dataset.visible, "false");
+	assert.throws(
+		() => table.refreshDelta({ order: ["missing"] }),
+		/missing row/,
+	);
+});
+
 /**
  * @matrix reconnect-refresh : batching cache-invalidation committed-delete delta-apply destination-invalidation fallback legacy-fallback manifest mounted-collection
  * @pair polling:reentrancy

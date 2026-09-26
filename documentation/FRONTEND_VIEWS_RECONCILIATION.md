@@ -102,6 +102,11 @@ User rows identify their cached Page. A changed Users collection also refreshes
 User-backed columns such as groups and last login. Form indexes retain full
 fragment replacement when their collection revision changes.
 
+Index-table deltas replace changed rows and insert or move only rows that are
+out of order. Unchanged rows remain attached, preserving focus and local input
+state. Existing sorting/filter controls still rebuild their row values and
+apply the user's active sort after the server order is reconciled.
+
 Forms never participate in generic collection replacement. Active, dirty,
 queued, or staged-review rows are protected. Hidden clean rows may refresh
 silently. If a changed row belongs to a loaded DOM collection whose widget has

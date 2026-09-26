@@ -4,14 +4,127 @@ from unittest.mock import Mock
 import pytest
 
 from google.auth.credentials import AnonymousCredentials
-from google.cloud.datastore import Client, Key
-from google.cloud.datastore_v1.types import RunAggregationQueryResponse
+from google.cloud.datastore import Client, Entity, Key, helpers
+from google.cloud.datastore_v1.types import RunAggregationQueryResponse, RunQueryResponse
 
 from lagniappe import CONFIG
 from lagniappe.core.tools.database import get, utility
 from lagniappe.core.definitions import Restriction
 from lagniappe.core.tools.database import filter as database_filter
 from lagniappe.core.tools.database.filter import Filter, Query, Results
+
+
+@pytest.fixture
+def reference_datastore(monkeypatch):
+    """Run real query construction against an explicit Datastore RPC boundary."""
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    rows = {}
+    queries = []
+    lookups = []
+
+    def matches(row, predicate):
+        if predicate._pb.HasField("composite_filter"):
+            branch = predicate.composite_filter
+            values = [matches(row, item) for item in branch.filters]
+            return any(values) if branch.op.name == "OR" else all(values)
+        field = predicate.property_filter
+        # Reference selection must happen in Datastore, not after a type scan.
+        assert field.property.name in {"form", "forms"}
+        assert field.op.name == "IN"
+        keys = {helpers.key_from_protobuf(value.key_value._pb)
+                for value in field.value.array_value.values}
+        value = row.get(field.property.name)
+        return bool(keys.intersection(value if isinstance(value, list) else [value]))
+
+    def run_query(request, **kwargs):
+        from google.cloud.datastore_v1.types import Query as QueryProto
+
+        query = QueryProto(request["query"])
+        queries.append(query)
+        found = [row for row in rows.values() if matches(row, query.filter)]
+        return RunQueryResponse(batch={
+            "entity_results": [{"entity": helpers.entity_to_protobuf(row)} for row in found],
+            "more_results": "NO_MORE_RESULTS",
+        })
+
+    def lookup(keys):
+        lookups.append(list(keys))
+        return [rows[key] for key in keys if key in rows]
+
+    client._datastore_api_internal = SimpleNamespace(run_query=Mock(side_effect=run_query))
+    monkeypatch.setattr(database_filter, "DATA", SimpleNamespace(datastore=client))
+    monkeypatch.setattr(get, "DATA", SimpleNamespace(datastore=SimpleNamespace(get_multi=lookup)))
+
+    def add(name, kind="category", parent=None, **values):
+        row = Entity(client.key(get.KINDS.models.value, name, parent=parent))
+        row.update(type=kind, **values)
+        rows[row.key] = row
+        return row
+
+    return SimpleNamespace(client=client, add=add, queries=queries, lookups=lookups)
+
+
+# @matrix forms database : reference-query primary-secondary owner-deduplication
+def test_form_users_filters_references_and_preserves_owner_set(reference_datastore):
+    db = reference_datastore
+    form = SimpleNamespace(key=db.client.key("models", "requested"))
+    other = db.client.key("models", "other")
+    primary = db.add("primary", form=form.key)
+    secondary = db.add("secondary", form=other, forms=[form.key])
+    both = db.add("both", form=form.key, forms=[form.key], active=False, reserved=True)
+    project = db.add("project", kind="project")
+    model = db.add("model", kind="model", parent=project.key, form=form.key)
+    model_two = db.add("model-two", kind="model", parent=project.key, form=form.key)
+    db.add("unrelated", form=other)
+    db.add("not-an-owner", kind="form", form=form.key)
+
+    result = get.form_users(form)
+
+    assert {row.key for row in result} == {
+        primary.key, secondary.key, both.key, model.key, model_two.key, project.key,
+    }
+    assert len(result) == 6
+    assert next(row for row in result if row.key == both.key)["active"] is False
+    assert len(db.queries) == 1
+    assert db.lookups == [[project.key]]
+
+
+# @matrix forms database : reference-query batching owner-deduplication
+@pytest.mark.parametrize(("count", "query_count"), [(15, 1), (25, 2), (31, 3)])
+def test_form_users_bounds_batches_and_deduplicates_owners(reference_datastore, count, query_count):
+    from math import prod
+
+    db = reference_datastore
+    forms = [SimpleNamespace(key=db.client.key("models", f"form-{i}")) for i in range(count)]
+    owners = [db.add(f"owner-{i}", form=form.key) for i, form in enumerate(forms)]
+    repeated = db.add("repeated", forms=[form.key for form in forms])
+    project = db.add("project", kind="project")
+    model = db.add("model", kind="model", parent=project.key,
+                   form=forms[0].key, forms=[forms[-1].key])
+
+    result = get.form_users(*forms, forms[0])
+
+    assert {row.key for row in result} == {
+        *(row.key for row in owners), repeated.key, model.key, project.key,
+    }
+    assert len(result) == count + 3
+    assert len(db.queries) == query_count
+    assert db.lookups == [[project.key]]
+    def disjunctions(predicate):
+        if predicate._pb.HasField("property_filter"):
+            return len(predicate.property_filter.value.array_value.values)
+        branches = predicate.composite_filter
+        counts = [disjunctions(branch) for branch in branches.filters]
+        return sum(counts) if branches.op.name == "OR" else prod(counts)
+
+    assert all(0 < disjunctions(query.filter) <= 30 for query in db.queries)
+
+
+# @matrix forms database : reference-query empty-input
+def test_form_users_empty_input_does_not_read(reference_datastore):
+    assert get.form_users() == []
+    assert reference_datastore.queries == []
+    assert reference_datastore.lookups == []
 
 
 # @matrix cache user : invalidation acknowledgement concurrency property-mask

@@ -180,6 +180,12 @@ for Tasks and Users so their Page/Form dependencies are resolved), and
 publish cursors used by lazy row routes. Task pages combine two ordered query
 streams: due-dated tasks first, then undated tasks by recent modification.
 
+Form owner discovery queries the indexed `form` and `forms` references rather
+than scanning all Categories and model tasks. It batches up to 15 Form keys
+across the two reference properties, deduplicates owners and loads their
+Projects together. The lookup preserves inactive/reserved references for save
+invalidation and deletion; viewer restrictions remain the caller's concern.
+
 Pass `user=viewer` when constructing an index outside an ordinary browser
 request. Query restrictions and final entity visibility checks use that same
 viewer, including related Form categories/projects and User groups. The omitted

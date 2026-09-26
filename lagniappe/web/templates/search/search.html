@@ -36,7 +36,7 @@
         <span class="text-base-medium">Query:</span>
         <span class="text-base-dark font-semibold">{{ query }}</span>
       </div>
-      <div class="{{ styles.attributes.container }} group/facets"
+      <div class="{{ styles.attributes.container }} group/facets cursor-default"
            data-role="facets"
            data-has-selection="false">
         {% for facet in facets %}{{ facet_button(facet.value) }}{% endfor %}
