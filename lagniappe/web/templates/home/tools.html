@@ -203,7 +203,6 @@
   {% endif %}
 {% endmacro %}
 
-
 {% macro generation_controls(report) %}
   {% if report.available and report.pending and report.status in ['pending', 'revising'] and report.deferred_job %}
     <form method="post" action="{{ url_for('tools.cancel_generation', job_key=report.deferred_job.key) }}" data-role="cancel-generation-form">

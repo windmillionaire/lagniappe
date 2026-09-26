@@ -42,7 +42,8 @@
               data-sorting="false">
             <span data-role="title" class="{{ styles.table.filters.title }}">{{ col.title }}</span>
             {% if col.ordering %}
-              <button class="{{ styles.table.filters.icon.container }}"
+              <button type="button"
+                      class="{{ styles.table.filters.icon.container }}"
                       data-visible="false"
                       data-toggle="filter"
                       aria-label="Sort or filter {{ col.title }}"
@@ -57,7 +58,8 @@
           <th scope="col"
               class="{{ styles.table.cell.action }}"
               data-column="selector">
-            <button class="{{ styles.toggle.container }} inline-grid"
+            <button type="button"
+                    class="{{ styles.toggle.container }} inline-grid"
                     lp-show="table:TableVisibility"
                     data-toggle="true"
                     data-kind="{{ parent.table.kind }}"

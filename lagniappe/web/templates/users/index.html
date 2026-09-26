@@ -1,5 +1,5 @@
-{% set view_entry = "user" %}
 {% extends "layouts/base.html" %}
+{% set view_entry = "user" %}
 {% import 'controls.html' as controls %}
 {% from 'table.html' import table, mobile_toggles %}
 {% from 'users/tools.html' import create_user, user_groups %}
@@ -25,19 +25,23 @@
   <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}">
     <span data-role="title">User Index</span>
     <div data-role="actions">
-      <button class="{{ styles.nav.mobileButton }}"
+      <button type="button"
+              class="{{ styles.nav.mobileButton }}"
               lp-show="table:MobileTableControls"
               data-toggle="true">{{ render_icon("column") }}</button>
       {{ public_users_toggle('mobile') }}
       {% if Resource.USERS.allowed(Action.CREATE) or Resource.USER_GROUPS.allowed(Action.VIEW) %}
-        <button class="{{ styles.nav.desktopButton }}"
+        <button type="button"
+                class="{{ styles.nav.desktopButton }}"
                 lp-show="table:TableEditor"
                 data-toggle="true">{{ render_icon("tableEdit") }}</button>
         {{ public_users_toggle('desktop') }}
-        <button class="{{ styles.nav.desktopButton }}"
+        <button type="button"
+                class="{{ styles.nav.desktopButton }}"
                 lp-show="tools:default"
                 data-toggle="true">{{ render_icon("indexTools") }}</button>
-        <button class="{{ styles.nav.mobileButton }}"
+        <button type="button"
+                class="{{ styles.nav.mobileButton }}"
                 data-role="tools-dropdown"
                 data-kind="user">{{ render_icon("columns") }}</button>
       {% endif %}
@@ -71,12 +75,13 @@
            data-persistent="true"
            data-nav="tools">
         {% if Resource.USERS.allowed(Action.CREATE) %}
-          <button class="{{ styles.index.tools.toggle }}"
+          <button type="button"
+                  class="{{ styles.index.tools.toggle }}"
                   data-role="create-user-toggle"
                   lp-show="tools:CreateUser">New User</button>
         {% endif %}
         {% if Resource.USER_GROUPS.allowed(Action.VIEW) %}
-          <button class="{{ styles.index.tools.toggle }}" lp-show="user-groups:nav">User Groups</button>
+          <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="user-groups:nav">User Groups</button>
         {% endif %}
       </nav>
     </div>

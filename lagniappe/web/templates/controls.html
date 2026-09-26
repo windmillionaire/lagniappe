@@ -51,7 +51,8 @@
 {% endmacro %}
 
 {% macro star(starred) %}
-  <button class="{{ styles.toggle.container }}"
+  <button type="button"
+          class="{{ styles.toggle.container }}"
           lp-control="star"
           data-kind="starred"
           data-active="{{ starred|yesno }}"
@@ -63,7 +64,8 @@
 {% endmacro %}
 
 {% macro column_visibility(label="Toggle column visibility") %}
-  <button class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
+  <button type="button"
+          class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
           data-active="false"
           data-toggle="visibility"
           aria-label="{{ label }}"
@@ -74,7 +76,8 @@
 {% endmacro %}
 
 {% macro filter(label="Sort or filter column", visible=true) %}
-  <button class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
+  <button type="button"
+          class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
           data-active="false"
           data-visible="{{ visible|yesno }}"
           data-toggle="filter"

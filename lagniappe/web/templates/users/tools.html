@@ -94,14 +94,16 @@
   <div class="{{ styles.index.tools.selector.container }}"
        data-role="group-selectors">
     {% if Resource.USER_GROUPS.allowed(Action.CREATE) %}
-      <button class="{{ styles.index.tools.selector.show }}"
+      <button type="button"
+              class="{{ styles.index.tools.selector.show }}"
               lp-show="user-groups:CreateUserGroup">
         {{ render_icon("add") }}
         <span>New Group</span>
       </button>
     {% endif %}
     {% if Resource.SITE.allowed(Action.PERMISSIONS) %}
-      <button class="{{ styles.index.tools.selector.show }}"
+      <button type="button"
+              class="{{ styles.index.tools.selector.show }}"
               lp-show="user-groups:PublicPermissions">
         {{ render_icon("public") }}
         <span>Public</span>
@@ -114,7 +116,8 @@
 {% endmacro %}
 
 {% macro group_selector(group) %}
-  <button class="{{ styles.index.tools.selector.show }}"
+  <button type="button"
+          class="{{ styles.index.tools.selector.show }}"
           data-key="{{ group.urlsafe_key }}"
           lp-show="user-groups:GroupPermissions/{{ group.hash }}">
     {{ render_icon("group") }}

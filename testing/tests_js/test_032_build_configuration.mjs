@@ -224,7 +224,7 @@ test("test_templates_preload_registered_view_and_interaction_foundations", () =>
 	];
 	for (const template of templates) {
 		const source = readFileSync(`lagniappe/web/templates/${template}`, "utf8");
-		const match = source.match(/^\{% set view_entry = "([^"]+)" %\}/);
+		const match = source.match(/^\{% set view_entry = "([^"]+)" %\}/m);
 		assert.ok(match, `${template} does not declare its view entry`);
 		assert.ok(
 			VIEW_ENTRIES[match[1]],

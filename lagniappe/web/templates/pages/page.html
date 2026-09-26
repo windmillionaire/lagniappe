@@ -1,5 +1,5 @@
-{% set view_entry = "page" %}
 {% extends "layouts/base.html" %}
+{% set view_entry = "page" %}
 {% from 'pages/photo.html' import card as photo_card %}
 {% from 'pages/document.html' import document_tab %}
 {% from 'pages/info.html' import info_tab %}
@@ -61,7 +61,8 @@
        data-persistent="true"
        data-standalone="true">
     {% if render_photo and show_photo %}
-      <button lp-show="photo:active"
+      <button type="button"
+              lp-show="photo:active"
               data-kind="page"
               data-visible="{{ has_image|yesno }}"
               {% if not has_image %}hidden{% endif %}
@@ -69,17 +70,21 @@
               aria-label="Image"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("image") }}</button>
     {% endif %}
-    <button lp-show="document:active"
+    <button type="button"
+            lp-show="document:active"
             data-kind="page"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
-    <button lp-show="info:active"
+    <button type="button"
+            lp-show="info:active"
             data-kind="page"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
-    <button lp-show="tasks:active"
+    <button type="button"
+            lp-show="tasks:active"
             data-kind="task"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("task") }}</button>
     {% if render_files %}
-      <button lp-show="files:active"
+      <button type="button"
+              lp-show="files:active"
               data-kind="file"
               class="{{ styles.entity.tabIcon }}">{{ render_icon("files") }}</button>
     {% endif %}
@@ -88,18 +93,21 @@
 
 {% macro sub_toggles(page) %}
   {% if can_view_user_settings %}
-    <button lp-show="info:UserSettings"
+    <button type="button"
+            lp-show="info:UserSettings"
             data-kind="user"
             data-visible="false"
             class="{{ styles.toggle.container }}">{{ render_icon("user") }}</button>
   {% elif view_permissions %}
-    <button lp-show="info:PagePermissions"
+    <button type="button"
+            lp-show="info:PagePermissions"
             data-kind="user"
             data-visible="false"
             class="{{ styles.toggle.container }}">{{ render_icon("permissions") }}</button>
   {% endif %}
   {% if page.allowed(Action.PUBLISH) %}
-    <button lp-show="document:DocumentSettings"
+    <button type="button"
+            lp-show="document:DocumentSettings"
             data-kind="default"
             data-visible="false"
             class="{{ styles.toggle.container }}">
@@ -107,13 +115,15 @@
     </button>
   {% endif %}
   {% if page.allowed(Action.EDIT) %}
-    <button lp-show="tasks:CreateTask"
+    <button type="button"
+            lp-show="tasks:CreateTask"
             data-kind="task"
             data-visible="false"
             class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
   {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
-    <button lp-show="files:FileUpload"
+    <button type="button"
+            lp-show="files:FileUpload"
             data-kind="file"
             data-visible="false"
             class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
@@ -131,7 +141,7 @@
       {{ controls.page_controls() }}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
-      <button data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
+      <button type="button" data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
       {{ toggles('mobile', true) }}
     </div>
   </div>

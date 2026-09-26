@@ -394,7 +394,6 @@
             data-role="date-select"
             data-title="Schedule"
             data-ai-enabled="{{ current_user.access(AI.CREATE)|yesno }}"
-            data-kind="task"
             {% if task and task.properties.schedule.active %}data-schedule='{{ task.schedule|tojson }}'{% endif %}
             {% if task and task.due_date %}data-due-date='{{ task.properties.due_date.form_value }}'{% endif %}
             class="{{ styles.select.button }}"></button>

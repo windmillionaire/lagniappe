@@ -1,5 +1,5 @@
-{% set view_entry = "index" %}
 {% extends "layouts/base.html" %}
+{% set view_entry = "index" %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
 {% from 'filters.html' import filtered_conditions %}
@@ -25,26 +25,30 @@
       {% endif %}
     </div>
     <div data-role="actions">
-      <button class="{{ styles.nav.mobileButton }}"
+      <button type="button"
+              class="{{ styles.nav.mobileButton }}"
               lp-show="table:MobileTableControls"
               data-toggle="true"
               aria-label="Table controls"
               title="Table controls">{{ render_icon("column") }}</button>
       {% if not filtered %}
         {% if category.allowed(Action.EDIT) %}
-          <button class="{{ styles.nav.desktopButton }}"
+          <button type="button"
+                  class="{{ styles.nav.desktopButton }}"
                   lp-show="table:TableEditor"
                   data-toggle="true"
                   aria-label="Edit table"
                   title="Edit table">{{ render_icon("tableEdit") }}</button>
         {% endif %}
         {% if category.allowed(Action.EDIT) or category.allowed(Action.VIEW) %}
-          <button class="{{ styles.nav.desktopButton }}"
+          <button type="button"
+                  class="{{ styles.nav.desktopButton }}"
                   lp-show="tools:default"
                   data-toggle="true"
                   aria-label="Category tools"
                   title="Category tools">{{ render_icon("indexTools") }}</button>
-          <button class="{{ styles.nav.mobileButton }}"
+          <button type="button"
+                  class="{{ styles.nav.mobileButton }}"
                   data-role="tools-dropdown"
                   data-kind="category"
                   aria-label="Category tools"
@@ -87,13 +91,13 @@
            data-persistent="true"
            data-nav="tools">
         {% if category.allowed(Action.EDIT) %}
-          <button class="{{ styles.index.tools.toggle }}" lp-show="tools:CreatePage">New Page</button>
+          <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="tools:CreatePage">New Page</button>
         {% endif %}
         {% if category.allowed(Action.VIEW) %}
-          <button class="{{ styles.index.tools.toggle }}" lp-show="tools:CategoryInfo">Category Settings</button>
+          <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="tools:CategoryInfo">Category Settings</button>
         {% endif %}
-        <button class="{{ styles.index.tools.toggle }}" lp-show="filters:Filters">Filter Pages</button>
-        <button class="{{ styles.index.tools.toggle }}" lp-show="tools:SavedFilters">Saved Filters</button>
+        <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="filters:Filters">Filter Pages</button>
+        <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="tools:SavedFilters">Saved Filters</button>
       </nav>
     </div>
   </div>

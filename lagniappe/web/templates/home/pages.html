@@ -42,14 +42,16 @@
     {% if pages.cursor or pages.back %}
       <div class="{{ styles.home.pagination.container }}">
         {% if pages.back %}
-          <button class="{{ styles.home.pagination.button }} bg-page-bg/50"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }} bg-page-bg/50"
                   lp-control="previous"
                   data-route='{{ url_for("internal.get", kind="pages", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if pages.cursor %}
-          <button class="{{ styles.home.pagination.button }} bg-page-bg/50"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }} bg-page-bg/50"
                   lp-control="next"
                   data-route='{{ url_for("internal.get", kind="pages", cursor=pages.cursor) }}'>
             {{ render_icon("next") }}

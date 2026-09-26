@@ -16,14 +16,16 @@
     {% if starred.cursor or starred.back %}
       <div class="{{ styles.home.pagination.container }}">
         {% if starred.back %}
-          <button class="{{ styles.home.pagination.button }}"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }}"
                   lp-control="previous"
                   data-route='{{ url_for("internal.get", kind="starred", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if starred.cursor %}
-          <button class="{{ styles.home.pagination.button }}"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }}"
                   lp-control="next"
                   data-route='{{ url_for("internal.get", kind="starred", cursor=starred.cursor) }}'>
             {{ render_icon("next") }}

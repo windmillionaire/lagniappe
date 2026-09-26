@@ -160,6 +160,21 @@ npm run format
 The project permits descending specificity and `!important` where state,
 responsive, and editor rules require them.
 
+## Jinja templates
+
+djLint checks the authored templates using the Jinja profile in `.djlintrc`.
+It is pinned in `requirements-dev.txt`, and the configuration keeps the
+existing two-space indentation when formatting templates in the editor.
+
+```bash
+venv/bin/python -m djlint lagniappe/web/templates --lint
+venv/bin/python run.py template-contracts --changed --check
+```
+
+Use explicit button types: `submit` for native form submission and `button`
+for delegated controls. Put `extends` before top-level `set` statements;
+Jinja still makes those variables available to the parent layout.
+
 ## Python
 
 Ruff performs focused correctness linting and is not the Python formatter:

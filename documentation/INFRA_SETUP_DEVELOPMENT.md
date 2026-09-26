@@ -71,7 +71,7 @@ passed as argument lists. Setup/config/report files use UTF-8 explicitly.
 | --- | --- |
 | `requirements-installer.txt` | Bootstrap-only installer clients and console helpers. |
 | `requirements.txt` | App Engine/runtime dependencies. |
-| `requirements-dev.txt` | Runtime plus pytest, Playwright, Ruff, and local tooling. |
+| `requirements-dev.txt` | Runtime plus pytest, Playwright, Ruff, djLint, and local tooling. |
 | `package-lock.json` | Exact frontend direct and transitive dependency tree. |
 | `mcp/uv-bootstrap.json` | Exact managed-uv archive/member digests and host policy. |
 | `mcp/uv.lock` | MCP service runtime/build/test dependency environment. |

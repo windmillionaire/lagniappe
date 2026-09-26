@@ -1,5 +1,5 @@
-{% set view_entry = "project" %}
 {% extends "layouts/base.html" %}
+{% set view_entry = "project" %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
 {% from 'projects/filters.html' import task_filters %}
@@ -26,17 +26,21 @@
        data-persistent="true"
        data-nav="{{ nav }}">
     {% if models %}
-      <button lp-show="model-tasks:ModelTaskList"
+      <button type="button"
+              lp-show="model-tasks:ModelTaskList"
               data-kind="model-task"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("model") }}</button>
     {% endif %}
-    <button lp-show="document:active"
+    <button type="button"
+            lp-show="document:active"
             data-kind="project"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
-    <button lp-show="info:active"
+    <button type="button"
+            lp-show="info:active"
             data-kind="project"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
-    <button lp-show="filters:active"
+    <button type="button"
+            lp-show="filters:active"
             data-kind="task"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("filter.list") }}</button>
   </nav>
@@ -50,13 +54,14 @@
     <div class="{{ styles.layout.nav.title }}" data-role="header">
       <span class="text-kind-dark" data-kind="default" data-role="title"></span>
       {% if project.allowed(Action.EDIT) %}
-        <button lp-show="model-tasks:CreateModelTask"
+        <button type="button"
+                lp-show="model-tasks:CreateModelTask"
                 data-kind="model-task"
                 class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
       {% endif %}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
-      <button data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
+      <button type="button" data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
       {{ toggles('mobile', true) }}
     </div>
     {{ controls.page_controls() }}
@@ -80,7 +85,8 @@
       </div>
       <nav class="{{ styles.layout.nav.card }}">
         {% if project.allowed(Action.EDIT) %}
-          <button lp-show="model-tasks:CreateModelTask"
+          <button type="button"
+                  lp-show="model-tasks:CreateModelTask"
                   class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
         {% endif %}
       </nav>

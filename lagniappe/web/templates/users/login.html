@@ -38,7 +38,8 @@
 {% endmacro %}
 
 {% macro button(text, role="submit", visible=true) %}
-  <button data-role="{{ role }}"
+  <button type="button"
+          data-role="{{ role }}"
           data-kind="user"
           class="{{ styles.button.submit }} w-full {{ 'hidden' if not visible }}">
     <span data-role="icon" data-visible="false" aria-hidden="true"></span>
