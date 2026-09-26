@@ -94,7 +94,11 @@ export class CollaborativeDocument {
 		this.container.setAttribute("aria-busy", "true");
 		this.loadingStatus = document.createElement("div");
 		this.loadingStatus.dataset.role = "document-status";
-		this.loadingStatus.className = "px-6 py-2 text-sm text-base-light";
+		// Overlay the empty editor space so showing/removing the message never
+		// moves the toolbar or changes the document panel's height.
+		this.target.classList.add("relative");
+		this.loadingStatus.className =
+			"absolute inset-x-0 px-6 py-2 text-sm text-base-light";
 		this.loadingStatus.setAttribute("role", "status");
 		this.loadingStatus.hidden = true;
 		this.target.insertBefore(this.loadingStatus, this.container);

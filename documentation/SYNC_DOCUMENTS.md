@@ -15,6 +15,11 @@ The editor renders its shell immediately but remains inert until
 baseline. Setup and untouched empty content do not produce a save; a user edit,
 including clearing content, marks it dirty.
 
+Delayed loading feedback overlays the empty editor area without changing its
+height. Do not infer initial sync readiness from the Page/Project asset list:
+cached parent HTML and Redis working state can outlive or precede the durable
+document asset. Even an apparently empty document must resolve its sync state.
+
 A document subscription contains entity key, `sync_id`, Redis generation,
 revision, and presence digest. Only an active visible document subscribes.
 Deactivation checkpoints local work, detaches the subscription, and closes

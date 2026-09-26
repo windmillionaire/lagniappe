@@ -134,6 +134,7 @@ def test_document_loading_status_waits_for_saved_content(get_user):
     editor.blur()
     sync_id = project.entity.sync_ids["document"]["id"]
     observed = []
+    loading_bounds = {}
 
     def hold_initial_document_response(route):
         payload = route.request.post_data_json or {}
@@ -150,6 +151,8 @@ def test_document_loading_status_waits_for_saved_content(get_user):
         expect(status).to_be_visible()
         expect(user.locate("[data-role='editor']")).to_have_attribute("inert", "")
         expect(user.locate("[data-role='toolbar']")).to_have_attribute("inert", "")
+        for role in ("editor", "toolbar"):
+            loading_bounds[role] = user.locate(f"[data-role='{role}']").bounding_box()
         observed.append(True)
         route.fulfill(response=response)
 
@@ -160,6 +163,12 @@ def test_document_loading_status_waits_for_saved_content(get_user):
         expect(user.locate("[data-role='editor']")).not_to_have_attribute("inert", "")
         expect(user.locate("[data-role='toolbar']")).not_to_have_attribute("inert", "")
     assert observed == [True]
+    # This short document fits within the editor's minimum height. Removing
+    # the loading message must not move or resize either part of the panel.
+    for role, before in loading_bounds.items():
+        after = user.locate(f"[data-role='{role}']").bounding_box()
+        assert before and after
+        assert after == pytest.approx(before, abs=1)
 
 
 # @matrix editor : formatting reload
