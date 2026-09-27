@@ -256,6 +256,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
 
 # @matrix cache : build-id etag missing-fingerprint standard-header
 # @matrix web-headers : conditional-request etag missing-fingerprint security
+@pytest.mark.e2e_serial
 def test_authenticated_home_response_headers_include_etag(get_user, browser_failures):
     """Authenticated app responses should carry the common header envelope."""
     user = get_user(Users.OWNER)

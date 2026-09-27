@@ -40,6 +40,11 @@ Component rendering does not wait for storage inspection, offline replay,
 Notifications, or optional managers. A direct consumer calls the matching
 `ensure...()` method and shares its single-flight promise.
 
+The background health ping has a five-second deadline, including browser
+scheduling and connection setup. A slow response alone must not disable online
+controls after only half a second; network errors and browser offline events
+still update connectivity immediately.
+
 Cold controls prevent a native action when required, set `aria-busy`, import
 their owner, and replay the intended action. A failed import clears the busy
 and single-flight state so the next interaction can retry. Global Search keeps

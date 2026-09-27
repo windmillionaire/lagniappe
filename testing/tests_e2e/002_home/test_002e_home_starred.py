@@ -29,7 +29,6 @@ source and its portal clone so an already-created menu stays current.
 """
 
 from uuid import uuid4
-from urllib.parse import urlsplit
 
 import pytest
 from playwright.sync_api import expect
@@ -48,67 +47,6 @@ from testing.definitions import (
 )
 from testing.elements import StarButton
 from testing.resources import File
-
-
-@pytest.fixture(autouse=True)
-def star_event_diagnostics(browser, monkeypatch, results):
-    """Temporary event capture for the concurrent-click investigation."""
-    events = []
-    original = browser.new_context
-
-    def create_context(**options):
-        context = original(**options)
-        context.expose_binding("__starTrace", lambda source, record: events.append(record))
-
-        def network_event(kind, request, **details):
-            path = urlsplit(request.url).path
-            if path == "/l/ping" or path.startswith("/l/toggle-star/"):
-                events.append({"type": kind, "path": path.split("/")[:3], **details})
-
-        context.on("request", lambda request: network_event("request", request))
-        context.on("response", lambda response: network_event(
-            "response", response.request, status=response.status
-        ))
-        context.on("requestfailed", lambda request: network_event(
-            "requestfailed", request, failure=request.failure
-        ))
-        context.add_init_script(script="""(() => {
-            const describe = node => node?.tagName && ({tag: node.tagName,
-                control: node.getAttribute('lp-control'), role: node.getAttribute('data-role'),
-                connected: node.isConnected, disabled: node.disabled});
-            const record = (type, extra = {}) => {
-                const root = document.querySelector('[lp-view]');
-                void window.__starTrace({type, time: performance.now(),
-                    route: location.pathname.split('/').slice(0, 2).join('/'),
-                    online: root?._lp_view?.online, dragging: root?._lp_view?.isDragging,
-                    initialized: root?.hasAttribute('initialized'),
-                    navigation: window.__NAVIGATION_TRANSITION_SETTLED__,
-                    animations: document.getAnimations().map(a => ({state: a.playState,
-                        pseudo: a.effect?.pseudoElement})), ...extra});
-            };
-            for (const name of ['pointerdown', 'pointerup', 'click']) {
-                for (const capture of [true, false]) document.addEventListener(name,
-                    event => record(name, {capture, target: describe(event.target),
-                        control: describe(event.target.closest?.('[lp-control]')),
-                        trusted: event.isTrusted, prevented: event.defaultPrevented,
-                        x: event.clientX, y: event.clientY}), capture);
-            }
-            const start = document.startViewTransition?.bind(document);
-            if (start) document.startViewTransition = (...args) => {
-                record('transition-start');
-                const transition = start(...args);
-                for (const phase of ['ready', 'updateCallbackDone', 'finished']) {
-                    transition[phase].then(() => record('transition-' + phase),
-                        () => record('transition-' + phase + '-rejected'));
-                }
-                return transition;
-            };
-        })();""")
-        return context
-
-    monkeypatch.setattr(browser, "new_context", create_context)
-    yield
-    results.record("star events", events)
 
 
 def _title_star_action(user, menu_name, action_name):

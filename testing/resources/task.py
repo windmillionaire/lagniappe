@@ -170,6 +170,7 @@ class Task(SiteResource):
         return self
 
     def wait_for_load(self):
+        self.initialize_view()
         self.element = self.user.locate(f"[data-key='{self.key}']")
         expect(self.element).to_be_visible()
 

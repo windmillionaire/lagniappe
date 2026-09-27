@@ -197,10 +197,11 @@ venv/bin/python run.py test --experiments=all
 venv/bin/python run.py hosted-e2e execute --experiments=all
 ```
 
-The bounded selection contains 48 existing browser cases across 13 modules and
-five coordination checks, with at most three pytest/browser processes active
-against one server URL. It covers forms, documents, mobile Pages, Tasks,
-Categories, search, file previews, messaging and site settings. Each sequential
+The bounded selection contains representative existing browser cases and five
+coordination checks, with at most three pytest/browser processes active against
+one server URL. It covers forms, documents, mobile Pages, Tasks, Categories,
+search, file previews, messaging and site settings, plus quota fallback,
+task-history cleanup, and global Home ETag regression stories. Each sequential
 story worker reuses its own Administrator through `get_admin`; each test still
 gets an isolated browser context. The Administrator has explicit CREATE AI
 entitlement as well as ordinary administrative permissions.

@@ -120,6 +120,8 @@ const getView = async () => {
 };
 
 let _ping = null;
+// Include browser scheduling and connection setup, not just handler latency.
+const SERVER_HEALTH_TIMEOUT_MS = 5_000;
 
 /**
  * @testable true
@@ -128,7 +130,8 @@ let _ping = null;
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
  * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_uses_server_owned_cache_policy
  * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_clears_only_the_settled_pending_promise
- * @matrix offline : cache-policy pending-ownership server-health settled-cleanup
+ * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_tolerates_slow_response_but_bounds_unresponsive_server
+ * @matrix offline : bounded-timeout cache-policy pending-ownership server-health settled-cleanup slow-response
  * @pair offline:indicator
  */
 export async function pingServer() {
@@ -136,7 +139,10 @@ export async function pingServer() {
 
 	_ping = (async () => {
 		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 500);
+		const timeoutId = setTimeout(
+			() => controller.abort(),
+			SERVER_HEALTH_TIMEOUT_MS,
+		);
 		try {
 			const response = await fetch("/l/ping", {
 				method: "HEAD",

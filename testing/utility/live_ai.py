@@ -92,6 +92,12 @@ def submit_live_ai(user, *, path, submit, results, browser_failures, fallback,
             quota = response.status == 422 and is_quota_message(body)
             assert response.ok or quota, body
         if quota:
+            from playwright.sync_api import expect
+
+            # Receiving headers does not mean the form has rendered its error.
+            # In forced-quota stories the backoff is zero, so observe that UI
+            # boundary before retrying or switching to the manual fallback.
+            expect(user.page.get_by_text(body, exact=True)).to_be_visible()
             raise ProviderQuotaBlocked(body)
         return response
 

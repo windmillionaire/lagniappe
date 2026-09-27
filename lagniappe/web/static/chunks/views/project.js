@@ -1,2 +1,2 @@
-import{E as t}from"../entity-foundation.js?v=b0daffa8";import"../core-foundation.js?v=b0daffa8";import"../connectivity.js?v=b0daffa8";import"../foundation.js?v=b0daffa8";import"../upstreamUnavailable.js?v=b0daffa8";class r extends t{get secondaryCard(){return this.elt.querySelector("#model-tasks")}}export{r as default};
+import{E as t}from"../entity-foundation.js?v=bbea7a5c";import"../core-foundation.js?v=bbea7a5c";import"../connectivity.js?v=bbea7a5c";import"../foundation.js?v=bbea7a5c";import"../upstreamUnavailable.js?v=bbea7a5c";class r extends t{get secondaryCard(){return this.elt.querySelector("#model-tasks")}}export{r as default};
 /*! Third-party licenses: /third-party-licenses.txt */

@@ -8,6 +8,7 @@ Verified against:
 - lagniappe/core/entities/task.py
 """
 
+from contextlib import contextmanager
 from dataclasses import replace
 import re
 import json
@@ -32,6 +33,7 @@ from testing.utility.network import (
 pytestmark = pytest.mark.e2e
 
 
+@contextmanager
 def _add_task_row_pressure(task, count=40):
     """Keep the history story representative of a well-populated task page."""
     page = task.entity.page
@@ -46,6 +48,10 @@ def _add_task_row_pressure(task, count=40):
         for index in range(count)
     ]
     Entities.save(*filler_tasks, page)
+    try:
+        yield
+    finally:
+        Entities.delete(*filler_tasks)
 
 
 def _complete_then_uncomplete(task, *, reload=True):
@@ -654,35 +660,35 @@ def test_completion_waits_for_acceptance_and_moves_closed_task(get_admin, get_us
 def test_task_history_visibility_persists_after_reload(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_history_form_task.get(user)
-    _add_task_row_pressure(task)
-    user.go(task)
+    with _add_task_row_pressure(task):
+        user.go(task)
 
-    _complete_then_uncomplete(task)
+        _complete_then_uncomplete(task)
 
-    history = _open_history(task)
-    form_column = history.locator("th[data-column='input-textab12']")
-    expect(form_column).to_be_hidden()
+        history = _open_history(task)
+        form_column = history.locator("th[data-column='input-textab12']")
+        expect(form_column).to_be_hidden()
 
-    controller = _open_history_visibility(history)
-    form_column_toggle = controller.locator(
-        "input[type='checkbox'][name='input-textab12']"
-    )
-    expect(form_column_toggle).not_to_be_checked()
-    form_column_toggle.set_checked(True)
-    expect(form_column).to_be_visible()
+        controller = _open_history_visibility(history)
+        form_column_toggle = controller.locator(
+            "input[type='checkbox'][name='input-textab12']"
+        )
+        expect(form_column_toggle).not_to_be_checked()
+        form_column_toggle.set_checked(True)
+        expect(form_column).to_be_visible()
 
-    user.reload()
-    task.wait_for_load()
+        user.reload()
+        task.wait_for_load()
 
-    history = _open_history(task)
-    expect(history.locator("th[data-column='completed_on']")).to_be_visible()
-    expect(history.locator("th[data-column='input-textab12']")).to_be_visible()
-    expect(history.locator("tbody tr")).not_to_have_count(0)
+        history = _open_history(task)
+        expect(history.locator("th[data-column='completed_on']")).to_be_visible()
+        expect(history.locator("th[data-column='input-textab12']")).to_be_visible()
+        expect(history.locator("tbody tr")).not_to_have_count(0)
 
-    controller = _open_history_visibility(history)
-    expect(
-        controller.locator("input[type='checkbox'][name='input-textab12']")
-    ).to_be_checked()
+        controller = _open_history_visibility(history)
+        expect(
+            controller.locator("input[type='checkbox'][name='input-textab12']")
+        ).to_be_checked()
 
 
 # @matrix tasks : history-fill latest-submission live-update

@@ -20,6 +20,9 @@ PILOT_FILE = "testing/tests_e2e/001_site/test_001h_parallel_pilot.py"
 CASES = ("independent-a", "independent-b", "shared-a", "shared-b", "exclusive")
 PROTOCOL_TARGETS = tuple(f"{PILOT_FILE}::test_worker_page_and_task[{case}]" for case in CASES)
 STORY_TARGETS = (
+    'testing/tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag',
+    'testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode',
+    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode[quota-fallback]',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_category',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_project',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_page',
@@ -27,6 +30,7 @@ STORY_TARGETS = (
     'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components',
     'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options',
     'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility',
+    'testing/tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state[quota-fallback]',
     'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_click_model_opens_info',
     'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name',
     'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form',
@@ -43,11 +47,14 @@ STORY_TARGETS = (
     'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_section_switching_updates_visible_panel_and_title',
     'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section',
     'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_selection_persists_after_reload',
+    'testing/tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files[quota-fallback]',
     'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task',
     'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes',
     'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_form',
     'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task',
     'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_submit_attached_task_form',
+    'testing/tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload',
+    'testing/tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell',
     'testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_hiding_column_updates_visible_headers_and_cells',
     'testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_ascending_reorders_rows',
     'testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_descending_reorders_rows',
