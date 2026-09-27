@@ -10,10 +10,12 @@ import threading
 from runner.test_session import inspect_process_identity
 
 
+# @testable infrastructure
 def context():
     return json.loads(Path(os.environ["LAGNIAPPE_E2E_WORKER_CONTEXT"]).read_text(encoding="utf-8"))
 
 
+# @testable infrastructure
 def assert_owner(record):
     from lagniappe.core.tools.hosted_e2e.lease import e2e_lease_active
 
@@ -21,12 +23,17 @@ def assert_owner(record):
         raise RuntimeError("E2E worker coordinator or lease is no longer active")
 
 
+# @testable true
+# @tests tests_unit/test_030_hosted_e2e.py::test_worker_inherits_run_cookie_without_replaying_bootstrap
+# @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
+# @matrix hosted-e2e : authentication cookie
+# @matrix testing : parallel-e2e
 @contextmanager
 def worker_runtime():
     from lagniappe import CONFIG
     from lagniappe.core.entities import Entities
     from testing.utility.e2e_runtime import (
-        E2ERuntime, hosted_e2e_browser_cookie, validate_hosted_e2e_health,
+        E2ERuntime, validate_hosted_e2e_health,
     )
 
     record = context()
@@ -51,7 +58,9 @@ def worker_runtime():
         cookies = ()
         if CONFIG.hosted_e2e_runner:
             validate_hosted_e2e_health()
-            cookies = (hosted_e2e_browser_cookie(record["run_id"]),)
+            cookies = tuple(record.get("browser_cookies", ()))
+            if len(cookies) != 1:
+                raise RuntimeError("Hosted E2E worker requires the coordinator's run cookie")
         else:
             from runner.testing import wait_for_session_server
             if not wait_for_session_server(record["base_url"], record["run_id"],
@@ -66,6 +75,7 @@ def worker_runtime():
         watcher.join(timeout=2)
 
 
+# @testable infrastructure
 def write_results(session, outcomes, exitstatus):
     record = context()
     selected = [item.nodeid for item in session.items]

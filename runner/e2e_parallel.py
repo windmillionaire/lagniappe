@@ -19,13 +19,16 @@ class Batch:
     exclusive: bool = False
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_allow_publication_during_completion
+# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_reject_missing_completed_messages
+# @matrix testing : parallel-e2e
 def await_worker_file(path):
     """Wait for an atomic harness message, never for browser/app state."""
     deadline = time.monotonic() + 90
     while not path.is_file():
         outcome = path.parent / "outcomes.json"
-        if outcome.is_file():
+        if outcome.is_file() and not path.is_file():
             raise AssertionError(f"Peer worker finished without {path.name}")
         if time.monotonic() >= deadline:
             raise AssertionError(f"Peer worker did not publish {path.name}")

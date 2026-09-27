@@ -77,6 +77,12 @@ def run_pilot(authority, command, pytest_args):
     if owner is None:
         raise RuntimeError("Cannot identify E2E pilot coordinator")
     run_id = getattr(authority, "run_id", None) or authority.nonce
+    cookies = ()
+    if CONFIG.hosted_e2e_runner:
+        from testing.utility.e2e_runtime import hosted_e2e_browser_cookie
+        # Google may return the same single-use bootstrap token to concurrent
+        # callers. Exchange once for the run, then share only its scoped cookie.
+        cookies = (hosted_e2e_browser_cookie(run_id),)
     local = load_session_state() if not CONFIG.hosted_e2e_runner else None
     batches = tuple(Batch(case, target, frozenset({"shared-page"}) if case.startswith("shared")
                           else frozenset(), exclusive=case == "exclusive")
@@ -98,6 +104,7 @@ def run_pilot(authority, command, pytest_args):
             record = {"attempt": attempt, "snapshot": snapshot, "batch": batch.name,
                       "nodeid": batch.nodeid, "run_id": run_id, "owner": owner,
                       "base_url": CONFIG.BASE_URL, "fixtures": fixtures,
+                      "browser_cookies": cookies,
                       "server_pid": local["server"]["pid"] if local else None,
                       "artifacts": str(artifacts)}
             path = contexts / f"{batch.name}.json"

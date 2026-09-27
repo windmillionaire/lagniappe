@@ -9,11 +9,38 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from runner.e2e_parallel import Batch, merge_results, schedule
+from runner.e2e_parallel import Batch, await_worker_file, merge_results, schedule
 from runner.e2e_pilot import TARGETS, pilot_arguments
 
 
 pytestmark = pytest.mark.tooling
+
+
+# @matrix testing : parallel-e2e
+@pytest.mark.parametrize("name", ["ready.json", "outcomes.json"])
+def test_worker_messages_allow_publication_during_completion(tmp_path, monkeypatch, name):
+    path = tmp_path / name
+    path.write_text('{"ready": true}')
+    (tmp_path / "outcomes.json").write_text('{"ready": true}')
+    is_file = Path.is_file
+    first_read = True
+
+    def before_publication(candidate):
+        nonlocal first_read
+        if candidate == path and first_read:
+            first_read = False
+            return False
+        return is_file(candidate)
+
+    monkeypatch.setattr(Path, "is_file", before_publication)
+    assert await_worker_file(path) == {"ready": True}
+
+
+# @matrix testing : parallel-e2e
+def test_worker_messages_reject_missing_completed_messages(tmp_path):
+    (tmp_path / "outcomes.json").write_text('{}')
+    with pytest.raises(AssertionError, match="finished without ready.json"):
+        await_worker_file(tmp_path / "ready.json")
 
 
 # @matrix testing : parallel-e2e

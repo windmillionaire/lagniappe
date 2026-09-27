@@ -202,7 +202,9 @@ the first worker's session teardown to verify that its data/server survive.
 Only the coordinator acquires and renews the shared lease and performs global
 setup/cleanup. Workers inherit an exact run/server binding through temporary
 private context files, monitor coordinator/lease liveness, and never clean or
-release shared state. The scheduler stops and reaps active worker process groups
+release shared state. In hosted runs the coordinator exchanges the single-use
+Google bootstrap token once and supplies its run-scoped cookie to each private
+worker context; ordinary browser user sessions remain distinct. The scheduler stops and reaps active worker process groups
 before outer cleanup on cancellation, timeout or lost authority. This cannot
 undo provider writes that were already in flight when authority was lost.
 
