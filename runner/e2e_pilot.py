@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from runner.context import REPOSITORY_ROOT
 from runner.e2e_parallel import Batch, merge_results, schedule
-from runner.e2e_inventory import story_batches
+from runner.e2e_inventory import duration_estimates, story_batches
 
 
 PILOT_FILE = "testing/tests_e2e/001_site/test_001h_parallel_pilot.py"
@@ -152,12 +152,15 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
     (root / "collection.log").write_text(collected.stdout + collected.stderr, encoding="utf-8")
     if collected.returncode:
         raise RuntimeError(f"Pilot collection failed; see {root / 'collection.log'}")
-    stories, inventory = story_batches(REPOSITORY_ROOT, json.loads(collection.read_text(encoding="utf-8")))
+    stories, inventory = story_batches(REPOSITORY_ROOT, json.loads(collection.read_text(encoding="utf-8")),
+                                       durations=duration_estimates(REPOSITORY_ROOT))
+    by_node = {row["nodeid"].removeprefix("testing/"): row for row in inventory}
     batches = ([batch for batch in stories if batch.name == "stories-before"] + batches
                + [batch for batch in stories if batch.name != "stories-before"])
     (root / "inventory.json").write_text(json.dumps(inventory, indent=2), encoding="utf-8")
     for batch in stories:
-        print(f"{batch.name}: {len(batch.nodeids)} cases, {len(batch.resources)} resources, "
+        estimated = sum(by_node[node.removeprefix("testing/")]["estimated_seconds"] for node in batch.nodeids)
+        print(f"{batch.name}: {len(batch.nodeids)} cases, estimated {estimated:.0f}s, "
               f"exclusive={batch.exclusive}", flush=True)
     destination = next((arg.split("=", 1)[1] for arg in pytest_args if arg.startswith("--junitxml=")),
                        str(root / "junit.xml"))
@@ -197,12 +200,17 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
                       "resource_registry": str(contexts),
                       "server_pid": local["server"]["pid"] if local else None,
                       "artifacts": str(artifacts)}
+            if batch.name.startswith("stories-"):
+                record["test_resources"] = {
+                    node.removeprefix("testing/"): by_node[node.removeprefix("testing/")]["resources"]
+                    for node in batch.nodeids}
             path = contexts / f"{batch.name}.json"
             path.write_text(json.dumps(record), encoding="utf-8")
             path.chmod(0o600)
             output = stack.enter_context((artifacts / "pytest.log").open("w", encoding="utf-8"))
             child_command = [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini",
                              "-p", "testing.utility.traceability_results", "-p", "runner.pytest_routing",
+                             "-p", "runner.e2e_claims",
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
                              f"--junitxml={artifacts / 'junit.xml'}", "-m", "not unfinished", *batch.nodeids]
             print(f"Pilot starting {batch.name}", flush=True)

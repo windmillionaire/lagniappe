@@ -18,13 +18,13 @@ Usage:
     FormSelect.select(widget, form_entity)
     DateSelect.select(widget, due_date)
 
-    # Submit buttons with loading spinner verification
-    SpinnerButtons.CREATE.click(form)  # Verifies spinner appears
+    # Submit, then assert the story's saved result or final feedback
+    SpinnerButtons.CREATE.click(form)
 """
 
 from enum import Enum
 
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, expect
+from playwright.sync_api import expect
 
 from .combobox import Select
 
@@ -179,7 +179,8 @@ class SpinnerButtons(Enum):
     Submit buttons that show loading spinners during submission.
 
     These buttons change text and show a spinner icon while the form
-    is being submitted. The click() method verifies the spinner appears.
+    is being submitted. Callers assert the final result or feedback; the
+    transient loading state can finish before the browser observes it.
 
     Members:
         CREATE: "Create" → "Creating..." with spinner
@@ -187,7 +188,7 @@ class SpinnerButtons(Enum):
         UPDATE: "Update" → "Updating..." with spinner
 
     Usage:
-        SpinnerButtons.CREATE.click(form)  # Clicks and verifies spinner
+        SpinnerButtons.CREATE.click(form)
     """
 
     CREATE = "button[type='submit']:has-text('Create')"
@@ -195,18 +196,9 @@ class SpinnerButtons(Enum):
     UPDATE = "button[type='submit']:has-text('Update')"
     UPDATE_SUCCESS = "button[type='submit']:has-text('Updated')"
 
-    def busy(self):
-        """Return the button text shown during loading."""
-        if self.name == "CREATE":
-            return "Creating"
-        elif self.name == "UPLOAD":
-            return "Uploading"
-        elif self.name == "UPDATE":
-            return "Updating"
-
     def click(self, element):
         """
-        Click submit button and verify loading spinner appears.
+        Click submit; the caller checks the operation's durable outcome.
 
         Args:
             element: Form or widget containing the submit button
@@ -214,14 +206,6 @@ class SpinnerButtons(Enum):
         submit_button = element.locator(self.value)
         expect(submit_button).to_be_visible()
         submit_button.click()
-        busy_button = element.locator(f"button:has-text('{self.busy()}')")
-        try:
-            expect(busy_button).to_be_visible(timeout=1000)
-            expect(busy_button.locator("[data-icon='spinner']")).to_be_visible()
-        except (PlaywrightTimeoutError, AssertionError):
-            if self != SpinnerButtons.UPDATE:
-                raise
-            assert SpinnerButtons.UPDATE_SUCCESS.successful(element)
 
     def successful(self, element):
         """

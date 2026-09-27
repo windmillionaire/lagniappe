@@ -11,7 +11,8 @@ import pytest
 
 from runner.e2e_parallel import Batch, await_worker_file, merge_results, schedule
 from runner.e2e_pilot import TARGETS, pilot_arguments
-from runner.e2e_inventory import discover_resources, story_batches
+from runner.e2e_inventory import discover_resources, duration_estimates, story_batches
+from runner.e2e_claims import reserve_resources
 
 
 pytestmark = pytest.mark.tooling
@@ -49,13 +50,15 @@ def fixture():
 
 
 # @matrix testing : parallel-e2e
-def test_inventory_groups_shared_resources_and_drains_serial_stories(tmp_path):
+def test_inventory_balances_cases_without_transitive_resource_groups(tmp_path):
     folder = tmp_path / "testing/tests_e2e"
     folder.mkdir(parents=True)
     (folder / "test_story.py").write_text('''
 from testing.definitions import Pages
 def test_a(): Pages.shared.get(None)
-def test_b(): Pages.shared.get(None)
+def test_b():
+    Pages.shared.get(None)
+    Pages.other.get(None)
 def test_c(): Pages.other.get(None)
 def test_d(): pass
 def test_reset(): pass
@@ -64,13 +67,144 @@ def test_reset(): pass
                for name in "abcd"]
     records.append({"nodeid": "tests_e2e/test_story.py::test_reset", "fixtures": [],
                     "serial": True, "serial_phase": "before"})
-    batches, inventory = story_batches(tmp_path, records, workers=2)
+    durations = {f"tests_e2e/test_story.py::test_{name}": value for name, value in zip("abc", (8, 5, 3))}
+    batches, inventory = story_batches(tmp_path, records, workers=2, durations=durations)
     assert len(batches) == 4
     assert batches[0].exclusive and batches[0].nodeid.endswith("test_reset")
-    assert batches[1].nodeids == ("testing/tests_e2e/test_story.py::test_a", "testing/tests_e2e/test_story.py::test_b")
-    assert not (batches[1].resources & batches[2].resources)
+    assert batches[1].nodeids == ("testing/tests_e2e/test_story.py::test_a",)
+    assert batches[2].nodeids == ("testing/tests_e2e/test_story.py::test_b", "testing/tests_e2e/test_story.py::test_c")
+    assert not batches[1].resources and not batches[2].resources
     assert batches[-1].exclusive and batches[-1].nodeid.endswith("test_d")
-    assert inventory[1]["resources"] == ["Pages.shared"]
+    assert inventory[1]["resources"] == ["Pages.other", "Pages.shared"]
+    assert inventory[2]["estimated_seconds"] == 3
+
+
+# @matrix testing : parallel-e2e
+def test_duration_estimates_use_only_valid_passed_e2e_results(tmp_path):
+    assert duration_estimates(tmp_path) == {}
+    evidence = tmp_path / "testing/evidence/latest.json"
+    evidence.parent.mkdir(parents=True)
+    values = {"good": 3.2, "zero": 0, "negative": -1, "infinite": float("inf"),
+              "string": "2", "missing": None, "boolean": True}
+    rows = {f"tests_e2e/test_{name}.py::test_story": {"outcome": "passed", "duration": duration}
+            for name, duration in values.items()}
+    rows["tests_e2e/test_failed.py::test_story"] = {"outcome": "failed", "duration": 500}
+    rows["tests_unit/test_other.py::test_story"] = {"outcome": "passed", "duration": 50}
+    evidence.write_text(json.dumps({"tests": rows}))
+    assert duration_estimates(tmp_path) == {"tests_e2e/test_good.py::test_story": 3.2}
+
+
+# @matrix testing : parallel-e2e
+def test_case_claims_overlap_independent_work_and_release_after_failure(tmp_path):
+    script = '''
+from pathlib import Path
+import sys, time
+from runner.e2e_claims import reserve_resources
+root, name, *resources = sys.argv[1:]
+root = Path(root)
+(root / (name + '-waiting')).touch()
+with reserve_resources(root / 'claims', resources, lambda: None, timeout=5):
+    (root / (name + '-acquired')).touch()
+    while not (root / (name + '-release')).exists():
+        time.sleep(.01)
+'''
+    processes = []
+
+    def launch(name, *resources):
+        child = subprocess.Popen([sys.executable, "-c", script, str(tmp_path), name, *resources])
+        processes.append(child)
+        return child
+
+    def await_file(name):
+        deadline = time.monotonic() + 5
+        while not (tmp_path / name).exists():
+            assert time.monotonic() < deadline, name
+            time.sleep(.01)
+
+    try:
+        first = launch("first", "z")
+        await_file("first-acquired")
+        both = launch("both", "a", "z")
+        await_file("both-waiting")
+        other = launch("other", "a")
+        await_file("other-acquired")
+        assert not (tmp_path / "both-acquired").exists()
+        (tmp_path / "other-release").touch()
+        assert other.wait(timeout=5) == 0
+        first.kill()  # OS releases its claims even without Python teardown.
+        first.wait(timeout=5)
+        await_file("both-acquired")
+        (tmp_path / "both-release").touch()
+        assert both.wait(timeout=5) == 0
+        with reserve_resources(tmp_path / "claims", ["a", "z"], lambda: None, timeout=0):
+            pass
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+
+
+# @matrix testing : parallel-e2e
+def test_case_claims_stop_waiting_on_timeout_or_lost_authority(tmp_path):
+    def lost():
+        raise RuntimeError("lease lost")
+
+    with reserve_resources(tmp_path, ["shared"], lambda: None):
+        with pytest.raises(RuntimeError, match="Timed out"):
+            with reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0):
+                pytest.fail("A conflicting claim was admitted")
+        with pytest.raises(RuntimeError, match="lease lost"):
+            with reserve_resources(tmp_path, ["shared"], lost):
+                pytest.fail("Lost authority was ignored")
+    with pytest.raises(ValueError):
+        with reserve_resources(tmp_path, ["shared"], lambda: None):
+            raise ValueError("fixture failed")
+    with reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0):
+        pass
+
+
+# @matrix testing : parallel-e2e
+def test_case_claim_hook_covers_fixture_teardown_and_continues_after_failure(tmp_path, monkeypatch):
+    (tmp_path / "pytest.ini").write_text("[pytest]\n")
+    (tmp_path / "conftest.py").write_text('''
+from testing.utility import e2e_worker
+e2e_worker.assert_owner = lambda record: None
+''')
+    (tmp_path / "test_claim.py").write_text('''
+from pathlib import Path
+import pytest
+from runner.e2e_claims import reserve_resources
+root = Path(__file__).parent
+def assert_reserved():
+    with pytest.raises(RuntimeError, match='Timed out'):
+        with reserve_resources(root / 'claims', ['shared'], lambda: None, timeout=0):
+            pytest.fail('Claim absent during fixture lifecycle')
+@pytest.fixture
+def broken_teardown():
+    assert_reserved()
+    yield
+    assert_reserved()
+    raise ValueError('intentional teardown failure')
+def test_one(broken_teardown):
+    assert_reserved()
+def test_two():
+    assert_reserved()
+''')
+    record = tmp_path / "context.json"
+    record.write_text(json.dumps({"resource_registry": str(tmp_path), "artifacts": str(tmp_path),
+                                  "test_resources": {f"test_claim.py::test_{n}": ["shared"]
+                                                     for n in ("one", "two")}}))
+    monkeypatch.setenv("LAGNIAPPE_E2E_WORKER_CONTEXT", str(record))
+    result = subprocess.run([sys.executable, "-m", "pytest", "-c", str(tmp_path / "pytest.ini"),
+                             "-p", "runner.e2e_claims", str(tmp_path / "test_claim.py"), "-q"],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "2 passed, 1 error" in result.stdout
+    events = [json.loads(line) for line in (tmp_path / "resource-events.jsonl").read_text().splitlines()]
+    assert [event["event"] for event in events] == ["waiting", "acquired", "released"] * 2
+    with reserve_resources(tmp_path / "claims", ["shared"], lambda: None, timeout=0):
+        pass
 
 
 # @matrix testing : parallel-e2e

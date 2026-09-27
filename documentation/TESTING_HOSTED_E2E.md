@@ -208,21 +208,36 @@ entitlement as well as ordinary administrative permissions.
 
 Pytest first collects exact parameter cases and fixtures. An AST inventory
 follows direct enum references, local and imported test helpers/constants and fixture functions.
-Tests sharing a named resource stay in one sequential batch; independent groups
-are balanced across workers. This does not traverse the related entity graph:
+Individual cases are balanced across three long-lived workers using the most
+recent passing E2E durations in `testing/evidence/latest.json`; unmeasured cases
+use the median duration (five seconds without history). Timings only guide
+placement and never count as current evidence. Each worker reserves a test's
+direct named resources through setup, call and teardown, releasing them before
+the next test. Overlapping claims wait; independent tests can run together even
+when an intermediate test references both resources. Claims are conservative
+exclusive reservations, not inferred read/write permissions. This does not traverse the related entity graph:
 Pages sharing a Form or Category can run together. Dynamic resource lookups still need review; use explicit enum members where
 possible. Import discovery follows named helpers under `testing/`, not arbitrary
 application calls or the related-entity graph.
-`@pytest.mark.e2e_serial` puts global-setting stories into an exclusive batch
-after the parallel workers finish. Public-user permission fixtures and site
-settings use this marker. New tests do not choose a worker or batch manually.
+`@pytest.mark.e2e_serial` puts stories requiring whole-site quietness into an
+exclusive batch after the parallel workers finish. Owner access alone is not
+exclusive. Public-user, user-index, provider and site-settings stories are part
+of the concurrent trial; their directly named resources still reserve affected
+records. New tests do not choose a worker or batch manually.
 Environment-reset checks use `@pytest.mark.e2e_serial(phase="before")` and finish
 before protocol checks or ordinary stories create fixtures. Workers publish
 atomic progress counts; the coordinator prints those counts every 30 seconds.
 
 A run-local locked registry shares enum keys between processes, making lazy
 prerequisite creation idempotent. Its lock covers fixture creation only; the
-scheduler controls test conflicts. Resources retain keys across tests and
+scheduler controls test conflicts. Per-test reservations use OS file locks in
+the private run directory shared by the local or Cloud Run workers. They acquire
+all claims together, release partial acquisitions before waiting, check outer
+authority while waiting, and fail after ten minutes instead of hanging forever.
+Process exit releases locks; the coordinator still reaps browser descendants
+before cleanup. `resource-events.jsonl` records wait, acquisition and release
+times per worker so the trial can distinguish execution from conflict waiting.
+Resources retain keys across tests and
 forget cached Python entity snapshots after each test. A later `.entity` access
 re-fetches from Datastore; browser-only uses of `.key` do not. No cached browser
 cookies are shared between the Administrator accounts.
@@ -251,11 +266,11 @@ non-E2E evidence. Neither claims the all-suite release validation scope.
 `--experiments` here selects the harness trial; it does not enable application
 experiments mode or measurement diagnostics. Ordinary suite execution remains serial. Full coordinated runs automatically
 collect exact parameter cases; no manual target list or 50-nodeid override is
-needed. Settings, public registration, shared-cache reset, provider contracts
-and assertions about global revision snapshots run exclusively. Ordinary
+needed. Shared-cache reset and assertions about unchanged global revision
+snapshots run exclusively. Ordinary
 all-access stories use `get_admin`; Owner/permission-specific stories keep
-their exact identities. Shared resource users retain collection order within
-one worker. This remains an opt-in trial while full-suite reliability is
+their exact identities. Tests retain collection order within each worker;
+there is no cross-worker order guarantee or work stealing. This remains an opt-in trial while full-suite reliability is
 validated. The browser runner and App Engine server have
 separate CPU/memory budgets; increasing browser concurrency does not require
 additional server URLs.

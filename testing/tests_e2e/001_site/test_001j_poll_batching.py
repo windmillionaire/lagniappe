@@ -12,7 +12,7 @@ from lagniappe.web import app
 from testing.definitions import Groups, Users
 
 
-pytestmark = [pytest.mark.e2e, pytest.mark.e2e_serial]
+pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
@@ -46,6 +46,8 @@ def _payload(page):
 # @source lagniappe/web/auth.py::logged_in
 # @source lagniappe/web/routes/home/poll.py::poll
 # @matrix polling auth : batching session-preload fallback validation
+# An unchanged global Tasks revision requires a quiet site between requests.
+@pytest.mark.e2e_serial
 def test_poll_batches_auth_entities_and_channels(polling_client, monkeypatch):
     client, user, page = polling_client
     payload = _payload(page)

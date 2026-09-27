@@ -32,7 +32,7 @@ from testing.utility.user_settings import (
     user_settings_field_order,
 )
 
-pytestmark = [pytest.mark.e2e, pytest.mark.e2e_serial]
+pytestmark = pytest.mark.e2e
 
 
 def _set_public_registration(owner, enabled):

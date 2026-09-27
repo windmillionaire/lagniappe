@@ -40,7 +40,6 @@ from testing.elements import Buttons, FormElements
 from testing.utility.live_ai import ProviderQuotaBlocked, run_live_ai
 
 pytestmark = [pytest.mark.e2e, pytest.mark.setup_provider]
-pytestmark = [*pytestmark, pytest.mark.e2e_serial]
 
 
 def _probe_id():

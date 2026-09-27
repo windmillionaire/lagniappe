@@ -373,18 +373,26 @@ CREATE AI entitlement, while `get_user` creates a fresh browser context for each
 call. Keep permission/Owner-specific stories on their explicitly named actors.
 
 Use full enum members such as `Pages.test_page_loads.get(user)`, rather than
-aliases for unrelated stories. The coordinator groups direct named resources,
+aliases for unrelated stories. Each test reserves direct named resources,
 including references in local/imported test helpers, constants and collected fixtures. It does
 not lock the whole dependency graph. A Page's Form or Category is shared normally
 unless the test directly names that resource as part of its mutable assumptions.
 Dynamic resource selection still needs explicit review; prefer named enum
-members so the scheduler can see those conflicts.
+members so the scheduler can see those conflicts. Reservations cover fixture
+setup and teardown as well as the test body; shared-resource tests may be in
+different workers and run sequentially only while their reservations overlap.
 
-Mark stories that mutate site-wide settings or require unchanged global
-revision snapshots with `@pytest.mark.e2e_serial` (or
+Mark stories that demonstrably require whole-site quietness, such as unchanged
+global revision snapshots, with `@pytest.mark.e2e_serial` (or
 set it in module `pytestmark`). They run together sequentially after parallel
-batches drain; still restore the setting in `finally`. Adding a story to the
+workers drain; still restore settings in `finally`. Using the Owner or changing
+a setting does not by itself require an exclusive phase: identify the affected
+consumers and trial ordinary resource reservations first. Adding a story to the
 pilot's explicit selection does not require manually choosing a batch.
+
+Submit helpers click the button without asserting transient spinners or busy
+text. Assert the story's saved result, final text or expected error instead;
+a fast response may finish before any busy state can be observed.
 
 Use `@pytest.mark.e2e_serial(phase="before")` for destructive environment-reset
 checks that must finish before any story fixtures are created. For example,

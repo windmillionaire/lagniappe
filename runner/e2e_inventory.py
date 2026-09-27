@@ -3,8 +3,10 @@
 import ast
 import inspect
 import json
+import math
 import os
 from pathlib import Path
+from statistics import median
 
 from runner.e2e_parallel import Batch
 
@@ -96,39 +98,37 @@ def discover_resources(root, path, name, fixtures=(), *, modules=None):
 
 
 # @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_groups_shared_resources_and_drains_serial_stories
+# @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_balances_cases_without_transitive_resource_groups
 # @matrix testing : parallel-e2e
-def story_batches(root, records, *, workers=3):
-    """Keep connected resource users sequential; balance components across workers."""
-    groups, serial, before, inventory = [], [], [], []
+def story_batches(root, records, *, workers=3, durations=None):
+    """Balance individual cases; workers reserve resources only during each test."""
+    durations = durations or {}
+    fallback = median(durations.values()) if durations else 5.0
+    ordinary, serial, before, inventory = [], [], [], []
     modules = {}
     for record in records:
         nodeid = record["nodeid"].removeprefix("testing/")
         path, name = nodeid.split("::", 1)
         resources = discover_resources(root, "testing/" + path, name.split("[")[0], record["fixtures"], modules=modules)
-        inventory.append({**record, "resources": sorted(resources)})
+        estimate = durations.get(nodeid, fallback)
+        inventory.append({**record, "resources": sorted(resources), "estimated_seconds": estimate})
         if record["serial"]:
             (before if record.get("serial_phase") == "before" else serial).append((nodeid, resources))
             continue
-        merged_nodes, merged_resources = [nodeid], set(resources)
-        for group in list(groups):
-            if merged_resources & group[1]:
-                merged_nodes.extend(group[0])
-                merged_resources.update(group[1])
-                groups.remove(group)
-        groups.append((merged_nodes, merged_resources))
+        ordinary.append((nodeid, estimate))
     order = {record["nodeid"].removeprefix("testing/"): i for i, record in enumerate(records)}
-    bins = [([], set()) for _ in range(workers)]
-    for nodes, resources in sorted(groups, key=lambda group: -len(group[0])):
-        assigned, held = min(bins, key=lambda group: len(group[0]))
-        assigned.extend(nodes)
-        held.update(resources)
+    bins = [[] for _ in range(workers)]
+    totals = [0.0] * workers
+    for nodeid, estimate in sorted(ordinary, key=lambda row: -row[1]):
+        worker = min(range(workers), key=lambda i: (totals[i], len(bins[i]), i))
+        bins[worker].append(nodeid)
+        totals[worker] += estimate
     batches = []
-    for i, (nodes, resources) in enumerate(bins):
+    for i, nodes in enumerate(bins):
         if nodes:
             nodes.sort(key=order.__getitem__)
             selected = ["testing/" + node for node in nodes]
-            batches.append(Batch(f"stories-{i + 1}", selected[0], frozenset(resources),
+            batches.append(Batch(f"stories-{i + 1}", selected[0],
                                  additional_nodeids=tuple(selected[1:])))
     for name, group in (("stories-before", before), ("stories-serial", serial)):
         if group:
@@ -140,3 +140,21 @@ def story_batches(root, records, *, workers=3):
             else:
                 batches.append(batch)
     return batches, inventory
+
+
+# @testable true
+# @tests tests_tooling/test_015_e2e_parallel.py::test_duration_estimates_use_only_valid_passed_e2e_results
+# @matrix testing : parallel-e2e
+def duration_estimates(root):
+    """Historical timings guide placement only; they never supply run outcomes."""
+    path = root / "testing/evidence/latest.json"
+    if not path.is_file():
+        return {}
+    rows = json.loads(path.read_text(encoding="utf-8")).get("tests", {})
+    return {node.removeprefix("testing/"): float(row["duration"])
+            for node, row in rows.items()
+            if node.removeprefix("testing/").startswith("tests_e2e/")
+            and row.get("outcome") == "passed"
+            and isinstance(row.get("duration"), (float, int))
+            and not isinstance(row["duration"], bool)
+            and math.isfinite(row["duration"]) and row["duration"] > 0}

@@ -22,7 +22,6 @@ pytestmark = pytest.mark.e2e
 # @matrix home pages : list load
 # @template home/pages.html::list
 # @template home/pages.html::page
-@pytest.mark.e2e_serial
 def test_home_page_list_loads_recent_pages(get_admin, get_user):
     user = get_admin()
     existing_page = Page(user=user, definition=replace(
