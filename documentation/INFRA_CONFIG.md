@@ -116,9 +116,13 @@ Draft documents and convenience projections:
 
 Environments are `development`, `testing`, and `production`. Precedence is
 application settings, built-in testing defaults, explicit environment overrides,
-then validated hosted-test overrides. Local testing enables agent access,
+then validated hosted-test overrides. Testing enables agent access,
 analytics, AI observability, and the public manual for deterministic E2E
-contracts; explicit test overrides still take precedence. Local test URLs use
+contracts. Local and hosted tests default experiments mode, execution, and
+request diagnostics to off, independently of the installation's settings;
+targeted experiments tests can opt in with explicit test overrides, which
+still take precedence. Production and development retain the installation's
+experiments settings. Local test URLs use
 the final server name and port; hosted tests retain their validated HTTPS URL.
 
 Configuration display and recovery exports use `read_saved_app_settings()`.

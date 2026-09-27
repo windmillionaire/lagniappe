@@ -46,6 +46,7 @@ test_roots:
   - testing/tests_tooling/test_012_mcp_environment.py
   - testing/tests_tooling/test_012c_remote_mcp_config.py
   - testing/tests_tooling/test_014_dependency_upgrade.py
+  - testing/tests_tooling/test_015_e2e_parallel.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:
@@ -83,6 +84,8 @@ annotated_source_roots:
   - runner/process.py
   - runner/pytest_routing.py
   - runner/pytest_reports.py
+  - runner/e2e_parallel.py
+  - runner/e2e_pilot.py
   - runner/testing.py
   - runner/test_session.py
   - runner/upgrade.py

@@ -113,11 +113,14 @@ def _pytest_command(
     targets=(),
     *,
     environment="standard",
+    experiments=False,
 ) -> list[str]:
     if environment not in HOSTED_E2E_ENVIRONMENTS:
         raise RuntimeError("Hosted E2E job received an invalid environment.")
     targets = tuple(targets or ())
-    if not targets:
+    if experiments:
+        pytest_targets = ["--experiments"]
+    elif not targets:
         pytest_targets = [
             "unit",
             "js",
@@ -136,7 +139,7 @@ def _pytest_command(
         sys.executable,
         str(REPOSITORY_ROOT / "run.py"),
         "test",
-        "--strict",
+        *([] if experiments else ["--strict"]),
         *pytest_targets,
         f"--junitxml={HOSTED_REPORT_ROOT / 'junit.xml'}",
     ]
@@ -261,17 +264,24 @@ def main(arguments=None) -> int:
         default=[],
         help="Run one test nodeid; repeat for more. Omit to run all complete suites.",
     )
+    parser.add_argument("--experiments", action="store_true", help="Run the coordinated E2E pilot.")
     args = parser.parse_args(arguments)
 
     environment = _hosted_environment()
-    targets = validate_focused_targets(args.target) if args.target else ()
+    if args.experiments and args.target:
+        parser.error("--experiments cannot be combined with --target")
+    if args.experiments:
+        from runner.e2e_pilot import TARGETS
+        targets = validate_focused_targets(TARGETS)
+    else:
+        targets = validate_focused_targets(args.target) if args.target else ()
     suite = "focused" if targets else "all"
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
     started_at = datetime.now(timezone.utc)
     result = subprocess.run(
-        _pytest_command(targets, environment=environment),
+        _pytest_command(targets, environment=environment, **({"experiments": True} if args.experiments else {})),
         cwd=REPOSITORY_ROOT,
     )
     finished_at = datetime.now(timezone.utc)

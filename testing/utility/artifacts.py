@@ -1,11 +1,12 @@
 """Shared paths for generated local reports and test artifacts."""
 
 from pathlib import Path
+import os
 import re
 from typing import Iterable, TypeVar
 
 
-REPORTS_ROOT = Path("reports")
+REPORTS_ROOT = Path(os.environ.get("LAGNIAPPE_TEST_ARTIFACTS", "reports"))
 TEST_FAILURES_DIR = REPORTS_ROOT / "test_failures"
 TEST_REPORTS_DIR = REPORTS_ROOT / "test_reports"
 BROWSER_REVIEWS_DIR = REPORTS_ROOT / "browser_reviews"

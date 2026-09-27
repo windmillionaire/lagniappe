@@ -213,9 +213,12 @@ def run_tests(test_args: list[str]) -> int:
         python run.py test --strict unit
         python run.py test -- -k "keyword"
     """
+    requested_args = list(test_args)
+    from runner.e2e_pilot import pilot_arguments
     try:
+        pilot, test_args = pilot_arguments(test_args)
         invocation = normalize_pytest_invocation(test_args, REPOSITORY_ROOT)
-    except PytestRoutingError as error:
+    except (PytestRoutingError, ValueError) as error:
         print(f"Test argument error: {error}", file=sys.stderr)
         return 4
 
@@ -265,7 +268,7 @@ def run_tests(test_args: list[str]) -> int:
         sys.executable,
         str(REPOSITORY_ROOT / "run.py"),
         "test",
-        *test_args,
+        *requested_args,
     ]
     os.environ[command_variable] = json.dumps(full_command)
     authority = None
@@ -314,9 +317,14 @@ def run_tests(test_args: list[str]) -> int:
         statuses = []
         with partition_junit_reports(partitions) as reports:
             if reports.root_args is not None:
-                statuses.append(
-                    _run_pytest_subprocess(pytest_command(list(reports.root_args)))
-                )
+                if pilot:
+                    from runner.e2e_pilot import pilot_authority, run_pilot
+                    with pilot_authority(authority) as coordinator:
+                        statuses.append(run_pilot(coordinator, full_command, reports.root_args))
+                else:
+                    statuses.append(
+                        _run_pytest_subprocess(pytest_command(list(reports.root_args)))
+                    )
             if reports.mcp_args is not None:
                 from runner.mcp_environment import run_pytest as run_mcp_pytest
 

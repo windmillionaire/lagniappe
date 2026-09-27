@@ -732,7 +732,7 @@ def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
 
 
 # @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
-@pytest.mark.parametrize("focused", [False, True], ids=["complete", "nodeid"])
+@pytest.mark.parametrize("focused", [False, True, "experiments"], ids=["complete", "nodeid", "experiments"])
 def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     tmp_path, monkeypatch, focused,
 ):
@@ -763,17 +763,24 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     monkeypatch.setattr(hosted_e2e_job, "_stamp_evidence", stamped.append)
     monkeypatch.setattr(hosted_e2e_job, "_upload_artifacts", uploaded.append)
 
-    assert hosted_e2e_job.main([f"--target={target}"] if focused else []) == 1
+    pilot = focused == "experiments"
+    arguments = ["--experiments"] if pilot else ([f"--target={target}"] if focused else [])
+    assert hosted_e2e_job.main(arguments) == 1
 
     command, options = commands[0]
     selection = [target] if focused else ["unit", "js", "tooling", "e2e"]
-    assert command[command.index("--strict") + 1 : -1] == [
-        *selection, "-m", "not unfinished"
-    ]
+    if pilot:
+        from runner.e2e_pilot import TARGETS
+        assert command[3:-1] == ["--experiments"]
+        selection = list(TARGETS)
+    else:
+        assert command[command.index("--strict") + 1 : -1] == [
+            *selection, "-m", "not unfinished"
+        ]
     assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
     assert stamped == uploaded
     assert uploaded[0]["suite"] == ("focused" if focused else "all")
-    assert uploaded[0].get("targets", []) == ([target] if focused else [])
+    assert uploaded[0].get("targets", []) == (selection if focused else [])
     assert uploaded[0]["exit_status"] == 1
 
     for suite in ("all", "full", "focused"):
@@ -787,7 +794,8 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
 
 
 # @matrix hosted-e2e : cloud-run focused-execution local-dispatch override
-def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
+@pytest.mark.parametrize("pilot", [False, True])
+def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch, pilot):
     target = "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
     second_target = (
         "testing/tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached"
@@ -823,23 +831,22 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
         lambda *_arguments, **_options: ({"status": {}}, 0),
     )
 
-    result = hosted_e2e.execute(
-        targets=[target, second_target],
-        import_results=False,
-    )
+    options = {"experiments": True} if pilot else {"targets": [target, second_target]}
+    result = hosted_e2e.execute(**options, import_results=False)
 
     assert result == {
         "execution": "lagniappe-e2e-focus1",
         "exit_status": 0,
         "suite": "focused",
     }
-    assert (
-        f"--args=--target={target},--target={second_target}"
-        in calls[0][0]
-    )
+    argument = "--args=--experiments" if pilot else f"--args=--target={target},--target={second_target}"
+    assert argument in calls[0][0]
     assert "--async" in calls[0][0]
     assert "--wait" not in calls[0][0]
-    assert writes[0][1]["last_targets"] == [target, second_target]
+    from runner.e2e_pilot import TARGETS
+    assert writes[0][1]["last_targets"] == (list(TARGETS) if pilot else [target, second_target])
+    with pytest.raises(hosted_e2e.HostedE2EError):
+        hosted_e2e.execute(targets=[target], experiments=True)
 
 
 # @matrix hosted-e2e : execution-name failure-recovery

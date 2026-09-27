@@ -181,6 +181,46 @@ origin.
 
 Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 
+## Coordinated worker pilot
+
+The opt-in EXP-026 harness trial uses the same bounded coordinator locally and
+inside one Cloud Run job:
+
+```bash
+venv/bin/python run.py test --experiments
+# After creating an exact committed hosted candidate:
+venv/bin/python run.py hosted-e2e execute --experiments
+```
+
+This selects five small browser cases, with at most two worker processes active
+against one server URL. Each case creates its own Administrator account; none
+pretends to be the singleton Owner. Independent cases use separate Pages and
+Tasks. Two shared-Page cases use a declared conflict lane, followed by an
+exclusive verification barrier. The second independent case continues after
+the first worker's session teardown to verify that its data/server survive.
+
+Only the coordinator acquires and renews the shared lease and performs global
+setup/cleanup. Workers inherit an exact run/server binding through temporary
+private context files, monitor coordinator/lease liveness, and never clean or
+release shared state. The scheduler stops and reaps active worker process groups
+before outer cleanup on cancellation, timeout or lost authority. This cannot
+undo provider writes that were already in flight when authority was lost.
+
+Worker logs, browser diagnostics, HTML reports and JUnit have separate paths
+under `reports/e2e-pilot/ATTEMPT/`. The coordinator checks exact selected-nodeid,
+attempt and source identity, merges JUnit, then records ordinary traceability
+evidence once. Missing/crashed workers become explicit failed selected results;
+old passing evidence cannot fill a missing worker. Hosted execution remains a
+focused run and uses the ordinary artifact upload/import path.
+
+`--experiments` here selects the harness trial; it does not enable application
+experiments mode or measurement diagnostics. Ordinary suite execution remains
+serial. This is an explicit case inventory, not a general `-n` option: additional
+cases need a fixture/conflict audit. Owner-specific and global-settings tests
+need exclusive scheduling; broad-access tests can use distinct Administrators.
+The pilot launches one process per case; batching multiple audited tests per
+process and broader suite scheduling remain later work.
+
 ## GitHub release path
 
 `.github/workflows/hosted-e2e.yml` accepts trusted manual dispatch and release

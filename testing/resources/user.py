@@ -81,6 +81,8 @@ class User(SiteResource):
         }
         if self.definition.ai_access is not None:
             data["ai_access"] = self.definition.ai_access.name
+        if self.definition.admin is not None:
+            data["admin"] = self.definition.admin
 
         entity = Entities.USER.create(data)
         self.entity = entity
