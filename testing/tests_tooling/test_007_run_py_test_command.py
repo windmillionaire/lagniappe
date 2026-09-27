@@ -2880,6 +2880,40 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     assert "Release check passed against main" in result.stdout
 
 
+# @matrix release : build-mode delivery-tree
+@pytest.mark.parametrize("change", ["runner", "documentation", "backend"])
+def test_run_py_release_check_reuses_valid_production_build(tmp_path, change):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo)
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    paths = {"runner": "runner/example.py", "documentation": "documentation/example.md",
+             "backend": "lagniappe/core/example.py"}
+    path = repo / paths[change]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("# An unrelated change\n", encoding="utf-8")
+    _git(repo, "add", paths[change])
+    assert run.run_release_check_command(["--base", base], repo_root=repo) == 0
+
+
+# @matrix release : build-mode delivery-tree
+@pytest.mark.parametrize("change", ["source", "artifact", "missing-artifact", "build-id"])
+def test_run_py_release_check_rejects_stale_or_modified_build(tmp_path, capsys, change):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo)
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    if change == "source":
+        (repo / "src/script/example.mjs").write_text("export const value = 2;\n", encoding="utf-8")
+    elif change == "artifact":
+        (repo / "lagniappe/web/static/script.js").write_text("tampered\n", encoding="utf-8")
+    elif change == "missing-artifact":
+        (repo / "lagniappe/web/static/script.js").unlink()
+    else:
+        (repo / "config/constants.py").write_text('BUILD_ID = "b7654321"\n', encoding="utf-8")
+    _git(repo, "add", "-A")
+    assert run.run_release_check_command(["--base", base], repo_root=repo) == 1
+    assert "Frontend build:" in capsys.readouterr().out
+
+
 # @pair release:delivery-tree
 @pytest.mark.parametrize(
     "declaration",
@@ -3001,8 +3035,6 @@ def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
     output = capsys.readouterr().out
     assert "must identify a production build" in output
-    assert "was not changed by a fresh production build" not in output
-    assert "does not contain a newly generated BUILD_ID" not in output
 
 
 # @pair release:delivery-tree
@@ -3028,8 +3060,6 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     output = capsys.readouterr().out
     assert "Installation-local files are present" in output
     assert "package.json version must use stable X.Y.Z form" in output
-    assert "was not changed by a fresh production build" in output
-    assert "does not contain a newly generated BUILD_ID" in output
     assert "must identify a production build" in output
 
 

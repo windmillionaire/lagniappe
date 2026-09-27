@@ -55,7 +55,8 @@ upgrade processes that retain their old caller after replacing source.
 
 ## Release preparation
 
-Freeze the release tree, then create one canonical build:
+Freeze the release tree and validate its production build. Create a canonical
+build when frontend inputs, outputs, or version changed:
 
 ```bash
 npm ci
@@ -72,6 +73,10 @@ and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
 It computes source and artifact digests from the exact Git index, preventing an
 unstaged working-tree build from validating a different committed candidate.
+An unchanged, valid production build can be reused for backend, runner, tests,
+or documentation changes. Generated files and `BUILD_ID` need not differ from
+the comparison commit; stale sources, modified or missing artifacts, and
+inconsistent build IDs still fail validation.
 The release workflow enforces the `next/*` or `hotfix/*` branch requirement
 using the pull request/event context and verifies the exact candidate commit.
 Passing the local tree check alone does not establish release eligibility.
