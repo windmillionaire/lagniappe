@@ -32,7 +32,7 @@ def reserve_resources(directory, resources, assert_active, *, timeout=600):
             try:
                 for resource in sorted(set(resources)):
                     path = directory / sha256(resource.encode()).hexdigest()
-                    handle = locks.enter_context(path.open("a"))
+                    handle = locks.enter_context(path.open("a", encoding="utf-8"))
                     fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 # Release the partial set before waiting; no hold-and-wait cycle.
