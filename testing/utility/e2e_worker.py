@@ -11,7 +11,7 @@ from runner.test_session import inspect_process_identity
 
 
 def context():
-    return json.loads(Path(os.environ["LAGNIAPPE_E2E_WORKER_CONTEXT"]).read_text())
+    return json.loads(Path(os.environ["LAGNIAPPE_E2E_WORKER_CONTEXT"]).read_text(encoding="utf-8"))
 
 
 def assert_owner(record):
@@ -75,5 +75,5 @@ def write_results(session, outcomes, exitstatus):
         "attempt": record["attempt"], "snapshot": record["snapshot"],
         "batch": record["batch"], "exit_status": int(exitstatus),
         "selected": selected, "outcomes": outcomes,
-    }))
+    }), encoding="utf-8")
     temporary.replace(path)

@@ -101,9 +101,9 @@ def run_pilot(authority, command, pytest_args):
                       "server_pid": local["server"]["pid"] if local else None,
                       "artifacts": str(artifacts)}
             path = contexts / f"{batch.name}.json"
-            path.write_text(json.dumps(record))
+            path.write_text(json.dumps(record), encoding="utf-8")
             path.chmod(0o600)
-            output = stack.enter_context((artifacts / "pytest.log").open("w"))
+            output = stack.enter_context((artifacts / "pytest.log").open("w", encoding="utf-8"))
             child_command = [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini",
                              "-p", "testing.utility.traceability_results", "-p", "runner.pytest_routing",
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
@@ -135,7 +135,7 @@ def run_pilot(authority, command, pytest_args):
                "hosted": CONFIG.hosted_e2e_runner, "workers": 2,
                "selected": list(TARGETS), "events": events,
                "exit_status": status, "errors": errors}
-    (root / "summary.json").write_text(json.dumps(summary, indent=2))
+    (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     if not any("Source changed" in error for error in errors):
         _write_manifest(REPOSITORY_ROOT, command, outcomes, status)
     print(f"Pilot: {sum(row['outcome'] == 'passed' for row in outcomes.values())}/{len(batches)} passed; {root}", flush=True)

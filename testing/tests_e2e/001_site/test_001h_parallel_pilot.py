@@ -3,13 +3,13 @@
 import json
 import os
 from pathlib import Path
-import time
 
 import pytest
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from runner.e2e_parallel import await_worker_file
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import Page
 from testing.utility.e2e_worker import context
@@ -22,22 +22,9 @@ pytestmark = [pytest.mark.e2e, pytest.mark.skipif(
 )]
 
 
-def _await_worker_file(path):
-    # This is an inter-process harness barrier, not a browser settling delay.
-    deadline = time.monotonic() + 90
-    while not path.is_file():
-        outcome = path.parent / "outcomes.json"
-        if outcome.is_file():
-            raise AssertionError(f"Peer worker finished without {path.name}")
-        if time.monotonic() >= deadline:
-            raise AssertionError(f"Peer worker did not publish {path.name}")
-        time.sleep(0.05)
-    return json.loads(path.read_text())
-
-
 def _publish(path, payload):
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload))
+    temporary.write_text(json.dumps(payload), encoding="utf-8")
     temporary.replace(path)
 
 
@@ -54,7 +41,7 @@ def test_worker_page_and_task(get_user, case, results):
     assert user.entity.is_admin and not user.entity.is_owner
 
     if case == "exclusive":
-        records = [_await_worker_file(root / name / "fixtures.json") for name in
+        records = [await_worker_file(root / name / "fixtures.json") for name in
                    ("independent-a", "independent-b", "shared-a", "shared-b")]
         assert len({row["user"] for row in records}) == 4
         assert len({row["page"] for row in records[:2]}) == 2
@@ -72,11 +59,11 @@ def test_worker_page_and_task(get_user, case, results):
     if case.startswith("independent"):
         _publish(artifacts / "ready.json", {"ready": True})
         peer = "independent-b" if case == "independent-a" else "independent-a"
-        _await_worker_file(root / peer / "ready.json")
+        await_worker_file(root / peer / "ready.json")
         if case == "independent-b":
             # A's session teardown has finished; B must still be able to read,
             # mutate, and render its own records on the same live server.
-            outcome = _await_worker_file(root / peer / "outcomes.json")
+            outcome = await_worker_file(root / peer / "outcomes.json")
             assert outcome["exit_status"] == 0
         entity = Entities.PAGE.create({"name": f"Page for {identity}"})
         entity.save()
