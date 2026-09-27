@@ -181,15 +181,20 @@ origin.
 
 Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 
-## Coordinated worker pilot
+## Coordinated E2E workers
 
-The opt-in EXP-026 harness trial uses the same bounded coordinator locally and
-inside one Cloud Run job:
+The opt-in EXP-026 harness uses the same coordinator locally and inside one
+Cloud Run job. The original selection remains a quick pilot; `=all` selects
+every complete E2E case (including live provider contracts), not the unit,
+JavaScript or tooling suites:
 
 ```bash
 venv/bin/python run.py test --experiments
 # After creating an exact committed hosted candidate:
 venv/bin/python run.py hosted-e2e execute --experiments
+# The whole E2E suite, with the same three-worker coordinator:
+venv/bin/python run.py test --experiments=all
+venv/bin/python run.py hosted-e2e execute --experiments=all
 ```
 
 The bounded selection contains 48 existing browser cases across 13 modules and
@@ -201,11 +206,12 @@ gets an isolated browser context. The Administrator has explicit CREATE AI
 entitlement as well as ordinary administrative permissions.
 
 Pytest first collects exact parameter cases and fixtures. An AST inventory
-follows direct enum references, local helpers/constants and fixture functions.
+follows direct enum references, local and imported test helpers/constants and fixture functions.
 Tests sharing a named resource stay in one sequential batch; independent groups
 are balanced across workers. This does not traverse the related entity graph:
-Pages sharing a Form or Category can run together. Dynamic lookups and imported
-helpers still need review before adding a story to this bounded selection.
+Pages sharing a Form or Category can run together. Dynamic resource lookups still need review; use explicit enum members where
+possible. Import discovery follows named helpers under `testing/`, not arbitrary
+application calls or the related-entity graph.
 `@pytest.mark.e2e_serial` puts global-setting stories into an exclusive batch
 after the parallel workers finish. Public-user permission fixtures and site
 settings use this marker. New tests do not choose a worker or batch manually.
@@ -234,14 +240,19 @@ Worker logs, browser diagnostics, HTML reports and JUnit have separate paths
 under `reports/e2e-pilot/ATTEMPT/`. The coordinator checks exact selected-nodeid,
 attempt and source identity, merges JUnit, then records ordinary traceability
 evidence once. Missing/crashed workers become explicit failed selected results;
-old passing evidence cannot fill a missing worker. Hosted execution remains a
-focused run and uses the ordinary artifact upload/import path.
+old passing evidence cannot fill a missing worker. The pilot reports focused scope; the complete coordinated selection reports
+`e2e` scope. Both use the ordinary artifact upload/import path and preserve
+non-E2E evidence. Neither claims the all-suite release validation scope.
 
 `--experiments` here selects the harness trial; it does not enable application
-experiments mode or measurement diagnostics. Ordinary suite execution remains
-serial. This is an explicit case inventory, not a general `-n` option. Expanding
-to the full suite still requires reviewing hidden mutations and global-state
-fixtures, then repeated trials. The browser runner and App Engine server have
+experiments mode or measurement diagnostics. Ordinary suite execution remains serial. Full coordinated runs automatically
+collect exact parameter cases; no manual target list or 50-nodeid override is
+needed. Settings, public registration, shared-cache reset, provider contracts
+and assertions about global revision snapshots run exclusively. Ordinary
+all-access stories use `get_admin`; Owner/permission-specific stories keep
+their exact identities. Shared resource users retain collection order within
+one worker. This remains an opt-in trial while full-suite reliability is
+validated. The browser runner and App Engine server have
 separate CPU/memory budgets; increasing browser concurrency does not require
 additional server URLs.
 

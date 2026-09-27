@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import Categories, Pages, Submissions, Users
+from testing.definitions import Categories, Pages, Submissions
 from testing.definitions.page_definitions import PageDefinition
 from testing.resources import Page
 from testing.resources.category import Category
@@ -78,8 +78,8 @@ def _select_name_sort(user, direction):
 
 
 # @matrix table-controls : columns visibility-panel
-def test_column_visibility_panel_opens(get_user):
-    user = get_user(Users.OWNER)
+def test_column_visibility_panel_opens(get_admin, get_user):
+    user = get_admin()
     user.go(Categories.test_create_page)
 
     panel = _open_visibility_panel(user)
@@ -109,8 +109,8 @@ def test_hiding_column_updates_visible_headers_and_cells(get_admin, get_user):
 
 
 # @matrix table-controls : column-visibility persistence
-def test_column_visibility_persists_after_reload(get_user):
-    user = get_user(Users.OWNER)
+def test_column_visibility_persists_after_reload(get_admin, get_user):
+    user = get_admin()
     _seed_sortable_pages(user)
     category = user.go(Categories.test_create_page)
 
@@ -135,8 +135,8 @@ def test_column_visibility_persists_after_reload(get_user):
 
 # @matrix category-index : missing-field mixed-form render
 # @matrix table-controls : column-visibility form-columns
-def test_visibility_panel_includes_category_form_columns(get_user):
-    user = get_user(Users.OWNER)
+def test_visibility_panel_includes_category_form_columns(get_admin, get_user):
+    user = get_admin()
     matching_page = Pages.test_category_filter_match_page.get(user)
     public_document_page = Pages.test_category_filter_public_document_page.get(user)
     user.go(Categories.test_category_filter_pages)
@@ -185,8 +185,8 @@ def test_visibility_panel_includes_category_form_columns(get_user):
 
 
 # @matrix table-controls : exists-column sorting
-def test_image_column_sort_panel_offers_presence_options(get_user):
-    user = get_user(Users.OWNER)
+def test_image_column_sort_panel_offers_presence_options(get_admin, get_user):
+    user = get_admin()
     Pages.test_category_filter_match_page.get(user)
     user.go(Categories.test_category_filter_pages)
 
@@ -211,8 +211,8 @@ def test_image_column_sort_panel_offers_presence_options(get_user):
 
 
 # @matrix table-controls : boolean-column sort-clear sorting
-def test_boolean_column_filter_clear_restores_rows(get_user):
-    user = get_user(Users.OWNER)
+def test_boolean_column_filter_clear_restores_rows(get_admin, get_user):
+    user = get_admin()
     matching_page = Pages.test_category_filter_match_page.get(user)
     nonmatching_page = Pages.test_category_filter_nonmatch_page.get(user)
     user.go(Categories.test_category_filter_pages)
@@ -270,8 +270,8 @@ def test_boolean_column_filter_clear_restores_rows(get_user):
 
 
 # @matrix table-controls : exists-column phone sorting
-def test_exists_column_filter_treats_phone_values_as_present(get_user):
-    user = get_user(Users.OWNER)
+def test_exists_column_filter_treats_phone_values_as_present(get_admin, get_user):
+    user = get_admin()
     suffix = uuid4().hex[:8]
     with_phone = Page(
         user=user,
@@ -337,8 +337,8 @@ def test_name_column_sort_ascending_reorders_rows(get_admin, get_user):
 
 
 # @matrix table-controls : persistence sorting
-def test_name_column_sort_persists_after_back_navigation(get_user):
-    user = get_user(Users.OWNER)
+def test_name_column_sort_persists_after_back_navigation(get_admin, get_user):
+    user = get_admin()
     _seed_sortable_pages(user)
     category = user.go(Categories.test_create_page)
 
@@ -373,8 +373,8 @@ def test_name_column_sort_descending_reorders_rows(get_admin, get_user):
 
 
 # @matrix table-controls : sort-clear sorting
-def test_clearing_sort_restores_default_order(get_user):
-    user = get_user(Users.OWNER)
+def test_clearing_sort_restores_default_order(get_admin, get_user):
+    user = get_admin()
     _seed_sortable_pages(user)
     user.go(Categories.test_create_page)
 

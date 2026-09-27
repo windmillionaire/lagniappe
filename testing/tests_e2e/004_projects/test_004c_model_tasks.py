@@ -173,8 +173,8 @@ def _click_status_filter(model_task, label):
 # @matrix model-tasks : completed status-filter
 # @pairs polling:task-index reconnect-refresh:task-index
 # @template tasks/index.html::view
-def test_completed_button(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_completed_button(get_admin, get_user, browser_failures):
+    user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
     results = _click_status_filter(model_task, "Completed")
@@ -232,8 +232,8 @@ def test_completed_button(get_user, browser_failures):
 
 
 # @matrix model-tasks : in-progress status-filter
-def test_in_progress_button(get_user):
-    user = get_user(Users.OWNER)
+def test_in_progress_button(get_admin, get_user):
+    user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
     results = _click_status_filter(model_task, "In Progress")
@@ -274,8 +274,8 @@ def test_status_filter_loads_task_page_form_permissions(get_user):
 
 
 # @pair model-tasks:delete
-def test_delete_model_task(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_model_task(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_delete_model_task.get(user)
     user.go(model_task.project)
 

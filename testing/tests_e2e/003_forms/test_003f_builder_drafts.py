@@ -67,8 +67,8 @@ def _http(user, method, path, **kwargs):
 # @matrix forms : draft-history stable-identity schema-generation builder-save builder-reload
 # @template forms/builder.html::header
 # @template forms/builder.html::generate
-def test_generation_is_one_undoable_unsaved_command(get_user):
-    user = get_user(Users.OWNER)
+def test_generation_is_one_undoable_unsaved_command(get_admin, get_user):
+    user = get_admin()
     form, field = _form(user)
     builder = form.builder
     before = dict(Entities.fetch_one(form.key, request=Fetch.root()).db)
@@ -124,8 +124,8 @@ def test_generation_is_one_undoable_unsaved_command(get_user):
 # @matrix forms : builder-preview focus-recovery
 # @template forms/builder.html::header
 # @style builder.switch.container
-def test_preview_toggle_retains_keyboard_focus(get_user):
-    user = get_user(Users.OWNER)
+def test_preview_toggle_retains_keyboard_focus(get_admin, get_user):
+    user = get_admin()
     form, notes = _form(user, "Preview keyboard focus")
     builder = form.builder
     _rename(builder, notes, "Keyboard notes")
@@ -155,9 +155,9 @@ def test_preview_toggle_retains_keyboard_focus(get_user):
 # @style nav.button
 @pytest.mark.parametrize("reconnect_during_save", [False, True])
 def test_save_feedback_retains_keyboard_focus(
-    get_user, browser_failures, reconnect_during_save,
+    get_admin, get_user, browser_failures, reconnect_during_save,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     form, notes = _form(user, "Save keyboard focus")
     builder = form.builder
     _rename(builder, notes, "Saved keyboard notes")
@@ -215,8 +215,8 @@ def test_save_feedback_retains_keyboard_focus(
 # @matrix forms : builder-save builder-reload
 # @template forms/builder.html::header
 # @template forms/builder.html::main
-def test_save_preserves_open_option_editor(get_user):
-    user = get_user(Users.OWNER)
+def test_save_preserves_open_option_editor(get_admin, get_user):
+    user = get_admin()
     notes = SchemaFields.TEXT_INPUT.get(_id="notes", title="Notes")
     outcome = SchemaFields.SELECT.get(
         _id="outcome", title="Review Outcome",
@@ -285,8 +285,8 @@ def test_save_preserves_open_option_editor(get_user):
 # @matrix forms : builder-lifecycle
 # @template forms/builder.html::main
 # @template forms/builder.html::header
-def test_condition_panels_fit_outline_to_selected_field(get_user):
-    user = get_user(Users.OWNER)
+def test_condition_panels_fit_outline_to_selected_field(get_admin, get_user):
+    user = get_admin()
     choice = SchemaFields.SELECT.get(
         _id="choice", title="Decision", options=[{"value": "ready", "label": "Ready"}],
     )
@@ -348,8 +348,8 @@ def test_condition_panels_fit_outline_to_selected_field(get_user):
 # @matrix forms : draft-history schema-generation
 # @template forms/builder.html::header
 # @template forms/builder.html::generate
-def test_manual_edit_after_undo_discards_generated_redo(get_user):
-    user = get_user(Users.OWNER)
+def test_manual_edit_after_undo_discards_generated_redo(get_admin, get_user):
+    user = get_admin()
     note = SchemaFields.TEXT_INPUT.get(_id="notes", title="Existing note")
     checkbox = SchemaFields.CHECKBOX.get(_id="check", title="BSU check")
     form = Form(user=user, definition=FormDefinition(
@@ -422,8 +422,8 @@ def test_manual_edit_after_undo_discards_generated_redo(get_user):
 # @matrix forms : draft-history
 # @matrix editor : initial-load
 # @template forms/builder.html::header
-def test_form_undo_preserves_document_edits(get_user):
-    user = get_user(Users.OWNER)
+def test_form_undo_preserves_document_edits(get_admin, get_user):
+    user = get_admin()
     note = SchemaFields.TEXT_INPUT.get(_id="notes", title="Original notes")
     document = SchemaFields.HTML.get(_id="instructions", title="Instructions")
     form = Form(user=user, definition=FormDefinition(
@@ -503,8 +503,8 @@ def test_form_undo_preserves_document_edits(get_user):
     ("Align right", "none", "0px"),
     ("Float left", "left", "1em"),
 ])
-def test_image_layout_survives_builder_save_and_reload(get_user, position, float_value, right_margin):
-    user = get_user(Users.OWNER)
+def test_image_layout_survives_builder_save_and_reload(get_admin, get_user, position, float_value, right_margin):
+    user = get_admin()
     document = SchemaFields.HTML.get(_id="instructions", title="Instructions")
     form = Form(user=user, definition=FormDefinition(
         name=f"BSU image layout {uuid4().hex[:8]}", form_type="task", schema=(document,),
@@ -570,8 +570,8 @@ def test_image_layout_survives_builder_save_and_reload(get_user, position, float
 # @matrix form-html security : html-sanitization owned-image
 # @template forms/builder.html::header
 # @template forms/builder.html::generate
-def test_generated_instructions_preserve_current_image_layout(get_user):
-    user = get_user(Users.OWNER)
+def test_generated_instructions_preserve_current_image_layout(get_admin, get_user):
+    user = get_admin()
     note = SchemaFields.TEXT_INPUT.get(_id="notes", title="Notes")
     document = SchemaFields.HTML.get(_id="instructions", title="Instructions")
     form = Form(user=user, definition=FormDefinition(
@@ -664,8 +664,8 @@ def test_generated_instructions_preserve_current_image_layout(get_user):
 # @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
 # @matrix forms : draft-history schema-generation stale-response
 # @template forms/builder.html::generate
-def test_generation_rejects_result_after_intervening_edit(get_user):
-    user = get_user(Users.OWNER)
+def test_generation_rejects_result_after_intervening_edit(get_admin, get_user):
+    user = get_admin()
     form, field = _form(user, "BSU stale generation")
     builder = form.builder
     def reply_after_intervening_edit(route):
@@ -724,8 +724,8 @@ def test_stale_save_preserves_local_draft_after_another_editor_saves(get_user, b
 
 
 # @matrix forms : builder-save migration-required save-receipt
-def test_builder_publication_rejects_incompatible_payload_and_reuses_receipt(get_user):
-    user = get_user(Users.OWNER)
+def test_builder_publication_rejects_incompatible_payload_and_reuses_receipt(get_admin, get_user):
+    user = get_admin()
     form, _ = _form(user, "BSU publication contract")
     form.builder
     bootstrap = json.loads(user.locate("#builder-draft").text_content())
@@ -747,8 +747,8 @@ def test_builder_publication_rejects_incompatible_payload_and_reuses_receipt(get
 
 
 # @matrix task-completion html-field permissions : schema-version owned-image record-scope
-def test_historical_images_are_bound_to_the_authorized_completion(get_user):
-    user = get_user(Users.OWNER)
+def test_historical_images_are_bound_to_the_authorized_completion(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_create_page_task.get(user)
     field = SchemaFields.HTML.get(_id="instructions", title="Instructions")
     form = Form(user=user, definition=FormDefinition(
@@ -822,8 +822,8 @@ def test_historical_images_are_bound_to_the_authorized_completion(get_user):
 # @matrix tasks forms : cache-invalidation live-metadata
 # @template forms/builder.html::header
 # @template pages/tasks.html::task_form
-def test_saved_relabels_preserve_active_task_answers_and_conditions(get_user):
-    user = get_user(Users.OWNER)
+def test_saved_relabels_preserve_active_task_answers_and_conditions(get_admin, get_user):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     channels = SchemaFields.SELECT.get(
         _id="channels", title="Contact channels", multiple=True,

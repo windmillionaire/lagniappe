@@ -311,8 +311,8 @@ def test_field_visibility(get_admin, get_user):
 
 
 # @matrix forms : builder-field-visibility select-or-values
-def test_field_visibility_select_multiple_values(get_user):
-    user = get_user(Users.OWNER)
+def test_field_visibility_select_multiple_values(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_field_visibility_select_multiple_values.get(user)
     builder = form.builder
     color = SchemaFields.SELECT.get(title="Color")
@@ -352,8 +352,8 @@ def test_field_visibility_select_multiple_values(get_user):
 
 
 # @pair forms:builder-table-column
-def test_table_column_condition_editor(get_user):
-    user = get_user(Users.OWNER)
+def test_table_column_condition_editor(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_table_column_condition_editor.get(user)
     builder = form.builder
     table = SchemaFields.TABLE.get(title="Line Items")
@@ -399,8 +399,8 @@ def test_table_column_condition_editor(get_user):
 
 
 # @pair forms:builder-status-message
-def test_status_message_condition_editor(get_user):
-    user = get_user(Users.OWNER)
+def test_status_message_condition_editor(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_status_message_condition_editor.get(user)
     builder = form.builder
     approved = SchemaFields.CHECKBOX.get(title="Approved")
@@ -461,8 +461,8 @@ def test_status_message_condition_editor(get_user):
 
 
 # @matrix forms signature : builder-preview builder-signature-field unique-component
-def test_signature_field_builder_unique_component(get_user):
-    user = get_user(Users.OWNER)
+def test_signature_field_builder_unique_component(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_signature_field_builder_unique_component.get(user)
     builder = form.builder
     signature = SchemaFields.SIGNATURE.get(title="Customer Signature")
@@ -493,8 +493,8 @@ def test_signature_field_builder_unique_component(get_user):
 
 # @matrix html-field : asset-lifecycle builder-html-field form-asset html-fields image-upload render-fetch submitter-key unsaved-schema
 # @matrix security : html-sanitization inner-html
-def test_html_field(get_user):
-    user = get_user(Users.OWNER)
+def test_html_field(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_html_field.get(user)
     builder = form.builder
     persisted_before = Entities.fetch_one(form.key, request=Fetch.root())
@@ -667,8 +667,8 @@ def test_html_editor_recovers_from_failed_load_and_save(
 
 
 # @pair forms:builder-drag-component
-def test_drag_component(get_user):
-    user = get_user(Users.OWNER)
+def test_drag_component(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_drag_component.get(user)
     builder = form.builder
 

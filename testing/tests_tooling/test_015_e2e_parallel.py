@@ -19,9 +19,18 @@ pytestmark = pytest.mark.tooling
 
 # @matrix testing : parallel-e2e
 def test_inventory_follows_helpers_constants_and_fixtures(tmp_path):
+    helpers = tmp_path / "testing/utility"
+    helpers.mkdir(parents=True)
+    (helpers / "arrange.py").write_text('''
+from testing.definitions.pages import Pages as P
+SHARED = P.imported
+def arrange_imported():
+    return SHARED.get(None)
+''', encoding="utf-8")
     source = tmp_path / "test_story.py"
     source.write_text('''
 from testing.definitions import Pages as P, Categories, Users
+from testing.utility.arrange import arrange_imported
 SORTABLE = (P.alpha, P.beta)
 def arrange(user):
     for page in SORTABLE:
@@ -29,12 +38,13 @@ def arrange(user):
 def test_story(get_user):
     user = get_user(Users.ANONYMOUS)
     arrange(user)
+    arrange_imported()
     user.go(Categories.table)
 def fixture():
     return P.fixture.get(None)
 ''', encoding="utf-8")
     assert discover_resources(tmp_path, "test_story.py", "test_story", [("test_story.py", "fixture")]) == {
-        "Pages.alpha", "Pages.beta", "Pages.fixture", "Categories.table",
+        "Pages.alpha", "Pages.beta", "Pages.fixture", "Pages.imported", "Categories.table",
     }
 
 
@@ -142,6 +152,10 @@ def test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged():
     assert pilot_arguments(["unit"]) == (False, ["unit"])
     enabled, arguments = pilot_arguments(["--experiments", "--junitxml=result.xml"])
     assert enabled and arguments == ["--junitxml=result.xml", *TARGETS]
+    assert pilot_arguments(["--experiments=all"]) == ("all", ["e2e"])
+    for arguments in (["--experiments=unknown"], ["--experiments", "--experiments=all"]):
+        with pytest.raises(ValueError):
+            pilot_arguments(arguments)
     with pytest.raises(ValueError):
         pilot_arguments(["--experiments", "e2e"])
 

@@ -2100,14 +2100,17 @@ def execute(
     if experiments:
         if targets:
             raise HostedE2EError("--experiments cannot be combined with --target")
-        from runner.e2e_pilot import TARGETS
-        targets = TARGETS
+        if experiments not in {True, "pilot", "all"}:
+            raise HostedE2EError("Unknown coordinated E2E scope")
+        if experiments != "all":
+            from runner.e2e_pilot import TARGETS
+            targets = TARGETS
     if targets:
         try:
             targets = validate_focused_targets(targets)
         except RuntimeError as error:
             raise HostedE2EError(str(error)) from error
-    suite = "focused" if targets else "all"
+    suite = "e2e" if experiments == "all" else "focused" if targets else "all"
 
     _activate(adc=import_results)
     infrastructure = _infrastructure()
@@ -2115,7 +2118,7 @@ def execute(
     # Cloud Run's execution override uses gcloud's UpdateAction parser, which
     # rejects repeated list entries such as separate ``--target`` tokens.
     # ``argparse`` accepts the equivalent equals form inside the container.
-    job_arguments = ["--experiments"] if experiments else [f"--target={target}" for target in targets]
+    job_arguments = (["--experiments=all"] if experiments == "all" else ["--experiments"]) if experiments else [f"--target={target}" for target in targets]
     result = _gcloud(
         "run",
         "jobs",
@@ -2770,7 +2773,7 @@ def run_hosted_e2e_command(arguments):
     )
     add_environment_argument(create_parser)
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
-    execute_parser.add_argument("--experiments", action="store_true", help="Run the coordinated E2E pilot.")
+    execute_parser.add_argument("--experiments", nargs="?", const="pilot", choices=("pilot", "all"), help="Run coordinated E2E: pilot or all.")
     add_environment_argument(execute_parser)
     execute_parser.add_argument(
         "--target",
@@ -2840,7 +2843,7 @@ def run_hosted_e2e_command(arguments):
                 "import_results": not args.no_import_results,
             }
             if args.experiments:
-                execute_options["experiments"] = True
+                execute_options["experiments"] = args.experiments
             if args.environment != "standard":
                 execute_options["environment"] = args.environment
             payload = execute(

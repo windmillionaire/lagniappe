@@ -48,8 +48,8 @@ def _add_table_row(user, table, note):
 
 # @matrix template-formatting : date number phone time
 # @pair pages:basic-inputs
-def test_basic_input_submission(get_user):
-    user = get_user(Users.OWNER)
+def test_basic_input_submission(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_basic_input_submission.get(user)
     user.go(page)
 
@@ -61,8 +61,8 @@ def test_basic_input_submission(get_user):
 # @matrix pages tasks : submission-validation
 # @pair request-errors:plain-validation
 @pytest.mark.parametrize("entity_kind", ["PAGE", "TASK"])
-def test_invalid_typed_submission_returns_error_without_saving(get_user, entity_kind):
-    user = get_user(Users.OWNER)
+def test_invalid_typed_submission_returns_error_without_saving(get_admin, get_user, entity_kind):
+    user = get_admin()
     # These cases register page forms; keep that state out of the shared ACL
     # category used by the submitted-reference permission tests.
     category = Entities.CATEGORY.create({"name": f"Typed validation {entity_kind}"})
@@ -128,8 +128,8 @@ def test_invalid_typed_submission_returns_error_without_saving(get_user, entity_
 
 
 # @matrix pages : read-mode selection-fields submission
-def test_selection_submission(get_user):
-    user = get_user(Users.OWNER)
+def test_selection_submission(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_selection_submission.get(user)
     user.go(page)
 
@@ -154,8 +154,8 @@ def test_selection_submission(get_user):
 # @matrix pages : link-field submission
 # @pair form-link:read-layout
 # @style form.linkLabel
-def test_link_submission(get_user):
-    user = get_user(Users.OWNER)
+def test_link_submission(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_link_submission.get(user)
     user.go(page)
 
@@ -180,8 +180,8 @@ def test_link_submission(get_user):
 
 
 # @matrix form-table : delete edit reload reorder row-actions
-def test_table_submission_row_actions(get_user):
-    user = get_user(Users.OWNER)
+def test_table_submission_row_actions(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_table_submission.get(user)
     user.go(page)
 

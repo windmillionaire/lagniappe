@@ -3,7 +3,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import Forms, SitePages, Users
+from testing.definitions import Forms, SitePages
 from testing.elements import Dropdown, MobileTableControls
 from testing.resources.site import FormIndex
 
@@ -13,8 +13,8 @@ pytestmark = pytest.mark.e2e
 # @matrix table-controls : mobile-controls mobile-tools mutual-exclusion
 # @template forms/index.html::view_header
 # @template table.html::mobile_toggles
-def test_form_index_mobile_tools_and_column_controls_are_exclusive(get_user):
-    user = get_user(Users.OWNER)
+def test_form_index_mobile_tools_and_column_controls_are_exclusive(get_admin, get_user):
+    user = get_admin()
     Forms.test_create_page_form.get(user)
     user.go(SitePages.FORM_INDEX)
 

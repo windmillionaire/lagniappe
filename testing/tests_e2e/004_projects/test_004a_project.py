@@ -10,7 +10,7 @@ Verified against:
 
 from playwright.sync_api import expect
 
-from testing.definitions import ModelTasks, Projects, Users
+from testing.definitions import ModelTasks, Projects
 from testing.elements import FormElements, FormSelect, SpinnerButtons, List
 
 
@@ -40,8 +40,8 @@ def _create_model_task(user, project, definition):
 
 
 # @pair model-tasks:create
-def test_create_model_task(get_user):
-    user = get_user(Users.OWNER)
+def test_create_model_task(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_model_task.get(user)
     user.go(project)
 
@@ -50,8 +50,8 @@ def test_create_model_task(get_user):
 
 
 # @matrix model-tasks : attach-form create
-def test_create_model_task_with_form(get_user):
-    user = get_user(Users.OWNER)
+def test_create_model_task_with_form(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_model_task_with_form.get(user)
     user.go(project)
 

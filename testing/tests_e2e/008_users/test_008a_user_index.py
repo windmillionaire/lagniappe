@@ -22,7 +22,7 @@ from testing.resources import Page
 from testing.utility.network import expect_successful_response
 from testing.utility.reconnect import expect_reconnect_refresh
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.e2e_serial]
 
 
 def _set_public_users_allowed(owner, enabled):

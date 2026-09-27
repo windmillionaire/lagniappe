@@ -72,12 +72,16 @@ TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 # @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged
 # @matrix testing : parallel-e2e
 def pilot_arguments(arguments):
-    if "--experiments" not in arguments:
+    flags = [arg for arg in arguments if arg == "--experiments" or arg.startswith("--experiments=")]
+    if not flags:
         return False, arguments
-    rest = [arg for arg in arguments if arg != "--experiments"]
+    if len(flags) != 1 or flags[0] not in {"--experiments", "--experiments=pilot", "--experiments=all"}:
+        raise ValueError("Use --experiments or --experiments=all")
+    scope = "all" if flags[0] == "--experiments=all" else "pilot"
+    rest = [arg for arg in arguments if arg not in flags]
     if any(not arg.startswith("--junitxml=") for arg in rest):
-        raise ValueError("test --experiments selects the fixed E2E pilot; only --junitxml= is additional")
-    return True, [*rest, *TARGETS]
+        raise ValueError("test --experiments selects coordinated E2E tests; only --junitxml= is additional")
+    return scope, [*rest, *(TARGETS if scope == "pilot" else ("e2e",))]
 
 
 # @testable infrastructure
@@ -105,7 +109,7 @@ def pilot_authority(local_authority):
 # @testable true
 # @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
 # @matrix testing : parallel-e2e
-def run_pilot(authority, command, pytest_args):
+def run_pilot(authority, command, pytest_args, *, scope="pilot"):
     from lagniappe import CONFIG
     from lagniappe.core.entities import Entities
     from runner.test_session import capture_process_identity, load_session_state
@@ -137,9 +141,10 @@ def run_pilot(authority, command, pytest_args):
                      else frozenset(), exclusive=case == "exclusive")
                for case, target in zip(CASES, PROTOCOL_TARGETS)]
     collection = root / "collection.json"
+    story_targets = STORY_TARGETS if scope == "pilot" else ("testing/tests_e2e", f"--ignore={PILOT_FILE}", "-m", "not unfinished")
     collected = subprocess.run(
         [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini", "--collect-only", "-q",
-         "-p", "runner.e2e_inventory", *STORY_TARGETS], cwd=REPOSITORY_ROOT,
+         "-p", "runner.e2e_inventory", *story_targets], cwd=REPOSITORY_ROOT,
         env={**os.environ, "LAGNIAPPE_E2E_COLLECTION": str(collection)},
         capture_output=True, text=True, timeout=120,
     )
@@ -180,7 +185,7 @@ def run_pilot(authority, command, pytest_args):
             child_command = [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini",
                              "-p", "testing.utility.traceability_results", "-p", "runner.pytest_routing",
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
-                             f"--junitxml={artifacts / 'junit.xml'}", *batch.nodeids]
+                             f"--junitxml={artifacts / 'junit.xml'}", "-m", "not unfinished", *batch.nodeids]
             print(f"Pilot starting {batch.name}", flush=True)
             return subprocess.Popen(child_command, cwd=REPOSITORY_ROOT, start_new_session=True,
                                     stdout=output, stderr=subprocess.STDOUT,
@@ -190,7 +195,7 @@ def run_pilot(authority, command, pytest_args):
         try:
             for signum in (signal.SIGTERM, signal.SIGINT):
                 previous[signum] = signal.signal(signum, cancel)
-            schedule(batches, launch, authority.assert_active, workers=3, timeout=1800,
+            schedule(batches, launch, authority.assert_active, workers=3, timeout=7200 if scope == "all" else 1800,
                      finished=statuses, events=events)
         except (OSError, RuntimeError, KeyboardInterrupt) as error:
             scheduler_error = str(error)
@@ -204,9 +209,9 @@ def run_pilot(authority, command, pytest_args):
         errors.append(scheduler_error)
     if behavior_snapshot(REPOSITORY_ROOT)[0] != snapshot:
         errors.append("Source changed during E2E pilot; results are not importable")
-    status = int(bool(errors) or any(row["outcome"] != "passed" for row in outcomes.values()))
+    status = int(bool(errors) or any(row["outcome"] == "failed" for row in outcomes.values()))
     summary = {"attempt": attempt, "source_snapshot": snapshot,
-               "hosted": CONFIG.hosted_e2e_runner, "workers": 3,
+               "hosted": CONFIG.hosted_e2e_runner, "workers": 3, "scope": scope,
                "selected": [nodeid for batch in batches for nodeid in batch.nodeids],
                "batches": [{"name": b.name, "selected": b.nodeids, "resources": sorted(b.resources),
                             "exclusive": b.exclusive} for b in batches], "events": events,

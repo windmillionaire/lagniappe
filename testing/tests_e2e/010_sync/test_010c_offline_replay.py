@@ -25,8 +25,8 @@ OFFLINE_INDICATOR = "[data-role='offline']"
 # @template pages/document.html::document_tab
 # @template projects/document.html::document_tab
 @pytest.mark.parametrize("kind,content", [("page", "Read without editing"), ("project", "")])
-def test_read_document_survives_offline_reload_without_saving(get_user, browser_failures, kind, content):
-    user = get_user(Users.OWNER)
+def test_read_document_survives_offline_reload_without_saving(get_admin, get_user, browser_failures, kind, content):
+    user = get_admin()
     with app.test_request_context("/"):
         entity = getattr(Entities, kind.upper()).create({"name": _unique("offline-read")})
         if content:
@@ -220,8 +220,8 @@ def _reconnect_with_sync(user, sync_id):
 
 
 # @matrix sync : offline-replay queue-clear replay-order
-def test_offline_document_edits_replay_in_order(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_offline_document_edits_replay_in_order(get_admin, get_user, browser_failures):
+    user = get_admin()
     project = Projects.test_offline_document_replay.get(user)
     user.go(project)
     editor = project.editor
@@ -246,8 +246,8 @@ def test_offline_document_edits_replay_in_order(get_user, browser_failures):
 
 
 # @matrix sync : offline-replay queue-preserved
-def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, browser_failures):
+    user = get_admin()
     project = Projects.test_offline_document_retry.get(user)
     user.go(project)
     editor = project.editor

@@ -14,7 +14,6 @@ from testing.definitions import (
     Schemas,
     SitePages,
     TaskFormFields,
-    Users,
 )
 from testing.elements import Buttons, FormElements, Modal, SpinnerButtons, Table, Tools
 from testing.resources.form import Builder
@@ -29,8 +28,8 @@ from testing.utility.network import expect_successful_response, multipart_form_f
 # @matrix indexes : fingerprint-gate rendering
 # @matrix reconnect-refresh : fallback manifest root-fingerprint
 # @template forms/index.html::view
-def test_forms_index_page(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_forms_index_page(get_admin, get_user, browser_failures):
+    user = get_admin()
     user.go(SitePages.FORM_INDEX)
 
     expect(user.page).to_have_title(re.compile(r"Form Index"))
@@ -59,8 +58,8 @@ def test_forms_index_page(get_user, browser_failures):
 
 # @matrix forms : delete-modal instance-query preview-limit
 # @template delete/form.html::instance_link
-def test_form_delete_modal_lists_page_and_task_users(get_user):
-    user = get_user(Users.OWNER)
+def test_form_delete_modal_lists_page_and_task_users(get_admin, get_user):
+    user = get_admin()
     suffix = uuid4().hex
     form = Entities.FORM.create(
         {"name": f"Delete Usage Form {suffix}", "form-type": "page"}
@@ -142,8 +141,8 @@ def _create_form(user, form, create_form):
 # @matrix forms : components create page-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
-def test_create_page_form(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_form(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_create_page_form.get(user, create=False)
     form_index = user.go(SitePages.FORM_INDEX)
     create_form = form_index.create_form_form()
@@ -170,8 +169,8 @@ def test_create_page_form(get_user):
 # @matrix forms : builder-defaults components create task-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
-def test_create_task_form(get_user):
-    user = get_user(Users.OWNER)
+def test_create_task_form(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_create_task_form.get(user, create=False)
     form_index = user.go(SitePages.FORM_INDEX)
     create_form = form_index.create_form_form()
@@ -199,8 +198,8 @@ def test_create_task_form(get_user):
 # @matrix forms : builder-copy builder-form-name delete form-type navigation schema
 # @pair frontend-icons:material-icon-preservation
 # @template forms/builder.html::header
-def test_copy_form_from_builder_title_menu(get_user):
-    user = get_user(Users.OWNER)
+def test_copy_form_from_builder_title_menu(get_admin, get_user):
+    user = get_admin()
     source = Form(
         user=user,
         definition=FormDefinition(
@@ -258,8 +257,8 @@ def test_copy_form_from_builder_title_menu(get_user):
 
 
 # @matrix forms : builder-add-inputs builder-reload builder-save
-def test_add_inputs_to_form(get_user):
-    user = get_user(Users.OWNER)
+def test_add_inputs_to_form(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_add_inputs_to_form.get(user)
     schema = Schemas.add_inputs.get()
 
@@ -284,7 +283,7 @@ def test_add_inputs_to_form(get_user):
 # @template forms/builder.html::generate
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_generate_form_schema_live_saved_state(get_user, request, browser_failures, live_ai_quota):
+def test_generate_form_schema_live_saved_state(get_admin, get_user, request, browser_failures, live_ai_quota):
     """
     Exercise real builder generation with bounded quota recovery.
 
@@ -293,7 +292,7 @@ def test_generate_form_schema_live_saved_state(get_user, request, browser_failur
     mark saves the prompt and response under
     reports/test_reports/ for review.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     form = Form(
         user=user,
         definition=FormDefinition(
@@ -393,8 +392,8 @@ def test_generate_form_schema_live_saved_state(get_user, request, browser_failur
 
 
 # @matrix forms : builder-add-fields builder-reload builder-save
-def test_add_fields_to_form(get_user):
-    user = get_user(Users.OWNER)
+def test_add_fields_to_form(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_add_fields_to_form.get(user)
     schema = Schemas.add_fields.get()
 

@@ -48,7 +48,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from testing.definitions import DueDates, SitePages, Tasks, Users
+from testing.definitions import DueDates, SitePages, Tasks
 from testing.definitions.task_definitions import TaskDefinition
 from testing.resources import Page, Task
 from testing.elements import (
@@ -110,7 +110,7 @@ def _make_recurring_daily(task):
 
 # @matrix tasks : create-form due-date
 @pytest.mark.e2e
-def test_create_task_form(get_user):
+def test_create_task_form(get_admin, get_user):
     """
     Verify create personal task form opens with expected fields.
 
@@ -122,7 +122,7 @@ def test_create_task_form(get_user):
 
     Note: Personal tasks use the Schedule button (opens due date UI).
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     form = user.locate(home.CREATE_TASK_FORM)
@@ -141,7 +141,7 @@ def test_create_task_form(get_user):
 
 # @matrix tasks : create-personal due-date
 @pytest.mark.e2e
-def test_create_personal_task_due_today(get_user):
+def test_create_personal_task_due_today(get_admin, get_user):
     """
     Verify personal task creation with today's due date via UI.
 
@@ -154,7 +154,7 @@ def test_create_personal_task_due_today(get_user):
         - home.create_personal_task: Fills CreateUserTask and submits
         - home.task_list: Opens list and returns List helper
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     task = Tasks.test_create_personal_task_due_today.get(user, create=False)
@@ -166,14 +166,14 @@ def test_create_personal_task_due_today(get_user):
 
 # @matrix tasks : create-personal due-date
 @pytest.mark.e2e
-def test_create_personal_task_due_in_four_days(get_user):
+def test_create_personal_task_due_in_four_days(get_admin, get_user):
     """
     Verify personal task creation with a due date four days out via UI.
 
     Tasks due within the near-term window are returned in the home_task response;
     otherwise verify due date on the user page.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
     task = Tasks.test_create_personal_task_due_in_four_days.get(user, create=False)
     task.key = _create_personal_task(user, home, task.definition)
@@ -186,7 +186,7 @@ def test_create_personal_task_due_in_four_days(get_user):
 
 # @pair tasks:complete
 @pytest.mark.e2e
-def test_complete_task_from_home_page(get_user):
+def test_complete_task_from_home_page(get_admin, get_user):
     """
     Verify task completion via checkbox.
 
@@ -204,7 +204,7 @@ def test_complete_task_from_home_page(get_user):
         - task.set_due_date(): Update task due date
         - task.save(): Persist changes to database
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Tasks.test_complete_task_from_home_page.get(user)
     home = user.go(SitePages.HOME)
 
@@ -230,9 +230,9 @@ def test_complete_task_from_home_page(get_user):
 
 # @matrix tasks : complete recurring
 @pytest.mark.e2e
-def test_complete_recurring_task_from_home_page_reappears(get_user):
+def test_complete_recurring_task_from_home_page_reappears(get_admin, get_user):
     """Completing a near-term recurring home task replaces it with the next occurrence."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Task(
         user=user,
         definition=TaskDefinition(
@@ -259,7 +259,7 @@ def test_complete_recurring_task_from_home_page_reappears(get_user):
 
 # @matrix tasks : due-date postpone
 @pytest.mark.e2e
-def test_postpone_task_due_date_to_tomorrow(get_user):
+def test_postpone_task_due_date_to_tomorrow(get_admin, get_user):
     """
     Verify postponing task due date via dropdown.
 
@@ -272,7 +272,7 @@ def test_postpone_task_due_date_to_tomorrow(get_user):
         - PostponeDropdown enum: Helpers for postpone options
         - PostponeDropdown.TOMORROW.select(): Selects "Tomorrow" option
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Tasks.test_postpone_task_due_date_to_tomorrow.get(user)
     home = user.go(SitePages.HOME)
 
@@ -286,9 +286,9 @@ def test_postpone_task_due_date_to_tomorrow(get_user):
 
 # @matrix tasks : due-date postpone
 @pytest.mark.e2e
-def test_postpone_task_due_date_to_this_week(get_user):
+def test_postpone_task_due_date_to_this_week(get_admin, get_user):
     """Choose any remaining calendar date through Sunday from 'This Week…'."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Tasks.test_postpone_task_due_date_to_this_week.get(user)
     home = user.go(SitePages.HOME)
 
@@ -330,9 +330,9 @@ def test_postpone_task_due_date_to_this_week(get_user):
 
 # @matrix tasks : due-date postpone
 @pytest.mark.e2e
-def test_postpone_task_due_date_to_next_week(get_user):
+def test_postpone_task_due_date_to_next_week(get_admin, get_user):
     """Choose a dated weekday from the progressive next-week postpone menu."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Tasks.test_postpone_task_due_date_to_next_week.get(user)
     home = user.go(SitePages.HOME)
 
@@ -359,13 +359,13 @@ def test_postpone_task_due_date_to_next_week(get_user):
 
 # @matrix tasks : due-date postpone
 @pytest.mark.e2e
-def test_postpone_task_due_date_to_no_due_date(get_user):
+def test_postpone_task_due_date_to_no_due_date(get_admin, get_user):
     """
     Clear due date via postpone menu; task leaves the home list (no near-term due).
 
     Restores due today on the user page (same pattern as test_complete cleanup).
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Tasks.test_postpone_task_due_date_to_no_due_date.get(user)
     home = user.go(SitePages.HOME)
 

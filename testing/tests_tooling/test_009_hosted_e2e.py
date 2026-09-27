@@ -732,7 +732,7 @@ def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
 
 
 # @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
-@pytest.mark.parametrize("focused", [False, True, "experiments"], ids=["complete", "nodeid", "experiments"])
+@pytest.mark.parametrize("focused", [False, True, "experiments", "experiments-all"], ids=["complete", "nodeid", "experiments", "experiments-all"])
 def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     tmp_path, monkeypatch, focused,
 ):
@@ -763,23 +763,25 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     monkeypatch.setattr(hosted_e2e_job, "_stamp_evidence", stamped.append)
     monkeypatch.setattr(hosted_e2e_job, "_upload_artifacts", uploaded.append)
 
-    pilot = focused == "experiments"
-    arguments = ["--experiments"] if pilot else ([f"--target={target}"] if focused else [])
+    pilot = focused in {"experiments", "experiments-all"}
+    full_e2e = focused == "experiments-all"
+    flag = "--experiments=all" if full_e2e else "--experiments"
+    arguments = [flag] if pilot else ([f"--target={target}"] if focused else [])
     assert hosted_e2e_job.main(arguments) == 1
 
     command, options = commands[0]
     selection = [target] if focused else ["unit", "js", "tooling", "e2e"]
     if pilot:
         from runner.e2e_pilot import TARGETS
-        assert command[3:-1] == ["--experiments"]
-        selection = list(TARGETS)
+        assert command[3:-1] == [flag]
+        selection = [] if full_e2e else list(TARGETS)
     else:
         assert command[command.index("--strict") + 1 : -1] == [
             *selection, "-m", "not unfinished"
         ]
     assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
     assert stamped == uploaded
-    assert uploaded[0]["suite"] == ("focused" if focused else "all")
+    assert uploaded[0]["suite"] == ("e2e" if full_e2e else "focused" if focused else "all")
     assert uploaded[0].get("targets", []) == (selection if focused else [])
     assert uploaded[0]["exit_status"] == 1
 

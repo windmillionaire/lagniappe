@@ -25,7 +25,7 @@ from playwright.sync_api import expect
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import Fetch
 
-from testing.definitions import Projects, Users
+from testing.definitions import Projects
 from testing.utility.network import assert_lagniappe_error_response
 
 
@@ -33,8 +33,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @pair editor:history-list
-def test_document_saves_do_not_create_automatic_history(get_user):
-    user = get_user(Users.OWNER)
+def test_document_saves_do_not_create_automatic_history(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_document_history_created)
     editor = project.editor
 
@@ -75,8 +75,8 @@ def test_document_saves_do_not_create_automatic_history(get_user):
 
 # @pair editor:history-restore
 # @matrix editor sync : preview restore
-def test_document_history_restore(get_user):
-    user = get_user(Users.OWNER)
+def test_document_history_restore(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_document_history_restore)
     editor = project.editor
 
@@ -144,8 +144,8 @@ def test_document_history_restore(get_user):
 # @matrix editor : confirmation current-content history-clear history-pin history-positioning parent-scope validation
 # @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
-def test_pin_and_clear_document_history(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_pin_and_clear_document_history(get_admin, get_user, browser_failures):
+    user = get_admin()
     project = user.go(Projects.test_document_history_pinned)
     other_project = Projects.test_formatting_persists.get(user)
     editor = project.editor
@@ -297,12 +297,12 @@ def test_pin_and_clear_document_history(get_user, browser_failures):
 # @source lagniappe/core/tools/document_history.py::read_backup
 # @matrix editor document-history : backups permissions preview
 # @template projects/document.html::document_tab
-def test_storage_backup_preview_is_read_only(get_user):
+def test_storage_backup_preview_is_read_only(get_admin, get_user):
     from uuid import uuid4
     from lagniappe.core.tools.document_crdt import append_fragment
     from testing.resources import Project
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     entity = Entities.PROJECT.create({"name": f"test-storage-history-{uuid4().hex[:8]}"})
     snapshot, _ = append_fragment(None, "<p>Retained storage version</p>", "seed")
     entity.properties.document.save(html="<p>Retained storage version</p>", ydoc=snapshot)

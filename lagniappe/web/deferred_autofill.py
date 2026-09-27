@@ -311,6 +311,7 @@ def cleanup_staged_uploads(records):
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @matrix ai notifications pages tasks : autofill deferred
+# @matrix ai tasks : retry original-prompt staged-upload
 # @pair deferred-jobs:hosted-e2e
 def start_deferred_autofill(
     entity,

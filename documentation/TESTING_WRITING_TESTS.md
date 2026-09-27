@@ -365,8 +365,8 @@ duplication. Do not build a second testing API around a one-off selector.
 
 ### Coordinated E2E resources
 
-The opt-in coordinated pilot is described in
-[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md#coordinated-worker-pilot).
+The opt-in pilot and `run.py test --experiments=all` full-suite trial are described
+in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md#coordinated-e2e-workers).
 Use `get_admin()` for a broad-access browser story that does not require the
 actual Owner. It reuses one Administrator per sequential worker, with explicit
 CREATE AI entitlement, while `get_user` creates a fresh browser context for each
@@ -374,13 +374,14 @@ call. Keep permission/Owner-specific stories on their explicitly named actors.
 
 Use full enum members such as `Pages.test_page_loads.get(user)`, rather than
 aliases for unrelated stories. The coordinator groups direct named resources,
-including references in local helpers, constants and collected fixtures. It does
+including references in local/imported test helpers, constants and collected fixtures. It does
 not lock the whole dependency graph. A Page's Form or Category is shared normally
 unless the test directly names that resource as part of its mutable assumptions.
-Imported helpers and dynamic resource selection need review when expanding the
-pilot selection.
+Dynamic resource selection still needs explicit review; prefer named enum
+members so the scheduler can see those conflicts.
 
-Mark stories that mutate site-wide settings with `@pytest.mark.e2e_serial` (or
+Mark stories that mutate site-wide settings or require unchanged global
+revision snapshots with `@pytest.mark.e2e_serial` (or
 set it in module `pytestmark`). They run together sequentially after parallel
 batches drain; still restore the setting in `finally`. Adding a story to the
 pilot's explicit selection does not require manually choosing a batch.

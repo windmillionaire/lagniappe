@@ -14,7 +14,7 @@ from lagniappe import CONFIG
 from testing.definitions import Groups, Users
 
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.e2e_serial]
 
 
 @pytest.fixture

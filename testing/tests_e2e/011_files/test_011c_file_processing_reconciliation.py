@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from testing.definitions import Pages, Uploads, Users
+from testing.definitions import Pages, Uploads
 from testing.definitions.page_definitions import PageDefinition
 from testing.resources import File, Page
 from testing.utility.network import expect_successful_response
@@ -26,10 +26,10 @@ pytestmark = pytest.mark.e2e
 
 # @matrix file : active-reset polling status summarize summary
 def test_file_summary_completion_stages_authoritative_info_until_reset(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     suffix = uuid4().hex
     category = Entities.CATEGORY.create(
         {

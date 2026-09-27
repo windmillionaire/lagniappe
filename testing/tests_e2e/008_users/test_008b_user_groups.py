@@ -210,6 +210,7 @@ def test_permissions_html_preserves_dirty_form_until_explicit_reset(get_user):
 
 # @matrix permissions public-groups : active permission-update public
 # @template users/tools.html::public_permissions
+@pytest.mark.e2e_serial
 def test_set_public_permissions(get_user):
     owner = get_user(Users.OWNER)
     user_index = owner.go(SitePages.USER_INDEX)

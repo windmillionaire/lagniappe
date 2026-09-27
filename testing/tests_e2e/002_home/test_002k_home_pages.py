@@ -19,8 +19,8 @@ pytestmark = pytest.mark.e2e
 # @matrix home pages : list load
 # @template home/pages.html::list
 # @template home/pages.html::page
-def test_home_page_list_loads_recent_pages(get_user):
-    user = get_user(Users.OWNER)
+def test_home_page_list_loads_recent_pages(get_admin, get_user):
+    user = get_admin()
     existing_page = Pages.test_create_page.get(user)
     home = user.go(SitePages.HOME)
 
@@ -33,8 +33,8 @@ def test_home_page_list_loads_recent_pages(get_user):
 # @matrix home pages : category-select create default-category
 # @template home/pages.html::create
 # @template home/pages.html::page
-def test_create_page_from_home(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_from_home(get_admin, get_user):
+    user = get_admin()
     home = user.go(SitePages.HOME)
     create_form = home.create_page_form()
     page_name = "Home Created Page"

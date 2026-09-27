@@ -38,14 +38,14 @@ Import Widget:
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import SitePages, Uploads, Users
+from testing.definitions import SitePages, Uploads
 from testing.elements import Buttons, Modal
 from testing.resources import File
 
 
 # @pair ingress:upload-form
 @pytest.mark.e2e
-def test_open_import_form(get_user):
+def test_open_import_form(get_admin, get_user):
     """
     Verify import form opens from the Admin Import Data tab.
 
@@ -53,7 +53,7 @@ def test_open_import_form(get_user):
         - Import form hidden initially
         - Toggle button shows form
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     admin = user.go(SitePages.ADMIN)
 
     form = admin.open_import_upload_form()
@@ -62,7 +62,7 @@ def test_open_import_form(get_user):
 
 # @matrix ingress : delete file-input upload-counts
 @pytest.mark.e2e
-def test_import_csv_via_file_input(get_user):
+def test_import_csv_via_file_input(get_admin, get_user):
     """
     Verify CSV upload via direct file input selection.
 
@@ -74,7 +74,7 @@ def test_import_csv_via_file_input(get_user):
 
     Uses Uploads.csv_file_input definition with FILE_INPUT method.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     admin = user.go(SitePages.ADMIN)
     upload = Uploads.csv_file_input
 
@@ -97,7 +97,7 @@ def test_import_csv_via_file_input(get_user):
 
 # @matrix ingress : delete drag-drop upload-counts
 @pytest.mark.e2e
-def test_import_csv_via_drag_drop(get_user):
+def test_import_csv_via_drag_drop(get_admin, get_user):
     """
     Verify CSV upload via drag and drop onto dropzone.
 
@@ -109,7 +109,7 @@ def test_import_csv_via_drag_drop(get_user):
 
     Uses Uploads.csv_drag_drop definition with DRAG_DROP method.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     admin = user.go(SitePages.ADMIN)
     upload = Uploads.csv_drag_drop
 

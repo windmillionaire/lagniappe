@@ -17,7 +17,7 @@ import pytest
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
-from testing.definitions import Categories, Forms, SitePages, Uploads, Users
+from testing.definitions import Categories, Forms, SitePages, Uploads
 from testing.elements import IngressWizard, SpinnerButtons
 from testing.resources import File
 
@@ -104,8 +104,8 @@ def _create_task_target_pages(user):
 # @template home/ingress.html::upload_ingress_file
 # @template files/ingress.html::ingress
 # @template files/status.html::column_values
-def test_import_wizard_opens_with_processed_csv_status(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_opens_with_processed_csv_status(get_admin, get_user):
+    user = get_admin()
     _, wizard = _upload_ingress_file(user, Uploads.ingress_pages_status_csv)
 
     wizard.expect_stage("PROCESS_CSV", "Row Count")
@@ -124,8 +124,8 @@ def test_import_wizard_opens_with_processed_csv_status(get_user):
 # @template files/status/form.html::form_choice
 # @template files/status/assign.html::assign_columns
 # @template files/status/verify.html::verify_import
-def test_import_wizard_advances_through_page_import_stages(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_advances_through_page_import_stages(get_admin, get_user):
+    user = get_admin()
     _, wizard = _advance_page_import_to_verify(user, Uploads.ingress_pages_stages_csv)
 
     expect(wizard.progress).to_contain_text(PAGE_IMPORT_CATEGORY)
@@ -141,8 +141,8 @@ def test_import_wizard_advances_through_page_import_stages(get_user):
 # @template files/status/form.html::form_choice
 # @template files/status/assign.html::assign_columns
 # @template files/status/verify.html::verify_import
-def test_import_wizard_advances_through_task_import_stages(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_advances_through_task_import_stages(get_admin, get_user):
+    user = get_admin()
     _create_task_target_pages(user)
     _, wizard = _upload_ingress_file(user, Uploads.ingress_tasks_stages_csv)
 
@@ -177,8 +177,8 @@ def test_import_wizard_advances_through_task_import_stages(get_user):
 
 # @matrix ingress : error-handling set-stage stage-wizard
 # @template files/status/parent.html::category_choice
-def test_import_wizard_stage_navigation_reconciles_downstream_status(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_stage_navigation_reconciles_downstream_status(get_admin, get_user):
+    user = get_admin()
     file, wizard = _upload_ingress_file(user, Uploads.ingress_pages_stage_nav_csv)
 
     wizard.continue_stage("CHOOSE_TYPE", "Row Type")
@@ -199,8 +199,8 @@ def test_import_wizard_stage_navigation_reconciles_downstream_status(get_user):
 # @matrix ingress : completed import-results
 # @template files/status/results.html::importing
 # @template files/status/results.html::completed
-def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_importing_stage_streams_results_and_completes(get_admin, get_user):
+    user = get_admin()
     _, wizard = _advance_page_import_to_verify(user, Uploads.ingress_pages_import_csv)
 
     wizard.start_import()
@@ -213,8 +213,8 @@ def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
 
 # @matrix ingress : non-csv validation
 # @pair request-errors:plain-validation
-def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_import_wizard_rejects_non_csv_upload(get_admin, get_user, browser_failures):
+    user = get_admin()
     form = _open_import_upload_form(user)
 
     Uploads.plain_text_file.set(form)
@@ -233,8 +233,8 @@ def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
 
 
 # @matrix ingress : error-handling persistence reopen
-def test_import_wizard_error_state_persists_after_reopen(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_error_state_persists_after_reopen(get_admin, get_user):
+    user = get_admin()
     file, wizard = _upload_ingress_file(user, Uploads.ingress_pages_error_csv)
 
     wizard.continue_stage("CHOOSE_TYPE", "Row Type")
@@ -258,8 +258,8 @@ def test_import_wizard_error_state_persists_after_reopen(get_user):
 
 
 # @matrix ingress : existing-form existing-parent
-def test_import_wizard_selects_existing_parent_and_form(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_selects_existing_parent_and_form(get_admin, get_user):
+    user = get_admin()
     category = Categories.test_empty_category.get(user)
     form = Forms.test_create_page_form.get(user)
     _, wizard = _upload_ingress_file(user, Uploads.ingress_pages_existing_csv)
@@ -283,8 +283,8 @@ def test_import_wizard_selects_existing_parent_and_form(get_user):
 
 
 # @matrix ingress : ignored-columns verify-import
-def test_import_wizard_ignored_columns_are_not_imported(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_ignored_columns_are_not_imported(get_admin, get_user):
+    user = get_admin()
     _, wizard = _advance_page_import_to_assign(user, Uploads.ingress_pages_ignored_csv)
 
     wizard.ignore_column("status")
@@ -299,8 +299,8 @@ def test_import_wizard_ignored_columns_are_not_imported(get_user):
 
 
 # @matrix ingress : page-form-lookup task-import
-def test_import_wizard_task_page_form_lookup_updates_index_fields(get_user):
-    user = get_user(Users.OWNER)
+def test_import_wizard_task_page_form_lookup_updates_index_fields(get_admin, get_user):
+    user = get_admin()
     page_form = Forms.test_create_category_with_form.get(user)
     _create_task_target_pages(user)
     _, wizard = _upload_ingress_file(user, Uploads.ingress_tasks_page_form_csv)

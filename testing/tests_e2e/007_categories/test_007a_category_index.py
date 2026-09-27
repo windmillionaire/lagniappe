@@ -9,7 +9,7 @@ from lagniappe import CONFIG
 from lagniappe.core.definitions import DeferredJobStatus, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
-from testing.definitions import Categories, Forms, Pages, Users
+from testing.definitions import Categories, Forms, Pages
 from testing.elements import (
     FormElements,
     FormSelect,
@@ -53,9 +53,9 @@ def _open_visibility_panel(user, category):
 # @template categories/index.html::view
 # @template table.html::table
 def test_category_index_renders_first_batch_before_cursor_continuation(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_create_page.get(user)
     suffix = uuid4().hex
     created = [
@@ -126,8 +126,8 @@ def test_category_index_renders_first_batch_before_cursor_continuation(
 
 
 # @matrix pages : category-index create
-def test_create_page_from_category_index(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_from_category_index(get_admin, get_user):
+    user = get_admin()
     category = Categories.test_empty_category.get(user)
     page = Pages.test_create_page.get(user, create=False)
     user.go(category)
@@ -144,8 +144,8 @@ def test_create_page_from_category_index(get_user):
 # @matrix reconnect-refresh : category-index component-identity
 # @pair category-index:refresh
 # @template table.html::row
-def test_category_index_reconnect_refreshes_external_page(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_category_index_reconnect_refreshes_external_page(get_admin, get_user, browser_failures):
+    user = get_admin()
     category = Categories.test_empty_category.get(user)
     user.go(category)
 
@@ -170,8 +170,8 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
 # @matrix pages : category-index create required-name row-navigation
 # @template categories/tools.html::create_page
 # @template table.html::row
-def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_admin, get_user, browser_failures):
+    user = get_admin()
     existing = Pages.test_category_filter_related_form_registration_page.get(user)
     category = existing.definition.category.get(user)
     attached = existing.definition.form.get(user)
@@ -223,8 +223,8 @@ def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_us
 # @matrix polling : operation owner progress timing
 # @template categories/tools.html::create_page
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_ai_job_quota):
-    user = get_user(Users.OWNER)
+def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, results, live_ai_job_quota):
+    user = get_admin()
     category = Categories.test_basic_inputs_submission.get(user)
     user.go(category)
 
@@ -305,8 +305,8 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch, results, live_a
 # @matrix categories : info-form update
 # @matrix web-headers : acknowledgement entity-revision local-save
 # @template categories/index.html::view_header
-def test_update_category_info_from_tools(get_user):
-    user = get_user(Users.OWNER)
+def test_update_category_info_from_tools(get_admin, get_user):
+    user = get_admin()
     category = Categories.test_category_info_update.get(user)
     updated_form = Forms.test_create_page_form.get(user)
     user.go(category)
@@ -337,8 +337,8 @@ def test_update_category_info_from_tools(get_user):
 
 
 # @matrix pages : category-index create related-forms
-def test_create_page_related_form_badge_selects_form(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_related_form_badge_selects_form(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_category_filter_related_form_registration_page.get(user)
     category = page.definition.category.get(user)
     related_form = page.definition.form.get(user)
@@ -377,8 +377,8 @@ def test_create_page_related_form_badge_selects_form(get_user):
 
 
 # @matrix category-index : editable-cell quick-edit
-def test_category_index_quick_edit_updates_text_cell(get_user):
-    user = get_user(Users.OWNER)
+def test_category_index_quick_edit_updates_text_cell(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_basic_input_submission.get(user)
     category = page.definition.category.get(user)
     user.go(category)
@@ -412,8 +412,8 @@ def test_category_index_quick_edit_updates_text_cell(get_user):
 
 
 # @matrix category-index : checkbox-cell quick-edit
-def test_category_index_quick_edit_renders_checkbox_cells(get_user):
-    user = get_user(Users.OWNER)
+def test_category_index_quick_edit_renders_checkbox_cells(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_category_filter_match_page.get(user)
     category = page.definition.category.get(user)
     user.go(category)
@@ -455,8 +455,8 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_user):
 # @matrix form-table table-controls : form-table-column table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
-def test_category_index_expands_table_submission_cell(get_user):
-    user = get_user(Users.OWNER)
+def test_category_index_expands_table_submission_cell(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_category_table_expansion.get(user)
     category = page.definition.category.get(user)
     user.go(category)

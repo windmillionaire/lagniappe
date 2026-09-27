@@ -250,8 +250,8 @@ def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
 
 
 # @matrix quick-create : create-entity create-route created-option default-category
-def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
-    user = get_user(Users.OWNER)
+def test_page_quick_create_uses_visible_uncategorized_pages_category(get_admin, get_user):
+    user = get_admin()
     user.go(SitePages.HOME)
 
     first = _fetch_json(
@@ -284,8 +284,8 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
 
 # @matrix quick-create : create-entity create-route created-option
 # @template pages/tasks.html::action_buttons
-def test_project_combobox_quick_create_selects_new_project(get_user):
-    user = get_user(Users.OWNER)
+def test_project_combobox_quick_create_selects_new_project(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_create_page_task.get(user)
     user.go(page)
     project_name = _unique("project-combobox")
@@ -305,8 +305,8 @@ def test_project_combobox_quick_create_selects_new_project(get_user):
 
 # @matrix quick-create : create-entity create-route created-option form-type
 # @template projects/model_tasks.html::create_model_task
-def test_model_task_form_selector_quick_creates_form(get_user):
-    user = get_user(Users.OWNER)
+def test_model_task_form_selector_quick_creates_form(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_model_task.get(user)
     user.go(project)
 
@@ -334,8 +334,8 @@ def test_model_task_form_selector_quick_creates_form(get_user):
 
 # @matrix quick-create : create-entity create-route created-option form-type
 # @template home/categories.html::create
-def test_home_create_category_form_selector_quick_creates_form(get_user):
-    user = get_user(Users.OWNER)
+def test_home_create_category_form_selector_quick_creates_form(get_admin, get_user):
+    user = get_admin()
     home = user.go(SitePages.HOME)
     category_name = _unique("category")
     form_name = _unique("category-form")
@@ -361,8 +361,8 @@ def test_home_create_category_form_selector_quick_creates_form(get_user):
 
 # @matrix quick-create : create-entity create-route created-option
 # @template pages/info.html::info_form
-def test_page_info_category_multiselect_quick_creates_category(get_user):
-    user = get_user(Users.OWNER)
+def test_page_info_category_multiselect_quick_creates_category(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_category_edit_page)
     page.wait_for_interaction_readiness()
     category_name = _unique("page-info-category")

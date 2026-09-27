@@ -320,7 +320,7 @@ def run_tests(test_args: list[str]) -> int:
                 if pilot:
                     from runner.e2e_pilot import pilot_authority, run_pilot
                     with pilot_authority(authority) as coordinator:
-                        statuses.append(run_pilot(coordinator, full_command, reports.root_args))
+                        statuses.append(run_pilot(coordinator, full_command, reports.root_args, scope=pilot))
                 else:
                     statuses.append(
                         _run_pytest_subprocess(pytest_command(list(reports.root_args)))

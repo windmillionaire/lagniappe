@@ -40,8 +40,8 @@ def _get(user, path):
 # @template reference/macros.html::modal
 # @style help.content
 # @pair help:navigation
-def test_help_article_navigation_and_canonical_ids(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_help_article_navigation_and_canonical_ids(get_admin, get_user, browser_failures):
+    user = get_admin()
     user.go(SitePage(url='/help/create_form'))
     expect(user.locate('[lp-view][data-kind="help"]')).to_have_attribute('initialized', '')
     expect(user.page.get_by_role('heading', name='Creating Forms', exact=True)).to_be_visible()
@@ -163,11 +163,11 @@ def test_redis_help_versions_permissions_pagination_and_record_exclusion():
         cache.redis.hdel(Keys.ENTITY_HASHES.value, *hashes)
 
 
-def test_rest_help_lookup_is_plan_free_and_uses_canonical_sources(monkeypatch, get_user):
+def test_rest_help_lookup_is_plan_free_and_uses_canonical_sources(monkeypatch, get_admin, get_user):
     from lagniappe.core.tools.auth import agent_api as agent_auth
     from lagniappe.core.tools.ai import external_api
     from lagniappe.web import app
-    user = get_user(Users.OWNER)
+    user = get_admin()
     monkeypatch.setattr(agent_auth, 'authenticate_credential', lambda _token: (user.entity, {'active': True}))
     monkeypatch.setattr(external_api, 'create_plan', lambda *_a, **_kw: pytest.fail('help must not create a plan'))
     client = app.test_client()

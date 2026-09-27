@@ -34,6 +34,7 @@ def _destination(entity):
 # @tests tests_unit/test_024_autofill_form_state.py::test_autofill_job_spec_contains_only_durable_inputs
 # @matrix ai : autofill deferred
 # @matrix pages tasks : autofill
+# @matrix ai tasks : current-answers
 def autofill_job_spec(
     entity,
     user,

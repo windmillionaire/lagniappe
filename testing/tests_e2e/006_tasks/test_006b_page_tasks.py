@@ -223,8 +223,8 @@ def test_complete_page_task(get_admin, get_user):
 # @matrix tasks : project-link select-toggle-layout
 # @style select.button
 # @template pages/tasks.html::action_buttons
-def test_create_page_task_with_project(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_with_project(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_create_page_task_with_project.get(user, create=False)
     project = Projects.test_attach_project_to_task.get(user)
@@ -269,8 +269,8 @@ def test_create_page_task_with_project(get_user):
 # @matrix tasks : attach-form badge create model-task-link
 # @template pages/tasks.html::task_details
 # @template pages/tasks.html::action_buttons
-def test_create_page_task_with_model_task(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_with_model_task(get_admin, get_user):
+    user = get_admin()
 
     project = Projects.test_page_tasks_multi_model.get(user)
     model_alpha = ModelTasks.test_multi_model_alpha.get(user)
@@ -323,8 +323,8 @@ def test_create_page_task_with_model_task(get_user):
 
 # @matrix tasks : attach-form create model-task-link retained-draft
 # @template pages/tasks.html::action_buttons
-def test_model_task_replaces_form_on_reopened_create_draft(get_user):
-    user = get_user(Users.OWNER)
+def test_model_task_replaces_form_on_reopened_create_draft(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_create_page_task.get(user)
     original_form = Forms.test_create_task_form.get(user)
     token = uuid4().hex[:12]
@@ -384,8 +384,8 @@ def test_model_task_replaces_form_on_reopened_create_draft(get_user):
 # @matrix tasks : assignee badge create
 # @pair notifications:assignee-target
 # @template notifications.html::item
-def test_create_page_task_with_assigned_to(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_with_assigned_to(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_create_page_task_with_assigned_to.get(user, create=False)
     assignee = Users.create_user.get(user)
@@ -417,8 +417,8 @@ def test_create_page_task_with_assigned_to(get_user):
 
 
 # @matrix tasks : badge create due-date
-def test_create_page_task_with_due_date(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_with_due_date(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_create_page_task_with_due_date.get(user, create=False)
     page = Pages.test_create_page_task.get(user)
@@ -439,8 +439,8 @@ def test_create_page_task_with_due_date(get_user):
 # @template controls.html::task_save
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::task_nav
-def test_update_page_task_settings_from_row(get_user):
-    user = get_user(Users.OWNER)
+def test_update_page_task_settings_from_row(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_update_page_task_settings.get(user)
     user.go(task)
 
@@ -487,8 +487,8 @@ def test_update_page_task_settings_from_row(get_user):
 # @template pages/tasks.html::task
 # @template pages/tasks.html::settings_form
 # @template pages/tasks.html::task_form
-def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
-    user = get_user(Users.OWNER)
+def test_adding_form_from_task_settings_preserves_widget_identity(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_update_page_task_settings.get(user)
     form = Forms.test_task_history_form.get(user)
     user.go(task)
@@ -575,8 +575,8 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::move_form
 # @template pages/tasks.html::move_page_select
-def test_completed_task_can_move_to_another_page(get_user):
-    user = get_user(Users.OWNER)
+def test_completed_task_can_move_to_another_page(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_move_pages.get(user)
     source_page = Pages.test_task_pages_move_source.get(user)
     target_page = Pages.test_task_pages_move_target.get(user)
@@ -616,8 +616,8 @@ def test_completed_task_can_move_to_another_page(get_user):
 
 # @pair tasks:delete
 # @template pages/tasks.html::task
-def test_delete_page_task_from_page_row(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_page_task_from_page_row(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_delete_page_task_from_page.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(page)
@@ -680,8 +680,8 @@ def test_submit_attached_task_form(get_admin, get_user):
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
-def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user):
-    user = get_user(Users.OWNER)
+def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_task_update_preserves_open_widget.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(task)
@@ -732,8 +732,8 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
-def test_completed_task_with_empty_form_is_readonly(get_user, tmp_path):
-    user = get_user(Users.OWNER)
+def test_completed_task_with_empty_form_is_readonly(get_admin, get_user, tmp_path):
+    user = get_admin()
     task = Tasks.test_completed_task_readonly_form.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(task)
@@ -771,8 +771,8 @@ def test_completed_task_with_empty_form_is_readonly(get_user, tmp_path):
 # @matrix tasks : attached-form complete empty-fields partial-submission readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
-def test_completed_task_with_partial_submission_omits_empty_fields(get_user):
-    user = get_user(Users.OWNER)
+def test_completed_task_with_partial_submission_omits_empty_fields(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_completed_partial_task_readonly_form.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(task)
@@ -806,8 +806,8 @@ def test_completed_task_with_partial_submission_omits_empty_fields(get_user):
 # @template pages/tasks.html::task_tab
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task
-def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_admin, get_user):
+    user = get_admin()
     existing_task = Tasks.test_create_while_open_existing.get(user)
     new_task = Tasks.test_create_while_open_new.get(user, create=False)
     page = Pages.test_create_page_task.get(user)
@@ -839,8 +839,8 @@ def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_user):
 
 
 # @matrix signature : asset-lifecycle clear editable file-input form-value readonly reload
-def test_signature_submission_draw_save_reload_and_clear(get_user):
-    user = get_user(Users.OWNER)
+def test_signature_submission_draw_save_reload_and_clear(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_signature_submission.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(task)
@@ -907,8 +907,8 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
 
 # @matrix tasks : async-upload attachment create file-upload remove
 # @template pages/tasks.html::action_buttons
-def test_create_page_task_with_file(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_with_file(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_create_page_task_with_file.get(user, create=False)
     page = Pages.test_create_page_task.get(user)

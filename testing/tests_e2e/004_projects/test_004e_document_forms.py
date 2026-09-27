@@ -95,8 +95,8 @@ def test_editor_preview_rejects_private_targets_without_disrupting_popover(
 
 
 # @matrix editor : color reload
-def test_color_picker(get_user):
-    user = get_user(Users.OWNER)
+def test_color_picker(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
@@ -116,8 +116,8 @@ def test_color_picker(get_user):
 
 
 # @matrix editor : font-family reload
-def test_font_family(get_user):
-    user = get_user(Users.OWNER)
+def test_font_family(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
@@ -137,8 +137,8 @@ def test_font_family(get_user):
 
 
 # @matrix editor : external-link link reload search shortcut unlink
-def test_external_link_persists_searches_and_unlinks(get_user):
-    user = get_user(Users.OWNER)
+def test_external_link_persists_searches_and_unlinks(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
     editor = project.editor
     editor.clear_text()
@@ -185,8 +185,8 @@ def test_external_link_persists_searches_and_unlinks(get_user):
 
 
 # @matrix editor : delimiter link
-def test_space_exits_link_at_document_end(get_user):
-    user = get_user(Users.OWNER)
+def test_space_exits_link_at_document_end(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
     editor = project.editor
     editor.clear_text()
@@ -208,8 +208,8 @@ def test_space_exits_link_at_document_end(get_user):
 
 
 # @matrix editor : form-dismissal link selection
-def test_link_form_dismissal_preserves_selection_interactions(get_user):
-    user = get_user(Users.OWNER)
+def test_link_form_dismissal_preserves_selection_interactions(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
     editor = project.editor
     editor.clear_text()
@@ -235,8 +235,8 @@ def test_link_form_dismissal_preserves_selection_interactions(get_user):
 
 
 # @matrix editor : click-navigation internal-link link paste popover readonly reload shortcut unlink
-def test_internal_links_normalize_paste_and_popover_navigation(get_user):
-    user = get_user(Users.OWNER)
+def test_internal_links_normalize_paste_and_popover_navigation(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
     editor = project.editor
     editor.clear_text()
@@ -374,8 +374,8 @@ def test_internal_links_normalize_paste_and_popover_navigation(get_user):
 
 
 # @style editor.container
-def test_links_colorize_properly(get_user):
-    user = get_user(Users.OWNER)
+def test_links_colorize_properly(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
     editor = project.editor
 
@@ -439,8 +439,8 @@ def test_links_colorize_properly(get_user):
 
 
 # @pair editor:youtube-embed
-def test_add_youtube(get_user):
-    user = get_user(Users.OWNER)
+def test_add_youtube(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
@@ -456,8 +456,8 @@ def test_add_youtube(get_user):
 
 
 # @pair editor:image-generate-toggle
-def test_add_image_generate_toggle(get_user):
-    user = get_user(Users.OWNER)
+def test_add_image_generate_toggle(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
@@ -474,8 +474,8 @@ def test_add_image_generate_toggle(get_user):
 
 
 # @matrix editor : image-selection image-upload
-def test_add_image(get_user):
-    user = get_user(Users.OWNER)
+def test_add_image(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor

@@ -10,7 +10,7 @@ from lagniappe import CONFIG
 from lagniappe.core.definitions import DeferredJobStatus, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
-from testing.definitions import Pages, Users
+from testing.definitions import Pages
 from testing.resources import Page
 from testing.utility.live_ai import run_hosted_autofill
 
@@ -26,12 +26,12 @@ EXPECTED_VALUE = "$245,000"
 # @pair ai:autofill
 # @template pages/info.html::info_form
 @pytest.mark.parametrize("task_state", ["none", "active", "completed"])
-def test_page_form_state_does_not_load_task_collection(get_user, monkeypatch, task_state):
+def test_page_form_state_does_not_load_task_collection(get_admin, get_user, monkeypatch, task_state):
     """Page form state survives completed Tasks without reading the collection."""
     from lagniappe.core.tools.database import get as database_get
     from lagniappe.web import app
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = Page(
         user=user,
         definition=replace(
@@ -89,9 +89,9 @@ def _attach_evidence(page):
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_page_autofill_runs_deferred_with_attached_file_context(
-    get_user, monkeypatch, browser_failures, results, live_ai_job_quota
+    get_admin, get_user, monkeypatch, browser_failures, results, live_ai_job_quota
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = Page(
         user=user,
         definition=replace(

@@ -37,24 +37,37 @@ def pytest_collection_finish(session):
 # @testable true
 # @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_follows_helpers_constants_and_fixtures
 # @matrix testing : parallel-e2e
-def discover_resources(root, path, name, fixtures=()):
-    """Follow local helper/constant references; no transitive entity graph."""
+def discover_resources(root, path, name, fixtures=(), *, modules=None):
+    """Follow test helpers/constants and fixtures; no transitive entity graph."""
     visited, resources = set(), set()
+    modules = {} if modules is None else modules
 
     def scan(relative, symbol):
         identity = (relative, symbol)
         if identity in visited:
             return
         visited.add(identity)
-        file = root / relative
-        tree = ast.parse(file.read_text(encoding="utf-8"))
-        functions = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
-        constants = {t.id: n.value for n in tree.body if isinstance(n, ast.Assign)
-                     for t in n.targets if isinstance(t, ast.Name)}
-        aliases = {}
-        for n in tree.body:
-            if isinstance(n, ast.ImportFrom) and n.module == "testing.definitions":
-                aliases.update({a.asname or a.name: a.name for a in n.names if a.name in ENUMS})
+        if relative not in modules:
+            tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+            functions = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+            for cls in (n for n in tree.body if isinstance(n, ast.ClassDef)):
+                functions.update({f"{cls.name}::{n.name}": n for n in cls.body
+                                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))})
+            constants = {t.id: n.value for n in tree.body if isinstance(n, ast.Assign)
+                         for t in n.targets if isinstance(t, ast.Name)}
+            modules[relative] = tree, functions, constants
+        tree, functions, constants = modules[relative]
+        aliases, imports = {}, {}
+        node = functions.get(symbol, constants.get(symbol))
+        imports_to_scan = [*tree.body, *ast.walk(node)] if node is not None else tree.body
+        for n in imports_to_scan:
+            if isinstance(n, ast.ImportFrom) and n.module:
+                if n.module.startswith("testing.definitions"):
+                    aliases.update({a.asname or a.name: a.name for a in n.names if a.name in ENUMS})
+                if n.module.startswith("testing."):
+                    target = n.module.replace(".", "/") + ".py"
+                    if (root / target).is_file():
+                        imports.update({a.asname or a.name: (target, a.name) for a in n.names})
         node = functions.get(symbol, constants.get(symbol))
         if node is None:
             return
@@ -65,6 +78,8 @@ def discover_resources(root, path, name, fixtures=()):
                     resources.add(f"{enum}.{child.attr}")
             elif isinstance(child, ast.Name) and child.id in constants:
                 scan(relative, child.id)
+            elif isinstance(child, ast.Name) and child.id in imports:
+                scan(*imports[child.id])
             elif isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id in functions:
                 scan(relative, child.func.id)
 
@@ -82,10 +97,11 @@ def discover_resources(root, path, name, fixtures=()):
 def story_batches(root, records, *, workers=3):
     """Keep connected resource users sequential; balance components across workers."""
     groups, serial, inventory = [], [], []
+    modules = {}
     for record in records:
         nodeid = record["nodeid"].removeprefix("testing/")
         path, name = nodeid.split("::", 1)
-        resources = discover_resources(root, "testing/" + path, name.split("[")[0], record["fixtures"])
+        resources = discover_resources(root, "testing/" + path, name.split("[")[0], record["fixtures"], modules=modules)
         inventory.append({**record, "resources": sorted(resources)})
         if record["serial"]:
             serial.append((nodeid, resources))

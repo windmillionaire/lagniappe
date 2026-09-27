@@ -28,7 +28,7 @@ import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Projects, Uploads, Users
+from testing.definitions import Projects, Uploads
 from testing.definitions.project_definitions import ProjectDefinition
 from testing.elements import (
     EditorAddImage,
@@ -53,8 +53,8 @@ MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
 
 
 # @matrix sync : empty-content initialization parent-modified save-guard
-def test_untouched_document_does_not_save_or_touch_project(get_user):
-    user = get_user(Users.OWNER)
+def test_untouched_document_does_not_save_or_touch_project(get_admin, get_user):
+    user = get_admin()
     # The shared toolbar project is intentionally edited by the earlier offline
     # lifecycle coverage. Use a dedicated fresh document so this regression
     # test measures eager-save behavior instead of depending on suite order.
@@ -121,8 +121,8 @@ def test_editor_loads_and_saves_text(get_admin, get_user):
 # @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument._startLoading
 # @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument._finishLoading
 # @matrix editor : loading-feedback reload text-save
-def test_document_loading_status_waits_for_saved_content(get_user):
-    user = get_user(Users.OWNER)
+def test_document_loading_status_waits_for_saved_content(get_admin, get_user):
+    user = get_admin()
     project = Project(
         user=user,
         definition=ProjectDefinition(name=f"Document loading {uuid4().hex[:8]}"),
@@ -215,8 +215,8 @@ def test_formatting_persists(get_admin, get_user):
 
 # @source src/script/elements/editor/extensions/image.mjs::getImageStyles
 # @pair editor:image-layout
-def test_image_layout_survives_document_autosave_and_reload(get_user):
-    user = get_user(Users.OWNER)
+def test_image_layout_survives_document_autosave_and_reload(get_admin, get_user):
+    user = get_admin()
     project = Project(
         user=user,
         definition=ProjectDefinition(name=f"Document image layout {uuid4().hex[:8]}"),
@@ -316,8 +316,8 @@ def test_inline_code_style_formats_selected_text_and_persists(get_admin, get_use
 
 
 # @matrix editor markdown : conversion paste
-def test_pasting_markdown_table_preserves_table_after_reload(get_user):
-    user = get_user(Users.OWNER)
+def test_pasting_markdown_table_preserves_table_after_reload(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_editor_markdown_table_paste.get(user)
     user.go(project)
 
@@ -351,8 +351,8 @@ def test_pasting_markdown_table_preserves_table_after_reload(get_user):
 
 # @matrix editor markdown : conversion paste
 # @matrix files security : html-sanitization
-def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
-    user = get_user(Users.OWNER)
+def test_pasting_plain_html_inserts_safe_formatted_content(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_editor_plain_html_paste.get(user)
     user.go(project)
 
@@ -407,8 +407,8 @@ def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
 # @style editor.toolbar.markdownPromptKeep
 # @style editor.toolbar.markdownPromptStatus
 # @style editor.container
-def test_pasting_common_markdown_preserves_formatting(get_user):
-    user = get_user(Users.OWNER)
+def test_pasting_common_markdown_preserves_formatting(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_editor_common_markdown_paste.get(user)
     user.go(project)
 
@@ -514,8 +514,8 @@ raw <script> stays text
 
 # @matrix editor markdown : paste source-block
 # @style editor.markdownSource
-def test_keeping_pasted_markdown_preserves_source_block(get_user):
-    user = get_user(Users.OWNER)
+def test_keeping_pasted_markdown_preserves_source_block(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_editor_markdown_source_paste.get(user)
     user.go(project)
 
@@ -541,8 +541,8 @@ def test_keeping_pasted_markdown_preserves_source_block(get_user):
 
 
 # @matrix editor : reload task-list
-def test_task_list_persists(get_user):
-    user = get_user(Users.OWNER)
+def test_task_list_persists(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_editor_task_list.get(user)
     user.go(project)
 

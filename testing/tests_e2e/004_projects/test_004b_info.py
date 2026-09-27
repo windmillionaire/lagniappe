@@ -38,8 +38,8 @@ def _wait_for_services_ready(user):
 # @template projects/project.html::view_header
 # @template projects/info.html::info_tab
 # @style entity.description
-def test_project_info_form(get_user):
-    user = get_user(Users.OWNER)
+def test_project_info_form(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_project_info_form.get(user)
     user.go(project)
     expect(user.page.get_by_role("button", name="Project actions")).to_be_visible()
