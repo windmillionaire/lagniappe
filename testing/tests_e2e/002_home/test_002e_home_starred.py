@@ -29,6 +29,7 @@ source and its portal clone so an already-created menu stays current.
 """
 
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 import pytest
 from playwright.sync_api import expect
@@ -58,6 +59,19 @@ def star_event_diagnostics(browser, monkeypatch, results):
     def create_context(**options):
         context = original(**options)
         context.expose_binding("__starTrace", lambda source, record: events.append(record))
+
+        def network_event(kind, request, **details):
+            path = urlsplit(request.url).path
+            if path == "/l/ping" or path.startswith("/l/toggle-star/"):
+                events.append({"type": kind, "path": path.split("/")[:3], **details})
+
+        context.on("request", lambda request: network_event("request", request))
+        context.on("response", lambda response: network_event(
+            "response", response.request, status=response.status
+        ))
+        context.on("requestfailed", lambda request: network_event(
+            "requestfailed", request, failure=request.failure
+        ))
         context.add_init_script(script="""(() => {
             const describe = node => node?.tagName && ({tag: node.tagName,
                 control: node.getAttribute('lp-control'), role: node.getAttribute('data-role'),
@@ -88,20 +102,6 @@ def star_event_diagnostics(browser, monkeypatch, results):
                         () => record('transition-' + phase + '-rejected'));
                 }
                 return transition;
-            };
-            const fetch = window.fetch;
-            window.fetch = async (...args) => {
-                const path = String(args[0]);
-                const watch = path.includes('/l/ping') || path.includes('/l/toggle-star/');
-                if (watch) record('fetch-start', {path: path.split('/').slice(0, 3).join('/')});
-                try {
-                    const response = await fetch(...args);
-                    if (watch) record('fetch-done', {status: response.status});
-                    return response;
-                } catch (error) {
-                    if (watch) record('fetch-error', {error: error.name});
-                    throw error;
-                }
             };
         })();""")
         return context
