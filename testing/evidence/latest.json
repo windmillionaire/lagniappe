@@ -1,5 +1,5 @@
 {
-  "exit_status": 0,
+  "exit_status": 1,
   "fingerprint_pairs": [
     [
       ".nvmrc",
@@ -14074,14 +14074,78 @@
   "provenance": {
     "behavior_snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8",
     "command": [
-      "/home/swifty/experiments/lagniappe/venv/bin/python",
-      "/home/swifty/experiments/lagniappe/run.py",
+      "/workspace/venv/bin/python",
+      "/workspace/run.py",
       "test",
-      "testing/tests_tooling/test_009_hosted_e2e.py::test_hosted_container_runs_complete_or_nodeids_and_records_scope[experiments]",
-      "testing/tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets[True]",
-      "testing/tests_tooling/test_015_e2e_parallel.py"
+      "--experiments",
+      "--junitxml=/workspace/reports/hosted-e2e/junit.xml"
     ],
-    "generated_at": "2026-09-27T10:56:27.091719+00:00"
+    "generated_at": "2026-09-27T11:14:00.369040+00:00",
+    "hosted_e2e": {
+      "build_id": "bbea7a5c",
+      "environment": "standard",
+      "execution": "lagniappe-e2e-w9454",
+      "job": "lagniappe-e2e",
+      "service": "e2e",
+      "source": "f6539f818a9cbf7790d41813c1c19642ece15809",
+      "source_snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8",
+      "suite": "focused",
+      "suite_finished_at": "2026-09-27T11:14:05.130491+00:00",
+      "suite_started_at": "2026-09-27T11:09:32.574310+00:00",
+      "targets": [
+        "testing/tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[independent-a]",
+        "testing/tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[independent-b]",
+        "testing/tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[shared-a]",
+        "testing/tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[shared-b]",
+        "testing/tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[exclusive]",
+        "testing/tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag",
+        "testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode",
+        "testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode[quota-fallback]",
+        "testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_category",
+        "testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_project",
+        "testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_page",
+        "testing/tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel",
+        "testing/tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options",
+        "testing/tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state[quota-fallback]",
+        "testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_click_model_opens_info",
+        "testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name",
+        "testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form",
+        "testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form",
+        "testing/tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text",
+        "testing/tests_e2e/004_projects/test_004j_editor_menus.py::test_compact_editor_menus",
+        "testing/tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection",
+        "testing/tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_creates_edits_and_saves",
+        "testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_nav_replaces_desktop_tabs",
+        "testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_section_switching_updates_visible_panel_and_title",
+        "testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section",
+        "testing/tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files[quota-fallback]",
+        "testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task",
+        "testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes",
+        "testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_form",
+        "testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task",
+        "testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_submit_attached_task_form",
+        "testing/tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload",
+        "testing/tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell",
+        "testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_hiding_column_updates_visible_headers_and_cells",
+        "testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_ascending_reorders_rows",
+        "testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_descending_reorders_rows",
+        "testing/tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar",
+        "testing/tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results",
+        "testing/tests_e2e/009_search/test_009a_search_page.py::test_search_no_results",
+        "testing/tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates",
+        "testing/tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content",
+        "testing/tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview",
+        "testing/tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget",
+        "testing/tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_update_persists_name_and_summary",
+        "testing/tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply",
+        "testing/tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces",
+        "testing/tests_e2e/008_users/test_008e_public_users.py::test_public_user_edits_document_without_ai_or_image_tools",
+        "testing/tests_e2e/008_users/test_008e_public_users.py::test_public_user_creates_task_with_reduced_schedule_options",
+        "testing/tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration",
+        "testing/tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting"
+      ],
+      "version": "e2e-d238c5c0f337f56c"
+    }
   },
   "schema_version": 3,
   "sessions": [
@@ -14098,6 +14162,19 @@
       "generated_at": "2026-09-27T10:56:27.091719+00:00",
       "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8",
       "tests": 27
+    },
+    {
+      "command": [
+        "/workspace/venv/bin/python",
+        "/workspace/run.py",
+        "test",
+        "--experiments",
+        "--junitxml=/workspace/reports/hosted-e2e/junit.xml"
+      ],
+      "exit_status": 1,
+      "generated_at": "2026-09-27T11:14:00.369040+00:00",
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8",
+      "tests": 54
     }
   ],
   "snapshots": {
@@ -83638,9 +83715,9 @@
   },
   "tests": {
     "tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag": {
-      "duration": 6.986886242986657,
+      "duration": 3.4162640640000177,
       "outcome": "passed",
-      "snapshot": "8dd3bd3420851765ae414864af8a3f40c91b69cac491330523229717dbd342fd"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/001_site/test_001a_environment.py::test_browser_failure_guard_detects_unhandled_page_errors": {
       "duration": 0.04139468900001475,
@@ -84108,29 +84185,29 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[exclusive]": {
-      "duration": 4.184041629999996,
+      "duration": 3.8938987939999947,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[independent-a]": {
-      "duration": 11.889529039000024,
+      "duration": 14.241477414999963,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[independent-b]": {
-      "duration": 16.705216501999985,
+      "duration": 19.97084305599998,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[shared-a]": {
-      "duration": 13.272424737000023,
+      "duration": 13.382469599000018,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task[shared-b]": {
-      "duration": 8.174078202999965,
+      "duration": 8.722176502999986,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/001_site/test_001j_poll_batching.py::test_batched_poll_rechecks_permissions[page-form]": {
       "duration": 3.5379136920005294,
@@ -84193,14 +84270,16 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode[live]": {
-      "duration": 20.28775018500164,
+      "duration": 17.92656873200002,
       "outcome": "passed",
-      "snapshot": "8dd3bd3420851765ae414864af8a3f40c91b69cac491330523229717dbd342fd"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode[quota-fallback]": {
-      "duration": 4.642134440000518,
-      "outcome": "passed",
-      "snapshot": "8dd3bd3420851765ae414864af8a3f40c91b69cac491330523229717dbd342fd"
+      "duration": 4.831916475000014,
+      "failed_phase": "teardown",
+      "outcome": "failed",
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8",
+      "traceback": "testing/tests_e2e/conftest.py:561: in get_user\n    browser_failures.assert_clean()\ntesting/utility/browser_failures.py:199: in assert_clean\n    raise AssertionError(self.format_events(unexpected))\nE   AssertionError: Unexpected browser failures:\nE   - console context='e2e-admin-215fd1639ff24847b709fa60756e96d1' page='https://e2e-d238c5c0f337f56c-dot-e2e-dot-lagniappe-experiments.uc.r.appspot.com/'; console_type='error', text='Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)', source_url='https://e2e-d238c5c0f337f56c-dot-e2e-dot-lagniappe-experiments.uc.r.appspot.com/projects/create', source_path='/projects/create', line='0'"
     },
     "tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form": {
       "duration": 5.966474798999997,
@@ -84228,9 +84307,9 @@
       "snapshot": "8dd3bd3420851765ae414864af8a3f40c91b69cac491330523229717dbd342fd"
     },
     "tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode[quota-fallback]": {
-      "duration": 5.996754179999698,
+      "duration": 3.511799764999978,
       "outcome": "passed",
-      "snapshot": "8dd3bd3420851765ae414864af8a3f40c91b69cac491330523229717dbd342fd"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/002_home/test_002c_home_categories.py::test_create_category_form": {
       "duration": 1.4960651330000019,
@@ -84308,9 +84387,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/002_home/test_002e_home_starred.py::test_star_category": {
-      "duration": 8.62467671597551,
+      "duration": 9.829873469999995,
       "outcome": "passed",
-      "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/002_home/test_002e_home_starred.py::test_star_file": {
       "duration": 12.781766152998898,
@@ -84318,14 +84397,14 @@
       "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
     },
     "tests_e2e/002_home/test_002e_home_starred.py::test_star_page": {
-      "duration": 6.069749008995132,
+      "duration": 4.967031824999992,
       "outcome": "passed",
-      "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/002_home/test_002e_home_starred.py::test_star_project": {
-      "duration": 8.530956874004914,
+      "duration": 11.270244165999998,
       "outcome": "passed",
-      "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets": {
       "duration": 10.815574601001572,
@@ -84853,14 +84932,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state[quota-fallback]": {
-      "duration": 10.991502647011657,
+      "duration": 3.3521771750000084,
       "outcome": "passed",
-      "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options": {
-      "duration": 6.867235593999794,
+      "duration": 7.153687015000031,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components": {
       "duration": 5.782748265999999,
@@ -84893,9 +84972,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel": {
-      "duration": 9.892721716999972,
+      "duration": 10.898780065000011,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component": {
       "duration": 3.2314254249999976,
@@ -85168,14 +85247,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form": {
-      "duration": 3.539747641999952,
+      "duration": 3.765657540999996,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004c_model_tasks.py::test_click_model_opens_info": {
-      "duration": 1.4564478940000072,
+      "duration": 2.2483206940000002,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004c_model_tasks.py::test_completed_button": {
       "duration": 2.6969900340000095,
@@ -85188,14 +85267,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form": {
-      "duration": 1.9017116159999432,
+      "duration": 3.2867308329999787,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name": {
-      "duration": 2.8964355279999836,
+      "duration": 2.8415977849999763,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004c_model_tasks.py::test_in_progress_button": {
       "duration": 1.7614477620001026,
@@ -85213,9 +85292,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text": {
-      "duration": 3.4895066349998842,
+      "duration": 3.693406820000007,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004d_document.py::test_formatting_persists": {
       "duration": 4.482826656000157,
@@ -85578,34 +85657,34 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_compact_editor_menus[desktop]": {
-      "duration": 2.2976640709999856,
+      "duration": 2.152364634000037,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_compact_editor_menus[mobile]": {
-      "duration": 3.209221446000015,
+      "duration": 3.0442400819999875,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection[desktop]": {
-      "duration": 4.2626261550001345,
+      "duration": 4.025887161000014,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection[mobile]": {
-      "duration": 3.3861002400001325,
+      "duration": 3.8182554560000312,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_creates_edits_and_saves[desktop]": {
-      "duration": 4.749440176000007,
+      "duration": 4.854009880000035,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_creates_edits_and_saves[mobile]": {
-      "duration": 4.492653195999765,
+      "duration": 5.143271823000049,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_edits_pasted_table": {
       "duration": 2.7513084830000025,
@@ -85713,9 +85792,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section": {
-      "duration": 2.7440253629999916,
+      "duration": 3.7092633749999777,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes": {
       "duration": 0.3952213349999738,
@@ -85728,14 +85807,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_nav_replaces_desktop_tabs": {
-      "duration": 0.6736358360000168,
+      "duration": 1.7200552679999817,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_section_switching_updates_visible_panel_and_title": {
-      "duration": 4.249078936000046,
+      "duration": 6.167982289000008,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_selection_persists_after_reload": {
       "duration": 3.7863875340000277,
@@ -85888,9 +85967,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files[quota-fallback]": {
-      "duration": 29.731468831989332,
+      "duration": 11.293887623999979,
       "outcome": "passed",
-      "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_provider_error_surfaces_in_form": {
       "duration": 2.6303997390000404,
@@ -86003,9 +86082,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task": {
-      "duration": 5.186771289000035,
+      "duration": 3.535884242999998,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page": {
       "duration": 5.45514872900003,
@@ -86023,9 +86102,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task": {
-      "duration": 5.76899408700001,
+      "duration": 3.9073854849999634,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear": {
       "duration": 5.483833077999861,
@@ -86048,9 +86127,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_form": {
-      "duration": 4.696765408000147,
+      "duration": 3.1996059859999946,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task": {
       "duration": 12.915846780000265,
@@ -86068,9 +86147,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes": {
-      "duration": 2.0454871609999827,
+      "duration": 3.0003010530000154,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft": {
       "duration": 8.867860396999959,
@@ -86083,9 +86162,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_submit_attached_task_form": {
-      "duration": 13.234460477000084,
+      "duration": 10.540306523999988,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state": {
       "duration": 12.019830445000025,
@@ -86248,9 +86327,9 @@
       "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
     },
     "tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell": {
-      "duration": 11.084001444003661,
+      "duration": 5.997331722000013,
       "outcome": "passed",
-      "snapshot": "7660e46faafe7571f739c2e790e9ed14813fd884d1076fcb6342eb3fc3525d69"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements": {
       "duration": 15.815691844982211,
@@ -86258,9 +86337,9 @@
       "snapshot": "19909e7654d3a97ab6c15a746c0afb3201ff6b40931f3342afc0d9d052d2b64a"
     },
     "tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload": {
-      "duration": 54.138739748013904,
+      "duration": 17.71803436600004,
       "outcome": "passed",
-      "snapshot": "7660e46faafe7571f739c2e790e9ed14813fd884d1076fcb6342eb3fc3525d69"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/006_tasks/test_006f_task_history.py::test_uncomplete_from_loaded_task_history_closes_task": {
       "duration": 12.579287762011518,
@@ -86578,9 +86657,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_hiding_column_updates_visible_headers_and_cells": {
-      "duration": 1.6267838770002072,
+      "duration": 1.9658410209999886,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_image_column_sort_panel_offers_presence_options": {
       "duration": 1.3338273379999919,
@@ -86588,14 +86667,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_ascending_reorders_rows": {
-      "duration": 2.381611598000063,
+      "duration": 1.9582875709999996,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_descending_reorders_rows": {
-      "duration": 1.2831600209999579,
+      "duration": 1.3849986020000244,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_persists_after_back_navigation": {
       "duration": 1.9184035659998244,
@@ -86783,14 +86862,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/008_users/test_008e_public_users.py::test_public_user_creates_task_with_reduced_schedule_options": {
-      "duration": 20.51219664500013,
+      "duration": 14.542281618000004,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/008_users/test_008e_public_users.py::test_public_user_edits_document_without_ai_or_image_tools": {
-      "duration": 17.687214443999437,
+      "duration": 13.078468802000032,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/008_users/test_008e_public_users.py::test_public_user_file_and_photo_actions_are_forbidden": {
       "duration": 15.70163852099995,
@@ -86798,9 +86877,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces": {
-      "duration": 18.75911520400041,
+      "duration": 14.084238798000001,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/008_users/test_008e_public_users.py::test_public_user_restricted_schedules_are_forbidden": {
       "duration": 15.746551750000435,
@@ -86848,14 +86927,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting": {
-      "duration": 4.210654877000252,
+      "duration": 3.6649868540000057,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration": {
-      "duration": 12.8274250329996,
+      "duration": 16.188032146999944,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_clear_facet_filter": {
       "duration": 1.1009438070000215,
@@ -86868,9 +86947,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates": {
-      "duration": 0.9051262450000195,
+      "duration": 0.935163665999994,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_facet_selection_visual_state": {
       "duration": 0.6026257550000764,
@@ -86918,14 +86997,14 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar": {
-      "duration": 0.7958737100000235,
+      "duration": 1.0172278850000112,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_search_no_results": {
-      "duration": 0.20349425199992766,
+      "duration": 0.4422657640000125,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_search_page_requires_login": {
       "duration": 0.2123078639999676,
@@ -86958,9 +87037,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results": {
-      "duration": 0.28183771899966814,
+      "duration": 1.4892147739999757,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/009_search/test_009a_search_page.py::test_search_special_characters": {
       "duration": 0.31674213800010875,
@@ -87228,9 +87307,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_update_persists_name_and_summary": {
-      "duration": 4.605572561999907,
+      "duration": 3.9501457120000225,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas": {
       "duration": 4.962433407000162,
@@ -87248,19 +87327,19 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content": {
-      "duration": 5.18511083899989,
+      "duration": 4.860117640000027,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview": {
-      "duration": 3.6724604580001596,
+      "duration": 3.9244766720000257,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget": {
-      "duration": 3.688249897000105,
+      "duration": 3.9238165710000033,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages": {
       "duration": 4.574628473000075,
@@ -87348,9 +87427,9 @@
       "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
     },
     "tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply": {
-      "duration": 11.715519286000017,
+      "duration": 12.684962923999962,
       "outcome": "passed",
-      "snapshot": "a258b662965fbfd2a0de488eea4fec3907e922eab1becfc8d3579482399b1518"
+      "snapshot": "d093cda3266d52b1b8c9b2defddb829bfdbeba6384d48a023e8e5ec35b8269c8"
     },
     "tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_plan_preview_redirect_is_session_and_creator_bound": {
       "duration": 0.022268438999844875,
