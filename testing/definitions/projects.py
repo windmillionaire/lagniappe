@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from enum import Enum
 
 from ..resources import Project
@@ -8,11 +10,11 @@ from .base import ResourceEnumMixin
 
 class Projects(ResourceEnumMixin, Enum):
     test_create_project_manual_mode = Project(definition=pd.create_project)
-    test_navigate_to_project = test_create_project_manual_mode
-    test_toolbar_loads = test_create_project_manual_mode
-    test_star_project = test_create_project_manual_mode
-    test_create_model_task = test_create_project_manual_mode
-    test_create_model_task_with_form = test_create_project_manual_mode
+    test_navigate_to_project = Project(definition=replace(pd.create_project, name='Navigate to project'))
+    test_toolbar_loads = Project(definition=replace(pd.create_project, name='Toolbar loads'))
+    test_star_project = Project(definition=replace(pd.create_project, name='Star project'))
+    test_create_model_task = Project(definition=replace(pd.create_project, name='Create model task'))
+    test_create_model_task_with_form = Project(definition=replace(pd.create_project, name='Create model task with form'))
     test_delete_project = Project(definition=pd.delete_project)
     test_create_project_ai_mode = Project(definition=pd.ai_generated)
     test_project_info_form = Project(definition=pd.edit_project_info)
@@ -51,7 +53,7 @@ class Projects(ResourceEnumMixin, Enum):
     )
 
     # Editor tests (005c, 005e, 005f) - reuse existing project with document
-    test_formatting_persists = test_create_project_manual_mode
-    test_inline_code_style = test_create_project_manual_mode
-    test_toolbar_buttons_visible = test_create_project_manual_mode
-    test_editor_forms = test_create_project_manual_mode
+    test_formatting_persists = Project(definition=replace(pd.create_project, name='Formatting persists'))
+    test_inline_code_style = Project(definition=replace(pd.create_project, name='Inline code style'))
+    test_toolbar_buttons_visible = Project(definition=replace(pd.create_project, name='Toolbar buttons visible'))
+    test_editor_forms = Project(definition=replace(pd.create_project, name='Editor forms'))

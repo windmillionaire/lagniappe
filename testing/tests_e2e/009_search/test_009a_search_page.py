@@ -103,8 +103,8 @@ def test_search_page_requires_login(get_user):
 
 # @matrix search : navbar-submit page-navigation results
 # @template nav.html::navbar
-def test_search_from_navbar(get_user):
-    user = get_user(Users.OWNER)
+def test_search_from_navbar(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(SitePages.HOME)
 
@@ -136,8 +136,8 @@ def test_search_page_shows_query(get_user):
 
 
 # @pair search:results
-def test_search_returns_results(get_user):
-    user = get_user(Users.OWNER)
+def test_search_returns_results(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
 
     _go_to_search_page(user, project.definition.name)
@@ -146,8 +146,8 @@ def test_search_returns_results(get_user):
 
 # @pair search:no-results
 # @template search/results.html::search_results
-def test_search_no_results(get_user):
-    user = get_user(Users.OWNER)
+def test_search_no_results(get_admin, get_user):
+    user = get_admin()
 
     _go_to_search_page(user, "zzz-no-search-results-here-zzz")
     expect(user.locate(SEARCH_RESULTS)).to_contain_text("No matches")
@@ -411,8 +411,8 @@ def test_navbar_task_results_render_current_completion_state(get_user):
 
 # @pair search:result-navigation
 # @template search/results.html::search_results
-def test_click_result_navigates(get_user):
-    user = get_user(Users.OWNER)
+def test_click_result_navigates(get_admin, get_user):
+    user = get_admin()
     name = _unique("navigate")
     project = _create_project(name, "Search result navigation fixture.")
 

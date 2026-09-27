@@ -86,7 +86,9 @@ annotated_source_roots:
   - runner/pytest_reports.py
   - runner/e2e_parallel.py
   - runner/e2e_pilot.py
+  - runner/e2e_inventory.py
   - testing/utility/e2e_worker.py
+  - testing/utility/e2e_resources.py
   - runner/testing.py
   - runner/test_session.py
   - runner/upgrade.py

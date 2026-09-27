@@ -11,9 +11,103 @@ import pytest
 
 from runner.e2e_parallel import Batch, await_worker_file, merge_results, schedule
 from runner.e2e_pilot import TARGETS, pilot_arguments
+from runner.e2e_inventory import discover_resources, story_batches
 
 
 pytestmark = pytest.mark.tooling
+
+
+# @matrix testing : parallel-e2e
+def test_inventory_follows_helpers_constants_and_fixtures(tmp_path):
+    source = tmp_path / "test_story.py"
+    source.write_text('''
+from testing.definitions import Pages as P, Categories, Users
+SORTABLE = (P.alpha, P.beta)
+def arrange(user):
+    for page in SORTABLE:
+        page.get(user)
+def test_story(get_user):
+    user = get_user(Users.ANONYMOUS)
+    arrange(user)
+    user.go(Categories.table)
+def fixture():
+    return P.fixture.get(None)
+''', encoding="utf-8")
+    assert discover_resources(tmp_path, "test_story.py", "test_story", [("test_story.py", "fixture")]) == {
+        "Pages.alpha", "Pages.beta", "Pages.fixture", "Categories.table",
+    }
+
+
+# @matrix testing : parallel-e2e
+def test_inventory_groups_shared_resources_and_drains_serial_stories(tmp_path):
+    folder = tmp_path / "testing/tests_e2e"
+    folder.mkdir(parents=True)
+    (folder / "test_story.py").write_text('''
+from testing.definitions import Pages
+def test_a(): Pages.shared.get(None)
+def test_b(): Pages.shared.get(None)
+def test_c(): Pages.other.get(None)
+def test_d(): pass
+''', encoding="utf-8")
+    records = [{"nodeid": f"tests_e2e/test_story.py::test_{name}", "fixtures": [], "serial": name == "d"}
+               for name in "abcd"]
+    batches, inventory = story_batches(tmp_path, records, workers=2)
+    assert len(batches) == 3
+    assert batches[0].nodeids == ("testing/tests_e2e/test_story.py::test_a", "testing/tests_e2e/test_story.py::test_b")
+    assert not (batches[0].resources & batches[1].resources)
+    assert batches[-1].exclusive and batches[-1].nodeid.endswith("test_d")
+    assert inventory[1]["resources"] == ["Pages.shared"]
+
+
+# @matrix testing : parallel-e2e
+def test_merge_preserves_each_parameter_and_reports_missing_batch_cases(tmp_path):
+    targets = tuple(f"testing/tests_e2e/test_story.py::test_story[{i}]" for i in range(3))
+    batch = Batch("stories", targets[0], additional_nodeids=targets[1:])
+    folder = tmp_path / "stories"
+    folder.mkdir()
+    selected = [s.removeprefix("testing/") for s in targets]
+    payload = {"attempt": "a", "snapshot": "s", "batch": "stories", "exit_status": 0,
+               "selected": selected, "outcomes": {n: {"outcome": "passed", "duration": 1} for n in selected}}
+    (folder / "outcomes.json").write_text(json.dumps(payload), encoding="utf-8")
+    suite = ET.Element("testsuite")
+    for target in selected:
+        ET.SubElement(suite, "testcase", name=target.split("::")[-1], classname="tests_e2e.test_story")
+    ET.ElementTree(suite).write(folder / "junit.xml")
+    result, errors = merge_results([batch], tmp_path, {"stories": 0}, attempt="a", snapshot="s", destination=tmp_path / "combined.xml")
+    assert not errors and set(result) == set(selected)
+    payload["outcomes"].pop(selected[-1])
+    (folder / "outcomes.json").write_text(json.dumps(payload), encoding="utf-8")
+    result, errors = merge_results([batch], tmp_path, {"stories": 0}, attempt="a", snapshot="s", destination=tmp_path / "combined.xml")
+    assert errors and len(result) == 3 and all(row["outcome"] == "failed" for row in result.values())
+
+
+# @matrix testing : parallel-e2e
+@pytest.mark.parametrize("variant", ["valid", "wrong-module", "swapped-outcomes"])
+def test_merge_checks_each_case_identity_and_outcome(tmp_path, variant):
+    targets = tuple(f"testing/tests_e2e/test_{name}.py::test_story" for name in ("a", "b"))
+    batch = Batch("stories", targets[0], additional_nodeids=targets[1:])
+    folder = tmp_path / "stories"
+    folder.mkdir()
+    selected = [target.removeprefix("testing/") for target in targets]
+    rows = {selected[0]: {"outcome": "failed", "duration": 1},
+            selected[1]: {"outcome": "skipped", "duration": 0}}
+    payload = {"attempt": "a", "snapshot": "s", "batch": "stories", "exit_status": 1,
+               "selected": selected, "outcomes": rows}
+    (folder / "outcomes.json").write_text(json.dumps(payload), encoding="utf-8")
+    suite = ET.Element("testsuite")
+    for name, outcome in (("a", "failure"), ("b", "skipped")):
+        classname = f"tests_e2e.test_{name}" if variant != "wrong-module" else "tests_e2e.wrong"
+        case = ET.SubElement(suite, "testcase", name="test_story", classname=classname)
+        if variant == "swapped-outcomes":
+            outcome = "skipped" if outcome == "failure" else "failure"
+        ET.SubElement(case, outcome)
+    ET.ElementTree(suite).write(folder / "junit.xml")
+    outcomes, errors = merge_results([batch], tmp_path, {"stories": 1}, attempt="a", snapshot="s",
+                                     destination=tmp_path / "combined.xml")
+    if variant == "valid":
+        assert not errors and outcomes == rows
+    else:
+        assert errors and all(row["failed_phase"] == "worker" for row in outcomes.values())
 
 
 # @matrix testing : parallel-e2e
@@ -154,7 +248,7 @@ def test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evide
                    "exit_status": statuses[batch.name], "selected": [nodeid], "outcomes": {nodeid: row}}
         (folder / "outcomes.json").write_text(json.dumps(payload))
         suite = ET.Element("testsuite")
-        case = ET.SubElement(suite, "testcase", name=nodeid.split("::")[-1])
+        case = ET.SubElement(suite, "testcase", name=nodeid.split("::")[-1], classname="tests_e2e.test_example")
         if row["outcome"] == "failed":
             ET.SubElement(case, "error", message="Original failure")
         ET.ElementTree(suite).write(folder / "junit.xml")

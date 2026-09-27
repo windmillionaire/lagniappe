@@ -400,8 +400,8 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
 
 
 # @matrix messaging : inline-reply preserve-selection responsive-peer-selector selection-race unread-peer
-def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
-    owner = get_user(Users.OWNER)
+def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, get_user):
+    owner = get_admin()
     user = get_user(_managed_definition("Mobile"), creator=owner, has_touch=True)
     peer = get_user(_managed_definition("Mobile Peer"), creator=owner)
     other_peer = get_user(_managed_definition("Other Mobile Peer"), creator=owner)

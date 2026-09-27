@@ -1,7 +1,7 @@
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import Pages, Users
+from testing.definitions import Pages
 from testing.elements import FormElements, MobileNav, Tabs
 from testing.resources import Page
 from testing.utility.network import scoped_browser_route
@@ -15,8 +15,8 @@ def _empty_main_script(route):
 
 # @template pages/page.html::main
 # @style entity.tabIcon
-def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
-    user = get_user(Users.OWNER)
+def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_loads.get(user)
     page.user = user
     user.page.set_viewport_size({"width": 375, "height": 667})
@@ -34,8 +34,8 @@ def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
 
 
 # @matrix entity-layout : nav page-mobile visibility
-def test_page_mobile_nav_replaces_desktop_tabs(get_user):
-    user = get_user(Users.OWNER)
+def test_page_mobile_nav_replaces_desktop_tabs(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_page_loads)
 
     expect(user.locate(page.MOBILE_NAV)).to_be_hidden()
@@ -51,8 +51,8 @@ def test_page_mobile_nav_replaces_desktop_tabs(get_user):
 
 
 # @matrix entity-layout : flipper page-mobile
-def test_page_mobile_flipper_reveals_sections(get_user):
-    user = get_user(Users.OWNER)
+def test_page_mobile_flipper_reveals_sections(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
@@ -69,8 +69,8 @@ def test_page_mobile_flipper_reveals_sections(get_user):
 
 
 # @matrix entity-layout : page-mobile section-switch
-def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user):
-    user = get_user(Users.OWNER)
+def test_page_mobile_section_switching_updates_visible_panel_and_title(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_loads.get(user)
     user.go(page)
     mobile_nav = page.mobile_nav
@@ -93,8 +93,8 @@ def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user)
 
 
 # @matrix entity-layout : page-mobile task-create
-def test_page_mobile_create_task_opens_from_tasks_section(get_user):
-    user = get_user(Users.OWNER)
+def test_page_mobile_create_task_opens_from_tasks_section(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
@@ -106,8 +106,8 @@ def test_page_mobile_create_task_opens_from_tasks_section(get_user):
 
 
 # @matrix entity-layout : page-mobile persistence reload
-def test_page_mobile_selection_persists_after_reload(get_user):
-    user = get_user(Users.OWNER)
+def test_page_mobile_selection_persists_after_reload(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_loads.get(user)
     user.go(page)
 

@@ -8,6 +8,7 @@ Maps to:
 - View: src/script/views/category.mjs
 """
 
+from dataclasses import replace
 from enum import Enum
 
 from ..resources import Category
@@ -19,7 +20,7 @@ from .base import ResourceEnumMixin
 class Categories(ResourceEnumMixin, Enum):
     # Home page category tests
     test_create_category_manual_mode = Category(definition=cd.create_category)
-    test_navigate_to_category = test_create_category_manual_mode
+    test_navigate_to_category = Category(definition=replace(cd.create_category, name='Navigate to category'))
     test_star_category = Category(definition=cd.starred_category)
     test_delete_category = Category(definition=cd.delete_category)
     test_create_category_ai_mode = Category(definition=cd.ai_generated)

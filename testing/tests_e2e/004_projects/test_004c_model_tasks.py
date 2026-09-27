@@ -55,8 +55,8 @@ from testing.utility.polling import expect_poll_result
 
 
 # @pair model-tasks:info-form
-def test_click_model_opens_info(get_user):
-    user = get_user(Users.OWNER)
+def test_click_model_opens_info(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_create_model_task.get(user)
     user.go(model_task.project)
 
@@ -72,8 +72,8 @@ def test_click_model_opens_info(get_user):
 
 
 # @matrix model-tasks : name update
-def test_edit_model_task_name(get_user):
-    user = get_user(Users.OWNER)
+def test_edit_model_task_name(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_edit_model_task_name.get(user)
     user.go(model_task.project)
 
@@ -99,8 +99,8 @@ def test_edit_model_task_name(get_user):
 
 
 # @matrix model-tasks : form-change update
-def test_change_model_task_form(get_user):
-    user = get_user(Users.OWNER)
+def test_change_model_task_form(get_admin, get_user):
+    user = get_admin()
 
     new_form = Forms.test_alternate_task_form.get(user)
     model_task = ModelTasks.test_change_model_task_form.get(user)
@@ -124,8 +124,8 @@ def test_change_model_task_form(get_user):
 
 
 # @matrix model-tasks : form-clear update
-def test_delete_model_task_form(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_model_task_form(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_delete_model_task_form.get(user)
     user.go(model_task.project)
 

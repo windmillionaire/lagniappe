@@ -1,4 +1,4 @@
-"""Opt-in five-case pilot using the same coordinator locally and in Cloud Run."""
+"""Opt-in coordinated protocol checks and automatically grouped browser stories."""
 
 from contextlib import contextmanager, ExitStack
 import json
@@ -12,11 +12,60 @@ from uuid import uuid4
 
 from runner.context import REPOSITORY_ROOT
 from runner.e2e_parallel import Batch, merge_results, schedule
+from runner.e2e_inventory import story_batches
 
 
 PILOT_FILE = "testing/tests_e2e/001_site/test_001h_parallel_pilot.py"
 CASES = ("independent-a", "independent-b", "shared-a", "shared-b", "exclusive")
-TARGETS = tuple(f"{PILOT_FILE}::test_worker_page_and_task[{case}]" for case in CASES)
+PROTOCOL_TARGETS = tuple(f"{PILOT_FILE}::test_worker_page_and_task[{case}]" for case in CASES)
+STORY_TARGETS = (
+    'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_category',
+    'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_project',
+    'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_page',
+    'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel',
+    'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components',
+    'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options',
+    'testing/tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility',
+    'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_click_model_opens_info',
+    'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name',
+    'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form',
+    'testing/tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form',
+    'testing/tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text',
+    'testing/tests_e2e/004_projects/test_004d_document.py::test_formatting_persists',
+    'testing/tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists',
+    'testing/tests_e2e/004_projects/test_004j_editor_menus.py::test_compact_editor_menus',
+    'testing/tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection',
+    'testing/tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_creates_edits_and_saves',
+    'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes',
+    'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_nav_replaces_desktop_tabs',
+    'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_flipper_reveals_sections',
+    'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_section_switching_updates_visible_panel_and_title',
+    'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section',
+    'testing/tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_selection_persists_after_reload',
+    'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task',
+    'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes',
+    'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_form',
+    'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task',
+    'testing/tests_e2e/006_tasks/test_006b_page_tasks.py::test_submit_attached_task_form',
+    'testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_hiding_column_updates_visible_headers_and_cells',
+    'testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_ascending_reorders_rows',
+    'testing/tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_descending_reorders_rows',
+    'testing/tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar',
+    'testing/tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results',
+    'testing/tests_e2e/009_search/test_009a_search_page.py::test_search_no_results',
+    'testing/tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates',
+    'testing/tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content',
+    'testing/tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview',
+    'testing/tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget',
+    'testing/tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_update_persists_name_and_summary',
+    'testing/tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply',
+    'testing/tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces',
+    'testing/tests_e2e/008_users/test_008e_public_users.py::test_public_user_edits_document_without_ai_or_image_tools',
+    'testing/tests_e2e/008_users/test_008e_public_users.py::test_public_user_creates_task_with_reduced_schedule_options',
+    'testing/tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration',
+    'testing/tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting',
+)
+TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 
 
 # @testable true
@@ -84,9 +133,25 @@ def run_pilot(authority, command, pytest_args):
         # callers. Exchange once for the run, then share only its scoped cookie.
         cookies = (hosted_e2e_browser_cookie(run_id),)
     local = load_session_state() if not CONFIG.hosted_e2e_runner else None
-    batches = tuple(Batch(case, target, frozenset({"shared-page"}) if case.startswith("shared")
-                          else frozenset(), exclusive=case == "exclusive")
-                    for case, target in zip(CASES, TARGETS))
+    batches = [Batch(case, target, frozenset({"shared-page"}) if case.startswith("shared")
+                     else frozenset(), exclusive=case == "exclusive")
+               for case, target in zip(CASES, PROTOCOL_TARGETS)]
+    collection = root / "collection.json"
+    collected = subprocess.run(
+        [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini", "--collect-only", "-q",
+         "-p", "runner.e2e_inventory", *STORY_TARGETS], cwd=REPOSITORY_ROOT,
+        env={**os.environ, "LAGNIAPPE_E2E_COLLECTION": str(collection)},
+        capture_output=True, text=True, timeout=120,
+    )
+    (root / "collection.log").write_text(collected.stdout + collected.stderr, encoding="utf-8")
+    if collected.returncode:
+        raise RuntimeError(f"Pilot collection failed; see {root / 'collection.log'}")
+    stories, inventory = story_batches(REPOSITORY_ROOT, json.loads(collection.read_text(encoding="utf-8")))
+    batches.extend(stories)
+    (root / "inventory.json").write_text(json.dumps(inventory, indent=2), encoding="utf-8")
+    for batch in stories:
+        print(f"{batch.name}: {len(batch.nodeids)} cases, {len(batch.resources)} resources, "
+              f"exclusive={batch.exclusive}", flush=True)
     destination = next((arg.split("=", 1)[1] for arg in pytest_args if arg.startswith("--junitxml=")),
                        str(root / "junit.xml"))
     statuses, events, scheduler_error = {}, [], None
@@ -102,9 +167,10 @@ def run_pilot(authority, command, pytest_args):
             artifacts = root / batch.name
             artifacts.mkdir()
             record = {"attempt": attempt, "snapshot": snapshot, "batch": batch.name,
-                      "nodeid": batch.nodeid, "run_id": run_id, "owner": owner,
+                      "nodeid": batch.nodeid, "nodeids": batch.nodeids, "run_id": run_id, "owner": owner,
                       "base_url": CONFIG.BASE_URL, "fixtures": fixtures,
                       "browser_cookies": cookies,
+                      "resource_registry": str(contexts),
                       "server_pid": local["server"]["pid"] if local else None,
                       "artifacts": str(artifacts)}
             path = contexts / f"{batch.name}.json"
@@ -114,7 +180,7 @@ def run_pilot(authority, command, pytest_args):
             child_command = [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini",
                              "-p", "testing.utility.traceability_results", "-p", "runner.pytest_routing",
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
-                             f"--junitxml={artifacts / 'junit.xml'}", batch.nodeid]
+                             f"--junitxml={artifacts / 'junit.xml'}", *batch.nodeids]
             print(f"Pilot starting {batch.name}", flush=True)
             return subprocess.Popen(child_command, cwd=REPOSITORY_ROOT, start_new_session=True,
                                     stdout=output, stderr=subprocess.STDOUT,
@@ -124,7 +190,8 @@ def run_pilot(authority, command, pytest_args):
         try:
             for signum in (signal.SIGTERM, signal.SIGINT):
                 previous[signum] = signal.signal(signum, cancel)
-            schedule(batches, launch, authority.assert_active, finished=statuses, events=events)
+            schedule(batches, launch, authority.assert_active, workers=3, timeout=1800,
+                     finished=statuses, events=events)
         except (OSError, RuntimeError, KeyboardInterrupt) as error:
             scheduler_error = str(error)
         finally:
@@ -139,13 +206,15 @@ def run_pilot(authority, command, pytest_args):
         errors.append("Source changed during E2E pilot; results are not importable")
     status = int(bool(errors) or any(row["outcome"] != "passed" for row in outcomes.values()))
     summary = {"attempt": attempt, "source_snapshot": snapshot,
-               "hosted": CONFIG.hosted_e2e_runner, "workers": 2,
-               "selected": list(TARGETS), "events": events,
+               "hosted": CONFIG.hosted_e2e_runner, "workers": 3,
+               "selected": [nodeid for batch in batches for nodeid in batch.nodeids],
+               "batches": [{"name": b.name, "selected": b.nodeids, "resources": sorted(b.resources),
+                            "exclusive": b.exclusive} for b in batches], "events": events,
                "exit_status": status, "errors": errors}
     (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     if not any("Source changed" in error for error in errors):
         _write_manifest(REPOSITORY_ROOT, command, outcomes, status)
-    print(f"Pilot: {sum(row['outcome'] == 'passed' for row in outcomes.values())}/{len(batches)} passed; {root}", flush=True)
+    print(f"Pilot: {sum(row['outcome'] == 'passed' for row in outcomes.values())}/{len(outcomes)} passed; {root}", flush=True)
     for error in errors:
         print(error, flush=True)
     return status

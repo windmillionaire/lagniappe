@@ -20,6 +20,7 @@ Additional page-task scenarios (project, model task, assignee, due date, file pl
 are defined in ``task_definitions.py`` and exposed as ``Tasks.test_create_page_task_*`` members.
 """
 
+from dataclasses import replace
 from enum import Enum
 
 from ..resources import Task
@@ -38,7 +39,7 @@ class Tasks(ResourceEnumMixin, Enum):
         definition=td.recurring_home_task
     )
     test_create_personal_task_due_in_four_days = Task(definition=td.four_days_task)
-    test_complete_task_from_home_page = test_create_personal_task_due_today
+    test_complete_task_from_home_page = Task(definition=replace(td.today_task, name='Complete task from home page'))
     test_postpone_task_due_date_to_tomorrow = Task(
         definition=td.postpone_task_due_date_to_tomorrow
     )

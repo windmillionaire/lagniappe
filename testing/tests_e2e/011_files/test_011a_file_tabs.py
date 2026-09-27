@@ -102,8 +102,8 @@ def _select_file_page_link(info_form, file, page):
 # @matrix file : load tabs text-asset text-tab
 # @template files/file.html::main
 # @template files/text.html::text_tab
-def test_file_text_tab_renders_uploaded_text_content(get_user):
-    user = get_user(Users.OWNER)
+def test_file_text_tab_renders_uploaded_text_content(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.csv_file_input)
 
     user.go(file)
@@ -290,8 +290,8 @@ def test_file_info_moves_between_page_and_task(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
-def test_page_uploaded_image_shows_desktop_preview(get_user):
-    user = get_user(Users.OWNER)
+def test_page_uploaded_image_shows_desktop_preview(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.editor_test_image)
 
     user.go(file)
@@ -317,8 +317,8 @@ def test_page_uploaded_image_shows_desktop_preview(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
-def test_page_uploaded_pdf_renders_pdf_preview_widget(get_user):
-    user = get_user(Users.OWNER)
+def test_page_uploaded_pdf_renders_pdf_preview_widget(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.pdf_file)
 
     user.go(file)
@@ -506,8 +506,8 @@ def test_file_mobile_pdf_preview_renders_canvas(get_user):
 
 # @matrix file : display-name info-update summary
 # @template files/file.html::view_header
-def test_file_info_update_persists_name_and_summary(get_user):
-    user = get_user(Users.OWNER)
+def test_file_info_update_persists_name_and_summary(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.plain_text_file)
     updated_name = "Updated page upload notes"
     updated_summary = "A saved summary for a page-uploaded text file."

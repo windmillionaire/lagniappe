@@ -98,8 +98,8 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
 
 
 # @matrix editor : reload text-save
-def test_editor_loads_and_saves_text(get_user):
-    user = get_user(Users.OWNER)
+def test_editor_loads_and_saves_text(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_toolbar_loads.get(user)
     user.go(project)
 
@@ -175,8 +175,8 @@ def test_document_loading_status_waits_for_saved_content(get_user):
 
 # @matrix editor : formatting reload
 @pytest.mark.filterwarnings("ignore:.*[tiptap warn].*")
-def test_formatting_persists(get_user):
-    user = get_user(Users.OWNER)
+def test_formatting_persists(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_formatting_persists.get(user)
     user.go(project)
 
@@ -281,8 +281,8 @@ def test_image_layout_survives_document_autosave_and_reload(get_user):
 
 
 # @matrix editor : formatting inline-code reload selection toggle
-def test_inline_code_style_formats_selected_text_and_persists(get_user):
-    user = get_user(Users.OWNER)
+def test_inline_code_style_formats_selected_text_and_persists(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_inline_code_style.get(user)
     user.go(project)
 

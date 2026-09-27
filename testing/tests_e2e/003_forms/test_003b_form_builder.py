@@ -75,8 +75,8 @@ def _set_forms_permission(user, action):
 
 # @pair forms:builder-preview
 # @template forms/builder.html::header
-def test_preview_panel(get_user):
-    user = get_user(Users.OWNER)
+def test_preview_panel(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_preview_panel.get(user)
     form.schema = Schemas.add_fields.get()
 
@@ -161,8 +161,8 @@ def test_preview_panel(get_user):
 
 # @pair forms:builder-delete-components
 # @template forms/builder.html::main
-def test_delete_components(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_components(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_delete_components.get(user)
     builder = form.builder
 
@@ -211,8 +211,8 @@ def test_delete_components(get_user):
 
 # @matrix forms : builder-field-title builder-select-options
 # @pair frontend-icons:material-icon-preservation
-def test_change_select_options(get_user):
-    user = get_user(Users.OWNER)
+def test_change_select_options(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_change_select_options.get(user)
     builder = form.builder
     field = SchemaFields.SELECT.get(title="Snack Choice")
@@ -274,8 +274,8 @@ def test_change_select_options(get_user):
 
 
 # @pair forms:builder-field-visibility
-def test_field_visibility(get_user):
-    user = get_user(Users.OWNER)
+def test_field_visibility(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_field_visibility.get(user)
     builder = form.builder
     checkbox = SchemaFields.CHECKBOX.get(title="Show Private Notes")

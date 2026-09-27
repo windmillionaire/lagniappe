@@ -90,8 +90,8 @@ def test_column_visibility_panel_opens(get_user):
 
 
 # @pair table-controls:column-visibility
-def test_hiding_column_updates_visible_headers_and_cells(get_user):
-    user = get_user(Users.OWNER)
+def test_hiding_column_updates_visible_headers_and_cells(get_admin, get_user):
+    user = get_admin()
     _seed_sortable_pages(user)
     user.go(Categories.test_create_page)
 
@@ -328,8 +328,8 @@ def test_exists_column_filter_treats_phone_values_as_present(get_user):
 
 
 # @matrix table-controls : sort-asc sorting
-def test_name_column_sort_ascending_reorders_rows(get_user):
-    user = get_user(Users.OWNER)
+def test_name_column_sort_ascending_reorders_rows(get_admin, get_user):
+    user = get_admin()
     _seed_sortable_pages(user)
     user.go(Categories.test_create_page)
 
@@ -364,8 +364,8 @@ def test_name_column_sort_persists_after_back_navigation(get_user):
 
 
 # @matrix table-controls : sort-desc sorting
-def test_name_column_sort_descending_reorders_rows(get_user):
-    user = get_user(Users.OWNER)
+def test_name_column_sort_descending_reorders_rows(get_admin, get_user):
+    user = get_admin()
     _seed_sortable_pages(user)
     user.go(Categories.test_create_page)
 

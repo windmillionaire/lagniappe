@@ -363,6 +363,36 @@ commands.
 Add an abstraction only when it names a stable concept or removes meaningful
 duplication. Do not build a second testing API around a one-off selector.
 
+### Coordinated E2E resources
+
+The opt-in coordinated pilot is described in
+[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md#coordinated-worker-pilot).
+Use `get_admin()` for a broad-access browser story that does not require the
+actual Owner. It reuses one Administrator per sequential worker, with explicit
+CREATE AI entitlement, while `get_user` creates a fresh browser context for each
+call. Keep permission/Owner-specific stories on their explicitly named actors.
+
+Use full enum members such as `Pages.test_page_loads.get(user)`, rather than
+aliases for unrelated stories. The coordinator groups direct named resources,
+including references in local helpers, constants and collected fixtures. It does
+not lock the whole dependency graph. A Page's Form or Category is shared normally
+unless the test directly names that resource as part of its mutable assumptions.
+Imported helpers and dynamic resource selection need review when expanding the
+pilot selection.
+
+Mark stories that mutate site-wide settings with `@pytest.mark.e2e_serial` (or
+set it in module `pytestmark`). They run together sequentially after parallel
+batches drain; still restore the setting in `finally`. Adding a story to the
+pilot's explicit selection does not require manually choosing a batch.
+
+Resource `.key` stays available across tests without reading Datastore. Cached
+`.entity` snapshots are cleared between tests and re-fetched on demand. Within a
+test, repeated `.entity` access retains the same object so intentional setup
+edits can still be saved together. Use `refresh_entity(request=...)` when a
+justified backend inspection needs a fresh or deeper relation fetch. Keep the
+behavior under test in the browser and move procedural backend checks to unit
+tests where appropriate.
+
 ## Other Test Layers
 
 Unit tests belong in `testing/tests_unit/` and should isolate only true external

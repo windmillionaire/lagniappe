@@ -150,8 +150,8 @@ def _clear_signature(form, field_id=SIGNATURE_FIELD_ID):
 
 
 # @matrix tasks : basic create
-def test_create_basic_page_task(get_user):
-    user = get_user(Users.OWNER)
+def test_create_basic_page_task(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_create_page_task.get(user, create=False)
     page = Pages.test_create_page_task.get(user)
@@ -170,8 +170,8 @@ def test_create_basic_page_task(get_user):
 # @matrix tasks : create-close empty-state
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task_empty
-def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
-    user = get_user(Users.OWNER)
+def test_empty_page_task_list_shows_marker_only_after_create_closes(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_empty_page_task_list.get(user)
     user.go(page)
 
@@ -192,8 +192,8 @@ def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
 
 
 # @matrix tasks : attach-form create
-def test_create_page_task_with_form(get_user):
-    user = get_user(Users.OWNER)
+def test_create_page_task_with_form(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_create_page_task_with_form.get(user, create=False)
     page = Pages.test_create_page_task.get(user)
@@ -208,8 +208,8 @@ def test_create_page_task_with_form(get_user):
 
 
 # @pair tasks:complete
-def test_complete_page_task(get_user):
-    user = get_user(Users.OWNER)
+def test_complete_page_task(get_admin, get_user):
+    user = get_admin()
 
     task = Tasks.test_complete_page_task.get(user)
     user.go(task)
@@ -635,8 +635,8 @@ def test_delete_page_task_from_page_row(get_user):
 
 # @matrix tasks : attached-form autofill submission
 # @template pages/tasks.html::task_form
-def test_submit_attached_task_form(get_user):
-    user = get_user(Users.OWNER)
+def test_submit_attached_task_form(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_submit_attached_task_form.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(task)

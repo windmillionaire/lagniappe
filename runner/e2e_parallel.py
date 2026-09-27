@@ -17,6 +17,11 @@ class Batch:
     nodeid: str
     resources: frozenset[str] = frozenset()
     exclusive: bool = False
+    additional_nodeids: tuple[str, ...] = ()
+
+    @property
+    def nodeids(self):
+        return (self.nodeid, *self.additional_nodeids)
 
 
 # @testable true
@@ -116,6 +121,8 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
 
 # @testable true
 # @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evidence
+# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_each_parameter_and_reports_missing_batch_cases
+# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_checks_each_case_identity_and_outcome
 # @matrix testing : parallel-e2e
 def merge_results(batches, directory, statuses, *, attempt, snapshot, destination):
     """Account for every selected nodeid without consulting earlier evidence."""
@@ -123,45 +130,63 @@ def merge_results(batches, directory, statuses, *, attempt, snapshot, destinatio
     errors = []
     combined = ET.Element("testsuites")
     for batch in batches:
-        nodeid = batch.nodeid.removeprefix("testing/")
+        expected = [nodeid.removeprefix("testing/") for nodeid in batch.nodeids]
         try:
-            if nodeid in outcomes:
+            if len(set(expected)) != len(expected) or set(expected) & outcomes.keys():
                 raise ValueError("duplicate selected nodeid")
             path = Path(directory) / batch.name
             payload = json.loads((path / "outcomes.json").read_text(encoding="utf-8"))
             status = statuses[batch.name]
             if (payload["attempt"] != attempt or payload["snapshot"] != snapshot
                     or payload["batch"] != batch.name or payload["exit_status"] != status
-                    or payload["selected"] != [nodeid]
-                    or set(payload["outcomes"]) != {nodeid}):
+                    or payload["selected"] != expected
+                    or set(payload["outcomes"]) != set(expected)):
                 raise ValueError("worker identity, selection or status mismatch")
-            row = payload["outcomes"][nodeid]
-            if not isinstance(row, dict) or row.get("outcome") not in {"passed", "failed", "skipped"}:
-                raise ValueError("missing terminal outcome")
-            duration = row.get("duration")
-            if type(duration) not in {int, float} or not math.isfinite(duration) or duration < 0:
-                raise ValueError("invalid worker duration")
-            if (status == 0) != (row["outcome"] != "failed"):
+            rows = payload["outcomes"]
+            for row in rows.values():
+                if not isinstance(row, dict) or row.get("outcome") not in {"passed", "failed", "skipped"}:
+                    raise ValueError("missing terminal outcome")
+                duration = row.get("duration")
+                if type(duration) not in {int, float} or not math.isfinite(duration) or duration < 0:
+                    raise ValueError("invalid worker duration")
+            failed = any(row["outcome"] == "failed" for row in rows.values())
+            if (status == 0) == failed:
                 raise ValueError("worker status disagrees with outcome")
             root = ET.parse(path / "junit.xml").getroot()
             if root.tag not in {"testsuites", "testsuite"}:
                 raise ValueError("invalid JUnit root")
             cases = list(root.iter("testcase"))
-            if not cases or any(case.get("name") != nodeid.split("::")[-1] for case in cases):
+            identities = {}
+            for nodeid in expected:
+                path, *names = nodeid.split("::")
+                classname = ".".join([path.removesuffix(".py").replace("/", "."), *names[:-1]])
+                identities[(classname, names[-1])] = nodeid
+            if not cases or {(case.get("classname"), case.get("name")) for case in cases} != set(identities):
                 raise ValueError("JUnit selection mismatch")
-            xml_failed = any(list(case.iter("failure")) or list(case.iter("error")) for case in cases)
-            if xml_failed != (row["outcome"] == "failed"):
+            # Pytest can emit separate call/teardown failures for one case.
+            xml_outcomes = {nodeid: "passed" for nodeid in expected}
+            for case in cases:
+                nodeid = identities[(case.get("classname"), case.get("name"))]
+                if case.find("failure") is not None or case.find("error") is not None:
+                    xml_outcomes[nodeid] = "failed"
+                elif case.find("skipped") is not None and xml_outcomes[nodeid] != "failed":
+                    xml_outcomes[nodeid] = "skipped"
+            if any(xml_outcomes[nodeid] != rows[nodeid]["outcome"] for nodeid in expected):
                 raise ValueError("JUnit outcome mismatch")
             combined.extend(list(root) if root.tag == "testsuites" else [root])
-            outcomes[nodeid] = row
+            outcomes.update(rows)
         except (OSError, ValueError, KeyError, TypeError, ET.ParseError) as error:
             message = f"{batch.name}: incomplete worker evidence ({error})"
             errors.append(message)
-            outcomes[nodeid] = {"outcome": "failed", "duration": 0,
-                                "failed_phase": "worker", "traceback": message}
-            suite = ET.SubElement(combined, "testsuite", name=batch.name, tests="1", errors="1")
-            case = ET.SubElement(suite, "testcase", name=nodeid.split("::")[-1])
-            ET.SubElement(case, "error", message=message)
+            suite = ET.SubElement(combined, "testsuite", name=batch.name,
+                                  tests=str(len(expected)), errors=str(len(expected)))
+            for nodeid in expected:
+                outcomes[nodeid] = {"outcome": "failed", "duration": 0,
+                                    "failed_phase": "worker", "traceback": message}
+                path, *names = nodeid.split("::")
+                case = ET.SubElement(suite, "testcase", name=names[-1],
+                                     classname=".".join([path.removesuffix(".py").replace("/", "."), *names[:-1]]))
+                ET.SubElement(case, "error", message=message)
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(".xml.tmp")

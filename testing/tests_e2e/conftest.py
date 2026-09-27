@@ -378,8 +378,39 @@ def browser_failures(request):
         diagnostics.append(collector.diagnostic_record(request.node.nodeid))
 
 
+@pytest.fixture(autouse=True)
+def fresh_resource_entities():
+    """One Python entity snapshot per test, with durable resource keys retained."""
+    from testing.resources.core import SiteResource
+    from testing.utility.e2e_resources import publish_resource_keys
+    SiteResource.forget_entities()
+    yield
+    publish_resource_keys()
+    SiteResource.forget_entities()
+
+
+@pytest.fixture(scope="session")
+def worker_admin(setup_test_server):
+    """One real Administrator for this sequential pytest worker, never the Owner."""
+    from uuid import uuid4
+    from lagniappe.core.definitions import AI
+    from testing.definitions.user_definitions import UserDefinition
+    from testing.resources import User
+    identity = f"e2e-admin-{uuid4().hex}"
+    return User(definition=UserDefinition(
+        name=identity, email=f"{identity}@example.test", admin=True, ai_access=AI.CREATE,
+    )).create()
+
+
 @pytest.fixture
-def get_user(browser, request, browser_failures, setup_test_server):
+def get_admin(get_user, worker_admin):
+    def administrator(**options):
+        return get_user(worker_admin, **options)
+    return administrator
+
+
+@pytest.fixture
+def get_user(browser, request, browser_failures, setup_test_server, fresh_resource_entities):
     """
     Factory fixture for getting authenticated User resources with isolated contexts.
 
@@ -453,7 +484,9 @@ def get_user(browser, request, browser_failures, setup_test_server):
         from testing.definitions.user_definitions import UserDefinition
         from testing.resources import User
 
-        if isinstance(user_definition, UserDefinition):
+        if isinstance(user_definition, User):
+            user = user_definition
+        elif isinstance(user_definition, UserDefinition):
             user = User(user=creator, definition=user_definition).create()
         else:
             user = user_definition.get(creator)

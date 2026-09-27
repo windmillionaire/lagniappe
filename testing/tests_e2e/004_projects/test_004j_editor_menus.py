@@ -5,15 +5,14 @@ from uuid import uuid4
 from playwright.sync_api import expect
 import pytest
 
-from testing.definitions import Users
 from testing.definitions.project_definitions import ProjectDefinition
 from testing.elements.combobox import Dropdown
 from testing.resources import Project
 from testing.utility.network import expect_successful_response
 
 
-def open_editor(get_user, mobile):
-    user = get_user(Users.OWNER, has_touch=mobile)
+def open_editor(get_admin, mobile):
+    user = get_admin(has_touch=mobile)
     project = Project(
         user=user,
         definition=ProjectDefinition(name=f"Editor menus {uuid4().hex[:8]}"),
@@ -30,8 +29,8 @@ def open_editor(get_user, mobile):
 # @style editor.toolbar.section
 # @style editor.toolbar.portalIconContext
 @pytest.mark.parametrize("mobile", [False, True], ids=["desktop", "mobile"])
-def test_compact_editor_menus(get_user, mobile):
-    user, project, editor = open_editor(get_user, mobile)
+def test_compact_editor_menus(get_admin, mobile):
+    user, project, editor = open_editor(get_admin, mobile)
     if not mobile:
         user.page.set_viewport_size({"width": 1600, "height": 900})
     expect(
@@ -94,8 +93,8 @@ def test_compact_editor_menus(get_user, mobile):
 
 # @matrix editor : list-menu selection toggle
 @pytest.mark.parametrize("mobile", [False, True], ids=["desktop", "mobile"])
-def test_list_menu_formats_selection(get_user, mobile):
-    user, project, editor = open_editor(get_user, mobile)
+def test_list_menu_formats_selection(get_admin, mobile):
+    user, project, editor = open_editor(get_admin, mobile)
     dropdown = Dropdown(editor.toolbar.get_by_label("Lists", exact=True))
 
     for title, selector in [
@@ -131,8 +130,8 @@ def test_list_menu_formats_selection(get_user, mobile):
 
 # @matrix editor : table-menu
 @pytest.mark.parametrize("mobile", [False, True], ids=["desktop", "mobile"])
-def test_table_menu_creates_edits_and_saves(get_user, mobile):
-    user, project, editor = open_editor(get_user, mobile)
+def test_table_menu_creates_edits_and_saves(get_admin, mobile):
+    user, project, editor = open_editor(get_admin, mobile)
     dropdown = Dropdown(editor.toolbar.get_by_label("Table", exact=True))
     panel = dropdown.open()
     expect(panel.get_by_role("option")).to_have_count(1)

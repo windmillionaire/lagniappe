@@ -15,12 +15,12 @@ class ModelTaskDefinition:
 
 create_model_task = ModelTaskDefinition(
     name="Test Model Task",
-    project=Projects.test_create_project_manual_mode,
+    project=Projects.test_create_model_task,
 )
 
 create_model_task_with_form = ModelTaskDefinition(
     name="Test Model Task with Form",
-    project=Projects.test_create_project_manual_mode,
+    project=Projects.test_create_model_task_with_form,
     form=Forms.test_create_task_form,
 )
 

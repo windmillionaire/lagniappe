@@ -184,6 +184,21 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
     assert "testing/evidence/latest.json" not in fingerprints
 
 
+def test_source_archive_snapshot_excludes_installed_mcp_environment(monkeypatch, tmp_path):
+    source = tmp_path / "mcp/server.py"
+    installed = tmp_path / "mcp/.venv/lib/python/site-packages/dependency.py"
+    installed.parent.mkdir(parents=True)
+    source.write_text("VALUE = 1\n")
+    installed.write_text("VALUE = 2\n")
+    monkeypatch.setattr(traceability_common, "_git", lambda *_a, **_kw:
+                        subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"no git"))
+    fingerprints = traceability_common.behavior_path_fingerprints(tmp_path)
+    assert "mcp/server.py" in fingerprints
+    assert not any(path.startswith("mcp/.venv/") for path in fingerprints)
+    installed.write_text("VALUE = 3\n")
+    assert traceability_common.behavior_path_fingerprints(tmp_path) == fingerprints
+
+
 def test_traceability_result_plugin_merges_focused_results_without_session_history(
     monkeypatch, tmp_path
 ):

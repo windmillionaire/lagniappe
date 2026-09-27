@@ -38,6 +38,7 @@ BEHAVIOR_EXCLUDED_PREFIXES = (
     "documentation/",
     "lagniappe/web/static/",
     "node_modules/",
+    "mcp/.venv/",
     "reports/",
     "testing/evidence/",
     "venv/",

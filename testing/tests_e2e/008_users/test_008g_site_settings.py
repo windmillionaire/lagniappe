@@ -18,7 +18,7 @@ from testing.utility.site_settings import (
     site_settings_section,
 )
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.e2e_serial]
 
 
 def _open_help_and_expect(user, trigger, text):

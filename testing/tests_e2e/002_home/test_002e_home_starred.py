@@ -98,7 +98,7 @@ def _patch_star(user, key):
 # @matrix starred : category title-menu
 # @template menus.html::star
 @pytest.mark.e2e
-def test_star_category(get_user):
+def test_star_category(get_admin, get_user):
     """
     Verify starring and unstarring a category.
 
@@ -112,7 +112,7 @@ def test_star_category(get_user):
         7. Unstar from category page
         8. Verify unstarred state on home page
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_star_category.get(user)
     home = user.go(SitePages.HOME)
 
@@ -150,7 +150,7 @@ def test_star_category(get_user):
 # @matrix starred : project title-menu
 # @template menus.html::star
 @pytest.mark.e2e
-def test_star_project(get_user):
+def test_star_project(get_admin, get_user):
     """
     Verify starring and unstarring a project.
 
@@ -164,7 +164,7 @@ def test_star_project(get_user):
         7. Unstar from project page
         8. Verify unstarred state on home page
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     project = Projects.test_star_project.get(user)
     home = user.go(SitePages.HOME)
 
@@ -206,7 +206,7 @@ def test_star_project(get_user):
 # @pair view-transition:navigation
 # @template menus.html::star
 @pytest.mark.e2e
-def test_star_page(get_user):
+def test_star_page(get_admin, get_user):
     """
     Verify starring and unstarring a page.
 
@@ -221,7 +221,7 @@ def test_star_page(get_user):
 
     Note: Pages don't appear in a list on home, so we star from the page itself.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = Pages.test_star_page.get(user)
 
     # Navigate to page and star it from the title menu.

@@ -192,12 +192,34 @@ venv/bin/python run.py test --experiments
 venv/bin/python run.py hosted-e2e execute --experiments
 ```
 
-This selects five small browser cases, with at most two worker processes active
-against one server URL. Each case creates its own Administrator account; none
-pretends to be the singleton Owner. Independent cases use separate Pages and
-Tasks. Two shared-Page cases use a declared conflict lane, followed by an
-exclusive verification barrier. The second independent case continues after
-the first worker's session teardown to verify that its data/server survive.
+The bounded selection contains 48 existing browser cases across 13 modules and
+five coordination checks, with at most three pytest/browser processes active
+against one server URL. It covers forms, documents, mobile Pages, Tasks,
+Categories, search, file previews, messaging and site settings. Each sequential
+story worker reuses its own Administrator through `get_admin`; each test still
+gets an isolated browser context. The Administrator has explicit CREATE AI
+entitlement as well as ordinary administrative permissions.
+
+Pytest first collects exact parameter cases and fixtures. An AST inventory
+follows direct enum references, local helpers/constants and fixture functions.
+Tests sharing a named resource stay in one sequential batch; independent groups
+are balanced across workers. This does not traverse the related entity graph:
+Pages sharing a Form or Category can run together. Dynamic lookups and imported
+helpers still need review before adding a story to this bounded selection.
+`@pytest.mark.e2e_serial` puts global-setting stories into an exclusive batch
+after the parallel workers finish. Public-user permission fixtures and site
+settings use this marker. New tests do not choose a worker or batch manually.
+
+A run-local locked registry shares enum keys between processes, making lazy
+prerequisite creation idempotent. Its lock covers fixture creation only; the
+scheduler controls test conflicts. Resources retain keys across tests and
+forget cached Python entity snapshots after each test. A later `.entity` access
+re-fetches from Datastore; browser-only uses of `.key` do not. No cached browser
+cookies are shared between the Administrator accounts.
+
+The five small coordination checks exercise overlapping independent workers,
+serialized shared-Page mutations, an exclusive barrier, and continued work
+after another worker's teardown. They run before the broader story batches.
 
 Only the coordinator acquires and renews the shared lease and performs global
 setup/cleanup. Workers inherit an exact run/server binding through temporary
@@ -217,11 +239,11 @@ focused run and uses the ordinary artifact upload/import path.
 
 `--experiments` here selects the harness trial; it does not enable application
 experiments mode or measurement diagnostics. Ordinary suite execution remains
-serial. This is an explicit case inventory, not a general `-n` option: additional
-cases need a fixture/conflict audit. Owner-specific and global-settings tests
-need exclusive scheduling; broad-access tests can use distinct Administrators.
-The pilot launches one process per case; batching multiple audited tests per
-process and broader suite scheduling remain later work.
+serial. This is an explicit case inventory, not a general `-n` option. Expanding
+to the full suite still requires reviewing hidden mutations and global-state
+fixtures, then repeated trials. The browser runner and App Engine server have
+separate CPU/memory budgets; increasing browser concurrency does not require
+additional server URLs.
 
 ## GitHub release path
 
