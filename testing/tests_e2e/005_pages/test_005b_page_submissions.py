@@ -95,6 +95,8 @@ def test_invalid_typed_submission_returns_error_without_saving(get_admin, get_us
     }
     entity.form_submission(answers)
     entity.save()
+    # Stabilize the empty-notes metadata before comparing the entire stored row.
+    page.remember_empty_notes()
 
     user.navigate(f"{SETTINGS.test_config['BASE_URL']}/pages/{page.urlsafe_key}")
     cookies = {cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()}

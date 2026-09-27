@@ -440,16 +440,22 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_admin, get_user):
     expect(checkbox).to_be_visible()
     expect(checkbox).to_be_checked()
 
-    with user.page.expect_response("**/pages/*/patch"):
-        checkbox.set_checked(False)
+    try:
+        with user.page.expect_response("**/pages/*/patch"):
+            checkbox.set_checked(False)
 
-    expect(checkbox).not_to_be_checked()
-    expect(cell).to_have_attribute("data-edit-value", "false")
+        expect(checkbox).not_to_be_checked()
+        expect(cell).to_have_attribute("data-edit-value", "false")
 
-    edit_toggle.click()
-    expect(
-        cell.locator(f"input[type='checkbox'][name='{field}']")
-    ).not_to_be_attached()
+        edit_toggle.click()
+        expect(checkbox).not_to_be_attached()
+    finally:
+        if body.get_attribute("data-editing") != "true":
+            edit_toggle.click()
+        if not checkbox.is_checked():
+            with user.page.expect_response("**/pages/*/patch"):
+                checkbox.set_checked(True)
+        expect(checkbox).to_be_checked()
 
 
 # @matrix form-table table-controls : form-table-column table-cell-expand

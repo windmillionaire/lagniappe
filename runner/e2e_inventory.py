@@ -29,8 +29,12 @@ def pytest_collection_finish(session):
                 path = inspect.getsourcefile(function)
                 if path and Path(path).is_relative_to(root):
                     fixtures.append([str(Path(path).relative_to(root)), function.__name__])
-        records.append({"nodeid": item.nodeid, "serial": bool(item.get_closest_marker("e2e_serial")),
-                        "fixtures": fixtures})
+        marker = item.get_closest_marker("e2e_serial")
+        phase = marker.kwargs.get("phase", "after") if marker else None
+        if marker and phase not in {"before", "after"}:
+            raise ValueError(f"Invalid e2e_serial phase for {item.nodeid}: {phase}")
+        records.append({"nodeid": item.nodeid, "serial": bool(marker),
+                        "serial_phase": phase, "fixtures": fixtures})
     Path(destination).write_text(json.dumps(records), encoding="utf-8")
 
 
@@ -96,7 +100,7 @@ def discover_resources(root, path, name, fixtures=(), *, modules=None):
 # @matrix testing : parallel-e2e
 def story_batches(root, records, *, workers=3):
     """Keep connected resource users sequential; balance components across workers."""
-    groups, serial, inventory = [], [], []
+    groups, serial, before, inventory = [], [], [], []
     modules = {}
     for record in records:
         nodeid = record["nodeid"].removeprefix("testing/")
@@ -104,7 +108,7 @@ def story_batches(root, records, *, workers=3):
         resources = discover_resources(root, "testing/" + path, name.split("[")[0], record["fixtures"], modules=modules)
         inventory.append({**record, "resources": sorted(resources)})
         if record["serial"]:
-            serial.append((nodeid, resources))
+            (before if record.get("serial_phase") == "before" else serial).append((nodeid, resources))
             continue
         merged_nodes, merged_resources = [nodeid], set(resources)
         for group in list(groups):
@@ -126,9 +130,13 @@ def story_batches(root, records, *, workers=3):
             selected = ["testing/" + node for node in nodes]
             batches.append(Batch(f"stories-{i + 1}", selected[0], frozenset(resources),
                                  additional_nodeids=tuple(selected[1:])))
-    if serial:
-        selected = ["testing/" + node for node, _ in serial]
-        batches.append(Batch("stories-serial", selected[0],
-                             frozenset().union(*(resources for _, resources in serial)),
-                             exclusive=True, additional_nodeids=tuple(selected[1:])))
+    for name, group in (("stories-before", before), ("stories-serial", serial)):
+        if group:
+            selected = ["testing/" + node for node, _ in group]
+            batch = Batch(name, selected[0], frozenset().union(*(resources for _, resources in group)),
+                          exclusive=True, additional_nodeids=tuple(selected[1:]))
+            if name == "stories-before":
+                batches.insert(0, batch)
+            else:
+                batches.append(batch)
     return batches, inventory

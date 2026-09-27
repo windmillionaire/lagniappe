@@ -44,6 +44,7 @@ def poll(user, subscriptions):
 
 
 # @matrix polling : authorization batching channel entity fingerprint identifiers permissions protocol revision unavailable validation
+@pytest.mark.e2e_serial
 def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.test_sync_form_page.get(owner)

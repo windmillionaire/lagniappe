@@ -112,7 +112,7 @@ def test_database_setup():
 
 
 # @matrix cache : cleanup index-recreation redis-connection
-@pytest.mark.e2e_serial
+@pytest.mark.e2e_serial(phase="before")
 def test_cache_setup():
     """
     Verify Redis cache is connected and using test-prefixed index.

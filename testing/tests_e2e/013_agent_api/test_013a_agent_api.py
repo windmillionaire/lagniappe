@@ -24,6 +24,7 @@ from lagniappe.core.tools.cache import rate_limit as rate_limiter
 from lagniappe.core.tools.database import agent_api as agent_api_store
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import app
 
@@ -329,7 +330,7 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
     monkeypatch.setattr(
         external_api,
         "plan_contract",
-        lambda current, user, *, submit_url: {
+        lambda current, user, *, submit_url, execution_allowed: {
             "contract_version": external_api.CONTRACT_VERSION,
             "actor": user.hash,
             "submission_format": {"method": "POST", "url": submit_url},
@@ -569,7 +570,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "/api/v1" in openapi.json["paths"]
     assert "/api/v1/client-skill.md" in openapi.json["paths"]
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
-    assert "/api/v1/plans/{plan_id}/execute" not in openapi.json["paths"]
+    assert set(openapi.json["paths"]["/api/v1/plans/{plan_id}/execute"]) == {"post"}
     assert (
         "external API never applies those proposals"
         in openapi.json["info"]["description"]
@@ -866,7 +867,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         external_api,
         "plan_contract",
-        lambda current, user, *, submit_url, actions=None: {
+        lambda current, user, *, submit_url, actions=None, execution_allowed=False: {
             "contract_version": external_api.CONTRACT_VERSION,
             "required_file_refs": [],
             "actor": user.hash,
@@ -1350,8 +1351,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         headers={"Authorization": "Bearer valid-key"},
         json={},
     )
-    assert missing_execution.status_code == 405
-    assert missing_execution.json["error"]["code"] == "method_not_allowed"
+    assert missing_execution.status_code == 403
+    assert missing_execution.json["error"]["code"] == "execution_forbidden"
 
     report.status = "running"
     browser_execution_locked_revision = client.post(
@@ -1959,8 +1960,8 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
         headers=headers,
         json={},
     )
-    assert missing_execution.status_code == 405
-    assert missing_execution.json["error"]["code"] == "method_not_allowed"
+    assert missing_execution.status_code == 403
+    assert missing_execution.json["error"]["code"] == "execution_forbidden"
 
 
 # @matrix agent-api ai-report : browser-review creator-bound short-link
@@ -2228,6 +2229,7 @@ def test_api_report_delete_rejects_active_execution_without_side_effects(monkeyp
 # @matrix agent-api ai-report : browser-review error-isolation report-execution
 def test_api_report_run_start_error_does_not_save_stale_report(monkeypatch):
     actor = Actor()
+    actor.key = database_utility.create_named_key("user", actor.urlsafe_key)
     report = _report(actor)
     report.status = "ready"
     report.proposal = {"summary": "Ready", "actions": []}

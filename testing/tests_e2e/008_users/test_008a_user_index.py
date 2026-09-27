@@ -121,7 +121,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(public_toggle).to_be_visible()
         expect(public_toggle).to_have_attribute("data-active", "false")
         expect(table.get_row(public_name)).to_have_count(0)
-        expect(table.get_row(owner.name)).to_be_visible()
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_be_visible()
 
         with owner.page.expect_response(_user_rows_response("public")):
             public_toggle.click()
@@ -131,7 +131,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(public_toggle).to_have_attribute("data-active", "true")
         expect(public_toggle).to_have_attribute("title", "Show regular users")
         expect(table.get_row(public_name)).to_be_visible()
-        expect(table.get_row(owner.name)).to_have_count(0)
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_have_count(0)
 
         _create_public_user(
             refreshed_public_email,
@@ -142,7 +142,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
 
         expect(table.get_row(public_name)).to_be_visible()
         expect(table.get_row(refreshed_public_name)).to_be_visible()
-        expect(table.get_row(owner.name)).to_have_count(0)
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_have_count(0)
 
         with owner.page.expect_response(_user_rows_response("regular")):
             public_toggle.click()
@@ -152,7 +152,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(public_toggle).to_have_attribute("data-active", "false")
         expect(public_toggle).to_have_attribute("title", "Show public users")
         expect(table.get_row(public_name)).to_have_count(0)
-        expect(table.get_row(owner.name)).to_be_visible()
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_be_visible()
     finally:
         _set_public_users_allowed(owner, False)
 

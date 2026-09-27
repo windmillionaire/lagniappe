@@ -274,6 +274,7 @@ def _attached_form_filter_context(user):
 # @pair permissions:authorization
 # @template tasks/index.html::view
 # @template forms/restrictions.html::restrict_access
+@pytest.mark.e2e_serial
 @pytest.mark.parametrize("mode", ["preview", "saved"])
 @pytest.mark.parametrize("permission_source", ["task_form", "model_form", "page", "page_form"])
 def test_project_filter_results_respect_task_permissions(get_user, mode, permission_source):

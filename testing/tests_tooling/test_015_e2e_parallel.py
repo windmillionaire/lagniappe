@@ -58,15 +58,36 @@ def test_a(): Pages.shared.get(None)
 def test_b(): Pages.shared.get(None)
 def test_c(): Pages.other.get(None)
 def test_d(): pass
+def test_reset(): pass
 ''', encoding="utf-8")
     records = [{"nodeid": f"tests_e2e/test_story.py::test_{name}", "fixtures": [], "serial": name == "d"}
                for name in "abcd"]
+    records.append({"nodeid": "tests_e2e/test_story.py::test_reset", "fixtures": [],
+                    "serial": True, "serial_phase": "before"})
     batches, inventory = story_batches(tmp_path, records, workers=2)
-    assert len(batches) == 3
-    assert batches[0].nodeids == ("testing/tests_e2e/test_story.py::test_a", "testing/tests_e2e/test_story.py::test_b")
-    assert not (batches[0].resources & batches[1].resources)
+    assert len(batches) == 4
+    assert batches[0].exclusive and batches[0].nodeid.endswith("test_reset")
+    assert batches[1].nodeids == ("testing/tests_e2e/test_story.py::test_a", "testing/tests_e2e/test_story.py::test_b")
+    assert not (batches[1].resources & batches[2].resources)
     assert batches[-1].exclusive and batches[-1].nodeid.endswith("test_d")
     assert inventory[1]["resources"] == ["Pages.shared"]
+
+
+# @matrix testing : parallel-e2e
+def test_worker_progress_counts_cases_without_double_counting_phases(tmp_path, monkeypatch):
+    from testing.utility.e2e_worker import write_progress
+
+    record = tmp_path / "context.json"
+    record.write_text(json.dumps({"artifacts": str(tmp_path), "nodeids": ["a", "b", "c"]}))
+    monkeypatch.setenv("LAGNIAPPE_E2E_WORKER_CONTEXT", str(record))
+    outcomes = {"a": {"outcome": "passed"}, "b": {"outcome": "skipped"}}
+    write_progress(outcomes, "b")
+    outcomes["a"]["outcome"] = "failed"  # A teardown failure changes the same case.
+    write_progress(outcomes, "a")
+    assert json.loads((tmp_path / "progress.json").read_text()) == {
+        "passed": 0, "failed": 1, "skipped": 1, "completed": 2, "total": 3, "last_nodeid": "a",
+    }
+    assert not (tmp_path / "progress.tmp").exists()
 
 
 # @matrix testing : parallel-e2e

@@ -82,6 +82,7 @@ def limited_public_user(get_user):
         }
     )
     task.save()
+    public_entity.page.remember_empty_notes()
 
     try:
         user = _login_public_test_user(get_user, email)

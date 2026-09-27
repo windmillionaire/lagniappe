@@ -215,6 +215,9 @@ application calls or the related-entity graph.
 `@pytest.mark.e2e_serial` puts global-setting stories into an exclusive batch
 after the parallel workers finish. Public-user permission fixtures and site
 settings use this marker. New tests do not choose a worker or batch manually.
+Environment-reset checks use `@pytest.mark.e2e_serial(phase="before")` and finish
+before protocol checks or ordinary stories create fixtures. Workers publish
+atomic progress counts; the coordinator prints those counts every 30 seconds.
 
 A run-local locked registry shares enum keys between processes, making lazy
 prerequisite creation idempotent. Its lock covers fixture creation only; the

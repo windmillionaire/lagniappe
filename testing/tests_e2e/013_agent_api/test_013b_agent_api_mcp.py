@@ -42,11 +42,12 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
-# Reviewed v10: nullable revision IDs and API-owned validation guidance in contracts.
+# Reviewed v10, including optional installation metadata and the execution capability
+# on get_actor. Ordinary API credentials still cannot execute proposals.
 LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                      'f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d'),
  'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
-               '5467240ac9b25c0e3e6a0fb035a1385501dba9f6470747ae83af4ad808b6f66f'),
+               '67f1f90a7a55e2bf678291801655eb551ca5d979b914f39be9abe1ccc05daaeb'),
  'start_plan': ('6b80b5bbc86766d1de25efec1b3d9db01071fe4418ddca24121e8498650cb1bf',
                 '9db8d984e62c2f4c56ca97010933b002920ed5d4639769cf70a8b7be53a32a56'),
  'get_plan': ('79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9',
@@ -723,6 +724,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "/api/v1/plans/{plan_id}": "get",
             "/api/v1/plans/{plan_id}/contract": "get",
             "/api/v1/plans/{plan_id}/submit": "post",
+            "/api/v1/plans/{plan_id}/execute": "post",
             "/api/v1/plans/{plan_id}/tools/{tool_name}": "post",
             "/api/v1/plans/{plan_id}/uploads": "post",
             "/api/v1/plans/{plan_id}/uploads/finalize": "post",
@@ -733,7 +735,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             set(openapi["paths"][path]) == {method}
             for path, method in expected_methods.items()
         )
-        assert all("execute" not in path for path in openapi["paths"])
         upload_schema = openapi["components"]["schemas"]["UploadFile"]
         assert upload_schema["additionalProperties"] is False
         assert upload_schema["required"] == ["filename", "size"]
@@ -763,6 +764,11 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             ),
             201,
         )
+        forbidden_execution = _json_response(_request(
+            "POST", f"/api/v1/plans/{invalid_plan['id']}/execute",
+            token=owner_token, body={},
+        ), 403)
+        assert forbidden_execution["error"]["code"] == "execution_forbidden"
         invalid_upload_path = f"/api/v1/plans/{invalid_plan['id']}/uploads"
         invalid_declarations = (
             (

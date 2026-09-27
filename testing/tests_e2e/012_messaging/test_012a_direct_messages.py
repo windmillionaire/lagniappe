@@ -303,7 +303,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     )
     expect(aggregate).to_be_visible()
     with recipient.page.expect_navigation():
-        aggregate.locator("a[href='/messages']").click()
+        aggregate.get_by_role("link", name="1 new message", exact=True).click()
 
     recipient_view = recipient.locate("[lp-view][data-kind='messages']")
     expect(recipient_view).to_have_attribute("initialized", "")
@@ -501,7 +501,7 @@ def test_inbound_message_allows_reply_without_compose_permission(get_user):
     aggregate = menu.locator("[role='option']").filter(has_text="1 new message")
     expect(aggregate).to_be_visible()
     with recipient.page.expect_navigation():
-        aggregate.locator("a[href='/messages']").click()
+        aggregate.get_by_role("link", name="1 new message", exact=True).click()
 
     view = recipient.locate("[lp-view][data-kind='messages']")
     expect(view).to_have_attribute("initialized", "")

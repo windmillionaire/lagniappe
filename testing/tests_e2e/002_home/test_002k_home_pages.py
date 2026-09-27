@@ -6,12 +6,15 @@ a small create form for users who can create them.
 """
 
 import re
+from dataclasses import replace
+from uuid import uuid4
 
 from playwright.sync_api import expect
 import pytest
 
 from testing.definitions import Categories, Pages, SitePages, Users
 from testing.elements import FormElements, Link, List, Select, SpinnerButtons
+from testing.resources import Page
 
 pytestmark = pytest.mark.e2e
 
@@ -19,9 +22,12 @@ pytestmark = pytest.mark.e2e
 # @matrix home pages : list load
 # @template home/pages.html::list
 # @template home/pages.html::page
+@pytest.mark.e2e_serial
 def test_home_page_list_loads_recent_pages(get_admin, get_user):
     user = get_admin()
-    existing_page = Pages.test_create_page.get(user)
+    existing_page = Page(user=user, definition=replace(
+        Pages.test_create_page.value.definition, name=f"Recent Page {uuid4().hex}"
+    )).create()
     home = user.go(SitePages.HOME)
 
     page_list = home.page_list

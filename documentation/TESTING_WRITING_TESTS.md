@@ -386,6 +386,10 @@ set it in module `pytestmark`). They run together sequentially after parallel
 batches drain; still restore the setting in `finally`. Adding a story to the
 pilot's explicit selection does not require manually choosing a batch.
 
+Use `@pytest.mark.e2e_serial(phase="before")` for destructive environment-reset
+checks that must finish before any story fixtures are created. For example,
+cache/index recreation runs here so it cannot erase already-created fixtures.
+
 Resource `.key` stays available across tests without reading Datastore. Cached
 `.entity` snapshots are cleared between tests and re-fetched on demand. Within a
 test, repeated `.entity` access retains the same object so intentional setup

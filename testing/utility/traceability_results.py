@@ -95,6 +95,10 @@ def pytest_runtest_logreport(report) -> None:
     elif report.when == "setup" and report.skipped:
         row["outcome"] = "skipped"
 
+    if report.when == "teardown" and os.environ.get("LAGNIAPPE_E2E_WORKER_CONTEXT"):
+        from testing.utility.e2e_worker import write_progress
+        write_progress(_OUTCOMES, report.nodeid)
+
 
 def pytest_sessionfinish(session, exitstatus: int) -> None:
     if os.environ.get("LAGNIAPPE_E2E_WORKER_CONTEXT"):

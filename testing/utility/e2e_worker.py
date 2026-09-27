@@ -75,6 +75,20 @@ def worker_runtime():
         watcher.join(timeout=2)
 
 
+# @testable true
+# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_progress_counts_cases_without_double_counting_phases
+# @matrix testing : parallel-e2e
+def write_progress(outcomes, nodeid):
+    record = context()
+    counts = {state: sum(row["outcome"] == state for row in outcomes.values())
+              for state in ("passed", "failed", "skipped")}
+    path = Path(record["artifacts"]) / "progress.json"
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps({**counts, "completed": sum(counts.values()),
+                                     "total": len(record["nodeids"]), "last_nodeid": nodeid}), encoding="utf-8")
+    temporary.replace(path)
+
+
 # @testable infrastructure
 def write_results(session, outcomes, exitstatus):
     record = context()

@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from uuid import uuid4
 
 from runner.context import REPOSITORY_ROOT
@@ -152,7 +153,8 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
     if collected.returncode:
         raise RuntimeError(f"Pilot collection failed; see {root / 'collection.log'}")
     stories, inventory = story_batches(REPOSITORY_ROOT, json.loads(collection.read_text(encoding="utf-8")))
-    batches.extend(stories)
+    batches = ([batch for batch in stories if batch.name == "stories-before"] + batches
+               + [batch for batch in stories if batch.name != "stories-before"])
     (root / "inventory.json").write_text(json.dumps(inventory, indent=2), encoding="utf-8")
     for batch in stories:
         print(f"{batch.name}: {len(batch.nodeids)} cases, {len(batch.resources)} resources, "
@@ -161,6 +163,23 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
                        str(root / "junit.xml"))
     statuses, events, scheduler_error = {}, [], None
     previous = {}
+    launched = []
+    next_progress = time.monotonic() + 30
+
+    def check_authority():
+        nonlocal next_progress
+        authority.assert_active()
+        now = time.monotonic()
+        if now < next_progress:
+            return
+        next_progress = now + 30
+        for name in launched:
+            progress = root / name / "progress.json"
+            if progress.is_file():
+                counts = json.loads(progress.read_text(encoding="utf-8"))
+                state = f"exit={statuses[name]}" if name in statuses else "running"
+                print(f"{name}: {counts['completed']}/{counts['total']} complete, "
+                      f"{counts['failed']} failed ({state}); {counts['last_nodeid']}", flush=True)
 
     def cancel(signum, frame):
         raise KeyboardInterrupt(f"E2E pilot cancelled by signal {signum}")
@@ -187,6 +206,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
                              f"--junitxml={artifacts / 'junit.xml'}", "-m", "not unfinished", *batch.nodeids]
             print(f"Pilot starting {batch.name}", flush=True)
+            launched.append(batch.name)
             return subprocess.Popen(child_command, cwd=REPOSITORY_ROOT, start_new_session=True,
                                     stdout=output, stderr=subprocess.STDOUT,
                                     env={**os.environ, "LAGNIAPPE_E2E_WORKER_CONTEXT": str(path),
@@ -195,7 +215,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
         try:
             for signum in (signal.SIGTERM, signal.SIGINT):
                 previous[signum] = signal.signal(signum, cancel)
-            schedule(batches, launch, authority.assert_active, workers=3, timeout=7200 if scope == "all" else 1800,
+            schedule(batches, launch, check_authority, workers=3, timeout=7200 if scope == "all" else 1800,
                      finished=statuses, events=events)
         except (OSError, RuntimeError, KeyboardInterrupt) as error:
             scheduler_error = str(error)

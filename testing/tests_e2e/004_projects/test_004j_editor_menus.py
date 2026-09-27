@@ -220,8 +220,8 @@ def test_table_menu_creates_edits_and_saves(get_admin, mobile):
 
 
 # @matrix editor : table-menu
-def test_table_menu_edits_pasted_table(get_user):
-    user, project, editor = open_editor(get_user, False)
+def test_table_menu_edits_pasted_table(get_admin):
+    user, project, editor = open_editor(get_admin, False)
     user.page.context.grant_permissions(["clipboard-read", "clipboard-write"])
     user.page.evaluate("""async () => {
         await navigator.clipboard.write([new ClipboardItem({
