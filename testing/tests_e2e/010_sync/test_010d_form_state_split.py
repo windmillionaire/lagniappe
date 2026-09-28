@@ -61,6 +61,7 @@ def _create_reconciliation_page(user):
 # @pairs edited-entity-notice:submission-choice form-schema:notice reconnect-refresh:dirty-form-preservation
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
+@pytest.mark.e2e_group("owner")
 def test_form_submission_reconciliation_uses_latest_schema(
     get_user,
     browser_failures,
@@ -185,6 +186,7 @@ def test_form_submission_reconciliation_uses_latest_schema(
 # @pair tasks:active-form-preservation
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
+@pytest.mark.e2e_group("owner")
 def test_task_collection_refresh_preserves_active_form_for_revision_review(
     get_user,
 ):

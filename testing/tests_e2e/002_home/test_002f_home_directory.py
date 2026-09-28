@@ -118,6 +118,7 @@ def _analytics_request(user, path, method="GET"):
 
 
 # @pair home:directory-list
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_directory_links_present(get_user):
     """Test that all directory links are present."""
@@ -138,6 +139,7 @@ def test_directory_links_present(get_user):
 
 # @pair manual:page-load
 # @template manual/content/overview.html::open_source
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_navigate_to_manual_from_home_button(get_user):
     """Test navigating to manual from the standalone home button."""
@@ -153,6 +155,7 @@ def test_navigate_to_manual_from_home_button(get_user):
 
 
 # @matrix admin : page-load site-settings
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_admin_directory_link_opens_admin_settings(get_user):
     """The owner can open the Admin settings view from the home directory."""
@@ -173,6 +176,7 @@ def test_admin_directory_link_opens_admin_settings(get_user):
 
 
 # @matrix analytics : accordion dashboard owner-filter page-load period-controls retention-clear
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_analytics_dashboard_owner_filter_and_retention_clear(
     get_user, browser_failures
@@ -282,6 +286,7 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
 
 
 # @pair analytics:internal-request-exclusion
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_analytics_excludes_internal_requests(get_user):
     owner = get_user(Users.OWNER)
@@ -322,6 +327,7 @@ def test_analytics_excludes_internal_requests(get_user):
 # @pair frontend-build:font-delivery
 # @template analytics/index.html::ai_observability
 # @template analytics/index.html::ai_runs
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     get_user,
@@ -483,6 +489,7 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
 
 
 # @matrix manual : metadata popstate section-navigation
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_manual_ajax_section_navigation_and_popstate(get_user):
     user = get_user(Users.OWNER)
@@ -523,6 +530,7 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
 
 
 # @pair manual:section-navigation
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_manual_security_section_loads(get_user):
     user = get_user(Users.OWNER)
@@ -666,6 +674,7 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
 
 
 # @matrix manual : address-redaction ai-email ajax-section anonymous-access direct-section no-auth-bootstrap
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     anonymous = get_user(Users.ANONYMOUS)

@@ -47,7 +47,7 @@ from lagniappe.core.entities import Entities
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources.form import Form
 
-from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks, Users
+from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks
 from testing.elements import Buttons, FormSelect, Modal, SpinnerButtons
 from testing.resources import Task
 from testing.utility.network import expect_successful_response
@@ -251,8 +251,8 @@ def test_in_progress_button(get_admin, get_user):
 
 # @matrix model-tasks : status-filter nested-relations
 # @template tasks/index.html::view
-def test_status_filter_loads_task_page_form_permissions(get_user):
-    user = get_user(Users.OWNER)
+def test_status_filter_loads_task_page_form_permissions(get_admin):
+    user = get_admin()
     model_task = ModelTasks.test_status_filter_model_task.get(user)
     form = Form(user=user, definition=FormDefinition(
         name=f"Status page form {uuid4().hex}", form_type="page",

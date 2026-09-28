@@ -273,6 +273,7 @@ def test_create_category_hides_form_picker_without_forms_view(get_user):
 
 # @matrix permissions : home-actions resource-gates
 # @template home/categories.html::category
+@pytest.mark.e2e_group("owner")
 def test_category_home_rows_only_offer_star_controls(get_user):
     """Home category rows omit delete even when the user may delete the entity."""
     owner = get_user(Users.OWNER)
@@ -290,6 +291,7 @@ def test_category_home_rows_only_offer_star_controls(get_user):
 
 # @matrix home : permissions task-list view-only
 # @template home/tasks.html::task
+@pytest.mark.e2e_group("owner")
 def test_home_task_list_shows_view_only_page_tasks_without_controls(get_user):
     """A readable page task appears on home without task action controls."""
     owner = get_user(Users.OWNER)

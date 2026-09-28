@@ -16,8 +16,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @matrix categories : index-filter permission-gates
-def test_page_acl_user_sees_one_page_on_category_index_home_and_search(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_acl_user_sees_one_page_on_category_index_home_and_search(get_admin, get_user):
+    owner = get_admin()
     category = Categories.acl_two_pages_lab.get(owner)
     visible = Pages.acl_lab_visible.get(owner)
     hidden = Pages.acl_lab_hidden.get(owner)
@@ -41,8 +41,8 @@ def test_page_acl_user_sees_one_page_on_category_index_home_and_search(get_user)
 
 
 # @matrix categories : create-control permission-gates
-def test_category_create_scoped_to_one_category(get_user):
-    owner = get_user(Users.OWNER)
+def test_category_create_scoped_to_one_category(get_admin, get_user):
+    owner = get_admin()
     allowed_cat = Categories.acl_create_allowed.get(owner)
     denied_cat = Categories.acl_create_denied.get(owner)
 
@@ -68,8 +68,8 @@ def test_category_create_scoped_to_one_category(get_user):
 # @matrix categories : default-form info-form labels permission-gates readonly
 # @template categories/index.html::tools_section
 # @template categories/tools.html::category_info
-def test_category_viewer_opens_readonly_settings(get_user):
-    owner = get_user(Users.OWNER)
+def test_category_viewer_opens_readonly_settings(get_admin, get_user):
+    owner = get_admin()
     category = Categories.test_category_readonly_settings.get(owner)
     form = category.definition.form.get(owner)
     description = "Readonly category settings description."

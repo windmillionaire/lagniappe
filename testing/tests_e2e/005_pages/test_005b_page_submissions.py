@@ -236,6 +236,7 @@ def test_table_submission_row_actions(get_admin, get_user):
 
 
 # @matrix form-table : mobile row-actions touch-gesture
+@pytest.mark.e2e_group("owner")
 def test_table_submission_mobile_row_action_gestures(get_user):
     user = get_user(Users.OWNER, has_touch=True)
     page = Pages.test_table_submission.get(user)

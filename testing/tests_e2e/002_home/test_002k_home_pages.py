@@ -65,6 +65,7 @@ def test_create_page_from_home(get_admin, get_user):
 # @pairs combobox:permission-filter permissions:category-edit
 # @template home/home.html::create
 # @template home/pages.html::create
+@pytest.mark.e2e_group("owner")
 def test_home_page_create_visible_for_category_editor(get_user):
     """Home page creation lists editable categories, not view-only categories."""
     owner = get_user(Users.OWNER)

@@ -59,6 +59,7 @@ def _create_group(user, user_index, group):
 # @matrix user-groups : column-link isolation query-route reload same-page-navigation
 # @template common.html::format_name
 # @template users/tools.html::group_permissions
+@pytest.mark.e2e_group("owner")
 def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     owner = get_user(Users.OWNER)
     member = get_user(Users.general_users_view_only, creator=owner)
@@ -100,6 +101,7 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
 # @matrix user-groups : general-permissions group-create nav permission-update
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
+@pytest.mark.e2e_group("owner")
 def test_set_general_permissions(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
@@ -114,9 +116,10 @@ def test_set_general_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
-# @matrix user-groups : entity-permissions group-create nav permission-update responsive-layout selection-render
+# @matrix user-groups : entity-permissions group-create nav permission-update
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
+@pytest.mark.e2e_group("owner")
 def test_set_entity_specific_permissions(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
@@ -134,6 +137,7 @@ def test_set_entity_specific_permissions(get_user):
 # @matrix user-groups : permission-update rename
 # @template users/tools.html::group_permissions
 # @template users/tools.html::group_selector
+@pytest.mark.e2e_group("owner")
 def test_rename_group(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
@@ -170,6 +174,7 @@ def test_rename_group(get_user):
 # @source lagniappe/web/responses.py::group_permissions
 # @template users/tools.html::group_permissions
 # @template users/permissions.html::sections
+@pytest.mark.e2e_group("owner")
 def test_permissions_html_preserves_dirty_form_until_explicit_reset(get_user):
     owner = get_user(Users.OWNER)
     collaborator = copy(owner)
@@ -210,6 +215,7 @@ def test_permissions_html_preserves_dirty_form_until_explicit_reset(get_user):
 
 # @matrix permissions public-groups : active permission-update public
 # @template users/tools.html::public_permissions
+@pytest.mark.e2e_group("owner")
 def test_set_public_permissions(get_user):
     owner = get_user(Users.OWNER)
     user_index = owner.go(SitePages.USER_INDEX)
@@ -266,6 +272,7 @@ def test_set_public_permissions(get_user):
 
 # @matrix user-groups : group-delete nav-refresh polling
 # @template users/tools.html::group_nav
+@pytest.mark.e2e_group("owner")
 def test_delete_group_refreshes_group_navigation(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)

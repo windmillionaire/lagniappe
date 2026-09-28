@@ -117,6 +117,7 @@ def _quick_create_from_combobox(user, combobox, label, name, response_glob):
 # @matrix facets : command-row permissions
 # @matrix quick-create : command-row opt-in permissions
 # @matrix search : permissions search-results
+@pytest.mark.e2e_group("owner")
 def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
     owner = get_user(Users.OWNER)
     owner.go(SitePages.HOME)
@@ -146,6 +147,7 @@ def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
 
 
 # @pairs permissions:category-edit search:permission-filter
+@pytest.mark.e2e_group("owner")
 def test_category_search_permission_filter_returns_editable_categories(get_user):
     owner = get_user(Users.OWNER)
     allowed = Categories.acl_create_allowed.get(owner)
@@ -168,6 +170,7 @@ def test_category_search_permission_filter_returns_editable_categories(get_user)
 # @matrix combobox search : permission-filter
 # @pair permissions:assign
 # @template pages/tasks.html::action_buttons
+@pytest.mark.e2e_group("owner")
 def test_user_assign_search_permission_filter_returns_assignable_users(get_user):
     owner = get_user(Users.OWNER)
     assignable = get_user(Users.assignable_user, creator=owner)
@@ -210,6 +213,7 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
 # @pair task-assignment:owner-opt-in
 # @template pages/tasks.html::action_buttons
 # @template pages/info.html::user_settings
+@pytest.mark.e2e_group("owner")
 def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex

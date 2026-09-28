@@ -105,6 +105,7 @@ MCP_BOUNDARY_PNG = base64.b64decode(
 # @pair agent-api:tool-dispatch
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
 # @source lagniappe/web/routes/api/main.py::execute_tool
+@pytest.mark.e2e_group("owner")
 def test_mcp_original_pdf_download_uses_existing_api_and_storage(
     get_user,
     tmp_path,
@@ -234,6 +235,7 @@ def _canonical_sha256(value) -> str:
 # @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
+@pytest.mark.e2e_group("owner")
 def test_rest_and_mcp_share_submission_validation(get_user, tmp_path, monkeypatch, setup_test_server):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
     for cookie in setup_test_server.browser_cookies:
@@ -654,6 +656,7 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 # @template notifications.html::item
+@pytest.mark.e2e_group("owner")
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
     get_user,
     tmp_path: Path,

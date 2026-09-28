@@ -285,6 +285,11 @@ The E2E browser failure guard fails tests on unaccounted console errors,
 exact method/path/message with `browser_failures.expect(...)` or use
 `browser_failures.expect_offline(user)`. Never add a broad global ignore.
 
+`expect_http_error()` allows the optional Chromium diagnostic for that exact
+context, status and path. Assert the actual response status or final error UI;
+console delivery and duplicate diagnostic counts are not application contracts.
+Explicit counts remain available for tests whose subject is diagnostic delivery.
+
 Use `scoped_browser_route()` for request interception. It always removes the
 route in `finally`; an unscoped route can leak into later actions in the same
 browser context. Playwright interception cannot observe a network request owned
@@ -372,6 +377,13 @@ actual Owner. It reuses one Administrator per sequential worker, with explicit
 CREATE AI entitlement, while `get_user` creates a fresh browser context for each
 call. Keep permission/Owner-specific stories on their explicitly named actors.
 
+Use `@pytest.mark.e2e_group("owner")` for stories retaining the shared Owner
+identity, including through a helper or fixture. Named groups are placed first
+and kept together on one sequential worker; ordinary cases fill the remaining
+capacity. Other groups may run concurrently. Group names describe a shared
+constraint, not a worker number, and can be set at module scope when applicable.
+An `e2e_serial` marker takes precedence when a story also needs whole-site quietness.
+
 Use full enum members such as `Pages.test_page_loads.get(user)`, rather than
 aliases for unrelated stories. Each test reserves direct named resources,
 including references in local/imported test helpers, constants and collected fixtures. It does
@@ -389,6 +401,8 @@ workers drain; still restore settings in `finally`. Using the Owner or changing
 a setting does not by itself require an exclusive phase: identify the affected
 consumers and trial ordinary resource reservations first. Adding a story to the
 pilot's explicit selection does not require manually choosing a batch.
+Keep short unchanged-global-revision assertions separate from long browser
+stories; polling and editing a unique entity do not themselves require isolation.
 
 Submit helpers click the button without asserting transient spinners or busy
 text. Assert the story's saved result, final text or expected error instead;
@@ -405,6 +419,11 @@ edits can still be saved together. Use `refresh_entity(request=...)` when a
 justified backend inspection needs a fresh or deeper relation fetch. Keep the
 behavior under test in the browser and move procedural backend checks to unit
 tests where appropriate.
+
+The first published enum key is its stable identity for the coordinated run.
+A UI creation story may inspect its newly created record locally, but teardown
+must not replace an existing shared key: permission groups and other fixtures
+may already reference it. The next enum lookup resolves the shared identity.
 
 ## Other Test Layers
 

@@ -18,7 +18,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 from lagniappe.core.tools.forms.definitions import rendered_html_fields, resolve_form_generation
 from lagniappe.core.tools.forms.drafts import archive_form_generation
-from testing.definitions import Pages, SitePages, Uploads, Users
+from testing.definitions import Pages, SitePages, Uploads
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
 from testing.definitions.user_definitions import UserDefinition
@@ -694,8 +694,8 @@ def test_generation_rejects_result_after_intervening_edit(get_admin, get_user):
 
 # @matrix forms : builder-save stale-acknowledgement persistent-error concurrent-edit
 # @template forms/builder.html::header
-def test_stale_save_preserves_local_draft_after_another_editor_saves(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_stale_save_preserves_local_draft_after_another_editor_saves(get_admin, get_user, browser_failures):
+    owner = get_admin()
     form, field = _form(owner, "BSU concurrent save")
     first = form.builder
     editor = get_user(UserDefinition(

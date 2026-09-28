@@ -216,7 +216,7 @@ def run_tests(test_args: list[str]) -> int:
     requested_args = list(test_args)
     from runner.e2e_pilot import pilot_arguments
     try:
-        pilot, test_args = pilot_arguments(test_args)
+        pilot, pilot_workers, test_args = pilot_arguments(test_args)
         invocation = normalize_pytest_invocation(test_args, REPOSITORY_ROOT)
     except (PytestRoutingError, ValueError) as error:
         print(f"Test argument error: {error}", file=sys.stderr)
@@ -320,7 +320,8 @@ def run_tests(test_args: list[str]) -> int:
                 if pilot:
                     from runner.e2e_pilot import pilot_authority, run_pilot
                     with pilot_authority(authority) as coordinator:
-                        statuses.append(run_pilot(coordinator, full_command, reports.root_args, scope=pilot))
+                        statuses.append(run_pilot(coordinator, full_command, reports.root_args,
+                                                  scope=pilot, workers=pilot_workers))
                 else:
                     statuses.append(
                         _run_pytest_subprocess(pytest_command(list(reports.root_args)))

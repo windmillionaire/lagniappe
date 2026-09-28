@@ -520,6 +520,7 @@ def test_tools_create_form_has_expected_controls(get_admin, get_user):
 # @template home/home.html::main
 # @template home/tools.html::create_report
 # @template home/tools.html::report_list
+@pytest.mark.e2e_group("owner")
 def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     suffix = _suffix()
@@ -608,6 +609,7 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
 # @template home/home.html::main
 # @template home/tools.html::report_list
 # @template tools/report.html::proposal_action_item
+@pytest.mark.e2e_group("owner")
 def test_saved_report_controls_do_not_require_provider_access(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -672,6 +674,7 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
 
 # @pair ai-access:provider-boundary
 # @template home/tools.html::generation_controls
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
 def test_corrective_plan_controls_require_create_access(get_user, browser_failures, tier):
     from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction

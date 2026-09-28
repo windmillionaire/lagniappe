@@ -51,6 +51,7 @@ def test_task_move_updates_all_owned_file_search_permissions():
 # @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
 # @template forms/restrictions.html::restrict_access
 # @template nav.html::search_results
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("form_type", ["page", "task"])
 def test_form_restrictions_reconcile_existing_descendants(get_user, browser_failures, form_type):
     owner = get_user(Users.OWNER)

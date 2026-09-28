@@ -19,6 +19,7 @@ pytestmark = pytest.mark.e2e
 # @source lagniappe/web/routes/users/login.py::login
 # @matrix pages : load
 # @matrix login : page-load
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("layout", ["page", "login"])
 @pytest.mark.parametrize("monitoring", ["pending", "blocked", "disabled", "missing-dsn"])
 def test_optional_monitoring_does_not_gate_controls(

@@ -34,8 +34,8 @@ def _ordered_project(owner):
 # @matrix model-tasks : ordering persistence
 # @template projects/model_tasks.html::model_task_list
 # @template projects/model_tasks.html::model_task
-def test_model_task_arrows_preserve_open_edits_and_saved_order(get_user):
-    owner = get_user(Users.OWNER)
+def test_model_task_arrows_preserve_open_edits_and_saved_order(get_admin):
+    owner = get_admin()
     project, models, form = _ordered_project(owner)
     owner.go(project)
     expect(owner.locate("[data-widget='ModelTaskList']")).to_have_attribute("loaded", "")
@@ -73,8 +73,8 @@ def test_model_task_arrows_preserve_open_edits_and_saved_order(get_user):
 
 # @matrix model-tasks : permission-gates parent-membership ordering
 # @template projects/model_tasks.html::model_task
-def test_model_order_rejects_invalid_membership_and_readonly_users(get_user):
-    owner = get_user(Users.OWNER)
+def test_model_order_rejects_invalid_membership_and_readonly_users(get_admin, get_user):
+    owner = get_admin()
     project, models, _form = _ordered_project(owner)
     foreign_project = Project(definition=ProjectDefinition(name=f"Other project {uuid4().hex[:8]}"))
     foreign_project.user = owner

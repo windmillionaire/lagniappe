@@ -57,6 +57,7 @@ def _fixture():
 
 # @source lagniappe/web/routes/pages/main.py::tasks
 # @matrix tasks cache : conditional-response durable-revision viewer-scope
+@pytest.mark.e2e_group("owner")
 def test_unchanged_task_list_skips_loading_and_invalidates_on_save(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
     page, task, form = _fixture()
@@ -104,6 +105,7 @@ def test_unchanged_task_list_skips_loading_and_invalidates_on_save(get_user, mon
 # @source lagniappe/web/routes/pages/main.py::tasks
 # @matrix auth : batch-load session-preload fallback
 # @matrix tasks cache : conditional-response
+@pytest.mark.e2e_group("owner")
 def test_task_list_batches_validation_with_session_context(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
     page, task, form = _fixture()
@@ -152,6 +154,7 @@ def test_task_list_batches_validation_with_session_context(get_user, monkeypatch
 # @source lagniappe/web/routes/pages/main.py::tasks
 # @matrix experiments : task-list-comparison
 # @matrix tasks cache : conditional-response
+@pytest.mark.e2e_group("owner")
 def test_experiments_compare_task_list_paths_without_changing_content_or_access(
     get_user, monkeypatch, quiet_control,
 ):
@@ -200,6 +203,7 @@ def test_experiments_compare_task_list_paths_without_changing_content_or_access(
 # @source lagniappe/web/routes/pages/main.py::tasks
 # @matrix auth : batch-load
 # @matrix tasks cache : conditional-response concurrent-render
+@pytest.mark.e2e_group("owner")
 def test_task_list_detects_change_after_batched_root_read(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
     page, task, form = _fixture()
@@ -229,6 +233,7 @@ def test_task_list_detects_change_after_batched_root_read(get_user, monkeypatch,
 
 # @source lagniappe/web/routes/pages/main.py::tasks
 # @matrix tasks cache : conditional-response job-lifecycle concurrent-render
+@pytest.mark.e2e_group("owner")
 def test_task_list_job_boundaries_and_render_race(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
     page, task, form = _fixture()
@@ -278,6 +283,7 @@ def test_task_list_job_boundaries_and_render_race(get_user, monkeypatch, quiet_c
 
 # @source lagniappe/web/routes/pages/main.py::tasks
 # @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("restriction", ["page", "page-form", "task-form"])
 def test_task_list_rechecks_restrictions_for_cached_viewer(get_user, quiet_control, restriction):
     owner = get_user(Users.OWNER)

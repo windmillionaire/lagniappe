@@ -102,6 +102,7 @@ def test_redis_search_matches_each_restriction_source_before_pagination():
 
 
 # @matrix cache : invalidation no-store etag conditional-response
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("path", ["/", "/l/get/tasks"])
 def test_invalidation_is_not_replayed_by_browser_http_cache(
     get_user, browser, browser_failures, setup_test_server, path,
@@ -192,6 +193,7 @@ def test_invalidation_is_not_replayed_by_browser_http_cache(
 
 # @matrix cache user : invalidation acknowledgement concurrency property-mask
 # @pair cache:invalidation-acknowledgement
+@pytest.mark.e2e_group("owner")
 def test_cache_acknowledgement_preserves_newer_permissions(get_user, setup_test_server):
     owner = get_user(Users.OWNER)
     user = User(user=owner, definition=UserDefinition(
@@ -254,6 +256,7 @@ def test_cache_acknowledgement_preserves_newer_permissions(get_user, setup_test_
 
 # @matrix search : permissions
 # @pair cache:invalidation-acknowledgement
+@pytest.mark.e2e_group("owner")
 def test_search_matches_explicit_denial_and_administrator_content_access(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex

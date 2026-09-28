@@ -347,6 +347,7 @@ def test_delete_activity_item_from_home(get_admin, get_user):
 
 # @matrix activity notes permissions : home owner private shared
 # @template notes.html::note_item
+@pytest.mark.e2e_group("owner")
 def test_home_note_visibility_across_users(get_user):
     owner = get_user(Users.OWNER)
     author = get_user(Users.create_user, creator=owner)
@@ -445,6 +446,7 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_admin,
 
 # @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership reconnect
 # @template nav.html::navbar
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("reconnect_before_open", [False, True])
 def test_notification_menu_deletes_and_clears(
     get_user, browser_failures, reconnect_before_open,

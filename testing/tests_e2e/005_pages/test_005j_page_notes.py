@@ -28,8 +28,8 @@ def _unique(label):
 
 # @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
 # @matrix mutations notes : delete photo-cleanup post-commit
-def test_note_delete_completes_with_root_only_owners(get_user, monkeypatch):
-    owner = get_user(Users.OWNER)
+def test_note_delete_completes_with_root_only_owners(get_admin, monkeypatch):
+    owner = get_admin()
     with app.test_request_context("/"):
         entity = Entities.PAGE.create({"name": _unique("Note owner")})
         Entities.save(entity)
@@ -130,8 +130,8 @@ def _open_note_composer(user):
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
 # @template notes.html::note_item
-def test_page_notes_visibility_and_title_menu(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_notes_visibility_and_title_menu(get_admin, get_user):
+    owner = get_admin()
     page = Pages.acl_lab_visible.get(owner)
     shared_body = _unique("Shared Page note")
     private_body = _unique("Private Page note")
@@ -180,8 +180,8 @@ def test_page_notes_visibility_and_title_menu(get_user):
 # @template notes.html::composer
 # @template notes.html::note_item
 # @style note.section
-def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_page_note_text_photo_and_delete_modal(get_admin, browser_failures):
+    owner = get_admin()
     page = Pages.test_create_page.get(owner)
     _go_with_page_notes(owner, page)
     body = _unique("Page text and photo note")
@@ -248,8 +248,8 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
 # @template pages/notes.html::note_list
 # @template notes.html::composer
 # @template notes.html::note_item
-def test_empty_notes_skip_fetch_without_hiding_new_notes(get_user):
-    owner = get_user(Users.OWNER)
+def test_empty_notes_skip_fetch_without_hiding_new_notes(get_admin):
+    owner = get_admin()
     page = Entities.PAGE.create({"name": _unique("Notes presence")})
     Entities.save(page)
     url = f"{SETTINGS.test_config['BASE_URL']}/pages/{page.urlsafe_key}"

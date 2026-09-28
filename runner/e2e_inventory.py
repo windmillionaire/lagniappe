@@ -15,7 +15,9 @@ ENUMS = frozenset({"Pages", "Tasks", "Projects", "Categories", "Forms", "Files",
                    "ModelTasks", "Users", "Groups"})
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_015_e2e_parallel.py::test_collection_preserves_group_and_serial_markers
+# @matrix testing : parallel-e2e
 def pytest_collection_finish(session):
     destination = os.environ.get("LAGNIAPPE_E2E_COLLECTION")
     if not destination:
@@ -35,8 +37,15 @@ def pytest_collection_finish(session):
         phase = marker.kwargs.get("phase", "after") if marker else None
         if marker and phase not in {"before", "after"}:
             raise ValueError(f"Invalid e2e_serial phase for {item.nodeid}: {phase}")
+        group_marker = item.get_closest_marker("e2e_group")
+        group = None
+        if group_marker:
+            if (len(group_marker.args) != 1 or group_marker.kwargs
+                    or not isinstance(group_marker.args[0], str) or not group_marker.args[0].strip()):
+                raise ValueError(f"e2e_group requires one nonempty name for {item.nodeid}")
+            group = group_marker.args[0]
         records.append({"nodeid": item.nodeid, "serial": bool(marker),
-                        "serial_phase": phase, "fixtures": fixtures})
+                        "serial_phase": phase, "group": group, "fixtures": fixtures})
     Path(destination).write_text(json.dumps(records), encoding="utf-8")
 
 
@@ -99,12 +108,16 @@ def discover_resources(root, path, name, fixtures=(), *, modules=None):
 
 # @testable true
 # @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_balances_cases_without_transitive_resource_groups
+# @tests tests_tooling/test_015_e2e_parallel.py::test_marked_groups_stay_on_one_worker_without_becoming_exclusive
 # @matrix testing : parallel-e2e
 def story_batches(root, records, *, workers=3, durations=None):
-    """Balance individual cases; workers reserve resources only during each test."""
+    """Place marked groups first, then balance cases; reserve resources per test."""
+    if type(workers) is not int or workers < 1:
+        raise ValueError("E2E workers must be a positive integer")
     durations = durations or {}
     fallback = median(durations.values()) if durations else 5.0
     ordinary, serial, before, inventory = [], [], [], []
+    groups = {}
     modules = {}
     for record in records:
         nodeid = record["nodeid"].removeprefix("testing/")
@@ -115,19 +128,24 @@ def story_batches(root, records, *, workers=3, durations=None):
         if record["serial"]:
             (before if record.get("serial_phase") == "before" else serial).append((nodeid, resources))
             continue
-        ordinary.append((nodeid, estimate))
+        if record.get("group"):
+            groups.setdefault(record["group"], []).append((nodeid, estimate))
+        else:
+            ordinary.append((nodeid, estimate))
     order = {record["nodeid"].removeprefix("testing/"): i for i, record in enumerate(records)}
     bins = [[] for _ in range(workers)]
     totals = [0.0] * workers
-    for nodeid, estimate in sorted(ordinary, key=lambda row: -row[1]):
+    units = sorted(groups.values(), key=lambda rows: -sum(estimate for _, estimate in rows))
+    units.extend([(nodeid, estimate)] for nodeid, estimate in sorted(ordinary, key=lambda row: -row[1]))
+    for unit in units:
         worker = min(range(workers), key=lambda i: (totals[i], len(bins[i]), i))
-        bins[worker].append(nodeid)
-        totals[worker] += estimate
+        bins[worker].append([nodeid for nodeid, _ in unit])
+        totals[worker] += sum(estimate for _, estimate in unit)
     batches = []
-    for i, nodes in enumerate(bins):
-        if nodes:
-            nodes.sort(key=order.__getitem__)
-            selected = ["testing/" + node for node in nodes]
+    for i, units in enumerate(bins):
+        if units:
+            units.sort(key=lambda nodes: min(order[node] for node in nodes))
+            selected = ["testing/" + node for nodes in units for node in nodes]
             batches.append(Batch(f"stories-{i + 1}", selected[0],
                                  additional_nodeids=tuple(selected[1:])))
     for name, group in (("stories-before", before), ("stories-serial", serial)):
@@ -147,10 +165,16 @@ def story_batches(root, records, *, workers=3, durations=None):
 # @matrix testing : parallel-e2e
 def duration_estimates(root):
     """Historical timings guide placement only; they never supply run outcomes."""
-    path = root / "testing/evidence/latest.json"
-    if not path.is_file():
-        return {}
-    rows = json.loads(path.read_text(encoding="utf-8")).get("tests", {})
+    hints = os.environ.get("LAGNIAPPE_E2E_DURATIONS")
+    if hints:
+        # The hosted image carries durations separately from prior test results.
+        rows = {node: {"duration": duration, "outcome": "passed"}
+                for node, duration in json.loads(Path(hints).read_text(encoding="utf-8")).items()}
+    else:
+        path = root / "testing/evidence/latest.json"
+        if not path.is_file():
+            return {}
+        rows = json.loads(path.read_text(encoding="utf-8")).get("tests", {})
     return {node.removeprefix("testing/"): float(row["duration"])
             for node, row in rows.items()
             if node.removeprefix("testing/").startswith("tests_e2e/")

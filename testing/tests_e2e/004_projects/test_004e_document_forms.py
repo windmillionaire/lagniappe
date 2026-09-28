@@ -36,10 +36,10 @@ from testing.utility.network import expect_successful_response
 # @matrix editor link-preview : url-safety
 # @matrix outbound-http : privacy url-validation
 def test_editor_preview_rejects_private_targets_without_disrupting_popover(
-    get_user,
+    get_admin,
     browser_failures,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     project = user.go(Projects.test_editor_forms)
     editor = project.editor
     private_targets = [

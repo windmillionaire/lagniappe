@@ -108,6 +108,7 @@ def test_poll_batching_preserves_validation_and_stale_session_recovery(polling_c
 # @source lagniappe/web/routes/home/poll.py::poll
 # @matrix polling permissions : batching authorization
 # @matrix auth : session-preload
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("restriction", ["page", "page-form", "task-form", "user"])
 def test_batched_poll_rechecks_permissions(polling_client, get_user, restriction):
     client, user, page = polling_client

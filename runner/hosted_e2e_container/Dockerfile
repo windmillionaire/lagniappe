@@ -41,6 +41,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+COPY runner/hosted_e2e_container/durations.json /opt/lagniappe-e2e-durations.json
+RUN rm runner/hosted_e2e_container/durations.json
+ENV LAGNIAPPE_E2E_DURATIONS=/opt/lagniappe-e2e-durations.json
 COPY --from=mcp-builder /workspace/mcp/.venv /workspace/mcp/.venv
 COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore
 

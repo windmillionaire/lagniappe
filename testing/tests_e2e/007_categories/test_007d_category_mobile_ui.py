@@ -32,8 +32,8 @@ def test_category_mobile_controls_open_with_page_columns(get_admin, get_user):
 
 # @template categories/index.html::view_header
 # @template categories/index.html::view
-def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_user):
-    owner = get_user(Users.OWNER)
+def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_admin, get_user):
+    owner = get_admin()
     category = Categories.acl_create_denied.get(owner)
 
     subject = get_user(Users.single_category_create)

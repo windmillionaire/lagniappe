@@ -23,6 +23,7 @@ pytestmark = pytest.mark.e2e
 # @matrix ai-report : batching identity dependencies
 # @matrix project : db-load model-tasks ordering relation-attach
 # @matrix entity-patch : preservation preparation
+@pytest.mark.e2e_group("owner")
 def test_saved_project_and_page_forms_survive_linked_batch_updates(get_user):
     actor = get_user(Users.OWNER).entity
     suffix = uuid4().hex[:8]
@@ -70,6 +71,7 @@ def test_saved_project_and_page_forms_survive_linked_batch_updates(get_user):
 # @source lagniappe/core/tools/ai/reporting/execution/actions/documents.py::_append_page_document
 # @matrix ai-report : batching atomicity documents dependencies recovery
 # @matrix ai-report : document append persistence
+@pytest.mark.e2e_group("owner")
 def test_related_creations_and_document_appends_commit_together(get_user, monkeypatch):
     user = get_user(Users.OWNER)
     actor = user.entity

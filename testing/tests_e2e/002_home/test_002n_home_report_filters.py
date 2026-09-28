@@ -71,6 +71,7 @@ def _executed_only(panel):
 # @matrix ai-report : filter-categories filter-counts filter-empty filter-persistence
 # @template home/tools.html::report_list
 # @template home/tools.html::report_item
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("mobile", [False, True])
 def test_report_filters_persist_and_follow_live_status(
     get_user, mobile, tmp_path, browser_failures
@@ -126,6 +127,7 @@ def test_report_filters_persist_and_follow_live_status(
 # @matrix ai-report : bulk-delete confirmation delete-snapshot delete-failure loading-indicator
 # @template home/tools.html::report_list
 # @template layouts/delete.html::delete_action
+@pytest.mark.e2e_group("owner")
 def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
     get_user, tmp_path
 ):
@@ -235,6 +237,7 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
 
 
 # @matrix ai-report : bulk-delete ownership validation
+@pytest.mark.e2e_group("owner")
 def test_bulk_report_delete_rechecks_ownership_and_validates_input(
     get_user, browser_failures
 ):

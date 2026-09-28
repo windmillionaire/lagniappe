@@ -298,6 +298,7 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_us
 # @matrix pages : photo-visibility readonly
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::card
+@pytest.mark.e2e_group("owner")
 def test_readonly_viewer_can_toggle_image_without_editing(get_user):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.acl_lab_visible)
@@ -321,6 +322,7 @@ def test_readonly_viewer_can_toggle_image_without_editing(get_user):
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::image
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto
+@pytest.mark.e2e_group("owner")
 def test_site_ai_disabled_upload_has_no_generation_controls(get_user, monkeypatch):
     from lagniappe import CONFIG
     from lagniappe.web import app

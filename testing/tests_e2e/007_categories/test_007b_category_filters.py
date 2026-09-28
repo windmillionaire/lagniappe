@@ -81,8 +81,8 @@ def _attached_form_filter_context(user):
 
 
 # @pair filters:related-forms
-def test_category_filter_select_includes_form_from_created_page(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_select_includes_form_from_created_page(get_admin):
+    user = get_admin()
     category = Categories.test_category_filter_related_form_registration.get(user)
     page = Page(
         user=user,
@@ -107,8 +107,8 @@ def test_category_filter_select_includes_form_from_created_page(get_user):
 
 
 # @pair filters:tab-open
-def test_category_filters_form_opens(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filters_form_opens(get_admin):
+    user = get_admin()
     category = Categories.test_create_page.get(user)
     user.go(category)
     filters = category.filter_section
@@ -120,8 +120,8 @@ def test_category_filters_form_opens(get_user):
 
 
 # @pair filters:empty-validation
-def test_category_filters_require_at_least_one_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filters_require_at_least_one_condition(get_admin):
+    user = get_admin()
     category = Categories.test_create_page.get(user)
     user.go(category)
     filters = Filters(user, category)
@@ -131,8 +131,8 @@ def test_category_filters_require_at_least_one_condition(get_user):
 
 
 # @matrix filters : empty-state saved-filters
-def test_category_saved_filters_empty_state(get_user):
-    user = get_user(Users.OWNER)
+def test_category_saved_filters_empty_state(get_admin):
+    user = get_admin()
     category = Categories.test_empty_category.get(user)
     user.go(category)
 
@@ -150,8 +150,8 @@ def test_category_saved_filters_empty_state(get_user):
 
 
 # @pair pages:tool-switch
-def test_category_saved_filters_hide_create_page_tool(get_user):
-    user = get_user(Users.OWNER)
+def test_category_saved_filters_hide_create_page_tool(get_admin):
+    user = get_admin()
     category = Categories.test_empty_category.get(user)
     user.go(category)
 
@@ -174,8 +174,8 @@ def test_category_saved_filters_hide_create_page_tool(get_user):
 
 
 # @matrix filters : query-tool saved-filters
-def test_category_url_tool_opens_saved_filters(get_user):
-    user = get_user(Users.OWNER)
+def test_category_url_tool_opens_saved_filters(get_admin):
+    user = get_admin()
     category = Categories.test_empty_category.get(user)
     user.go(category, query_params={"tool": "saved-filters"})
 
@@ -193,8 +193,8 @@ def test_category_url_tool_opens_saved_filters(get_user):
 
 
 # @matrix filters : run-results string-condition
-def test_category_filter_by_page_name(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_page_name(get_admin):
+    user = get_admin()
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
     user.go(category)
 
@@ -206,8 +206,8 @@ def test_category_filter_by_page_name(get_user):
 
 
 # @matrix filters : run-results string-condition view-access
-def test_category_filter_results_respect_page_permissions(get_user):
-    owner = get_user(Users.OWNER)
+def test_category_filter_results_respect_page_permissions(get_admin, get_user):
+    owner = get_admin()
     category = Categories.test_category_filter_pages.get(owner)
     visible = Pages.test_category_filter_permission_visible.get(owner)
     hidden = Pages.test_category_filter_permission_hidden.get(owner)
@@ -226,8 +226,8 @@ def test_category_filter_results_respect_page_permissions(get_user):
 
 
 # @matrix filters : description run-results string-condition
-def test_category_filter_by_page_description(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_page_description(get_admin):
+    user = get_admin()
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
     user.go(category)
 
@@ -239,8 +239,8 @@ def test_category_filter_by_page_description(get_user):
 
 
 # @matrix filters : category entity-condition run-results
-def test_category_filter_by_additional_category(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_additional_category(get_admin):
+    user = get_admin()
     category, matching_page, excluded_page, _, extra_category = (
         _category_filter_context(user)
     )
@@ -254,8 +254,8 @@ def test_category_filter_by_additional_category(get_user):
 
 
 # @matrix filters : boolean-condition public run-results
-def test_category_filter_by_public_page(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_public_page(get_admin):
+    user = get_admin()
     category, _, excluded_page, public_document_page, _ = (
         _category_filter_context(user)
     )
@@ -269,8 +269,8 @@ def test_category_filter_by_public_page(get_user):
 
 
 # @matrix filters : boolean-condition document run-results
-def test_category_filter_by_document_asset(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_document_asset(get_admin):
+    user = get_admin()
     category, _, excluded_page, public_document_page, _ = (
         _category_filter_context(user)
     )
@@ -284,8 +284,8 @@ def test_category_filter_by_document_asset(get_user):
 
 
 # @matrix filters : attached-form run-results string-condition
-def test_category_filter_by_attached_form_text_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_attached_form_text_condition(get_admin):
+    user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
 
     (
@@ -299,8 +299,8 @@ def test_category_filter_by_attached_form_text_condition(get_user):
 
 
 # @matrix filters : attached-form number-condition run-results
-def test_category_filter_by_attached_form_number_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_attached_form_number_condition(get_admin):
+    user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
 
     (
@@ -314,8 +314,8 @@ def test_category_filter_by_attached_form_number_condition(get_user):
 
 
 # @matrix filters : attached-form boolean-condition run-results
-def test_category_filter_by_attached_form_checkbox_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_attached_form_checkbox_condition(get_admin):
+    user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
 
     (
@@ -327,8 +327,8 @@ def test_category_filter_by_attached_form_checkbox_condition(get_user):
 
 
 # @matrix filters : attached-form run-results select-condition
-def test_category_filter_by_attached_form_select_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_category_filter_by_attached_form_select_condition(get_admin):
+    user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
 
     (
@@ -344,8 +344,8 @@ def test_category_filter_by_attached_form_select_condition(get_user):
 # @matrix filters : reload-persistence save saved-filters
 # @pairs polling:category-index reconnect-refresh:category-index
 # @template categories/index.html::view
-def test_category_saved_filter_save_and_run(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_category_saved_filter_save_and_run(get_admin, browser_failures):
+    user = get_admin()
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
     user.go(category)
 

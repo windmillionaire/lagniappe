@@ -94,6 +94,7 @@ def _unique(label):
 # @matrix editor sync : replacement recovery offline-replay
 # @matrix document-history : recovery
 # @template projects/document.html::document_tab
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("headless", [False, True])
 def test_offline_draft_is_pinned_before_document_replacement(get_user, browser_failures, headless):
     from lagniappe.core.tools.document_crdt import append_fragment, replace_fragment
@@ -309,6 +310,7 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, brow
 
 # @matrix polling : current-state cursor document
 # @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
+@pytest.mark.e2e_group("owner")
 def test_headless_offline_replay_merges_concurrent_remote_edits(
     get_user, browser_failures
 ):

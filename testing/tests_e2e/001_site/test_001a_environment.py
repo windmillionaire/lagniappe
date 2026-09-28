@@ -205,6 +205,7 @@ def test_server_running(get_user):
 
 # @matrix notifications : ping redis-projection
 # @pair web-headers:notification-state
+@pytest.mark.e2e_group("owner")
 def test_ping_notification_state_is_redis_only_and_optional(get_user):
     """A real notification reaches a reloaded page through the ping header."""
     user = get_user(Users.OWNER)
@@ -256,6 +257,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
 
 # @matrix cache : build-id etag missing-fingerprint standard-header
 # @matrix web-headers : conditional-request etag missing-fingerprint security
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e_serial
 def test_authenticated_home_response_headers_include_etag(get_user, browser_failures):
     """Authenticated app responses should carry the common header envelope."""
@@ -379,6 +381,7 @@ def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
 
 
 # @matrix cache session timezone : permissions-preserved
+@pytest.mark.e2e_group("owner")
 def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setup_test_server):
     owner = get_user(Users.OWNER)
     actor = User(user=owner, definition=UserDefinition(
@@ -423,6 +426,7 @@ def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setu
 
 
 # @matrix location session timezone : atomic-update coordinates validation
+@pytest.mark.e2e_group("owner")
 def test_update_session_rejects_invalid_timezone_and_location_atomically(
     get_user, browser_failures
 ):
@@ -562,6 +566,7 @@ def test_error_handling(get_user, browser_failures):
     expect(user.page).to_have_title("Error 404")
 
 
+@pytest.mark.e2e_group("owner")
 def test_browser_failure_guard_detects_unhandled_page_errors(
     get_user, browser_failures
 ):

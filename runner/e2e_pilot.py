@@ -1,6 +1,7 @@
 """Opt-in coordinated protocol checks and automatically grouped browser stories."""
 
 from contextlib import contextmanager, ExitStack
+import argparse
 import json
 import os
 from pathlib import Path
@@ -73,16 +74,30 @@ TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 # @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged
 # @matrix testing : parallel-e2e
 def pilot_arguments(arguments):
+    parser = argparse.ArgumentParser(add_help=False, exit_on_error=False, allow_abbrev=False)
+    parser.add_argument("--experiments-workers", type=int)
+    try:
+        options, arguments = parser.parse_known_args(arguments)
+    except argparse.ArgumentError as error:
+        raise ValueError(str(error)) from error
     flags = [arg for arg in arguments if arg == "--experiments" or arg.startswith("--experiments=")]
     if not flags:
-        return False, arguments
+        if options.experiments_workers is not None:
+            raise ValueError("--experiments-workers requires --experiments")
+        return False, 3, arguments
+    limit = os.environ.get("LAGNIAPPE_HOSTED_E2E_WORKERS")
+    workers = options.experiments_workers if options.experiments_workers is not None else int(limit or 3)
+    if not 1 <= workers <= 6:
+        raise ValueError("--experiments-workers must be between 1 and 6")
+    if limit and workers > int(limit):
+        raise ValueError("Requested workers exceed this hosted candidate's capacity")
     if len(flags) != 1 or flags[0] not in {"--experiments", "--experiments=pilot", "--experiments=all"}:
         raise ValueError("Use --experiments or --experiments=all")
     scope = "all" if flags[0] == "--experiments=all" else "pilot"
     rest = [arg for arg in arguments if arg not in flags]
     if any(not arg.startswith("--junitxml=") for arg in rest):
         raise ValueError("test --experiments selects coordinated E2E tests; only --junitxml= is additional")
-    return scope, [*rest, *(TARGETS if scope == "pilot" else ("e2e",))]
+    return scope, workers, [*rest, *(TARGETS if scope == "pilot" else ("e2e",))]
 
 
 # @testable infrastructure
@@ -110,7 +125,7 @@ def pilot_authority(local_authority):
 # @testable true
 # @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
 # @matrix testing : parallel-e2e
-def run_pilot(authority, command, pytest_args, *, scope="pilot"):
+def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     from lagniappe import CONFIG
     from lagniappe.core.entities import Entities
     from runner.test_session import capture_process_identity, load_session_state
@@ -153,7 +168,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
     if collected.returncode:
         raise RuntimeError(f"Pilot collection failed; see {root / 'collection.log'}")
     stories, inventory = story_batches(REPOSITORY_ROOT, json.loads(collection.read_text(encoding="utf-8")),
-                                       durations=duration_estimates(REPOSITORY_ROOT))
+                                       workers=workers, durations=duration_estimates(REPOSITORY_ROOT))
     by_node = {row["nodeid"].removeprefix("testing/"): row for row in inventory}
     batches = ([batch for batch in stories if batch.name == "stories-before"] + batches
                + [batch for batch in stories if batch.name != "stories-before"])
@@ -223,7 +238,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
         try:
             for signum in (signal.SIGTERM, signal.SIGINT):
                 previous[signum] = signal.signal(signum, cancel)
-            schedule(batches, launch, check_authority, workers=3, timeout=7200 if scope == "all" else 1800,
+            schedule(batches, launch, check_authority, workers=workers, timeout=7200 if scope == "all" else 1800,
                      finished=statuses, events=events)
         except (OSError, RuntimeError, KeyboardInterrupt) as error:
             scheduler_error = str(error)
@@ -239,7 +254,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot"):
         errors.append("Source changed during E2E pilot; results are not importable")
     status = int(bool(errors) or any(row["outcome"] == "failed" for row in outcomes.values()))
     summary = {"attempt": attempt, "source_snapshot": snapshot,
-               "hosted": CONFIG.hosted_e2e_runner, "workers": 3, "scope": scope,
+               "hosted": CONFIG.hosted_e2e_runner, "workers": workers, "scope": scope,
                "selected": [nodeid for batch in batches for nodeid in batch.nodeids],
                "batches": [{"name": b.name, "selected": b.nodeids, "resources": sorted(b.resources),
                             "exclusive": b.exclusive} for b in batches], "events": events,

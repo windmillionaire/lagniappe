@@ -92,7 +92,7 @@ class BrowserFailureCollector:
         user: Any,
         *,
         kind: str,
-        count: int = 1,
+        count: int | None = 1,
         max_count: int | None = None,
         method: str | None = None,
         path: str | None = None,
@@ -106,9 +106,9 @@ class BrowserFailureCollector:
         source_path: str | None = None,
     ) -> "ExpectedBrowserFailure":
         """Return a scope that consumes an intentional failure pattern."""
-        if count < 0:
+        if count is not None and count < 0:
             raise ValueError("Expected browser failure count cannot be negative.")
-        if max_count is not None and max_count < count:
+        if max_count is not None and max_count < (count or 0):
             raise ValueError(
                 "Maximum browser failure count must be at least the minimum count."
             )
@@ -138,10 +138,10 @@ class BrowserFailureCollector:
         *,
         status: int,
         path: str,
-        count: int = 1,
+        count: int | None = None,
         max_count: int | None = None,
     ) -> "ExpectedBrowserFailure":
-        """Account for an intentional HTTP error reported by Chromium."""
+        """Allow Chromium's optional diagnostic; callers assert the HTTP/UI result."""
         source_path = urlsplit(path).path
         return self.expect(
             user,
@@ -315,14 +315,14 @@ class ExpectedBrowserFailure(AbstractContextManager[None]):
         *,
         context_id: int,
         kind: str,
-        count: int,
+        count: int | None,
         max_count: int | None,
         criteria: dict[str, str | None],
     ):
         self.collector = collector
         self.context_id = context_id
         self.kind = kind
-        self.min_count = count
+        self.min_count = count or 0
         self.max_count = count if max_count is None else max_count
         self.criteria = criteria
         self.start_index = 0
@@ -343,9 +343,12 @@ class ExpectedBrowserFailure(AbstractContextManager[None]):
         description = self._description()
         for event in matches:
             event.expected_by = description
-        if not self.min_count <= len(matches) <= self.max_count:
+        if len(matches) < self.min_count or (
+            self.max_count is not None and len(matches) > self.max_count
+        ):
             expected_count = (
-                str(self.min_count)
+                f"at least {self.min_count}"
+                if self.max_count is None else str(self.min_count)
                 if self.min_count == self.max_count
                 else f"between {self.min_count} and {self.max_count}"
             )

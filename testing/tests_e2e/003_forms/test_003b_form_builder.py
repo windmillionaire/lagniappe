@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Forms, Pages, Schemas, SitePages, Uploads, Users
+from testing.definitions import Forms, Pages, Schemas, SitePages, Uploads
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
 from testing.definitions.user_definitions import UserDefinition
@@ -592,9 +592,9 @@ def test_html_field(get_admin, get_user):
 # @style message
 # @style editor.container
 def test_html_editor_recovers_from_failed_load_and_save(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     html = SchemaFields.HTML.get(title="Resilient instructions")
     form = Form(
         user=owner,

@@ -21,6 +21,7 @@ pytestmark = pytest.mark.e2e
 # @matrix ai-report editor sync : document append browser-review persistence source-attribution
 # @matrix asset-storage : copy metadata visibility
 # @template tools/report.html::proposal_action_item
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("action_type", ["append_page_document", "replace_page_document"])
 def test_reviewed_document_append_updates_open_editor(get_user, action_type):
     owner = get_user(Users.OWNER)

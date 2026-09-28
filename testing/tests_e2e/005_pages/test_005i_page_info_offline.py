@@ -41,8 +41,8 @@ def _fill_form_element(form, selector, value):
 # @template pages/info.html::info_form
 # @template pages/document.html::document_settings
 # @template notifications.html::list
-def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_failures):
+    owner = get_admin()
     page = owner.go(Pages.test_offline_sync_form_page)
     mutation_id = f"update:page:{page.key}"
     updated_name = _unique("Offline page info")
@@ -91,7 +91,9 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
     notifications.click()
     option = owner.page.locator(
         "[role='listbox'][data-visible='true'] [role='option']"
-    ).filter(has_text=updated_name)
+    ).filter(has=owner.page.locator("[data-role='target']", has_text=updated_name)).filter(
+        has=owner.page.locator("[data-role='notification-body']", has_text="Offline page update synced.")
+    )
     expect(option).to_be_visible()
     expect(option.locator("[data-role='target']")).to_contain_text(updated_name)
     expect(option.locator("[data-role='notification-body']")).to_have_text(
@@ -106,8 +108,8 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
 # @matrix offline : queue-submit reload replay-reconciliation
 # @pairs edited-entity-notice:replayed-response pages:lp-offline polling:freshness
 # @template pages/info.html::info_form
-def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_page_info_replay_reconciles_after_reload(get_admin, browser_failures):
+    owner = get_admin()
     page = owner.go(Pages.test_offline_sync_form_page)
     page = page.reload()
     mutation_id = f"update:page:{page.key}"
@@ -180,8 +182,8 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
 # @source src/script/forms/revisions/reconciler.mjs::EditReconciler
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
-def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_offline_submission_conflict_keeps_queue_until_choice(get_admin, get_user, browser_failures):
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     page = Page(
         user=owner,

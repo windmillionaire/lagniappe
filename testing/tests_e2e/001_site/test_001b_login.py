@@ -500,6 +500,7 @@ def test_login_page_loads(get_user):
 
 
 # @matrix login : session test-user
+@pytest.mark.e2e_group("owner")
 def test_user_login_success(get_user):
     """
     Verify test user authentication and home page access.
@@ -530,6 +531,7 @@ def test_user_login_success(get_user):
 
 # @matrix auth : invalidation page-key session-keys session-user switch user-key
 # @pair cache:invalidation-acknowledgement
+@pytest.mark.e2e_group("owner")
 def test_switching_session_user_requests_client_cache_invalidation(get_user):
     owner = get_user(Users.OWNER)
     source = get_user(Users.session_switch_source, creator=owner)
@@ -563,6 +565,7 @@ def test_switching_session_user_requests_client_cache_invalidation(get_user):
 
 
 # @matrix auth : batch-load clear fallback flask-login-skip page-key session-keys session-preload stale-session user-key
+@pytest.mark.e2e_group("owner")
 def test_stale_preloaded_session_keys_fall_back_to_flask_login_user(get_user):
     owner = get_user(Users.OWNER)
     stale = get_user(Users.create_user_from_index, creator=owner)
@@ -1510,6 +1513,7 @@ def test_login_responsive_design(get_user):
 
 
 # @pair error-handling:csrf
+@pytest.mark.e2e_group("owner")
 def test_csrf_failure_is_identified_for_targeted_retry(get_user, browser_failures):
     """Only Flask-WTF CSRF failures should trigger the frontend retry path."""
     user = get_user(Users.OWNER)
@@ -1548,6 +1552,7 @@ def test_csrf_failure_is_identified_for_targeted_retry(get_user, browser_failure
 # @matrix login : clear logout redirect session session-keys
 # @pair cache:invalidation-acknowledgement
 # @style login.heading
+@pytest.mark.e2e_group("owner")
 def test_logout_clears_session_and_returns_login(get_user):
     """
     Authenticated users visiting /users/login see logged-in shell; POST logout
@@ -1598,6 +1603,7 @@ def test_logout_clears_session_and_returns_login(get_user):
 
 # @matrix login : ajax invalidation logout redirect
 # @pair cache:invalidation-acknowledgement
+@pytest.mark.e2e_group("owner")
 def test_logout_flags_user_cache_invalidation(get_user):
     """The logout control should expose invalidation and navigate to login."""
     owner = get_user(Users.OWNER)
@@ -1643,6 +1649,7 @@ def test_logout_flags_user_cache_invalidation(get_user):
 
 
 # @matrix login : cookie-hardening remember-cookie
+@pytest.mark.e2e_group("owner")
 def test_login_sets_hardened_auth_cookies(get_user):
     """Test login should issue hardened session and remember-me cookies."""
     owner = get_user(Users.OWNER)

@@ -274,7 +274,7 @@ def _attached_form_filter_context(user):
 # @pair permissions:authorization
 # @template tasks/index.html::view
 # @template forms/restrictions.html::restrict_access
-@pytest.mark.e2e_serial
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("mode", ["preview", "saved"])
 @pytest.mark.parametrize("permission_source", ["task_form", "model_form", "page", "page_form"])
 def test_project_filter_results_respect_task_permissions(get_user, mode, permission_source):
@@ -370,8 +370,6 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
         )
         return {"status": response.status_code, "etag": response.headers.get("etag")}
 
-    assert conditional_get(etag)["status"] == 304
-
     # Both records must match before the form's real save changes access.
     visible_row = results.locator(f"tr[data-key='{visible_task.urlsafe_key}']")
     restricted_row = results.locator(f"tr[data-key='{restricted_task.urlsafe_key}']")
@@ -413,6 +411,39 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
             expect(restricted_row).to_have_count(0)
         else:
             expect(restricted_row).to_be_visible()
+
+
+# @source lagniappe/web/auth.py::permission
+# @matrix cache : conditional-response
+@pytest.mark.e2e_serial
+@pytest.mark.parametrize("mode", ["preview", "saved"])
+def test_unchanged_project_filter_returns_304(get_admin, mode):
+    # Only this negative cache assertion needs a quiet global Tasks revision.
+    # The permission/polling story above can run alongside unrelated mutations.
+    user = get_admin()
+    task = Tasks.test_filter_by_task_name.get(user)
+    project = user.go(task.project)
+    filters = Filters(user, project)
+    filters.set_condition(ProjectFilterConditions.NAME)
+    filters.name_contains(task.definition.name).add_filter()
+    if mode == "preview":
+        with expect_successful_response(user.page, method="GET", path=f"/filters/{project.key}/test") as result:
+            results = filters.run()
+    else:
+        saved = filters.save_filter()
+        with user.page.expect_navigation(url=f"**/filters/{saved.get_attribute('data-key')}") as result:
+            saved.get_by_role("link", name="Run saved filter").click()
+        results = user.locate("[lp-view][data-kind='task'] #table")
+    expect(results.locator(f"tr[data-key='{task.key}']")).to_be_visible()
+    response = result.value
+    assert response.status == 200
+    unchanged = requests.get(
+        response.url,
+        cookies={cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()},
+        headers={"If-None-Match": response.headers["etag"], "User-Agent": user.page.evaluate("navigator.userAgent")},
+        allow_redirects=False, timeout=10,
+    )
+    assert unchanged.status_code == 304 and not unchanged.content
 
 
 # @matrix filters : category entity-condition run-results

@@ -271,6 +271,7 @@ def test_star_file(get_admin, get_user):
 
 # @matrix starred : add-authorization inaccessible-placeholder missing-placeholder missing-target no-mutation retained-inaccessible unavailable-removal
 # @template home/starred.html::list
+@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_star_route_rejects_inaccessible_and_missing_targets(
     get_user, browser_failures

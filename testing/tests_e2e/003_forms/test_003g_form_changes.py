@@ -275,6 +275,7 @@ def test_direct_stale_generation_write_is_rejected_after_migration(get_admin, ge
 
 
 # @matrix form-migration : form-authority restricted-submissions
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("form_type", ["page", "task"])
 def test_form_editor_migrates_restricted_submissions(get_user, form_type):
     owner = get_user(Users.OWNER)
@@ -477,6 +478,7 @@ def test_deleted_migrated_form_retains_completed_submissions_and_history(get_adm
 # @matrix form-migration : stale-input queued-conflict explicit-review
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("change", ["convert", "remove"])
 def test_offline_submission_survives_schema_migration_until_review(
     get_user, browser_failures, change,

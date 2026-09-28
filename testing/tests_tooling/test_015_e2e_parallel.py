@@ -5,17 +5,37 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 from xml.etree import ElementTree as ET
 
 import pytest
 
 from runner.e2e_parallel import Batch, await_worker_file, merge_results, schedule
 from runner.e2e_pilot import TARGETS, pilot_arguments
-from runner.e2e_inventory import discover_resources, duration_estimates, story_batches
+from runner.e2e_inventory import discover_resources, duration_estimates, pytest_collection_finish, story_batches
 from runner.e2e_claims import reserve_resources
 
 
 pytestmark = pytest.mark.tooling
+
+
+# @matrix testing : parallel-e2e
+def test_collection_preserves_group_and_serial_markers(tmp_path, monkeypatch):
+    destination = tmp_path / "collection.json"
+    monkeypatch.setenv("LAGNIAPPE_E2E_COLLECTION", str(destination))
+    markers = {"e2e_group": SimpleNamespace(args=("owner",), kwargs={}),
+               "e2e_serial": SimpleNamespace(args=(), kwargs={"phase": "before"})}
+    item = SimpleNamespace(nodeid="tests_e2e/test_story.py::test_one", fixturenames=[],
+                           get_closest_marker=markers.get)
+    session = SimpleNamespace(items=[item])
+    pytest_collection_finish(session)
+    assert json.loads(destination.read_text()) == [{
+        "nodeid": item.nodeid, "fixtures": [], "serial": True, "serial_phase": "before", "group": "owner",
+    }]
+    for args, kwargs in [((), {}), (("",), {}), ((1,), {}), (("a", "b"), {}), (("a",), {"workers": 1})]:
+        markers["e2e_group"] = SimpleNamespace(args=args, kwargs=kwargs)
+        with pytest.raises(ValueError, match="one nonempty name"):
+            pytest_collection_finish(session)
 
 
 # @matrix testing : parallel-e2e
@@ -80,7 +100,40 @@ def test_reset(): pass
 
 
 # @matrix testing : parallel-e2e
-def test_duration_estimates_use_only_valid_passed_e2e_results(tmp_path):
+@pytest.mark.parametrize("workers", [1, 3, 6])
+def test_marked_groups_stay_on_one_worker_without_becoming_exclusive(tmp_path, workers):
+    folder = tmp_path / "testing/tests_e2e"
+    folder.mkdir(parents=True)
+    (folder / "test_story.py").write_text('''
+from testing.definitions import Users
+def test_owner(): Users.OWNER.get(None)
+def test_other(): pass
+def test_quiet(): pass
+''', encoding="utf-8")
+    records = [
+        {"nodeid": f"tests_e2e/test_story.py::test_owner[{i}]", "group": "owner"}
+        for i in range(3)
+    ] + [
+        {"nodeid": f"tests_e2e/test_story.py::test_other[{i}]"} for i in range(12)
+    ] + [{"nodeid": "tests_e2e/test_story.py::test_quiet", "group": "owner", "serial": True}]
+    records = [{"fixtures": [], "serial": False, **record} for record in records]
+    batches, inventory = story_batches(tmp_path, records, workers=workers)
+    ordinary = [batch for batch in batches if not batch.exclusive]
+    assert len(ordinary) == workers
+    owner_batches = [batch for batch in ordinary if any("test_owner[" in node for node in batch.nodeids)]
+    assert len(owner_batches) == 1
+    assert sum("test_owner[" in node for node in owner_batches[0].nodeids) == 3
+    assert all(not batch.resources for batch in ordinary)  # Per-test claims still apply.
+    assert batches[-1].exclusive and batches[-1].nodeid.endswith("test_quiet")
+    assert sorted(node.removeprefix("testing/") for batch in batches for node in batch.nodeids) == sorted(
+        record["nodeid"] for record in records
+    )
+    assert inventory[0]["resources"] == ["Users.OWNER"]
+
+
+# @matrix testing : parallel-e2e
+def test_duration_estimates_use_only_valid_passed_e2e_results(tmp_path, monkeypatch):
+    monkeypatch.delenv("LAGNIAPPE_E2E_DURATIONS", raising=False)
     assert duration_estimates(tmp_path) == {}
     evidence = tmp_path / "testing/evidence/latest.json"
     evidence.parent.mkdir(parents=True)
@@ -92,6 +145,11 @@ def test_duration_estimates_use_only_valid_passed_e2e_results(tmp_path):
     rows["tests_unit/test_other.py::test_story"] = {"outcome": "passed", "duration": 50}
     evidence.write_text(json.dumps({"tests": rows}))
     assert duration_estimates(tmp_path) == {"tests_e2e/test_good.py::test_story": 3.2}
+    hints = tmp_path / "durations.json"
+    hints.write_text(json.dumps({"tests_e2e/test_hosted.py::test_story": 7.5,
+                                 "tests_e2e/test_bad.py::test_story": -4}))
+    monkeypatch.setenv("LAGNIAPPE_E2E_DURATIONS", str(hints))
+    assert duration_estimates(tmp_path) == {"tests_e2e/test_hosted.py::test_story": 7.5}
 
 
 # @matrix testing : parallel-e2e
@@ -303,16 +361,27 @@ def test_worker_messages_reject_missing_completed_messages(tmp_path):
 
 
 # @matrix testing : parallel-e2e
-def test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged():
-    assert pilot_arguments(["unit"]) == (False, ["unit"])
-    enabled, arguments = pilot_arguments(["--experiments", "--junitxml=result.xml"])
-    assert enabled and arguments == ["--junitxml=result.xml", *TARGETS]
-    assert pilot_arguments(["--experiments=all"]) == ("all", ["e2e"])
+def test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged(monkeypatch):
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_WORKERS", raising=False)
+    assert pilot_arguments(["unit"]) == (False, 3, ["unit"])
+    enabled, workers, arguments = pilot_arguments(["--experiments", "--junitxml=result.xml"])
+    assert enabled and workers == 3 and arguments == ["--junitxml=result.xml", *TARGETS]
+    assert pilot_arguments(["--experiments=all"]) == ("all", 3, ["e2e"])
+    assert pilot_arguments(["--experiments=all", "--experiments-workers", "6"]) == ("all", 6, ["e2e"])
     for arguments in (["--experiments=unknown"], ["--experiments", "--experiments=all"]):
         with pytest.raises(ValueError):
             pilot_arguments(arguments)
     with pytest.raises(ValueError):
         pilot_arguments(["--experiments", "e2e"])
+    for arguments in (["--experiments-workers=6"], ["--experiments", "--experiments-workers=0"],
+                      ["--experiments", "--experiments-workers=7"], ["--experiments", "--experiments-workers=x"]):
+        with pytest.raises(ValueError):
+            pilot_arguments(arguments)
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_WORKERS", "3")
+    with pytest.raises(ValueError, match="capacity"):
+        pilot_arguments(["--experiments", "--experiments-workers=6"])
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E_WORKERS", "6")
+    assert pilot_arguments(["--experiments=all"]) == ("all", 6, ["e2e"])
 
 
 # @matrix testing : parallel-e2e
@@ -376,7 +445,12 @@ def test_scheduler_stops_children_before_returning_on_lost_authority(failure, tm
     for name in ("a", "b"):
         status_file = Path(f"/proc/{int((tmp_path / name).read_text())}/stat")
         deadline = time.monotonic() + 2
-        while status_file.exists() and status_file.read_text().split()[2] != "Z":
+        while True:
+            try:
+                if status_file.read_text().split()[2] == "Z":
+                    break
+            except (FileNotFoundError, ProcessLookupError):
+                break
             assert time.monotonic() < deadline, "cancelled worker's descendant survived"
             time.sleep(.01)
 
@@ -393,7 +467,12 @@ def test_scheduler_reaps_a_crashed_workers_remaining_children(tmp_path):
     assert statuses == {"crashed": 7}
     status_file = Path(f"/proc/{int(pid_file.read_text())}/stat")
     deadline = time.monotonic() + 2
-    while status_file.exists() and status_file.read_text().split()[2] != "Z":
+    while True:
+        try:
+            if status_file.read_text().split()[2] == "Z":
+                break
+        except (FileNotFoundError, ProcessLookupError):
+            break
         assert time.monotonic() < deadline, "worker's descendant survived"
         time.sleep(.01)
 

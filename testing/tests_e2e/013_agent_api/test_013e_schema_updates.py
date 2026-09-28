@@ -36,6 +36,7 @@ pytestmark = pytest.mark.e2e
 # @matrix ai-report : schema-update deterministic-run continue
 # @pairs agent-api:proposal-validation
 # @matrix ai tasks : original-completion schema-version
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("origin", ["api", "web", "web-without-id"])
 def test_reviewed_schema_migration_waits_for_publication_and_preserves_completion(get_user, monkeypatch, origin):
     user = get_user(Users.OWNER)

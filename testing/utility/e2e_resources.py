@@ -61,9 +61,11 @@ def resolve_resource(member, user, create=True):
     return resource
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_031_e2e_resources.py::test_publishing_keys_preserves_the_first_shared_identity
+# @matrix testing : parallel-e2e
 def publish_resource_keys():
-    """Publish identities captured by browser creation stories at teardown."""
+    """Publish new identities without replacing another worker's shared fixture."""
     if not os.environ.get("LAGNIAPPE_E2E_WORKER_CONTEXT"):
         return
     from enum import Enum
@@ -77,4 +79,4 @@ def publish_resource_keys():
             for member in enum:
                 key = getattr(member.value, "_key", None)
                 if key:
-                    rows[f"{enum.__name__}.{member.name}"] = key
+                    rows.setdefault(f"{enum.__name__}.{member.name}", key)

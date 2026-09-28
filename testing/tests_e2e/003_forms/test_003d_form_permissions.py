@@ -27,8 +27,8 @@ def test_form_index_forbidden_without_forms_view(get_user, browser_failures):
 
 # @matrix forms : create-control index-view
 # @template forms/index.html::view
-def test_form_index_lists_forms_but_hides_create_without_forms_create(get_user):
-    owner = get_user(Users.OWNER)
+def test_form_index_lists_forms_but_hides_create_without_forms_create(get_admin, get_user):
+    owner = get_admin()
     Forms.test_create_page_form.get(owner)
 
     viewer = get_user(Users.general_forms_view_only)
@@ -53,8 +53,8 @@ def test_form_index_shows_create_for_user_with_forms_create(get_user):
 
 # @matrix forms : builder-edit permission-gates
 # @template forms/builder.html::main
-def test_form_builder_hides_edit_affordances_without_forms_edit(get_user):
-    owner = get_user(Users.OWNER)
+def test_form_builder_hides_edit_affordances_without_forms_edit(get_admin, get_user):
+    owner = get_admin()
     form = Forms.test_create_page_form.get(owner)
 
     viewer = get_user(Users.general_forms_view_only)
@@ -76,8 +76,8 @@ def test_form_builder_hides_edit_affordances_without_forms_edit(get_user):
 
 # @matrix forms : builder-edit permission-gates
 # @template forms/builder.html::main
-def test_form_builder_shows_edit_affordances_with_forms_edit(get_user):
-    owner = get_user(Users.OWNER)
+def test_form_builder_shows_edit_affordances_with_forms_edit(get_admin, get_user):
+    owner = get_admin()
     form = Forms.test_create_page_form.get(owner)
 
     user = get_user(Users.admin)
@@ -92,6 +92,7 @@ def test_form_builder_shows_edit_affordances_with_forms_edit(get_user):
 
 # @matrix forms : permission-gates restriction-control
 # @template forms/restrictions.html::restrict_access
+@pytest.mark.e2e_group("owner")
 def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
     owner = get_user(Users.OWNER)
     form = Forms.test_create_page_form.get(owner)
@@ -111,6 +112,7 @@ def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
 
 
 # @matrix ai forms : submitted-reference
+@pytest.mark.e2e_group("owner")
 def test_schema_generation_requires_edit_access_to_submitted_form(get_user):
     owner = get_user(Users.OWNER)
     form = Forms.test_owner_restricted_form.get(owner)

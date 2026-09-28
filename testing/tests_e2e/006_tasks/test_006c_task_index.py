@@ -78,6 +78,7 @@ def test_task_index_allows_own_page_only_users(get_user):
 # @pair tasks:inaccessible-backing-page
 # @template table.html::rows
 # @template home/tasks.html::task
+@pytest.mark.e2e_group("owner")
 def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_user):
     """Live queries include an assignee's dated and undated restricted tasks.
 
@@ -149,9 +150,10 @@ def test_task_index_due_date_sort_filters_to_dated_rows(get_admin, get_user):
     future = Tasks.test_task_index_due_future.get(user)
     user.go(SitePages.TASK_INDEX)
 
+    expect(_row_for(user, undated)).to_be_visible()
     _select_sort(user, "due_date", "asc")
 
-    expect(_row_for(user, undated)).to_have_attribute("data-visible", "false")
+    expect(_row_for(user, undated)).not_to_be_visible()
     _assert_visible_task_order(user, [today, future])
 
 

@@ -16,9 +16,9 @@ pytestmark = pytest.mark.e2e
 
 # @pair pages:permission-gates
 def test_page_is_forbidden_without_model_or_page_permission(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     page = Pages.test_create_page.get(owner)
 
     blocked = get_user(Users.user_no_access)
@@ -29,8 +29,8 @@ def test_page_is_forbidden_without_model_or_page_permission(
 
 # @matrix pages : load permission-gates readonly tabs
 # @template pages/info.html::info_form
-def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_user):
+    owner = get_admin()
     page = Pages.acl_lab_visible.get(owner)
 
     viewer = get_user(Users.page_acl_one_visible)
@@ -61,8 +61,8 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
 
 # @matrix pages : document-tab readonly
 # @template pages/page.html::main
-def test_page_viewer_can_read_document_content(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_viewer_can_read_document_content(get_admin, get_user):
+    owner = get_admin()
     page = Pages.acl_lab_document.get(owner)
     marker = "Readonly document content marker"
     if marker not in (page.entity.properties.document.html or ""):
@@ -80,8 +80,8 @@ def test_page_viewer_can_read_document_content(get_user):
 
 # @matrix files : async-load empty-state permission-gates readonly
 # @template pages/files.html::file_list
-def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_admin, get_user):
+    owner = get_admin()
     page = Pages.acl_lab_visible.get(owner)
 
     viewer = get_user(Users.page_acl_one_visible)
@@ -99,6 +99,7 @@ def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_user):
 
 
 # @matrix pages : permission-gates permissions-panel
+@pytest.mark.e2e_group("owner")
 def test_owner_can_open_page_permissions_panel(get_user):
     owner = get_user(Users.OWNER)
     owner.go(Pages.test_create_page)
@@ -115,9 +116,9 @@ def test_owner_can_open_page_permissions_panel(get_user):
 
 
 # @pair pages:submitted-reference
-def test_page_submission_rejects_hidden_internal_link_target(get_user):
+def test_page_submission_rejects_hidden_internal_link_target(get_admin, get_user):
     """A forged internal-link ID must not bypass the picker's visibility filter."""
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     category = Categories.acl_create_allowed.get(owner)
     hidden_file_resource = File.upload_from_page(
         owner,

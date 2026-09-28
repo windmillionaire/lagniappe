@@ -123,6 +123,7 @@ def _assert_routes_forbidden(user, routes, browser_failures):
 # @pairs notification-email:public-user user-settings:field-order
 # @template pages/page.html::main
 # @template pages/info.html::user_settings
+@pytest.mark.e2e_group("owner")
 def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user):
     scenario = limited_public_user
     user = scenario.user
@@ -165,6 +166,7 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
 
 # @pair sync:document
 # @template pages/document.html::document_tab
+@pytest.mark.e2e_group("owner")
 def test_public_user_edits_document_without_ai_or_image_tools(limited_public_user):
     scenario = limited_public_user
     user = scenario.user
@@ -197,6 +199,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
 
 # @pairs tasks:create public-users:task-project-link
 # @template pages/tasks.html::action_buttons
+@pytest.mark.e2e_group("owner")
 def test_public_user_creates_task_with_reduced_schedule_options(
     limited_public_user, browser_failures
 ):
@@ -301,6 +304,7 @@ def test_public_user_creates_task_with_reduced_schedule_options(
 
 
 # @matrix public-users : metered-actions restriction-gate
+@pytest.mark.e2e_group("owner")
 def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failures):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
@@ -354,6 +358,7 @@ def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failu
 
 
 # @matrix public-users : file-photo-gates restriction-gate
+@pytest.mark.e2e_group("owner")
 def test_public_user_file_and_photo_actions_are_forbidden(
     limited_public_user, browser_failures
 ):
@@ -379,6 +384,7 @@ def test_public_user_file_and_photo_actions_are_forbidden(
 
 
 # @matrix public-users : ai-schedule-guard restriction-gate
+@pytest.mark.e2e_group("owner")
 def test_public_user_restricted_schedules_are_forbidden(
     limited_public_user, browser_failures
 ):

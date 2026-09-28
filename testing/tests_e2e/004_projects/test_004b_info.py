@@ -94,10 +94,10 @@ def test_project_info_form(get_admin, get_user):
 # @matrix edited-entity-notice projects : info-form replacement side-effect-free timestamp-only
 # @template projects/info.html::info_form
 def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision(
-    get_user,
+    get_admin,
     browser_failures,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     project = Project(
         user=owner,
         definition=replace(
@@ -159,10 +159,10 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
 # @matrix projects : dirty-state info-form no-reload replacement staged-reset
 # @template projects/info.html::info_form
 def test_project_revision_notice_only_resets_changed_form(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_project_info_form.get(owner)
 
