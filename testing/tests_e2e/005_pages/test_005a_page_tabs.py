@@ -62,6 +62,11 @@ def test_page_with_default_category_form(get_admin, get_user):
 
     submission = Submissions.default_category_form.get()
 
+    # A label click should open the field, just like its Edit button.
+    name_field = page.info_form.locator("[id^='name'].form-element")
+    name_field.locator("[data-role='label'] > span").click()
+    expect(name_field.locator("input")).to_be_visible()
+
     page.set_submission(submission)
     page.submit_and_verify_submission(submission)
 
