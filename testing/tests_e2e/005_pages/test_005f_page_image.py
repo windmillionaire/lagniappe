@@ -298,9 +298,8 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_us
 # @matrix pages : photo-visibility readonly
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::card
-@pytest.mark.e2e_group("owner")
-def test_readonly_viewer_can_toggle_image_without_editing(get_user):
-    owner = get_user(Users.OWNER)
+def test_readonly_viewer_can_toggle_image_without_editing(get_admin, get_user):
+    owner = get_admin()
     page = owner.go(Pages.acl_lab_visible)
     _ensure_photo_form(owner, page)
     viewer = get_user(Users.page_acl_one_visible)

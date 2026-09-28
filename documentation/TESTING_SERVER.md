@@ -109,6 +109,10 @@ normal server teardown.
 
 ## Failure guard
 
+HTTP 5xx console failures include a bounded response-body excerpt and selected
+origin/trace headers when the browser still has the response. Successful
+response bodies are not inspected.
+
 E2E teardown fails on unaccounted browser console errors, page errors, and
 failed requests. An intentional failure must use a narrowly scoped
 `browser_failures.expect(...)` or `expect_offline(...)` context. Do not add a

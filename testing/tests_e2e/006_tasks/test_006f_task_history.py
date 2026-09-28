@@ -36,7 +36,9 @@ pytestmark = pytest.mark.e2e
 @contextmanager
 def _add_task_row_pressure(task, count=40):
     """Keep the history story representative of a well-populated task page."""
-    page = task.entity.page
+    # A reused Task fixture attaches only its Page. Creating additional Tasks
+    # also needs that Page's permission relations, unlike merely displaying it.
+    page = Entities.fetch_one(task.entity.page, request=Fetch.direct())
     filler_tasks = [
         Entities.TASK.create(
             {
@@ -47,8 +49,9 @@ def _add_task_row_pressure(task, count=40):
         )
         for index in range(count)
     ]
-    Entities.save(*filler_tasks, page)
     try:
+        # Task saves already refresh their parent list; the Page has no edits.
+        Entities.save(*filler_tasks)
         yield
     finally:
         Entities.delete(*filler_tasks)

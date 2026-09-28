@@ -106,9 +106,8 @@ def _session_page_key(user):
 # @matrix notification-email : default-daily user-setting
 # @matrix user-settings : field-order group-selector-hidden personal-page readonly-email restrictions sign-out
 # @template pages/info.html::user_settings
-@pytest.mark.e2e_group("owner")
-def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_user_settings_panel_opens_from_my_page(get_admin, get_user, browser_failures):
+    owner = get_admin()
     user = get_user(Users.create_user, creator=owner)
     user.go(SitePages.HOME)
 
@@ -269,9 +268,8 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
 
 # @matrix agent-api user-settings : confirmation-modal entitlement-independent revoke rotate shown-once
 # @template pages/info.html::user_settings
-@pytest.mark.e2e_group("owner")
-def test_user_without_provider_access_can_manage_external_agent_api_key(get_user):
-    owner = get_user(Users.OWNER)
+def test_user_without_provider_access_can_manage_external_agent_api_key(get_admin, get_user):
+    owner = get_admin()
     suffix = uuid4().hex
     user = get_user(
         UserDefinition(
@@ -342,12 +340,11 @@ def test_user_without_provider_access_can_manage_external_agent_api_key(get_user
 
 
 # @matrix ai : access-gate batch-summary provider-boundary
-@pytest.mark.e2e_group("owner")
 def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     user = get_user(Users.create_user, creator=owner)
     page = user.entity.page
     assert page.allowed(Action.EDIT, user=user.entity)

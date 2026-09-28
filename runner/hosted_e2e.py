@@ -1113,7 +1113,7 @@ def _hosted_app_descriptor(
         "service": SERVICE,
         "service_account": infrastructure.runtime_email,
         "entrypoint": f"gunicorn -t 3600 -w {6 if experiments_workers > 3 else 3} -b :$PORT main:app",
-        "instance_class": "B8" if experiments_workers > 3 else "B2",
+        "instance_class": "B4" if experiments_workers > 3 else "B2",
         "basic_scaling": {"max_instances": 1, "idle_timeout": "15m"},
         # Static build artifacts contain no application or test data. Keep them
         # on App Engine's native static path so isolated browser contexts do not

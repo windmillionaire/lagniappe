@@ -373,6 +373,7 @@ def test_home_note_visibility_across_users(get_user):
 
 
 # @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
+# @matrix notifications : body create
 # @template notifications.html::item
 def test_notification_menu_renders_target_and_preserves_pending_state(get_admin, get_user):
     user = get_admin()
@@ -446,12 +447,11 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_admin,
 
 # @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership reconnect
 # @template nav.html::navbar
-@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("reconnect_before_open", [False, True])
 def test_notification_menu_deletes_and_clears(
-    get_user, browser_failures, reconnect_before_open,
+    get_admin, get_user, browser_failures, reconnect_before_open,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     suffix = uuid4().hex
     user = get_user(
         UserDefinition(

@@ -212,7 +212,7 @@ entitlement as well as ordinary administrative permissions.
 
 Local runs accept `--experiments-workers=1` through `=6`. Hosted creation records
 the count and execution inherits it: 1–3 use one B2 instance with three Gunicorn
-processes and a 2-CPU/4-GiB Cloud Run driver; 4–6 use one B8 instance with six
+processes and a 2-CPU/4-GiB Cloud Run driver; 4–6 use one B4 instance with six
 Gunicorn processes and a 4-CPU/8-GiB driver. The larger profile is a trial sizing,
 not a measured throughput guarantee. The coordinator remains one Cloud Run job,
 with multiple browser workers sharing the candidate URL. A worker override

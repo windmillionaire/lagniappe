@@ -5,7 +5,7 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Pages, Submissions, Users
+from testing.definitions import Pages, Submissions
 from testing.elements import SpinnerButtons
 from testing.utility.network import manual_mutation_headers
 
@@ -236,9 +236,8 @@ def test_table_submission_row_actions(get_admin, get_user):
 
 
 # @matrix form-table : mobile row-actions touch-gesture
-@pytest.mark.e2e_group("owner")
-def test_table_submission_mobile_row_action_gestures(get_user):
-    user = get_user(Users.OWNER, has_touch=True)
+def test_table_submission_mobile_row_action_gestures(get_admin):
+    user = get_admin(has_touch=True)
     page = Pages.test_table_submission.get(user)
     user.go(page)
     user.mobile = True

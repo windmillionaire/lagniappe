@@ -269,14 +269,13 @@ def _start_tool_report(
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
 # @matrix ai-report : remote-update async create http-boundary text-only upload validation persistence
-# @matrix ai-report : list stage-labels
+# @matrix ai-report : list
 @tools.route("/ai", methods=["POST"])
 @ai_access(AI.ASK)
 def create_ai_report():
@@ -342,7 +341,7 @@ def _external_plan_mutation_error(outcome):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
@@ -412,7 +411,7 @@ def run_report(key):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access

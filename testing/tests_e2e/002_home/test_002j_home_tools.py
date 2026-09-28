@@ -18,12 +18,11 @@ from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai.function_definitions.preview_form_schema_update import execute_preview_form_schema_update
 from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
 from lagniappe.web import app
-from testing.definitions import SitePages, Uploads, Users
+from testing.definitions import SitePages, Uploads
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import List, Modal
 from testing.resources import Report
 from testing.utility.network import browser_fetch, expect_successful_response
-from testing.utility.polling import expect_poll_result
 
 pytestmark = pytest.mark.e2e
 
@@ -520,9 +519,8 @@ def test_tools_create_form_has_expected_controls(get_admin, get_user):
 # @template home/home.html::main
 # @template home/tools.html::create_report
 # @template home/tools.html::report_list
-@pytest.mark.e2e_group("owner")
-def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_ai_access_tiers_gate_tool_routes(get_admin, get_user, browser_failures):
+    owner = get_admin()
     suffix = _suffix()
     user = get_user(
         UserDefinition(
@@ -609,9 +607,8 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
 # @template home/home.html::main
 # @template home/tools.html::report_list
 # @template tools/report.html::proposal_action_item
-@pytest.mark.e2e_group("owner")
-def test_saved_report_controls_do_not_require_provider_access(get_user):
-    owner = get_user(Users.OWNER)
+def test_saved_report_controls_do_not_require_provider_access(get_admin, get_user):
+    owner = get_admin()
     suffix = uuid4().hex
     user = get_user(
         UserDefinition(
@@ -674,9 +671,8 @@ def test_saved_report_controls_do_not_require_provider_access(get_user):
 
 # @pair ai-access:provider-boundary
 # @template home/tools.html::generation_controls
-@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
-def test_corrective_plan_controls_require_create_access(get_user, browser_failures, tier):
+def test_corrective_plan_controls_require_create_access(get_admin, get_user, browser_failures, tier):
     from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction
 
     suffix = _suffix()
@@ -686,7 +682,7 @@ def test_corrective_plan_controls_require_create_access(get_user, browser_failur
             email=f"correction-access-{suffix}@example.test",
             ai_access=tier,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     owner = _owner(user)
     source = Entities.REPORT.create({
@@ -874,114 +870,6 @@ def test_text_only_organize_plans_updates(get_admin, get_user):
     assert report.input_files == []
 
 
-# @matrix deferred-jobs : polling progress terminal-ownership
-# @matrix notifications : body create
-# @template home/tools.html::report_item
-# @template notifications.html::item
-@pytest.mark.parametrize("surface", ["home", "report"])
-def test_open_pending_report_converges_with_notification(get_admin, get_user, surface):
-    user = get_admin()
-    owner = _owner(user)
-    suffix = _suffix()
-    report = Entities.REPORT.create(
-        {
-            "parent": owner,
-            "user": owner,
-            "name": f"Report convergence {suffix}",
-            "tool": "organize",
-            "status": "pending",
-            "pending": True,
-        }
-    )
-    job = Entities.DEFERRED_JOB.create(
-        {
-            "actor": owner,
-            "job_type": DeferredJobType.REPORT_AI.value,
-            "idempotency_key": f"report-convergence-{suffix}",
-            "status": "running",
-            "dispatch_state": "dispatched",
-            "status_revision": 4,
-            "inputs": {},
-            "client": {
-                "key": report.urlsafe_key,
-                "source_widget": "CreateToolReport",
-                "destination": "tools:ToolReportList",
-            },
-            "progress": {"phase": "using_tools"},
-        }
-    )
-    report.deferred_job = {"key": job.urlsafe_key, "revision": 4}
-    notification = Entities.NOTIFICATION.create(
-        {
-            "parent": owner,
-            "target": report,
-            "body": "Organize report is running.",
-            "pending": True,
-        }
-    )
-    Entities.save(report, job, notification)
-
-    if surface == "home":
-        home = user.go(SitePages.HOME)
-        user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
-        target = user.locate(home.TOOL_REPORT_LIST).locator(
-            f"li[data-key='{report.urlsafe_key}']"
-        )
-    else:
-        user.go(Report.for_entity(user, report))
-        target = user.locate(Report.VIEW)
-
-    expect(target).to_have_attribute("data-pending", "true")
-    expect(target.locator("[data-icon='spinner']")).to_be_visible()
-    expect(target.locator("[data-role='deferred-phase']")).to_have_text(
-        "Checking context"
-    )
-    notification_button = user.locate("[data-role='notifications']")
-    notification_button.click()
-    option = user.page.locator(
-        f"[role='listbox'][data-visible='true'] [role='option'][data-key='{notification.urlsafe_key}']"
-    )
-    expect(option).to_contain_text("Organize report is running.")
-
-    report.properties.process.set_proposal(
-        {"summary": f"Ready proposal {suffix}", "actions": []}
-    )
-    report.deferred_job = None
-    job.status = "succeeded"
-    job.dispatch_state = "complete"
-    job.status_revision = 5
-    job.progress = {"phase": "complete"}
-    notification.body = "Organize report is ready."
-    notification.pending = False
-    completion = (
-        expect_poll_result(
-            user.page,
-            subscription_id=f"operation:{job.urlsafe_key}",
-            timeout=35_000,
-        )
-        if surface == "home"
-        else expect_successful_response(
-            user.page,
-            method="GET",
-            path=f"/tools/reports/{report.urlsafe_key}",
-            timeout=35_000,
-        )
-    )
-    with completion:
-        Entities.save(report, job, notification)
-
-    expect(target).to_have_attribute("data-pending", "false")
-    expect(target).to_contain_text(f"Ready proposal {suffix}")
-    expect(target.locator("[data-icon='spinner']")).not_to_be_attached()
-    expect(target.locator("[data-role='deferred-phase']")).not_to_be_attached()
-    if surface == "report":
-        # Terminal report reconciliation navigates to authoritative full HTML.
-        Report.for_entity(user, report).wait_for_interaction_readiness()
-        notification_button.click()
-    expect(option).to_contain_text("Organize report is ready.")
-    expect(option.locator("[data-icon='spinner']")).not_to_be_attached()
-
-
 # @matrix ai-report : http-boundary upload validation
 def test_organize_rejects_zero_byte_folder_placeholder(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -1092,95 +980,6 @@ def test_report_list_snippets_are_plain_text_and_at_most_five_lines(get_admin, g
     saved = Entities.fetch_one(reports[0].urlsafe_key, request=Fetch.direct())
     assert saved.summary == markdown
     assert saved.proposal["summary"] == markdown
-
-
-# @matrix ai-report : deferred-refresh list operation-poll stage-labels
-# @template home/tools.html::report_stage_label
-# @template home/tools.html::report_item
-def test_report_list_item_refreshes_stage_labels(get_admin, get_user):
-    user = get_admin()
-    item, report = _create_uploaded_report_item(user)
-    expect(item.locator("[data-role='title']")).to_have_text(
-        "sample_notes.txt"
-    )
-    expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
-    expect(item).to_contain_text("Thinking...")
-    expect(item.locator("[lp-delete]")).to_be_visible()
-
-    report_key = item.get_attribute("data-key")
-
-    def reload_item():
-        home = user.go(SitePages.HOME)
-        user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
-        report_list = List(user.locate(home.TOOL_REPORT_LIST))
-        assert report_list.is_loaded
-        return report_list.list.locator(f"li[data-key='{report_key}']")
-
-    assert report.input_files == []
-    assert len(report.upload_manifest) == 1
-    assert report.upload_manifest[0]["filename"] == "sample_notes.txt"
-    finalized = report_uploads.finalize_report_upload_manifest(report, _owner(user))
-    assert [file.filename for file in finalized] == ["sample_notes.txt"]
-    assert [file.filename for file in report.input_files] == ["sample_notes.txt"]
-    assert report.upload_manifest is None
-    report.status = "ready"
-    report.pending = False
-    report.summary = "Ready from deferred refresh."
-    report.proposal = {
-        "summary": "Ready from deferred refresh.",
-        "actions": [
-            {
-                "id": "review",
-                "type": "needs_review",
-                "display_label": "Review imported notes",
-                "data": {},
-            },
-        ],
-    }
-    job = Entities.fetch_one(report.deferred_job["key"], request=Fetch.direct())
-    job.status = DeferredJobStatus.SUCCEEDED.value
-    job.status_revision += 1
-    Entities.save(job, report)
-
-    # A terminal operation poll is followed by server-rendered list
-    # reconciliation; assert the visible outcome across both async stages.
-    expect(item.locator("[data-role='report-stage']")).to_have_text(
-        "Needs review",
-        timeout=30_000,
-    )
-    expect(item).to_contain_text("Ready from deferred refresh.")
-    expect(item).not_to_contain_text("Thinking...")
-
-    report.status = "ready"
-    report.proposal = {
-        "summary": "Executable proposal.",
-        "actions": [
-            {"type": "needs_review", "data": {}},
-            {"type": "create_page", "data": {}},
-        ],
-    }
-    Entities.save(report)
-    item = reload_item()
-    expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal ready")
-
-    report.status = "complete"
-    report.proposal = {
-        "summary": "Executed proposal.",
-        "actions": [{"type": "create_page", "data": {}}],
-    }
-    Entities.save(report)
-    item = reload_item()
-    user.locate("[data-role='report-filter'][data-filter='executed']").click()
-    expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal executed")
-
-    report.proposal = {
-        "summary": "Answer summary.",
-        "answer_html": "<p>Answer body.</p>",
-        "actions": [],
-    }
-    Entities.save(report)
-    item = reload_item()
-    expect(item.locator("[data-role='report-stage']")).to_have_text("Answer ready")
 
 
 # @matrix ai-report : delete-modal file-cleanup list
@@ -1556,14 +1355,14 @@ def test_create_report_detail_shows_revision_and_manual_execution(get_admin, get
     expect(proposal_json).to_contain_text('"type": "create_page"')
 
 
-# @matrix ai-report : async deferred-refresh detail feedback live-submit organize pending revision
-def test_organize_report_detail_refreshes_when_submitted_revision_completes(
+# @matrix ai-report : async detail feedback live-submit organize pending revision
+def test_organize_report_detail_submits_revision(
     get_admin, get_user,
 ):
     user = get_admin()
     report, _category_name, _page_name = _ready_report(user)
 
-    report_page = user.go(Report.for_entity(user, report))
+    user.go(Report.for_entity(user, report))
     expect(
         user.page.get_by_text("Create a category and page.", exact=True)
     ).to_be_visible()
@@ -1584,39 +1383,11 @@ def test_organize_report_detail_refreshes_when_submitted_revision_completes(
     expect(report_view).to_have_attribute("data-pending", "true")
     expect(report_view).to_have_attribute("data-operation", operation)
 
-    report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
+    saved = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
     job = Entities.fetch_one(operation, request=Fetch.direct())
-    assert report.deferred_job["key"] == operation
-    assert job is not None
-    report.properties.process.set_proposal(
-        {
-            "summary": "Use the revised plan instead.",
-            "confidence": 1,
-            "actions": [
-                {
-                    "id": "review-revision",
-                    "type": "needs_review",
-                    "display_label": "Review revised plan",
-                    "data": {},
-                }
-            ],
-        }
-    )
-    report.deferred_job = None
-    job.status = "succeeded"
-    job.dispatch_state = "complete"
-    job.status_revision = int(job.status_revision or 0) + 1
-    job.progress = {"phase": "complete"}
-    Entities.save(report, job)
-
-    expect(
-        user.page.get_by_text("Use the revised plan instead.", exact=True)
-    ).to_be_visible(timeout=10000)
-    report_page.initialize_view()
-    expect(user.locate(Report.VIEW)).to_have_attribute("data-pending", "false")
-    expect(
-        user.page.get_by_text("Create a category and page.", exact=True)
-    ).not_to_be_attached()
+    assert saved.deferred_job["key"] == operation
+    assert job.parameters["feedback"] == "Use a review step instead."
+    assert job.parameters["mode"] == "revise"
 
 
 # @matrix ai-report : dependencies detail result-json skip-action

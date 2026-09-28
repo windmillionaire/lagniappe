@@ -16,6 +16,10 @@ from .artifacts import TEST_RUNS_DIR
 
 logger = logging.getLogger(__name__)
 DIAGNOSTIC_PATH = TEST_RUNS_DIR / "browser_failure_diagnostics.json"
+HTTP_DIAGNOSTIC_HEADERS = frozenset({
+    "content-type", "server", "x-cloud-trace-context", "x-lagniappe-error",
+    "x-lagniappe-upstream-status", "x-lagniappe-upstream-server",
+})
 
 
 @dataclass
@@ -27,6 +31,7 @@ class BrowserFailure:
     context_label: str
     page_url: str
     details: dict[str, str | None]
+    page_id: int | None = None
     expected_by: str | None = None
     ignored_reason: str | None = None
 
@@ -69,6 +74,7 @@ class BrowserFailureCollector:
         self.events: list[BrowserFailure] = []
         self._contexts: dict[int, tuple[str, list[str] | None]] = {}
         self._pages: set[int] = set()
+        self._http_failures: dict[tuple[int, str], dict[str, str]] = {}
 
     def monitor_context(
         self,
@@ -224,6 +230,34 @@ class BrowserFailureCollector:
         page.on("console", lambda message: self._capture_console(page, message))
         page.on("pageerror", lambda error: self._capture_pageerror(page, error))
         page.on("requestfailed", lambda request: self._capture_request(page, request))
+        page.on("response", lambda response: self._capture_response(page, response))
+
+    def _capture_response(self, page: Any, response: Any) -> None:
+        """Enrich existing console failures without changing expected-error rules."""
+        if response.status < 500:
+            return
+        details = {
+            "http_status": str(response.status),
+            "http_method": response.request.method,
+            "http_headers": json.dumps({
+                key: value for key, value in response.headers.items()
+                if key.lower() in HTTP_DIAGNOSTIC_HEADERS
+            }, sort_keys=True),
+        }
+        try:
+            details["http_body"] = response.text()[:2048]
+        except Exception:
+            details["http_body"] = "Unavailable after navigation/context close"
+        self._http_failures[id(page), response.url] = details
+        if len(self._http_failures) > 100:
+            self._http_failures.pop(next(iter(self._http_failures)))
+        # Chromium may deliver its console message before or after the response.
+        for event in self.events:
+            if (event.page_id == id(page)
+                    and event.kind == "console"
+                    and event.details.get("source_url") == response.url
+                    and "Failed to load resource" in (event.details.get("text") or "")):
+                event.details.update(details)
 
     def _context(self, page: Any) -> tuple[int, str, list[str] | None]:
         context_id = id(page.context)
@@ -239,6 +273,7 @@ class BrowserFailureCollector:
                 context_label=label,
                 page_url=page.url,
                 details=details,
+                page_id=id(page),
             )
         )
 
@@ -268,8 +303,13 @@ class BrowserFailureCollector:
                     if location.get("lineNumber") is not None
                     else None,
                 },
+                page_id=id(page),
             )
         )
+        if "Failed to load resource" in message.text:
+            self.events[-1].details.update(
+                self._http_failures.get((id(page), source_url), {})
+            )
         if (
             message.text
             == "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"

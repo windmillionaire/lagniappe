@@ -54,6 +54,9 @@ class Pages(ResourceEnumMixin, Enum):
     test_owner_restricted_page = Page(definition=pd.owner_restricted_page)
     test_group_restricted_page = Page(definition=pd.group_restricted_page)
     test_document_visibility_page = Page(definition=pd.document_visibility_page)
+    test_public_document_image_page = Page(
+        definition=replace(pd.document_visibility_page, name="Public document image")
+    )
     test_file_upload_page = Page(definition=pd.file_upload_page)
     test_category_edit_page = Page(definition=pd.category_edit_page)
     test_image_page = Page(definition=pd.image_page)

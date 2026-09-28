@@ -118,11 +118,10 @@ def _analytics_request(user, path, method="GET"):
 
 
 # @pair home:directory-list
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
-def test_directory_links_present(get_user):
+def test_directory_links_present(get_admin):
     """Test that all directory links are present."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     directory = home.directory
@@ -139,11 +138,10 @@ def test_directory_links_present(get_user):
 
 # @pair manual:page-load
 # @template manual/content/overview.html::open_source
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
-def test_navigate_to_manual_from_home_button(get_user):
+def test_navigate_to_manual_from_home_button(get_admin):
     """Test navigating to manual from the standalone home button."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     user.locate(home.MANUAL_BUTTON).click()
@@ -176,7 +174,8 @@ def test_admin_directory_link_opens_admin_settings(get_user):
 
 
 # @matrix analytics : accordion dashboard owner-filter page-load period-controls retention-clear
-@pytest.mark.e2e_group("owner")
+# Deleting all analytics records and asserting an empty view needs a quiet site.
+@pytest.mark.e2e_serial
 @pytest.mark.e2e
 def test_analytics_dashboard_owner_filter_and_retention_clear(
     get_user, browser_failures
@@ -286,10 +285,9 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
 
 
 # @pair analytics:internal-request-exclusion
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
-def test_analytics_excludes_internal_requests(get_user):
-    owner = get_user(Users.OWNER)
+def test_analytics_excludes_internal_requests(get_admin):
+    owner = get_admin()
     owner.go(SitePages.HOME)
     marker = f"internal-exclusion-{uuid4().hex}"
     ignored = ["/api", "/api/v1/tools/get_entity", "/mcp", "/mcp/tools", "/l", "/l/poll", "/l/update", "/analytics/"]
@@ -327,7 +325,9 @@ def test_analytics_excludes_internal_requests(get_user):
 # @pair frontend-build:font-delivery
 # @template analytics/index.html::ai_observability
 # @template analytics/index.html::ai_runs
-@pytest.mark.e2e_group("owner")
+# Clearing all diagnostics deletes other workers' terminal jobs before their
+# browsers can observe completion. This action requires whole-site quietness.
+@pytest.mark.e2e_serial
 @pytest.mark.e2e
 def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     get_user,
@@ -489,10 +489,9 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
 
 
 # @matrix manual : metadata popstate section-navigation
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
-def test_manual_ajax_section_navigation_and_popstate(get_user):
-    user = get_user(Users.OWNER)
+def test_manual_ajax_section_navigation_and_popstate(get_admin):
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     user.locate(home.MANUAL_BUTTON).click()
@@ -530,10 +529,9 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
 
 
 # @pair manual:section-navigation
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
-def test_manual_security_section_loads(get_user):
-    user = get_user(Users.OWNER)
+def test_manual_security_section_loads(get_admin):
+    user = get_admin()
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
 
     response = user.page.goto(
@@ -674,9 +672,8 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
 
 
 # @matrix manual : address-redaction ai-email ajax-section anonymous-access direct-section no-auth-bootstrap
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
-def test_ai_manual_keeps_account_addresses_authenticated(get_user):
+def test_ai_manual_keeps_account_addresses_authenticated(get_admin, get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
     auth_bootstrap_paths = []
@@ -724,7 +721,7 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     assert "@" not in ajax["text"]
     assert auth_bootstrap_paths == []
 
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     response = owner.page.goto(
         f"{base_url}/manual/ai",
         wait_until="load",

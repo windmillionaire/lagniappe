@@ -94,15 +94,14 @@ def _unique(label):
 # @matrix editor sync : replacement recovery offline-replay
 # @matrix document-history : recovery
 # @template projects/document.html::document_tab
-@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("headless", [False, True])
-def test_offline_draft_is_pinned_before_document_replacement(get_user, browser_failures, headless):
+def test_offline_draft_is_pinned_before_document_replacement(get_admin, browser_failures, headless):
     from lagniappe.core.tools.document_crdt import append_fragment, replace_fragment
     from lagniappe.core.tools.document_updates import save_checkpoint
     from lagniappe.core.tools.database import get as database_get
     from testing.resources import Project
 
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     entity = Entities.PROJECT.create({"name": _unique("replacement-recovery")})
     baseline, _ = append_fragment(None, "<p>Original paragraph</p>", "seed")
     entity.properties.document.save(html="<p>Original paragraph</p>", ydoc=baseline)
@@ -310,11 +309,10 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, brow
 
 # @matrix polling : current-state cursor document
 # @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
-@pytest.mark.e2e_group("owner")
 def test_headless_offline_replay_merges_concurrent_remote_edits(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_offline_document_concurrent_replay.get(owner)
     document_sync_id = project.entity.sync_ids["document"]["id"]

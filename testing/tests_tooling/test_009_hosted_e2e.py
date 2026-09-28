@@ -2154,7 +2154,7 @@ def test_hosted_descriptor_preserves_native_static_handlers(workers):
         "redirect_http_response_code": 301,
     }
     assert descriptor["entrypoint"] == f"gunicorn -t 3600 -w {workers} -b :$PORT main:app"
-    assert descriptor["instance_class"] == ("B8" if workers == 6 else "B2")
+    assert descriptor["instance_class"] == ("B4" if workers == 6 else "B2")
     assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_WORKERS"] == str(workers)
     assert descriptor["basic_scaling"] == {
         "max_instances": 1,

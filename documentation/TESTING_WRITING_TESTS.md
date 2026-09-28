@@ -395,7 +395,8 @@ setup and teardown as well as the test body; shared-resource tests may be in
 different workers and run sequentially only while their reservations overlap.
 
 Mark stories that demonstrably require whole-site quietness, such as unchanged
-global revision snapshots, with `@pytest.mark.e2e_serial` (or
+global revision snapshots or deletion of all job/analytics records, with
+`@pytest.mark.e2e_serial` (or
 set it in module `pytestmark`). They run together sequentially after parallel
 workers drain; still restore settings in `finally`. Using the Owner or changing
 a setting does not by itself require an exclusive phase: identify the affected

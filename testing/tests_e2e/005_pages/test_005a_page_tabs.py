@@ -199,7 +199,7 @@ def test_public_document_images_are_anonymous_and_revocable(
     setup_test_server,
 ):
     user = get_admin()
-    page = user.go(Pages.test_document_visibility_page)
+    page = user.go(Pages.test_public_document_image_page)
     editor = page.editor
     editor.clear_text()
     marker = "Public image route marker"

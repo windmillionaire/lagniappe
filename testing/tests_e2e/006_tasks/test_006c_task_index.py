@@ -4,6 +4,8 @@ import pytest
 
 from playwright.sync_api import expect
 
+from lagniappe.core.definitions import Fetch, FetchReason
+
 from testing.definitions import SitePages, Tasks, Users
 from testing.elements import Buttons, Modal
 from testing.utility.network import expect_successful_response, scoped_browser_route
@@ -78,15 +80,14 @@ def test_task_index_allows_own_page_only_users(get_user):
 # @pair tasks:inaccessible-backing-page
 # @template table.html::rows
 # @template home/tasks.html::task
-@pytest.mark.e2e_group("owner")
-def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_user):
+def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_admin, get_user):
     """Live queries include an assignee's dated and undated restricted tasks.
 
     Waiting for the task-index table to finish loading executes both pagination
     streams. Together with the home list, this crosses every assigned-task
     composite-index query shape against the managed Datastore.
     """
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     due_task = Tasks.test_assigned_due_permission_task.get(owner)
     undated_task = Tasks.test_assigned_permission_task.get(owner)
 
@@ -224,34 +225,42 @@ def test_task_index_delete_task_from_row(get_admin, get_user):
 def test_task_index_quick_edit_updates_editable_cell(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_task_index_page_active.get(user)
-    user.go(SitePages.TASK_INDEX)
+    task_original_name = task.entity.name
+    try:
+        user.go(SitePages.TASK_INDEX)
 
-    row = user.locate(f"{TASK_ROW}[data-key='{task.key}']")
-    expect(row).to_be_visible()
+        row = user.locate(f"{TASK_ROW}[data-key='{task.key}']")
+        expect(row).to_be_visible()
 
-    edit_toggle = user.locate("button[lp-show='table:TableEditor']")
-    expect(edit_toggle).to_be_visible()
-    edit_toggle.click()
+        edit_toggle = user.locate("button[lp-show='table:TableEditor']")
+        expect(edit_toggle).to_be_visible()
+        edit_toggle.click()
 
-    body = user.locate("#table tbody")
-    expect(body).to_have_attribute("data-editing", "true")
+        body = user.locate("#table tbody")
+        expect(body).to_have_attribute("data-editing", "true")
 
-    cell = row.locator("td[data-column='name']")
-    expect(cell).to_have_attribute("data-editable", "true")
-    title = cell.locator("a[data-role='title']")
-    title.hover()
-    expect(title).to_have_css("text-decoration-line", "none")
-    title.click()
+        cell = row.locator("td[data-column='name']")
+        expect(cell).to_have_attribute("data-editable", "true")
+        title = cell.locator("a[data-role='title']")
+        title.hover()
+        expect(title).to_have_css("text-decoration-line", "none")
+        title.click()
 
-    name_input = cell.locator("input[name='name']")
-    expect(name_input).to_be_visible()
+        name_input = cell.locator("input[name='name']")
+        expect(name_input).to_be_visible()
 
-    updated_name = "Task Index Quick Edit Updated"
-    name_input.fill(updated_name)
-    with user.page.expect_response("**/tasks/*/patch"):
-        name_input.press("Enter")
+        updated_name = "Task Index Quick Edit Updated"
+        name_input.fill(updated_name)
+        with user.page.expect_response("**/tasks/*/patch"):
+            name_input.press("Enter")
 
-    expect(cell).to_contain_text(updated_name)
+        expect(cell).to_contain_text(updated_name)
+    finally:
+        restored = task.refresh_entity(
+            request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+        )
+        restored.name = task_original_name
+        restored.save()
 
 
 # @source src/script/widgets/tables/editor.mjs::TableEditor
@@ -261,60 +270,74 @@ def test_task_index_quick_edit_background_save_preserves_newer_edit(get_admin, g
     user = get_admin()
     first = Tasks.test_task_index_page_active.get(user)
     second = Tasks.test_task_index_personal_today.get(user)
-    user.go(SitePages.TASK_INDEX)
+    first_original_name = first.entity.name
+    second_original_name = second.entity.name
+    try:
+        user.go(SitePages.TASK_INDEX)
 
-    body = user.locate("#table tbody")
-    expect(body).to_have_attribute("loaded", "")
-    toggle = user.locate("button[lp-show='table:TableEditor']")
-    first_cell = user.locate(f"{TASK_ROW}[data-key='{first.key}'] td[data-column='name']")
-    second_cell = user.locate(f"{TASK_ROW}[data-key='{second.key}'] td[data-column='name']")
-    first_name = "Background quick edit saved"
-    second_name = "Newer quick edit retained"
-    first_path = f"/tasks/{first.key}/patch"
-    held = []
+        body = user.locate("#table tbody")
+        expect(body).to_have_attribute("loaded", "")
+        toggle = user.locate("button[lp-show='table:TableEditor']")
+        first_cell = user.locate(f"{TASK_ROW}[data-key='{first.key}'] td[data-column='name']")
+        second_cell = user.locate(f"{TASK_ROW}[data-key='{second.key}'] td[data-column='name']")
+        first_name = "Background quick edit saved"
+        second_name = "Newer quick edit retained"
+        first_path = f"/tasks/{first.key}/patch"
+        held = []
 
-    toggle.click()
-    first_cell.click()
-    first_input = first_cell.locator("input[name='name']")
-    first_input.fill(first_name)
-    with scoped_browser_route(user.page.context, f"**{first_path}", lambda route: held.append(route)):
-        try:
-            with user.page.context.expect_event(
-                "request",
-                predicate=lambda request: request.method == "PATCH" and request.url.endswith(first_path),
-            ):
-                first_input.press("Enter")
-            expect(first_cell).to_have_attribute("aria-busy", "true")
-            toggle.click()
-            expect(body).to_have_attribute("data-editing", "false")
-            expect(first_input).not_to_be_attached()
+        toggle.click()
+        first_cell.click()
+        first_input = first_cell.locator("input[name='name']")
+        first_input.fill(first_name)
+        with scoped_browser_route(user.page.context, f"**{first_path}", lambda route: held.append(route)):
+            try:
+                with user.page.context.expect_event(
+                    "request",
+                    predicate=lambda request: request.method == "PATCH" and request.url.endswith(first_path),
+                ):
+                    first_input.press("Enter")
+                expect(first_cell).to_have_attribute("aria-busy", "true")
+                toggle.click()
+                expect(body).to_have_attribute("data-editing", "false")
+                expect(first_input).not_to_be_attached()
 
-            toggle.click()
-            second_cell.click()
-            second_input = second_cell.locator("input[name='name']")
-            second_input.fill(second_name)
-            expect(second_input).to_be_focused()
+                toggle.click()
+                second_cell.click()
+                second_input = second_cell.locator("input[name='name']")
+                second_input.fill(second_name)
+                expect(second_input).to_be_focused()
 
-            assert len(held) == 1
-            with expect_successful_response(user.page, method="PATCH", path=first_path):
-                held.pop().continue_()
-            expect(first_cell).to_contain_text(first_name)
-            expect(first_cell).not_to_have_attribute("aria-busy", "true")
-            expect(second_input).to_have_value(second_name)
-            expect(second_input).to_be_focused()
+                assert len(held) == 1
+                with expect_successful_response(user.page, method="PATCH", path=first_path):
+                    held.pop().continue_()
+                expect(first_cell).to_contain_text(first_name)
+                expect(first_cell).not_to_have_attribute("aria-busy", "true")
+                expect(second_input).to_have_value(second_name)
+                expect(second_input).to_be_focused()
 
-            with expect_successful_response(
-                user.page, method="PATCH", path=f"/tasks/{second.key}/patch",
-            ):
-                second_input.press("Enter")
-            expect(second_cell).to_contain_text(second_name)
-        finally:
-            for route in held:
-                route.continue_()
+                with expect_successful_response(
+                    user.page, method="PATCH", path=f"/tasks/{second.key}/patch",
+                ):
+                    second_input.press("Enter")
+                expect(second_cell).to_contain_text(second_name)
+            finally:
+                for route in held:
+                    route.continue_()
 
-    user.go(SitePages.TASK_INDEX)
-    expect(first_cell).to_contain_text(first_name)
-    expect(second_cell).to_contain_text(second_name)
+        user.go(SitePages.TASK_INDEX)
+        expect(first_cell).to_contain_text(first_name)
+        expect(second_cell).to_contain_text(second_name)
+    finally:
+        restored = first.refresh_entity(
+            request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+        )
+        restored.name = first_original_name
+        restored.save()
+        restored = second.refresh_entity(
+            request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+        )
+        restored.name = second_original_name
+        restored.save()
 
 
 # @matrix table-controls task-index : checkbox-cell column-visibility quick-edit

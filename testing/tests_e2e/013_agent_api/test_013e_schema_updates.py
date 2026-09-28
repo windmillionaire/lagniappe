@@ -15,7 +15,7 @@ from lagniappe.core.tools.ai.reporting import schema_updates
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import app
-from testing.definitions import Pages, Users
+from testing.definitions import Pages
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
 from testing.resources.form import Form
@@ -36,10 +36,9 @@ pytestmark = pytest.mark.e2e
 # @matrix ai-report : schema-update deterministic-run continue
 # @pairs agent-api:proposal-validation
 # @matrix ai tasks : original-completion schema-version
-@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("origin", ["api", "web", "web-without-id"])
-def test_reviewed_schema_migration_waits_for_publication_and_preserves_completion(get_user, monkeypatch, origin):
-    user = get_user(Users.OWNER)
+def test_reviewed_schema_migration_waits_for_publication_and_preserves_completion(get_admin, monkeypatch, origin):
+    user = get_admin()
     actor = user.entity
     parent = Pages.test_create_page_task.get(user)
     form = Form(user=user, definition=FormDefinition(

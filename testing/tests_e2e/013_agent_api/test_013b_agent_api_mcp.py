@@ -25,7 +25,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import notifications as notification_database
 from runner import mcp_environment
-from testing.definitions import Groups, Pages, SitePages, Users
+from testing.definitions import Groups, Pages, SitePages
 from testing.definitions.user_definitions import UserDefinition
 from testing.utility.network import browser_fetch
 
@@ -105,9 +105,8 @@ MCP_BOUNDARY_PNG = base64.b64decode(
 # @pair agent-api:tool-dispatch
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
 # @source lagniappe/web/routes/api/main.py::execute_tool
-@pytest.mark.e2e_group("owner")
 def test_mcp_original_pdf_download_uses_existing_api_and_storage(
-    get_user,
+    get_admin, get_user,
     tmp_path,
     monkeypatch,
     setup_test_server,
@@ -126,7 +125,7 @@ def test_mcp_original_pdf_download_uses_existing_api_and_storage(
             email=f"pdf-owner-{suffix}@example.test",
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     intruder = get_user(
         UserDefinition(
@@ -134,7 +133,7 @@ def test_mcp_original_pdf_download_uses_existing_api_and_storage(
             email=f"pdf-intruder-{suffix}@example.test",
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     owner.go(SitePages.HOME)
     intruder.go(SitePages.HOME)
@@ -235,8 +234,7 @@ def _canonical_sha256(value) -> str:
 # @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-@pytest.mark.e2e_group("owner")
-def test_rest_and_mcp_share_submission_validation(get_user, tmp_path, monkeypatch, setup_test_server):
+def test_rest_and_mcp_share_submission_validation(get_admin, get_user, tmp_path, monkeypatch, setup_test_server):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
     for cookie in setup_test_server.browser_cookies:
         if cookie["name"] == "__Host-lagniappe-e2e":
@@ -250,7 +248,7 @@ def test_rest_and_mcp_share_submission_validation(get_user, tmp_path, monkeypatc
             groups=[Groups.all_create],
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     owner.go(SitePages.HOME)
     task = Entities.TASK.create({"name": "Validation parity task", "page": owner.entity.page})
@@ -656,9 +654,8 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
 # @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 # @template notifications.html::item
-@pytest.mark.e2e_group("owner")
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
-    get_user,
+    get_admin, get_user,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     setup_test_server,
@@ -678,7 +675,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         with pytest.raises(ValueError, match="different origin"):
             _request("GET", "https://storage.googleapis.com/object", token="test-only")
     _prepare_package_environment()
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     owner.go(SitePages.HOME)
     readable_page = Pages.test_create_page.get(owner)
 

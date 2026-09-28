@@ -257,11 +257,10 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
 
 # @matrix cache : build-id etag missing-fingerprint standard-header
 # @matrix web-headers : conditional-request etag missing-fingerprint security
-@pytest.mark.e2e_group("owner")
 @pytest.mark.e2e_serial
-def test_authenticated_home_response_headers_include_etag(get_user, browser_failures):
+def test_authenticated_home_response_headers_include_etag(get_admin, browser_failures):
     """Authenticated app responses should carry the common header envelope."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     with user.page.expect_response("**/l/update-session") as session_info:
         user.page.goto(f"{SETTINGS.test_config['BASE_URL']}/")
     assert session_info.value.ok
@@ -381,9 +380,8 @@ def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
 
 
 # @matrix cache session timezone : permissions-preserved
-@pytest.mark.e2e_group("owner")
-def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setup_test_server):
-    owner = get_user(Users.OWNER)
+def test_timezone_update_preserves_permissions_and_cache_revision(get_admin, setup_test_server):
+    owner = get_admin()
     actor = User(user=owner, definition=UserDefinition(
         name="Timezone HTTP", email=f"timezone-{uuid4().hex}@example.test",
     )).create()
@@ -426,11 +424,10 @@ def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setu
 
 
 # @matrix location session timezone : atomic-update coordinates validation
-@pytest.mark.e2e_group("owner")
 def test_update_session_rejects_invalid_timezone_and_location_atomically(
-    get_user, browser_failures
+    get_admin, browser_failures
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
     persisted = Entities.USER.load(user.email)
     timezone_before = persisted.db.get("timezone")
@@ -566,12 +563,11 @@ def test_error_handling(get_user, browser_failures):
     expect(user.page).to_have_title("Error 404")
 
 
-@pytest.mark.e2e_group("owner")
 def test_browser_failure_guard_detects_unhandled_page_errors(
-    get_user, browser_failures
+    get_admin, browser_failures
 ):
     """The guard rejects a real page error unless a narrow scope accounts for it."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     sentinel = "browser-failure-guard-sentinel"
 
     with browser_failures.expect(

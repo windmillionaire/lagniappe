@@ -88,7 +88,7 @@ function completedAutofillInMarkup(node, status) {
  * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_batches_orders_and_renders_status
  * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
  * @tests tests_js/test_023_deferred_operations.mjs::test_cold_task_operations_wait_for_activation_and_completed_reviews_need_no_poll
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
+ * @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
  * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-autofill rendered-visibility revision status teardown terminal-ownership timing visible-blur
  * @pair deferred-jobs:review-probe
  */

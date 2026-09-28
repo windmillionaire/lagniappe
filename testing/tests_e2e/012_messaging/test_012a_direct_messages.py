@@ -486,9 +486,8 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, ge
 
 # @matrix messaging : compose-eligibility inline-reply reply-permission
 # @pair notifications:menu-open
-@pytest.mark.e2e_group("owner")
-def test_inbound_message_allows_reply_without_compose_permission(get_user):
-    owner = get_user(Users.OWNER)
+def test_inbound_message_allows_reply_without_compose_permission(get_admin, get_user):
+    owner = get_admin()
     recipient = get_user(_restricted_definition("Reply Only"), creator=owner)
 
     _go_messages(owner)

@@ -12,7 +12,6 @@ from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.document_crdt import append_fragment
 from lagniappe.web import app
-from testing.definitions import Users
 
 pytestmark = pytest.mark.e2e
 
@@ -23,9 +22,8 @@ pytestmark = pytest.mark.e2e
 # @matrix ai-report : batching identity dependencies
 # @matrix project : db-load model-tasks ordering relation-attach
 # @matrix entity-patch : preservation preparation
-@pytest.mark.e2e_group("owner")
-def test_saved_project_and_page_forms_survive_linked_batch_updates(get_user):
-    actor = get_user(Users.OWNER).entity
+def test_saved_project_and_page_forms_survive_linked_batch_updates(get_admin):
+    actor = get_admin().entity
     suffix = uuid4().hex[:8]
     with app.test_request_context('/'):
         login_user(actor)
@@ -71,9 +69,8 @@ def test_saved_project_and_page_forms_survive_linked_batch_updates(get_user):
 # @source lagniappe/core/tools/ai/reporting/execution/actions/documents.py::_append_page_document
 # @matrix ai-report : batching atomicity documents dependencies recovery
 # @matrix ai-report : document append persistence
-@pytest.mark.e2e_group("owner")
-def test_related_creations_and_document_appends_commit_together(get_user, monkeypatch):
-    user = get_user(Users.OWNER)
+def test_related_creations_and_document_appends_commit_together(get_admin, monkeypatch):
+    user = get_admin()
     actor = user.entity
     suffix = uuid4().hex[:8]
     with app.test_request_context('/'):

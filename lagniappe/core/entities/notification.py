@@ -50,7 +50,7 @@ class Notification(Entity):
         return database_notifications.notification_keys(parent)
 
     # @testable true
-    # @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
+    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
     # @matrix notifications : body create
     @classmethod
     def create(cls, data):
