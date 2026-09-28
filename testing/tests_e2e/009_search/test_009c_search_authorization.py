@@ -102,6 +102,9 @@ def test_redis_search_matches_each_restriction_source_before_pagination():
 
 
 # @matrix cache : invalidation no-store etag conditional-response
+# Both routes include a site-wide revision in their ETag; unrelated writes must
+# not change it while this story verifies the acknowledgement preserves it.
+@pytest.mark.e2e_serial
 @pytest.mark.parametrize("path", ["/", "/l/get/tasks"])
 def test_invalidation_is_not_replayed_by_browser_http_cache(
     get_admin, browser, browser_failures, setup_test_server, path,

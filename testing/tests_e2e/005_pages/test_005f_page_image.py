@@ -100,7 +100,7 @@ def test_add_image_to_page(get_admin, get_user):
 # @matrix pages : desktop-tabs photo-prompt
 def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_admin, get_user):
     user = get_admin()
-    page = user.go(Pages.test_generated_image_page)
+    page = user.go(Pages.test_desktop_photo_prompt_page)
     prompt = _photo_prompt(page)
     desktop_photo_toggle = _desktop_photo_toggle(user)
 
@@ -118,7 +118,7 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_admin,
 # @template pages/page.html::main
 def test_mobile_photo_prompt_rejoins_section_switching(get_admin, get_user):
     user = get_admin()
-    page = user.go(Pages.test_generated_image_page)
+    page = user.go(Pages.test_mobile_photo_prompt_page)
     user.mobile = True
     prompt = _photo_prompt(page)
 
@@ -244,10 +244,7 @@ def test_remove_image_from_page(get_admin, get_user):
 # @template pages/info.html::info_form
 def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_user):
     user = get_admin()
-    page = Pages.test_generated_image_page.get(user)
-    page.entity.properties.image.delete()
-    page.entity.save()
-    user.go(page)
+    page = user.go(Pages.test_photo_visibility_page)
     prompt = _photo_prompt(page)
     toggle = prompt.locator(page.PHOTO_PROMPT_UPLOAD)
 

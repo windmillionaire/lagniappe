@@ -67,6 +67,15 @@ class Pages(ResourceEnumMixin, Enum):
         definition=replace(pd.image_page, name="Add image Page")
     )
     test_generated_image_page = Page(definition=pd.generated_image_page)
+    test_desktop_photo_prompt_page = Page(
+        definition=replace(pd.image_page, name="Desktop photo prompt Page")
+    )
+    test_mobile_photo_prompt_page = Page(
+        definition=replace(pd.image_page, name="Mobile photo prompt Page")
+    )
+    test_photo_visibility_page = Page(
+        definition=replace(pd.image_page, name="Photo visibility Page")
+    )
     test_document_generation_page = Page(definition=pd.document_generation_page)
     test_document_generation_selection_page = Page(
         definition=pd.document_generation_selection_page

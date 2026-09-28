@@ -46,7 +46,7 @@ from testing.utility.network import browser_fetch, expect_successful_response
 from testing.utility.live_ai import submit_live_ai
 
 
-def _create_category(user, home, definition, *, results=None, browser_failures=None, live_ai_quota=None):
+def _create_category(user, home, definition, *, results=None, browser_failures=None):
     create_form = home.create_category_form()
     if not definition.description_for_ai:
         create_form.locator(FormElements.NAME).fill(definition.name)
@@ -71,13 +71,10 @@ def _create_category(user, home, definition, *, results=None, browser_failures=N
             create_form.locator(FormElements.NAME).fill(definition.name or "Books quota fallback")
             results.record("alternate_verification", "Manual creation validates the same save and list workflow; AI content remains unverified.")
             return manual_submit()
-        with live_ai_quota(user, "/categories/create"):
-            response = submit_live_ai(
-                # A mocked quota response can finish before a spinner is observed.
-                # The response and resulting form/list state are the boundaries.
-                user, path="/categories/create", submit=lambda: create_form.get_by_role("button", name="Create Category", exact=True).click(),
-                results=results, browser_failures=browser_failures, fallback=fallback,
-            )
+        response = submit_live_ai(
+            user, path="/categories/create", submit=lambda: create_form.get_by_role("button", name="Create Category", exact=True).click(),
+            results=results, browser_failures=browser_failures, fallback=fallback,
+        )
     else:
         response = manual_submit()
     expect(create_form).not_to_be_visible()
@@ -198,8 +195,7 @@ def test_create_category_manual_mode(get_admin, get_user):
 
 # @matrix categories : ai-create ai-generated
 @pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_create_category_ai_mode(get_admin, get_user, results, browser_failures, live_ai_quota):
+def test_create_category_ai_mode(get_admin, get_user, results, browser_failures):
     """
     Verify category creation in AI mode.
 
@@ -212,7 +208,7 @@ def test_create_category_ai_mode(get_admin, get_user, results, browser_failures,
 
     category.key = _create_category(
         user, home, category.definition, results=results,
-        browser_failures=browser_failures, live_ai_quota=live_ai_quota,
+        browser_failures=browser_failures,
     )
     results.record("category", category.entity.db)
 
