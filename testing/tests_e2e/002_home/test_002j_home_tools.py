@@ -1782,7 +1782,8 @@ def test_incompatible_reports_render_and_delete_without_touching_workspace(get_a
 # @source lagniappe/web/routes/tools/main.py::cancel_generation
 # @source lagniappe/web/routes/tools/main.py::retry_generation
 # @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportAdapter.cleanup
-# @matrix ai-report : cancellation revision reload
+# @source src/script/views/report.mjs::Report
+# @matrix ai-report : cancellation deferred-refresh revision reload
 # @template home/tools.html::generation_controls
 @pytest.mark.parametrize("revision", [False, True])
 def test_cancel_report_generation_restores_terminal_view(get_admin, get_user, revision):

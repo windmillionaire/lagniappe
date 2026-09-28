@@ -361,7 +361,9 @@ def _medical_project(owner, case, slug):
     return project, matching, distractor
 
 
-# @matrix ai-report : ask async live-provider persistence usable-answer workspace-tools
+# @source src/script/widgets/home/lists.mjs::ToolReportList
+# @matrix ai-report : ask async deferred-refresh live-provider operation-poll persistence stage-labels usable-answer workspace-tools
+# @matrix deferred-jobs : polling progress status
 # @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
 # @matrix polling : operation owner progress timing
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
