@@ -378,7 +378,7 @@ duplication. Do not build a second testing API around a one-off selector.
 
 ### Coordinated E2E resources
 
-The opt-in pilot and `run.py test --experiments=all` full-suite trial are described
+The default hosted coordinator and local `run.py test --parallel` mode are described
 in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md#coordinated-e2e-workers).
 Use `get_admin()` for a broad-access browser story that does not require the
 actual Owner. It reuses one Administrator per sequential worker, with explicit

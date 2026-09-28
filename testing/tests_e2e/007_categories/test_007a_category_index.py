@@ -308,6 +308,10 @@ def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, resu
 def test_update_category_info_from_tools(get_admin, get_user):
     user = get_admin()
     category = Categories.test_category_info_update.get(user)
+    original = {
+        name: getattr(category.entity, name)
+        for name in ("name", "description", "form")
+    }
     updated_form = Forms.test_create_page_form.get(user)
     user.go(category)
     expect(user.page.get_by_role("button", name="Category actions")).to_be_visible()
@@ -316,24 +320,33 @@ def test_update_category_info_from_tools(get_admin, get_user):
 
     updated_name = "Updated Category Info"
     updated_description = "A category updated through the tools panel."
-    _fill_editable_field(info_form, "name", FormElements.NAME, updated_name)
-    _fill_editable_field(
-        info_form,
-        "description",
-        FormElements.DESCRIPTION,
-        updated_description,
-    )
-    expect(info_form.locator("[data-icon='builder.unsaved']")).to_be_visible()
-    FormSelect(info_form).select(updated_form)
-    with user.page.expect_response("**/update"):
-        SpinnerButtons.UPDATE.click(info_form)
+    try:
+        _fill_editable_field(info_form, "name", FormElements.NAME, updated_name)
+        _fill_editable_field(
+            info_form,
+            "description",
+            FormElements.DESCRIPTION,
+            updated_description,
+        )
+        expect(info_form.locator("[data-icon='builder.unsaved']")).to_be_visible()
+        FormSelect(info_form).select(updated_form)
+        with expect_successful_response(
+            user.page, method="PUT", path=f"/categories/{category.key}/update",
+            entity_key=category.key,
+        ):
+            SpinnerButtons.UPDATE.click(info_form)
 
-    expect(user.locate("[data-nav='view'] [data-role='title']")).to_have_text(
-        updated_name
-    )
-    expect(info_form.locator("#name")).to_contain_text(updated_name)
-    expect(info_form.locator("#description")).to_contain_text(updated_description)
-    FormSelect(info_form).contains(updated_form)
+        expect(user.locate("[data-nav='view'] [data-role='title']")).to_have_text(
+            updated_name
+        )
+        expect(info_form.locator("#name")).to_contain_text(updated_name)
+        expect(info_form.locator("#description")).to_contain_text(updated_description)
+        FormSelect(info_form).contains(updated_form)
+    finally:
+        restored = category.refresh_entity(request=Fetch.direct())
+        for name, value in original.items():
+            setattr(restored, name, value)
+        Entities.save(restored)
 
 
 # @matrix pages : category-index create related-forms

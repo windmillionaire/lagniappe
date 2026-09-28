@@ -372,7 +372,7 @@ def test_form_creation_and_task_update_batch_preserves_dependencies_and_retry(mo
     from lagniappe.core.tools.database import get as database_get
     monkeypatch.setattr(database_get, "entity", lambda key, **kwargs: next((item.db for item in store.values() if item.key == key), None))
     keys = iter(range(100, 200))
-    monkeypatch.setattr(database_utility, "create_key", lambda kind, parent=None: Key("activity", str(next(keys)), project="test-project"))
+    monkeypatch.setattr(database_utility, "create_keys", lambda kind, parent, count: [Key("activity", str(next(keys)), project="test-project") for _ in range(count)])
     report.proposal = {"summary": "Migrate", "confidence": 1, "actions": [
         {"id": "form", "type": "create_form", "data": {"name": "New", "form_type": "task", "schema": [{"id": "summary", "type": "input", "input": "text", "title": "Summary"}]}},
         {"id": "migrate", "type": "update_task", "depends_on": ["form"], "data": {"entity": task.urlsafe_key, "changes": {"form": "$form", "submission": {"summary": "Migrated"}, "description": "Short"}}},
@@ -452,7 +452,7 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
     monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: reference if hasattr(reference, "entity_kind") else store.get(reference))
     monkeypatch.setattr(database_get, "entity", lambda key, **kwargs: next((item.db for item in store.values() if item.key == key), None))
     keys = iter(range(300, 400))
-    monkeypatch.setattr(database_utility, "create_key", lambda kind, parent=None: Key("activity", str(next(keys)), project="test-project"))
+    monkeypatch.setattr(database_utility, "create_keys", lambda kind, parent, count: [Key("activity", str(next(keys)), project="test-project") for _ in range(count)])
     saved_commit = None
     def save(*items):
         nonlocal saved_commit
