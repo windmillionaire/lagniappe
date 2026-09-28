@@ -38,26 +38,12 @@ Usage:
 """
 
 import re
-from html.parser import HTMLParser
 
 from playwright.sync_api import expect
 
 from ..elements import List, SpinnerButtons, FormElements
 
 from .site import SitePage
-
-
-class _DataKeyParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.key = None
-
-    def handle_starttag(self, tag, attrs):
-        if self.key:
-            return
-        attr_map = dict(attrs)
-        if "data-key" in attr_map:
-            self.key = attr_map["data-key"]
 
 
 class HomePage(SitePage):
@@ -173,13 +159,6 @@ class HomePage(SitePage):
         "#tools [data-role='list-loading']"
         "[data-indicator='ToolReportList']"
     )
-
-    @staticmethod
-    def entity_key_from_response(response):
-        parser = _DataKeyParser()
-        parser.feed(response.text())
-        assert parser.key, "Create response did not include an entity data-key"
-        return parser.key
 
     def initialize_view(self):
         super().initialize_view()

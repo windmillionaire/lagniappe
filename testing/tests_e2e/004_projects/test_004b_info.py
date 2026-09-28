@@ -164,7 +164,7 @@ def test_project_revision_notice_only_resets_changed_form(
 ):
     owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
-    project = Projects.test_project_info_form.get(owner)
+    project = Projects.test_project_revision_notice.get(owner)
 
     owner.go(project)
     project.user = owner

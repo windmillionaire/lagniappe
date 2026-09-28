@@ -26,7 +26,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import Fetch
 
 from testing.definitions import Projects
-from testing.utility.network import assert_lagniappe_error_response
+from testing.utility.network import assert_lagniappe_error_response, expect_successful_response
 
 
 pytestmark = pytest.mark.e2e
@@ -115,7 +115,13 @@ def test_document_history_restore(get_admin, get_user):
     preview.get_by_role("button", name="Back to current").click()
     expect(editor.text_entry).to_have_text("Replacement content")
     editor.history.get_by_role("option", name=re.compile(r"Original notes — .+")).click()
-    preview.get_by_role("button", name="Restore this version").click()
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/sync",
+        request_payload_contains=['"save":true', "Original content to preserve"],
+    ):
+        preview.get_by_role("button", name="Restore this version").click()
     expect(preview).not_to_be_attached()
     notice = user.page.locator('[data-role="document-version-notice"]')
     expect(notice).to_contain_text("Version restored")
@@ -126,8 +132,6 @@ def test_document_history_restore(get_admin, get_user):
     preview.get_by_role("button", name="Back to current").click()
     expect(notice).to_be_visible()
     expect(editor.text_entry).to_have_text("Original content to preserve")
-    editor.focus()
-    editor.blur()
     user.go(project)
     expect(project.editor.text_entry).to_have_text("Original content to preserve")
     # Restored content remains the editable live document, and its recovery pin

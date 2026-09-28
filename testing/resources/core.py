@@ -1,3 +1,4 @@
+from html.parser import HTMLParser
 from weakref import WeakSet
 
 from playwright.sync_api import expect
@@ -10,6 +11,19 @@ from testing.elements import MobileNav
 
 
 VIEW_INITIALIZATION_TIMEOUT = 15000
+
+
+class _DataKeyParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.key = None
+
+    def handle_starttag(self, tag, attrs):
+        if self.key:
+            return
+        attr_map = dict(attrs)
+        if "data-key" in attr_map:
+            self.key = attr_map["data-key"]
 
 
 class SiteResource:
@@ -42,6 +56,13 @@ class SiteResource:
             expect(self.user.locate("[lp-view]")).to_have_attribute(
                 "initialized", "", timeout=VIEW_INITIALIZATION_TIMEOUT
             )
+
+    @staticmethod
+    def entity_key_from_response(response):
+        parser = _DataKeyParser()
+        parser.feed(response.text())
+        assert parser.key, "Create response did not include an entity data-key"
+        return parser.key
 
     def wait_for_interaction_readiness(self):
         """Wait for deferred view startup and its visual transition to settle."""

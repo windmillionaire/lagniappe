@@ -69,8 +69,8 @@ def test_import_csv_via_file_input(get_admin, get_user):
     Tests:
         1. Open import form
         2. Upload file via file input
-        3. Verify file appears in import list with correct row/column counts
-        4. Delete file via delete button and modal
+        3. Upload the same filename again and verify both records' counts
+        4. Delete each file independently via its delete button and modal
 
     Uses Uploads.csv_file_input definition with FILE_INPUT method.
     """
@@ -78,21 +78,17 @@ def test_import_csv_via_file_input(get_admin, get_user):
     admin = user.go(SitePages.ADMIN)
     upload = Uploads.csv_file_input
 
-    file_item = admin.import_file(upload)
-    file = File(user)
-    file.key = file_item.get_attribute("data-key")
+    file_items = [admin.import_file(upload), admin.import_file(upload)]
+    assert file_items[0].get_attribute("data-key") != file_items[1].get_attribute("data-key")
+    for file_item in file_items:
+        expect(file_item).to_contain_text(f"Rows: {upload.definition.rows}")
+        expect(file_item).to_contain_text(f"Columns: {upload.definition.columns}")
 
-    # Verify row and column counts
-    expect(file_item).to_contain_text(f"Rows: {upload.definition.rows}")
-    expect(file_item).to_contain_text(f"Columns: {upload.definition.columns}")
-
-    # Delete file
-    file_list = admin.import_list
-    file_item = file_list.get_item(file)
-    file_item.locator(Buttons.LP_DELETE).click()
-    modal = Modal(user.page)
-    modal.delete()
-    expect(file_item).not_to_be_visible()
+    for file_item in file_items:
+        expect(file_item).to_be_visible()
+        file_item.locator(Buttons.LP_DELETE).click()
+        Modal(user.page).delete()
+        expect(file_item).not_to_be_visible()
 
 
 # @matrix ingress : delete drag-drop upload-counts

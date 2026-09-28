@@ -397,7 +397,8 @@ def test_site_settings_public_page_indexing_saves_live_setting(
 # @matrix admin : site-update success
 # @pair cache:current
 # @template home/site_settings.html::site_settings
-@pytest.mark.e2e_group("owner")
+# Rebuild clears the entire test cache, including active document write locks.
+@pytest.mark.e2e_serial
 def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     owner = get_user(Users.OWNER)
     _, settings_panel = open_owner_site_settings(owner)

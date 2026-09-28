@@ -25,6 +25,7 @@ Usage:
 from playwright.sync_api import expect
 
 from testing.elements import List, SpinnerButtons, Tools
+from testing.utility.network import expect_successful_response
 
 from .core import SiteResource
 
@@ -135,13 +136,18 @@ class AdminPage(SiteResource):
         form = self.open_import_upload_form()
 
         upload.set(form)
-        with self.user.page.expect_response("**/ingress", timeout=20000):
+        with expect_successful_response(
+            self.user.page, method="POST", path="/files/ingress", timeout=20000
+        ) as upload_response:
             SpinnerButtons.UPLOAD.click(form)
 
+        file_key = self.entity_key_from_response(upload_response.value)
         expect(form).not_to_be_visible()
         file_list = self.import_list
         expect(file_list.list).to_be_visible()
-        return file_list.new_item(upload.definition.filename, flash=False)
+        file_item = file_list.list.locator(f"li[data-key='{file_key}']")
+        expect(file_item).to_be_visible()
+        return file_item
 
     @property
     def import_list(self):
