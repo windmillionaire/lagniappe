@@ -51,7 +51,7 @@ from lagniappe.core.tools.database import notifications as notification_database
 from testing.definitions import SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import User
-from testing.utility.network import assert_same_etag, manual_mutation_headers
+from testing.utility.network import assert_same_etag, manual_mutation_headers, scoped_browser_route
 
 pytestmark = pytest.mark.e2e
 
@@ -585,3 +585,29 @@ def test_browser_failure_guard_detects_unhandled_page_errors(
         assert str(page_error.value) == sentinel
         with pytest.raises(AssertionError, match="Unexpected browser failures"):
             browser_failures.assert_clean()
+
+
+# @matrix e2e : navigation static-assets bounded-retry failure-reporting
+def test_setup_navigation_recovers_a_static_503(get_admin, browser_failures):
+    """A failed cold module fetch gets one reload, then the real Home works."""
+    user = get_admin()
+    requests = []
+
+    def transient(route):
+        requests.append(route.request.url)
+        if len(requests) == 1:
+            route.fulfill(status=503, content_type="text/html", body="Temporarily unavailable")
+        else:
+            route.continue_()
+
+    with scoped_browser_route(user.page, "**/chunks/foundation.js?*", transient):
+        home = user.go(SitePages.HOME)
+        expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
+        user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
+        expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_be_visible()
+
+    assert len(requests) == 2
+    recovered = [event for event in browser_failures.events
+                 if event.ignored_reason == "static-503-recovered-by-navigation"]
+    assert recovered and all(event.details["http_status"] == "503" for event in recovered)
+    browser_failures.assert_clean()

@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 
 from config import SETTINGS
 from lagniappe.core.entities import Entities
+from testing.utility.navigation import navigate_with_static_retry
 
 from .core import SiteResource
 
@@ -21,6 +22,7 @@ class User(SiteResource):
         self.storage_state = None
         self.console_messages = []
         self.page = None
+        self.browser_failures = None
 
     @property
     def email(self):
@@ -117,20 +119,11 @@ class User(SiteResource):
         self.offline = False
         self.mobile = False
 
-        response = self.navigate(url)
-        expected_status = resource.expected_status
-        if response and expected_status is not None and response.status != expected_status:
-            raise AssertionError(
-                f"Navigation returned HTTP {response.status}, expected "
-                f"{expected_status}: {response.url}"
-            )
-        if response and expected_status is None and response.status >= 400:
-            raise AssertionError(
-                f"Navigation failed with HTTP {response.status}: {response.url}"
-            )
-
-        if resource.initialize:
-            resource.initialize_view()
+        navigate_with_static_retry(
+            self.page, url, expected_status=resource.expected_status,
+            initialize=resource.initialize_view if resource.initialize else None,
+            browser_failures=self.browser_failures,
+        )
 
         return resource
 

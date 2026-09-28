@@ -81,6 +81,7 @@ CLOUD_BUILD_ID_RE = re.compile(
 )
 CLOUD_BUILD_PENDING_STATUSES = {"STATUS_UNKNOWN", "QUEUED", "WORKING", "PENDING"}
 HOSTED_E2E_ENVIRONMENTS = ("standard",)
+DEFAULT_BROWSER_WORKERS = 6
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -1073,7 +1074,7 @@ def _hosted_app_descriptor(
     build_id,
     base_url,
     session_key,
-    experiments_workers=3,
+    experiments_workers=DEFAULT_BROWSER_WORKERS,
 ):
     """Return a test descriptor with production-equivalent static delivery."""
     handlers = copy.deepcopy(APP_HANDLERS)
@@ -1492,7 +1493,7 @@ def _resumable_create_state(
     source_snapshot,
     build_id,
     environment="standard",
-    experiments_workers=3,
+    experiments_workers=DEFAULT_BROWSER_WORKERS,
 ):
     """Return interrupted exact-source state, or reject an unsafe replacement."""
     selected = _environment(environment)
@@ -1602,11 +1603,11 @@ def _require_current_setup(infrastructure):
 
 
 # @testable infrastructure
-def create(*, base_ref=None, environment="standard", experiments_workers=3):
+def create(*, base_ref=None, environment="standard", experiments_workers=DEFAULT_BROWSER_WORKERS):
     """Deploy one committed production build as a test app and runner."""
     selected = _environment(environment)
     if type(experiments_workers) is not int or not 1 <= experiments_workers <= 6:
-        raise HostedE2EError("--experiments-workers must be between 1 and 6")
+        raise HostedE2EError("--workers must be between 1 and 6")
     source = require_clean_source()
     build_id = _require_committed_production_build(source)
     _run_create_preflight(source, base_ref=base_ref)
@@ -2792,8 +2793,9 @@ def run_hosted_e2e_command(arguments):
         ),
     )
     add_environment_argument(create_parser)
-    create_parser.add_argument("--experiments-workers", type=int, choices=range(1, 7), default=3,
-                               help="Coordinated workers: 1–3 use B2; 4–6 use B8 and a larger Cloud Run driver.")
+    create_parser.add_argument("--workers", "--experiments-workers", dest="experiments_workers",
+                               type=int, choices=range(1, 7), default=DEFAULT_BROWSER_WORKERS,
+                               help="Browser workers (default 6): 1–3 use B2; 4–6 use B4 and a larger Cloud Run driver.")
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
     execute_parser.add_argument("--experiments", nargs="?", const="pilot", choices=("pilot", "all"), help="Run coordinated E2E: pilot or all.")
     add_environment_argument(execute_parser)
@@ -2855,7 +2857,7 @@ def run_hosted_e2e_command(arguments):
             )
         elif args.action == "create":
             create_options = {"base_ref": args.base_ref}
-            if args.experiments_workers != 3:
+            if args.experiments_workers != DEFAULT_BROWSER_WORKERS:
                 create_options["experiments_workers"] = args.experiments_workers
             if args.environment != "standard":
                 create_options["environment"] = args.environment

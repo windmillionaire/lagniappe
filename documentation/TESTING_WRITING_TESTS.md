@@ -97,6 +97,14 @@ resets offline/mobile state, and waits for an initialized authenticated view
 when the resource requires one. Navigate by a real link, history action, or
 native browser control only when that navigation behavior is part of the story.
 
+`User.go()` permits one reload when a same-origin startup script or stylesheet
+returns an unmarked HTTP 503. The reload must fetch the failed assets
+successfully and initialize the view. Recovered resource errors remain in the
+browser diagnostics and are logged; other browser errors still fail. Document
+errors, application requests, missing assets, and failed assertions without a
+matching static 503 are not retried. Direct navigation, reloads, and later test
+actions retain their ordinary behavior.
+
 Keep helpers at the lowest reusable level:
 
 | Scope | Location |

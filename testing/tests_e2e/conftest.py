@@ -492,6 +492,7 @@ def get_user(browser, request, browser_failures, setup_test_server, fresh_resour
             user = user_definition.get(creator)
 
         user.console_messages.clear()
+        user.browser_failures = browser_failures
 
         # Persisted cache invalidation belongs to the browser acknowledgement
         # protocol; permission-mutating tests must consume it explicitly.

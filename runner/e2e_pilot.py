@@ -1,4 +1,4 @@
-"""Opt-in coordinated protocol checks and automatically grouped browser stories."""
+"""Coordinated protocol checks and automatically grouped browser stories."""
 
 from contextlib import contextmanager, ExitStack
 import argparse
@@ -23,7 +23,7 @@ PROTOCOL_TARGETS = tuple(f"{PILOT_FILE}::test_worker_page_and_task[{case}]" for 
 STORY_TARGETS = (
     'testing/tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag',
     'testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode',
-    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode[quota-fallback]',
+    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_category',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_project',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_page',
@@ -75,28 +75,28 @@ TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 # @matrix testing : parallel-e2e
 def pilot_arguments(arguments):
     parser = argparse.ArgumentParser(add_help=False, exit_on_error=False, allow_abbrev=False)
-    parser.add_argument("--experiments-workers", type=int)
+    parser.add_argument("--workers", "--experiments-workers", dest="experiments_workers", type=int)
     try:
         options, arguments = parser.parse_known_args(arguments)
     except argparse.ArgumentError as error:
         raise ValueError(str(error)) from error
-    flags = [arg for arg in arguments if arg == "--experiments" or arg.startswith("--experiments=")]
+    flags = [arg for arg in arguments if arg == "--parallel" or arg == "--experiments" or arg.startswith("--experiments=")]
     if not flags:
         if options.experiments_workers is not None:
-            raise ValueError("--experiments-workers requires --experiments")
+            raise ValueError("--workers requires --parallel or --experiments")
         return False, 3, arguments
     limit = os.environ.get("LAGNIAPPE_HOSTED_E2E_WORKERS")
     workers = options.experiments_workers if options.experiments_workers is not None else int(limit or 3)
     if not 1 <= workers <= 6:
-        raise ValueError("--experiments-workers must be between 1 and 6")
+        raise ValueError("--workers must be between 1 and 6")
     if limit and workers > int(limit):
         raise ValueError("Requested workers exceed this hosted candidate's capacity")
-    if len(flags) != 1 or flags[0] not in {"--experiments", "--experiments=pilot", "--experiments=all"}:
-        raise ValueError("Use --experiments or --experiments=all")
-    scope = "all" if flags[0] == "--experiments=all" else "pilot"
+    if len(flags) != 1 or flags[0] not in {"--parallel", "--experiments", "--experiments=pilot", "--experiments=all"}:
+        raise ValueError("Use --parallel for all E2E tests or --experiments for the smoke pilot")
+    scope = "all" if flags[0] in {"--parallel", "--experiments=all"} else "pilot"
     rest = [arg for arg in arguments if arg not in flags]
     if any(not arg.startswith("--junitxml=") for arg in rest):
-        raise ValueError("test --experiments selects coordinated E2E tests; only --junitxml= is additional")
+        raise ValueError("Coordinated E2E selects the full suite or smoke pilot; only --junitxml= is additional")
     return scope, workers, [*rest, *(TARGETS if scope == "pilot" else ("e2e",))]
 
 

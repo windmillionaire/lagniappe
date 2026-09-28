@@ -364,6 +364,10 @@ def test_worker_messages_reject_missing_completed_messages(tmp_path):
 def test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged(monkeypatch):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_WORKERS", raising=False)
     assert pilot_arguments(["unit"]) == (False, 3, ["unit"])
+    assert pilot_arguments(["--parallel"]) == ("all", 3, ["e2e"])
+    assert pilot_arguments(["--parallel", "--workers=6"]) == ("all", 6, ["e2e"])
+    with pytest.raises(ValueError):
+        pilot_arguments(["--parallel", "--experiments"])
     enabled, workers, arguments = pilot_arguments(["--experiments", "--junitxml=result.xml"])
     assert enabled and workers == 3 and arguments == ["--junitxml=result.xml", *TARGETS]
     assert pilot_arguments(["--experiments=all"]) == ("all", 3, ["e2e"])

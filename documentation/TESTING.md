@@ -46,12 +46,19 @@ venv/bin/python run.py test js
 venv/bin/python run.py test tooling
 venv/bin/python run.py test setup
 venv/bin/python run.py test e2e
+venv/bin/python run.py test --parallel  # Complete E2E with three coordinated workers
 
 venv/bin/python run.py test testing/tests_unit/test_file.py
 venv/bin/python run.py test testing/tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
 venv/bin/python run.py test -k "category"
 venv/bin/python run.py test -v --tb=long
 ```
+
+Normal hosted runs and CI use six coordinated browser workers on one B4
+candidate; their unit/JavaScript/tooling coverage remains sequential and is
+merged with E2E evidence. Local `test e2e` and focused paths stay sequential.
+Use `test --parallel --workers=6` to override the local parallel default of
+three workers. See [hosted testing](TESTING_HOSTED_E2E.md#coordinated-e2e-workers).
 
 Suite aliases expand only the documented suite names. Focused runs use real
 pytest paths or nodeids. Multiple aliases may be combined, but an alias and an

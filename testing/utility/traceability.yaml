@@ -35,6 +35,7 @@ test_roots:
   - testing/tests_tooling/test_001l_setup_experiments.py
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_004_reports.py
+  - testing/tests_tooling/test_004_navigation.py
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_005_test_session.py
   - testing/tests_tooling/test_005a_frontend_build.py
@@ -68,6 +69,7 @@ annotated_source_roots:
   - testing/utility/hosted_deferred_jobs.py
   - testing/utility/hosted_e2e_job.py
   - testing/utility/live_ai.py
+  - testing/utility/navigation.py
   - run.py
   - runner/context.py
   - runner/console.py

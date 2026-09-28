@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
+from xml.etree import ElementTree
 
 import pytest
 import yaml
@@ -762,6 +764,9 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     )
     monkeypatch.setattr(hosted_e2e_job, "_stamp_evidence", stamped.append)
     monkeypatch.setattr(hosted_e2e_job, "_upload_artifacts", uploaded.append)
+    complete_phases = []
+    monkeypatch.setattr(hosted_e2e_job, "_run_complete_suites",
+                        lambda environment: complete_phases.append(environment) or 1)
 
     pilot = focused in {"experiments", "experiments-all"}
     full_e2e = focused == "experiments-all"
@@ -769,17 +774,21 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     arguments = [flag] if pilot else ([f"--target={target}"] if focused else [])
     assert hosted_e2e_job.main(arguments) == 1
 
-    command, options = commands[0]
     selection = [target] if focused else ["unit", "js", "tooling", "e2e"]
+    if focused:
+        command, options = commands[0]
+        assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
     if pilot:
         from runner.e2e_pilot import TARGETS
         assert command[3:-1] == [flag]
         selection = [] if full_e2e else list(TARGETS)
-    else:
+    elif focused:
         assert command[command.index("--strict") + 1 : -1] == [
             *selection, "-m", "not unfinished"
         ]
-    assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
+    else:
+        assert complete_phases == ["standard"]
+        assert commands == []
     assert stamped == uploaded
     assert uploaded[0]["suite"] == ("e2e" if full_e2e else "focused" if focused else "all")
     assert uploaded[0].get("targets", []) == (selection if focused else [])
@@ -791,8 +800,61 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
         assert error.value.code == 2
     with pytest.raises(RuntimeError, match="individual"):
         hosted_e2e_job.main(["--target", target.split("::")[0]])
-    assert len(commands) == 1
+    assert len(commands) == int(bool(focused))
     assert len(uploaded) == 1
+
+
+# @matrix hosted-e2e testing : suite-scope result-aggregation failure-retention junit environment-isolation
+# @matrix mcp-package : junit result-aggregation environment-isolation
+@pytest.mark.parametrize("statuses", [(0, 0), (1, 0), (0, 1)])
+def test_hosted_complete_run_merges_all_phases_without_hiding_failure(tmp_path, monkeypatch, statuses):
+    from testing.utility.traceability_results import _write_manifest
+
+    report_root = tmp_path / "reports/hosted-e2e"
+    report_root.mkdir(parents=True)
+    evidence = tmp_path / "testing/evidence/latest.json"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text('{"kind":"test-run","tests":{"stale":{"outcome":"passed"}}}')
+    monkeypatch.setattr(hosted_e2e_job, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(hosted_e2e_job, "HOSTED_REPORT_ROOT", report_root)
+    monkeypatch.setattr(hosted_e2e_job, "EVIDENCE_PATH", evidence)
+    targets = ["tests_unit/test_support.py::test_support", "tests_e2e/test_browser.py::test_browser"]
+    for target in targets:
+        path = tmp_path / "testing" / target.split("::")[0]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"def {target.split('::')[1]}():\n    pass\n")
+    commands = []
+
+    def run(command, **kwargs):
+        index = len(commands)
+        if index == 0:
+            assert not evidence.exists()
+        commands.append(command)
+        nodeid = targets[index]
+        outcome = "failed" if statuses[index] else "passed"
+        _write_manifest(tmp_path, command, {nodeid: {"outcome": outcome, "duration": 1}}, statuses[index])
+        suite = ElementTree.Element("testsuite", name=("support", "e2e")[index])
+        case = ElementTree.SubElement(suite, "testcase", name=nodeid)
+        if statuses[index]:
+            ElementTree.SubElement(case, "failure", message="genuine failure")
+        destination = Path(command[-1].split("=", 1)[1])
+        ElementTree.ElementTree(suite).write(destination)
+        return subprocess.CompletedProcess(command, statuses[index])
+
+    monkeypatch.setattr(hosted_e2e_job, "subprocess", SimpleNamespace(run=run))
+    assert hosted_e2e_job._run_complete_suites("standard") == int(any(statuses))
+    assert commands[0][4:-1] == ["unit", "js", "tooling", "-m", "not unfinished"]
+    assert commands[1][3:-1] == ["--parallel"]
+    merged = json.loads(evidence.read_text())
+    assert set(merged["tests"]) == set(targets)
+    assert merged["exit_status"] == int(any(statuses))
+    assert merged["sessions"][0]["tests"] == 2
+    assert merged["sessions"][0]["exit_status"] == int(any(statuses))
+    assert [merged["tests"][target]["outcome"] for target in targets] == [
+        "failed" if status else "passed" for status in statuses]
+    junit = ElementTree.parse(report_root / "junit.xml")
+    assert len(junit.findall(".//testcase")) == 2
+    assert len(junit.findall(".//failure")) == sum(bool(status) for status in statuses)
 
 
 # @matrix hosted-e2e : cloud-run focused-execution local-dispatch override
@@ -1110,8 +1172,11 @@ def test_hosted_create_command_routes_preflight_base(monkeypatch, capsys):
 
     assert calls == [{"base_ref": "release-base"}]
     assert "Hosted E2E version ready" in capsys.readouterr().out
-    assert hosted_e2e.run_hosted_e2e_command(["create", "--experiments-workers=6"]) == 0
-    assert calls[-1] == {"base_ref": None, "experiments_workers": 6}
+    assert hosted_e2e.DEFAULT_BROWSER_WORKERS == 6
+    assert hosted_e2e.run_hosted_e2e_command(["create", "--workers=3"]) == 0
+    assert calls[-1] == {"base_ref": None, "experiments_workers": 3}
+    assert hosted_e2e.run_hosted_e2e_command(["create", "--experiments-workers=3"]) == 0
+    assert calls[-1] == {"base_ref": None, "experiments_workers": 3}
 
 
 # @pair hosted-e2e:cli-routing
@@ -2022,6 +2087,7 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
         "build_id": "b1234567",
         "image": f"{infrastructure.image_base}:{source}",
         "cloud_build_id": "12345678-1234-1234-1234-123456789abc",
+        "experiments_workers": 6,
     }
     monkeypatch.setattr(
         hosted_e2e,
@@ -2042,7 +2108,7 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
     with pytest.raises(HostedE2EError, match="different worker capacity"):
         hosted_e2e._resumable_create_state(
             state, infrastructure, source=source, source_snapshot=snapshot,
-            build_id="b1234567", experiments_workers=6,
+            build_id="b1234567", experiments_workers=3,
         )
 
     mismatched = dict(state, source="c" * 40)

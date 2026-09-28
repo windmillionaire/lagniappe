@@ -183,23 +183,32 @@ Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 
 ## Coordinated E2E workers
 
-The opt-in EXP-026 harness uses the same coordinator locally and inside one
-Cloud Run job. The original selection remains a quick pilot; `=all` selects
-every complete E2E case (including live provider contracts), not the unit,
-JavaScript or tooling suites:
+Normal `hosted-e2e execute` and CI use one Cloud Run coordinator with six
+browser workers by default. Unit, JavaScript and tooling tests run first in
+their existing environments; the complete E2E selection then runs concurrently.
+Both phases contribute to one JUnit report and traceability manifest with
+`all` scope. A failure in either phase fails the run. Application experiments
+mode and measurement diagnostics remain disabled.
 
 ```bash
+# Default hosted/CI profile: one B4 candidate, six Gunicorn and browser workers.
+venv/bin/python run.py hosted-e2e create
+venv/bin/python run.py hosted-e2e execute
+# Local complete coordinated E2E, three browsers by default:
+venv/bin/python run.py test --parallel
+venv/bin/python run.py test --parallel --workers=6
+# Optional smaller hosted profile:
+venv/bin/python run.py hosted-e2e create --workers=3
+# Legacy bounded pilot and E2E-only hosted selection remain available:
 venv/bin/python run.py test --experiments
-# After creating an exact committed hosted candidate:
 venv/bin/python run.py hosted-e2e execute --experiments
-# The whole E2E suite, with the same three-worker coordinator:
-venv/bin/python run.py test --experiments=all
-venv/bin/python run.py hosted-e2e execute --experiments=all
-# Six-worker trial, with a candidate sized for it:
-venv/bin/python run.py test --experiments --experiments-workers=6
-venv/bin/python run.py hosted-e2e create --experiments-workers=6
 venv/bin/python run.py hosted-e2e execute --experiments=all
 ```
+
+Focused `--target` runs remain sequential. Local `test e2e` also retains its
+sequential path for debugging; `test --parallel` selects the complete E2E suite
+without additional pytest filters. `--experiments=all` remains an alias for it,
+and `--experiments-workers` remains an alias for `--workers`.
 
 The bounded selection contains representative existing browser cases and five
 coordination checks, with three pytest/browser processes by default against
@@ -210,11 +219,10 @@ story worker reuses its own Administrator through `get_admin`; each test still
 gets an isolated browser context. The Administrator has explicit CREATE AI
 entitlement as well as ordinary administrative permissions.
 
-Local runs accept `--experiments-workers=1` through `=6`. Hosted creation records
+Local coordinated runs accept `--workers=1` through `=6`. Hosted creation records
 the count and execution inherits it: 1–3 use one B2 instance with three Gunicorn
 processes and a 2-CPU/4-GiB Cloud Run driver; 4–6 use one B4 instance with six
-Gunicorn processes and a 4-CPU/8-GiB driver. The larger profile is a trial sizing,
-not a measured throughput guarantee. The coordinator remains one Cloud Run job,
+Gunicorn processes and a 4-CPU/8-GiB driver. Six workers are the retained default, not a measured throughput optimum. The coordinator remains one Cloud Run job,
 with multiple browser workers sharing the candidate URL. A worker override
 cannot exceed the hosted candidate's declared capacity. Capacity changes require
 a new candidate, and interrupted creation cannot resume with a different count.
@@ -279,19 +287,19 @@ Worker logs, browser diagnostics, HTML reports and JUnit have separate paths
 under `reports/e2e-pilot/ATTEMPT/`. The coordinator checks exact selected-nodeid,
 attempt and source identity, merges JUnit, then records ordinary traceability
 evidence once. Missing/crashed workers become explicit failed selected results;
-old passing evidence cannot fill a missing worker. The pilot reports focused scope; the complete coordinated selection reports
-`e2e` scope. Both use the ordinary artifact upload/import path and preserve
-non-E2E evidence. Neither claims the all-suite release validation scope.
+old passing evidence cannot fill a missing worker. Explicit pilot and E2E-only
+invocations report `focused` and `e2e` scope respectively. The normal hosted
+job combines the support suites and coordinated E2E results into `all` scope,
+retaining failures from both phases. CI invokes this same default job.
 
 `--experiments` here selects the harness trial; it does not enable application
-experiments mode or measurement diagnostics. Ordinary suite execution remains serial. Full coordinated runs automatically
+experiments mode or measurement diagnostics. Full coordinated runs automatically
 collect exact parameter cases; no manual target list or 50-nodeid override is
 needed. Shared-cache reset and assertions about unchanged global revision
 snapshots run exclusively. Ordinary
 all-access stories use `get_admin`; Owner/permission-specific stories keep
 their exact identities. Tests retain collection order within each worker;
-there is no cross-worker order guarantee or work stealing. This remains an opt-in trial while full-suite reliability is
-validated. The browser runner and App Engine server have
+there is no cross-worker order guarantee or work stealing. The browser runner and App Engine server have
 separate CPU/memory budgets; increasing browser concurrency does not require
 additional server URLs.
 
