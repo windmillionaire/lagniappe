@@ -1,13 +1,17 @@
 import re
+from dataclasses import replace
+from uuid import uuid4
 
 import pytest
 
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
+from lagniappe.core.entities import Entities
 
 from testing.definitions import SitePages, Tasks, Users
 from testing.elements import Buttons, Modal
+from testing.resources import Task
 from testing.utility.network import expect_successful_response, scoped_browser_route
 
 """
@@ -269,9 +273,14 @@ def test_task_index_quick_edit_updates_editable_cell(get_admin, get_user):
 def test_task_index_quick_edit_background_save_preserves_newer_edit(get_admin, get_user):
     user = get_admin()
     first = Tasks.test_task_index_page_active.get(user)
-    second = Tasks.test_task_index_personal_today.get(user)
+    # A shared personal task may belong to another worker's Administrator,
+    # whose Page is correctly read-only to this actor.
+    second = Task(user=user, definition=replace(
+        Tasks.test_task_index_personal_today.value.definition,
+        name=f"Quick edit personal task {uuid4().hex}",
+    ))
+    second.create()
     first_original_name = first.entity.name
-    second_original_name = second.entity.name
     try:
         user.go(SitePages.TASK_INDEX)
 
@@ -286,6 +295,8 @@ def test_task_index_quick_edit_background_save_preserves_newer_edit(get_admin, g
         held = []
 
         toggle.click()
+        expect(first_cell).to_have_attribute("data-editable", "true")
+        expect(second_cell).to_have_attribute("data-editable", "true")
         first_cell.click()
         first_input = first_cell.locator("input[name='name']")
         first_input.fill(first_name)
@@ -333,11 +344,7 @@ def test_task_index_quick_edit_background_save_preserves_newer_edit(get_admin, g
         )
         restored.name = first_original_name
         restored.save()
-        restored = second.refresh_entity(
-            request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
-        )
-        restored.name = second_original_name
-        restored.save()
+        Entities.delete(second.entity)
 
 
 # @matrix table-controls task-index : checkbox-cell column-visibility quick-edit

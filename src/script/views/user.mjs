@@ -185,9 +185,10 @@ export default class Users extends EntityIndex {
 	}
 
 	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason request/reconcile flow is browser-only and covered by public-users index E2E
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
+	 * @tests tests_js/test_022_refresh_frontend.mjs::test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failure
+	 * @matrix users : index-mode-toggle pagination
 	 */
 	async _loadUserMode(mode, button) {
 		const table = this.getComponent(this.elt.querySelector("#table"));
@@ -195,29 +196,42 @@ export default class Users extends EntityIndex {
 		if (!table || !route) return;
 
 		this._setPublicModeLoading(true);
-		let response;
 		try {
-			response = await request.get(route);
+			const response = await request.get(route);
+			if (!this.successfulResponse(response, table)) return;
+
+			const body = response.html?.querySelector(
+				"tbody[data-widget='IndexTable']",
+			);
+			if (!body) return;
+
+			// Mode replacement is atomic: collect every cursor page before
+			// marking the new table loaded, retaining the old mode on failure.
+			let continuation = body.querySelector("tr[lp-load]");
+			while (continuation) {
+				const next = await request.get(continuation.dataset.route);
+				if (!this.successfulResponse(next, table)) return;
+				const nextBody = next.html?.querySelector(
+					"tbody[data-widget='IndexTable']",
+				);
+				if (!nextBody) return;
+				continuation.replaceWith(...nextBody.children);
+				continuation = body.querySelector("tr[lp-load]");
+			}
+
+			await withTransition(
+				() => {
+					this.elt.dataset.userMode = mode;
+					this._replaceUserRows(table, body, route);
+					this._syncPublicModeControls();
+					this._setCreateUserAvailability();
+					table.render(true);
+				},
+				{ label: "users:change-index-mode" },
+			);
 		} finally {
 			this._setPublicModeLoading(false);
 		}
-		if (!this.successfulResponse(response, table)) return;
-
-		const body = response.html?.querySelector(
-			"tbody[data-widget='IndexTable']",
-		);
-		if (!body) return;
-
-		await withTransition(
-			() => {
-				this.elt.dataset.userMode = mode;
-				this._replaceUserRows(table, body, route);
-				this._syncPublicModeControls();
-				this._setCreateUserAvailability();
-				table.render(true);
-			},
-			{ label: "users:change-index-mode" },
-		);
 	}
 
 	/**

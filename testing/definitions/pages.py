@@ -59,7 +59,13 @@ class Pages(ResourceEnumMixin, Enum):
     )
     test_file_upload_page = Page(definition=pd.file_upload_page)
     test_category_edit_page = Page(definition=pd.category_edit_page)
+    test_add_category_page = Page(
+        definition=replace(pd.category_edit_page, name="Add category Page")
+    )
     test_image_page = Page(definition=pd.image_page)
+    test_add_image_page = Page(
+        definition=replace(pd.image_page, name="Add image Page")
+    )
     test_generated_image_page = Page(definition=pd.generated_image_page)
     test_document_generation_page = Page(definition=pd.document_generation_page)
     test_document_generation_selection_page = Page(

@@ -7,6 +7,87 @@ class EntityBoundary {
 	async reconcilePollingSubscriptions() {}
 }
 
+/** @matrix users : index-mode-toggle pagination */
+test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failure", async (t) => {
+	createBrowser(t, {
+		html: `<main data-user-mode="regular">
+		<h1 data-role="title">User Index</h1>
+		<button data-role="public-users-toggle" data-route-public="/users/rows?mode=public" data-route-regular="/users/rows"></button>
+		<div id="table"><table><tbody data-widget="IndexTable"><tr data-key="original"><td>Original</td></tr></tbody></table></div>
+	</main>`,
+	});
+	const root = document.querySelector("main");
+	const button = root.querySelector("button");
+	const original = root.querySelector("tbody");
+	let failContinuation = true;
+	const requests = [];
+	const { default: Users } = await esmock.strict(
+		"../../src/script/views/user.mjs",
+		{
+			"../../src/script/views/base/index.mjs": { default: class {} },
+			"../../src/script/shared/transitions.mjs": {
+				withTransition: async (commit) => commit(),
+			},
+			"../../src/script/shared/request.mjs": {
+				request: {
+					async get(route) {
+						requests.push(route);
+						assert.equal(button.disabled, true);
+						assert.equal(root.dataset.userMode, "regular");
+						assert.equal(root.querySelector("tbody"), original);
+						if (route.includes("cursor=") && failContinuation)
+							return { ok: false };
+						const rows = route.includes("cursor=")
+							? '<tr data-key="second"><td>Second</td></tr>'
+							: '<tr data-key="first"><td>First</td></tr><tr lp-load data-route="/users/rows?mode=public&cursor=next"></tr>';
+						return {
+							ok: true,
+							html: new DOMParser().parseFromString(
+								`<table><tbody data-widget="IndexTable">${rows}</tbody></table>`,
+								"text/html",
+							),
+						};
+					},
+				},
+			},
+		},
+	);
+	const users = new Users();
+	const table = {
+		elt: root.querySelector("#table"),
+		widgets: { IndexTable: {} },
+		render() {},
+	};
+	Object.assign(users, {
+		elt: root,
+		getComponent: () => table,
+		successfulResponse: (response) => response.ok,
+	});
+	await users._loadUserMode("public", button);
+	assert.equal(root.querySelector("tbody"), original);
+	assert.equal(root.dataset.userMode, "regular");
+	assert.equal(button.disabled, false);
+
+	failContinuation = false;
+	await users._loadUserMode("public", button);
+	assert.deepEqual(requests, [
+		"/users/rows?mode=public",
+		"/users/rows?mode=public&cursor=next",
+		"/users/rows?mode=public",
+		"/users/rows?mode=public&cursor=next",
+	]);
+	assert.equal(root.dataset.userMode, "public");
+	assert.equal(root.querySelector("h1").textContent, "Public User Index");
+	assert.equal(button.disabled, false);
+	assert.deepEqual(
+		[...root.querySelectorAll("tr")].map((row) => row.dataset.key),
+		["first", "second"],
+	);
+	assert.equal(root.querySelector("[lp-load]"), null);
+	assert.equal(table.widgets.IndexTable.loaded, true);
+	assert.equal(table.widgets.IndexTable.route, "/users/rows?mode=public");
+});
+
 async function loadPage() {
 	return (
 		await esmock.strict("../../src/script/views/page.mjs", {

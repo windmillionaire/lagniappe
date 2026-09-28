@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -143,7 +144,10 @@ def _create_form(user, form, create_form):
 # @template forms/builder.html::main
 def test_create_page_form(get_admin, get_user):
     user = get_admin()
-    form = Forms.test_create_page_form.get(user, create=False)
+    form = Form(user=user, definition=replace(
+        Forms.test_create_page_form.value.definition,
+        name=f"Created Page Form {uuid4().hex}",
+    ))
     form_index = user.go(SitePages.FORM_INDEX)
     create_form = form_index.create_form_form()
     create_form.locator(FormElements.NAME).fill(form.definition.name)
@@ -171,7 +175,10 @@ def test_create_page_form(get_admin, get_user):
 # @template forms/builder.html::main
 def test_create_task_form(get_admin, get_user):
     user = get_admin()
-    form = Forms.test_create_task_form.get(user, create=False)
+    form = Form(user=user, definition=replace(
+        Forms.test_create_task_form.value.definition,
+        name=f"Created Task Form {uuid4().hex}",
+    ))
     form_index = user.go(SitePages.FORM_INDEX)
     create_form = form_index.create_form_form()
     create_form.locator(FormElements.NAME).fill(form.definition.name)

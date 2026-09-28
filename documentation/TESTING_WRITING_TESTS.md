@@ -376,6 +376,10 @@ Use `get_admin()` for a broad-access browser story that does not require the
 actual Owner. It reuses one Administrator per sequential worker, with explicit
 CREATE AI entitlement, while `get_user` creates a fresh browser context for each
 call. Keep permission/Owner-specific stories on their explicitly named actors.
+An Administrator cannot edit another Administrator's personal Page or Tasks.
+Create personal-task fixtures for the current actor instead of reusing a named
+personal Task first created by another worker. UI creation stories should also
+use fresh resources and unique names, leaving shared enum identities intact.
 
 Use `@pytest.mark.e2e_group("owner")` for stories retaining the shared Owner
 identity, including through a helper or fixture. Named groups are placed first

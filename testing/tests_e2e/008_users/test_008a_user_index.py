@@ -101,7 +101,7 @@ def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
 
 
 # @matrix reconnect-refresh : batched-request root-fingerprint
-# @matrix users : index-mode-toggle refresh table-row
+# @matrix users : index-mode-toggle refresh table-row pagination
 # @pair permissions:authorization
 # @template users/index.html::public_users_toggle
 @pytest.mark.e2e_group("owner")
@@ -111,10 +111,17 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
     public_email = f"{uuid4().hex}@public-toggle.example"
     refreshed_public_name = f"Reconnect Public User {uuid4().hex}"
     refreshed_public_email = f"{uuid4().hex}@public-toggle.example"
+    # Keep Owner beyond the first 25-row batch when regular mode is restored.
+    regular_users = [Entities.USER.create({
+        "name": f"Mode pagination {index} {uuid4().hex}",
+        "email": f"{uuid4().hex}@mode-pagination.example",
+        "test_user": True,
+    }) for index in range(26)]
 
     try:
         _set_public_users_allowed(owner, True)
         _create_public_user(public_email, public_name)
+        Entities.save(*regular_users)
 
         user_index = owner.go(SitePages.USER_INDEX)
         table = Table(owner)
@@ -156,6 +163,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(table.get_row(public_name)).to_have_count(0)
         expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_be_visible()
     finally:
+        Entities.delete(*regular_users)
         _set_public_users_allowed(owner, False)
 
 

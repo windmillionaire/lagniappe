@@ -101,6 +101,8 @@ independent of refresh fingerprints.
 User rows identify their cached Page. A changed Users collection also refreshes
 User-backed columns such as groups and last login. Form indexes retain full
 fragment replacement when their collection revision changes.
+Switching between regular and public Users follows all cursor pages before
+replacing the table. A failed continuation leaves the previous mode intact.
 
 Index-table deltas replace changed rows and insert or move only rows that are
 out of order. Unchanged rows remain attached, preserving focus and local input
@@ -126,6 +128,10 @@ a task in that list is open; it defers sort-order moves until the task closes
 or a later refresh, so an autofill save does not move the form under the user.
 An unchanged task order leaves the existing row elements mounted, preserving
 hover and click continuity across a harmless refresh.
+Mutation deltas (such as combining tasks) can mention another client's new row
+without including its HTML. If a delta orders an unknown row, the task list
+fetches its focused list route and uses normal draft-preserving reconciliation.
+Complete deltas need no extra request.
 Task title clicks are handled by the view's delegated `lp-show` handler; the
 task-list widget does not add a second click-driven toggle. The delegated open
 event measures the entire expanded task row below the fixed header. It scrolls

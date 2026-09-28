@@ -8,6 +8,8 @@ from lagniappe.web import auth as web_auth
 from testing.definitions import Categories, Projects, SitePages, Tasks, Users
 from testing.elements import HeaderSearch, List
 from testing.resources import Task
+from testing.utility.network import expect_successful_response
+from urllib.parse import urlsplit
 
 pytestmark = pytest.mark.e2e
 
@@ -139,12 +141,26 @@ def test_admin_permissions(get_user):
     project_one = Projects.test_create_project_manual_mode.get(user)
     home = user.go(SitePages.HOME)
 
-    category_list = home.category_list
-    expect(category_list.get_item(cat_one)).to_be_visible()
-    expect(category_list.get_item(cat_two)).to_be_visible()
-
-    project_list = home.project_list
-    expect(project_list.get_item(project_one)).to_be_visible()
+    for listing, expected in (
+        (home.category_list, [cat_one, cat_two]),
+        (home.project_list, [project_one]),
+    ):
+        remaining = list(expected)
+        while remaining:
+            for item in remaining[:]:
+                row = listing.get_item(item)
+                if row.count():
+                    expect(row).to_be_visible()
+                    remaining.remove(item)
+            if not remaining:
+                break
+            next_page = listing.list.locator("button[lp-control='next']")
+            expect(next_page).to_be_visible()
+            route = next_page.get_attribute("data-route")
+            first_key = listing.list.locator("li[lp-entity]").first.get_attribute("data-key")
+            with expect_successful_response(user.page, method="GET", path=urlsplit(route).path):
+                next_page.click()
+            expect(listing.list.locator(f"li[data-key='{first_key}']")).not_to_be_attached()
 
     directory_list = home.directory
     expect(directory_list.list.locator("li")).to_have_count(4)

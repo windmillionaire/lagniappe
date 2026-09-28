@@ -93,14 +93,14 @@ class SelectButton:
 
     def select(self, item):
         """
-        Open dropdown and select an item by its definition name.
+        Search by name, then select the exact persisted entity.
 
         Args:
             element: Parent element containing the select button
             item: Entity with .definition.name to select
         """
         combobox = Select(self._element)
-        combobox.select_by_name(item.definition.name)
+        combobox.select_by_key(item.key, query=item.definition.name)
 
         expect(self._element).to_contain_text(item.definition.name)
 

@@ -317,8 +317,10 @@ export class PageTaskList extends BaseList {
 	}
 
 	/**
-	 * @testable infrastructure
-	 * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
+	 * @tests tests_js/test_028_form_state_split.mjs::test_task_delta_loads_unknown_rows_without_discarding_local_edits
+	 * @matrix tasks : delta concurrent-create dirty-form-preservation
 	 */
 	async prepareRefreshDelta(delta) {
 		const existing = new Map(
@@ -327,6 +329,16 @@ export class PageTaskList extends BaseList {
 				(task) => [task.dataset.key, task],
 			),
 		);
+		const known = new Set(existing.keys());
+		for (const key of delta.remove || []) known.delete(key);
+		for (const { key } of delta.upsert || []) known.add(key);
+		if ((delta.order || []).some((key) => !known.has(key))) {
+			// Mutation deltas contain only the affected rows. Another client may
+			// have added a task since this list loaded; reconcile the full list
+			// through the usual draft-preserving path before applying anything.
+			const response = await this.view.load(this.component, this.route);
+			return this.prepareRefresh(response);
+		}
 		this._removed = (delta.remove || [])
 			.map((key) => existing.get(key))
 			.filter(Boolean);
@@ -422,7 +434,7 @@ export class PageTaskList extends BaseList {
 
 	async refreshDelta(delta) {
 		const commit = await this.prepareRefreshDelta(delta);
-		commit();
+		commit?.();
 	}
 
 	updated(response) {

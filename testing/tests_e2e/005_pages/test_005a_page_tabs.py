@@ -451,7 +451,7 @@ def test_add_multiple_files_to_page_without_existing_file_select(get_admin, get_
 # @pair pages:category-add
 def test_add_category_to_page(get_admin, get_user):
     user = get_admin()
-    page = user.go(Pages.test_category_edit_page)
+    page = user.go(Pages.test_add_category_page)
     category = Categories.test_empty_category.get(user)
 
     info_form = page.info_form
@@ -459,7 +459,9 @@ def test_add_category_to_page(get_admin, get_user):
         category.definition.name
     )
 
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page, method="PUT", path=f"/pages/{page.key}/update", entity_key=page.key,
+    ):
         SpinnerButtons.UPDATE.click(info_form)
 
     user.go(category)

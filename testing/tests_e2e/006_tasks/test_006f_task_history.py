@@ -1150,6 +1150,7 @@ def test_combine_task_form_filters_compatible_tasks(get_admin, get_user):
 # @template pages/tasks.html::combine_form
 # @template pages/tasks.html::task
 # @template tasks/history.html::completion_history
+# @matrix tasks : delta concurrent-create
 def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get_user):
     user = get_admin()
     fixture = Tasks.test_history_form_task.get(user)
@@ -1202,6 +1203,11 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get
     combine_form.get_by_role("checkbox", name=secondary.entity.name).check()
     combine_form.get_by_role("checkbox", name=winner.entity.name).check()
 
+    # Another client adds a Task after this browser loaded the list. The
+    # combine response must not assume its order is entirely mounted here.
+    concurrent = _create_combine_task(user, page, "Created while combining")
+    expect(user.locate(f"li[data-key='{concurrent.key}']")).not_to_be_attached()
+
     with user.page.expect_response(
         lambda response: response.url.split("?", 1)[0]
         .rstrip("/")
@@ -1222,6 +1228,7 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get
     expect(winner_row).to_have_attribute("data-completed", "true")
     expect(user.locate(f"[data-key='{source.key}']")).not_to_be_attached()
     expect(user.locate(f"[data-key='{secondary.key}']")).not_to_be_attached()
+    expect(user.locate(f"li[data-key='{concurrent.key}']")).to_be_visible()
 
     fixture.definition.origin.get(user).completed_task_list
     expect(winner_row).to_be_visible()

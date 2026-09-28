@@ -88,7 +88,7 @@ def _desktop_photo_toggle(user):
 # @matrix pages : image-add photo-prompt
 def test_add_image_to_page(get_admin, get_user):
     user = get_admin()
-    page = user.go(Pages.test_image_page)
+    page = user.go(Pages.test_add_image_page)
 
     _upload_image_from_prompt(user, page)
 
