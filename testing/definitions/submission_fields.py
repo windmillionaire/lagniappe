@@ -73,7 +73,7 @@ class SubmissionField:
 
     def _switch_to_edit(self):
         if self.read.is_visible():
-            self.label.click()
+            self.element.locator("button[data-role='edit']").click()
             expect(self.read).not_to_be_visible()
 
 

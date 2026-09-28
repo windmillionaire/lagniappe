@@ -8,6 +8,9 @@ Verified against:
 - src/script/views/base/entity.mjs
 """
 
+from dataclasses import replace
+from uuid import uuid4
+
 from playwright.sync_api import expect
 
 from testing.definitions import ModelTasks, Projects
@@ -45,8 +48,11 @@ def test_create_model_task(get_admin, get_user):
     project = Projects.test_create_model_task.get(user)
     user.go(project)
 
-    model_task = ModelTasks.test_create_model_task.get(user, create=False)
-    model_task.key = _create_model_task(user, project, model_task.definition)
+    definition = replace(
+        ModelTasks.test_create_model_task.value.definition,
+        name=f"Created Model Task {uuid4().hex}",
+    )
+    _create_model_task(user, project, definition)
 
 
 # @matrix model-tasks : attach-form create
@@ -55,5 +61,8 @@ def test_create_model_task_with_form(get_admin, get_user):
     project = Projects.test_create_model_task_with_form.get(user)
     user.go(project)
 
-    model_task = ModelTasks.test_create_model_task_with_form.get(user, create=False)
-    model_task.key = _create_model_task(user, project, model_task.definition)
+    definition = replace(
+        ModelTasks.test_create_model_task_with_form.value.definition,
+        name=f"Created Model Task with Form {uuid4().hex}",
+    )
+    _create_model_task(user, project, definition)

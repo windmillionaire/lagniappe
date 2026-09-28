@@ -100,16 +100,20 @@ class SelectButton:
             item: Entity with .definition.name to select
         """
         combobox = Select(self._element)
-        combobox.select_by_key(item.key, query=item.definition.name)
+        combobox.select_by_key(self.selection_key(item), query=item.definition.name)
 
         expect(self._element).to_contain_text(item.definition.name)
 
     def select_by_key(self, item):
         """Open dropdown and select an item by its persisted entity key."""
         combobox = Select(self._element)
-        combobox.select_by_key(item.key)
+        combobox.select_by_key(self.selection_key(item))
 
         expect(self._element).to_contain_text(item.definition.name)
+
+    @staticmethod
+    def selection_key(item):
+        return item.key
 
     def form(self):
         """
@@ -166,6 +170,11 @@ class DateSelect(SelectButton):
 class UserSelect(SelectButton):
     value = '[data-role="user-select"]'
     default_text = "Assign"
+
+    @staticmethod
+    def selection_key(item):
+        """Assignments select a User's personal Page, not its User record."""
+        return item.entity.page.urlsafe_key
 
 
 class FileSelect(SelectButton):
