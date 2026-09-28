@@ -363,10 +363,12 @@ class Editor:
 
     def clear_text(self):
         """Clear all text from the editor."""
-        self.focus()
+        # Select-all does not depend on where the caret starts.
+        self.text_entry.click()
         self.select_text()
         self.text_entry.press("Delete")
         self.wait_for_render()
+        expect(self.text_entry).to_have_text("")
         return self.text_entry
 
     def get_text(self):
