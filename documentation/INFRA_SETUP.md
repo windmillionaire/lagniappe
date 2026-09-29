@@ -5,6 +5,12 @@ provider configuration, and source/configuration updates. Platform launchers
 create and invoke this checkout's `venv`; the installer process must run from
 that interpreter.
 
+Run setup from the checkout that manages the intended installation. Its
+untracked settings select the cloud project, operator and application mode;
+see [Current installation](INFRA_CONFIG.md#current-installation). Separate
+installations keep separate local configuration even when they use the same
+source branch.
+
 ```bash
 ./setup.sh
 ```
@@ -17,7 +23,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | Command | Purpose |
 | --- | --- |
 | no arguments | Install or recover a complete instance. |
-| `--experiments` | Create a dedicated experiments installation with an admin agent, MCP execution and request measurements; see [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md). |
+| `--experiments` | Enable experiments mode during creation of a dedicated installation, with an admin agent, MCP execution and request measurements; see [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md). |
 | `auth` | Refresh the saved gcloud account and align human ADC. |
 | `doctor` | Read-only local/provider audit. |
 | `repair` | Explicit full reconciliation, followed by validation. |

@@ -36,9 +36,43 @@ isolated tests.
 | `package.json` | Application version and frontend toolchain. |
 | `lagniappe/web/static/manifest.json` | Generated PWA manifest. |
 
+The deployment descriptor, indexes, and files under `config/files/` are local
+to each installation and ignored by Git. Their reusable defaults and builders
+are tracked; setup generates the files for each installation. The PWA manifest
+is tracked and uses the project name `Lagniappe` for both `name` and `short_name`,
+independently of the installation's `APP_NAME`. Setup and deployment preserve
+that branding while refreshing icon cache versions.
+
 `Directory` and `File` enums expose the known project paths and parse/save
 helpers. Do not add dynamic path discovery or upward searching to runtime
 configuration.
+
+## Current installation
+
+The checkout and its saved local configuration together identify the installation
+being managed. Separate checkouts can manage unrelated installations while
+sharing the same source revision. A branch name or directory name does not
+select an application mode or deployment target.
+
+| Needed value | Source in this checkout |
+| --- | --- |
+| Cloud project and app origin | `GOOGLE_CLOUD_PROJECT`, `CUSTOM_DOMAIN` and `APP_URL` in `config/files/lagniappe_settings.yaml`; use the custom HTTPS domain when configured, otherwise `APP_URL`. |
+| Operator account and gcloud configuration | `gcloud_config.NAME`, `ACCOUNT` and `PROJECT` in `config/files/lagniappe_dev.yaml`; the saved project must agree with the application settings. |
+| MCP connection | `MCP_NAME` and `MCP_RESOURCE` in the application settings; verify the connected client targets that endpoint. |
+| Experiments mode and permissions | `EXPERIMENTS_*`, AI and agent-access settings in the application settings, plus the current app user's permissions. |
+| Hosted test resources | This checkout's generated `reports/hosted-e2e/setup.json` and `state.json`, validated against its saved project. |
+
+Use the installer or runner's target validation before provider operations. A
+browser login, connected MCP server, or active gcloud configuration may belong
+to another installation. If the local configuration is missing or inconsistent,
+resolve it through setup or the operator before choosing a live target.
+
+Read only the settings needed for the task and decode their saved values through
+the configuration helpers. Keep credentials out of logs and tracked files.
+Installation-specific notebook links and operator instructions belong in that
+installation's app or ignored local notes. Public project links, fixture values
+and historical run provenance do not select the current installation or confer
+authority to change it.
 
 ## Settings writes
 

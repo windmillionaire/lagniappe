@@ -1,9 +1,15 @@
-# Experiments installation
+# Experiments mode
 
-Create a separate normal installation from a fresh checkout and a dedicated
-project with `./setup.sh --experiments`. Select `lagniappe-experiments` when
-setup asks for the project. The flag applies to initial installation, not to
-subcommands or conversion of another installation. Interrupted setup retains
+Experiments is an optional mode configured for an individual installation.
+Follow the [current installation](INFRA_CONFIG.md#current-installation) settings
+in the checkout being used. Verify its project, app origin, MCP connection and
+`EXPERIMENTS_ENABLED` value before following this guide. The source repository
+supports installations with the mode either enabled or disabled.
+
+To create an installation with experiments enabled, use a fresh checkout and a
+dedicated project with `./setup.sh --experiments`. Choose the project intended
+for that installation when setup asks. The flag applies to initial installation,
+not to subcommands or conversion of another installation. Interrupted setup retains
 its experiments intent. Later updates use `./setup.sh update` without repeating
 the flag. Use the normal production runtime and a dedicated Redis database.
 
@@ -117,10 +123,13 @@ cookies, credentials, signed URLs, or bodies. Export only the structured
 experiments payload when archiving cloud evidence; provider request envelopes
 and browser traces may contain other sensitive fields.
 
-For example, collect recent summaries locally, then attach the reviewed JSON:
+For example, collect recent summaries locally, then attach the reviewed JSON.
+Replace `PROJECT_ID` with this checkout's saved `GOOGLE_CLOUD_PROJECT`, and
+`GCLOUD_CONFIG_NAME` and `GCLOUD_ACCOUNT` with its saved
+`gcloud_config.NAME` and `ACCOUNT`. Verify the saved projects agree before running:
 
 ```bash
-gcloud logging read 'resource.type="gae_app" AND jsonPayload.event="lagniappe.experiments.request"' --project=lagniappe-experiments --freshness=1h --limit=200 --format=json
+gcloud logging read 'resource.type="gae_app" AND jsonPayload.event="lagniappe.experiments.request"' --project=PROJECT_ID --configuration=GCLOUD_CONFIG_NAME --account=GCLOUD_ACCOUNT --freshness=1h --limit=200 --format=json
 ```
 
 Use explicit project and time bounds, retain request IDs, and record missing or
@@ -128,7 +137,7 @@ truncated coverage. Compare diagnostics off/summary overhead separately. Keep
 instrumentation mode, browser conditions, region, instance class and workers
 consistent across baseline/candidate samples.
 
-For the P5-01 read-batching comparison, authenticated requests to
+For a task-list read-batching comparison, authenticated requests to
 `GET /pages/<key>/tasks` may send `X-Lagniappe-Experiments-Task-List: batched`
 or `unbatched`. Both use the same permissions, validators and render path;
 the control reads revisions separately instead of with the initial auth roots.
@@ -180,12 +189,12 @@ service alongside the existing logging and Sentry paths.
 
 ## Installation acceptance and first experiments
 
-1. Through MCP, create **Experiment Installation**, its **Setup** and **Results**
-   Pages, upload this guide and the installation's creation documents,
-   and attach them through `execute_plan`. The original creation documents for
-   `lagniappe-experiments` are archived on its Setup Page; ongoing plans and
-   experiment records live on the app. Read back the Pages and file originals,
-   verify checksums, and replay the same operation to check for duplicates.
+1. In the authorized installation, locate or create an experiment Category with
+   **Setup** and **Results** Pages. Record its setup procedure and attach this
+   guide and reviewed, non-secret creation documents through `execute_plan`.
+   Keep ongoing plans and experiment records in that installation's app; record
+   their locations there or in ignored local notes. Read back the Pages and file
+   originals, verify checksums, and replay the same operation to check for duplicates.
 2. Create a small Task Form containing two static HTML sections and one text
    field, plus one Task. Record exact fixture references and a readiness check
    that sees both sections and a usable field. Measure full navigation separately
@@ -199,22 +208,20 @@ service alongside the existing logging and Sentry paths.
 Setup/Results/fixtures/evidence must be retrievable from the app before calling
 these pilots complete. Installation and live acceptance are separate steps.
 
-## Sandbox updates
+## Installation workspace
 
 ### Agent notebook
 
-The `lagniappe-experiments` installation has an
-[Agent Notebook](https://lagniappe-experiments.uc.r.appspot.com/categories/ahVsYWduaWFwcGUtZXhwZXJpbWVudHNyEwsSBm1vZGVscxiAgICE7IGICgw)
-Category and [Agent Follow-up](https://lagniappe-experiments.uc.r.appspot.com/projects/ahVsYWduaWFwcGUtZXhwZXJpbWVudHNyEwsSBm1vZGVscxiAgID4wr2ECgw)
-Project for incidental findings during other work. The app owns the notebook's
-Pages, model tasks, forms, notes, and decisions. Changes to that structure or
-content do not require repository edits or commits.
+An installation may have a notebook Category, a follow-up Project, and a Page
+describing its local workflow. When the user's task authorizes recording
+findings, discover those records through the current installation's app or its
+local notes and verify the connected actor and endpoint. Record names, IDs and
+URLs vary by installation; this guide supplies no standing authorization to
+create records or perform unrelated work.
 
-The user has authorized low-friction capture during other work; it does not
-expand the active task into unrelated implementation. The
-[Notebook Guide](https://lagniappe-experiments.uc.r.appspot.com/pages/ahVsYWduaWFwcGUtZXhwZXJpbWVudHNyFgsSCWluc3RhbmNlcxiAgICYpf6fCgw)
-holds the current workflow, and the repository's `AGENTS.md` points future agents
-to it. Keep each installation's notes in its own authorized workspace.
+The app owns the notebook's Pages, tasks, forms, notes and decisions. Keep its
+workflow and record locations there or in ignored local notes. Changes to an
+installation's notebook do not require repository edits or commits.
 
 ### Updating and retaining candidates
 

@@ -24,7 +24,7 @@ with several supporting files differs from generic “file everything” sorting
 
 ## Historical evidence and controls
 
-Source: `/home/swifty/Desktop/FILE_USE_AI_TEST/file-use-ai-after/02-page-from-documents`.
+Source: `<historical-captures>/FILE_USE_AI_TEST/file-use-ai-after/02-page-from-documents`.
 The historical Pi/REST run passed semantically, with a wrong-tree-path control
 gap; the three files were byte-identical. Evidence is `RESULTS.md`,
 `artifacts/transcript.jsonl`, and `artifacts/SESSION.txt` there.

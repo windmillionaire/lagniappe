@@ -58,6 +58,11 @@ Follow the [installation guide](https://lagniappe.site/manual/installation) for 
 
 For installer architecture and implementation details, see [INFRA_SETUP.md](documentation/INFRA_SETUP.md).
 
+Each checkout manages the installation selected by its untracked local settings.
+Keep separate settings for separate installations, and resolve cloud projects,
+app URLs and optional modes from the checkout being used. See
+[Current installation](documentation/INFRA_CONFIG.md#current-installation).
+
 ## Hosting and Support
 
 The app deploys to Google App Engine in your cloud project. Its data and supporting services remain under your provider accounts, so the operator is responsible for monitoring, backups, provider retention settings, account security, and usage costs.

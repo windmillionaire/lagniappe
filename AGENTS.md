@@ -3,6 +3,29 @@
 These instructions apply to the whole repository unless a more specific
 `AGENTS.md` exists in a subdirectory.
 
+## Current Installation
+
+- Each checkout manages the installation selected by its own untracked settings.
+  Read `documentation/INFRA_CONFIG.md` for the configuration sources before
+  working with cloud resources, a deployed app, or an MCP connection.
+- Resolve the project, account, app origin, MCP endpoint, and enabled modes from
+  this checkout's `config/files/lagniappe_settings.yaml` and
+  `config/files/lagniappe_dev.yaml`. Inspect only the fields needed for the task;
+  these files contain secrets.
+- Use the installer and runner to validate the saved target. Do not infer it
+  from the directory name, Git branch, public project website, historical test
+  evidence, another checkout, or the ambient gcloud/browser/MCP session.
+- Experiments is an optional installation mode. Check the current settings
+  before using its workflows; repository membership does not enable the mode
+  or authorize app writes, experiments, or deployment.
+- Keep tracked source, documentation, and examples reusable across installations.
+  Store installation-specific URLs, record IDs, notebook locations, and operator
+  instructions in that installation's app or ignored local files. Resolve any
+  notebook through the current installation and the user's task authorization.
+- Keep generated installation settings and deployment descriptors out of Git.
+  Project branding and filenames such as `Lagniappe` and `lagniappe_settings.yaml`
+  are shared across installations; the tracked PWA manifest uses that branding.
+
 ## Python
 
 - Use the project virtualenv for all Python commands.

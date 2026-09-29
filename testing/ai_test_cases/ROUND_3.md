@@ -5,6 +5,9 @@ All five captures were promoted to the flat `artifacts/baseline/` folders on
 September 5 before the remote pilot. The preparation/operator notes below are
 retained as provenance; their old export destinations are historical, not
 instructions to recreate nested folders or overwrite this batch.
+`<historical-checkout>` and `<historical-captures>` represent the original
+operator's private directories, not locations expected in the current checkout.
+For a new run, follow [the current case workflow](README.md#run-a-case).
 
 Baseline: preserved round-2 MCP captures (0.1.5, Sol medium). Candidate: the
 next deployed server and **lagniappe-mcp 0.1.6**. The candidate is prepared
@@ -45,15 +48,15 @@ The tracked library preserves prompt and substantive fixture bytes. Keeping the
 existing neutral Desktop working directories also preserves instruction context;
 only the post-task export destination changes.
 
-Launch under `/home/swifty/Desktop/lagniappe-mcp-trial/<case>/fixtures/`.
+Launch under `<historical-captures>/lagniappe-mcp-trial/<case>/fixtures/`.
 When finished, ask “Export this chat to …” with the appropriate destination:
 
 ```text
-/home/swifty/lagniappe/testing/ai_test_cases/cases/01-ask-known-page/artifacts/current/mcp
-/home/swifty/lagniappe/testing/ai_test_cases/cases/02-ask-books-filter/artifacts/current/mcp
-/home/swifty/lagniappe/testing/ai_test_cases/cases/08-organize-mixed-files/artifacts/current/mcp
-/home/swifty/lagniappe/testing/ai_test_cases/cases/09-create-project/artifacts/current/mcp
-/home/swifty/lagniappe/testing/ai_test_cases/cases/11-ask-approximate-issue/artifacts/current/mcp
+<historical-checkout>/testing/ai_test_cases/cases/01-ask-known-page/artifacts/current/mcp
+<historical-checkout>/testing/ai_test_cases/cases/02-ask-books-filter/artifacts/current/mcp
+<historical-checkout>/testing/ai_test_cases/cases/08-organize-mixed-files/artifacts/current/mcp
+<historical-checkout>/testing/ai_test_cases/cases/09-create-project/artifacts/current/mcp
+<historical-checkout>/testing/ai_test_cases/cases/11-ask-approximate-issue/artifacts/current/mcp
 ```
 
 The existing installed Export Chat skill is unchanged. A reusable copy, including

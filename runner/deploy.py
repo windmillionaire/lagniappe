@@ -362,16 +362,16 @@ def increment_version():
 # @covered-by installer/config_builders.py::build_manifest
 # @reason manifest naming and icon versioning shared by setup generation and deployment
 def update_manifest(*, app_settings=None, manifest=None):
-    """Update the supplied manifest, or the current settings for deployment."""
+    """Apply project branding and the installation's icon cache version."""
+    from config import constants
+
     if app_settings is None or manifest is None:
         if app_settings is None:
             app_settings = SETTINGS.APP
         if manifest is None:
             manifest = SETTINGS.MANIFEST
-    app_name = app_settings["APP_NAME"]
-
-    manifest["name"] = app_name
-    manifest["short_name"] = app_name
+    manifest["name"] = constants.MANIFEST["name"]
+    manifest["short_name"] = constants.MANIFEST["short_name"]
 
     image_version = app_settings.get("SITE_IMAGE_VERSION", 0)
     if image_version:
