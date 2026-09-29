@@ -56,7 +56,7 @@
   <ul data-role="completed-tasks"
       class="divide-y divide-base-light/50"
       data-visible="false">
-    {% for t in page.completed %}{{ task(t, page) }}{% endfor %}
+    {% for t in page.completed_tasks %}{{ task(t, page) }}{% endfor %}
   </ul>
 {% endmacro %}
 
@@ -109,7 +109,7 @@
        data-kind="error"
        data-visible="false"
        data-role="error"></p>
-    <p class="text-sm whitespace-pre-wrap italic px-3 py-2 ring ring-inset font-semibold w-fit rounded-md text-base-default ring-task-default/20 bg-base-bg"
+    <p class="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] italic px-3 py-2 ring ring-inset font-semibold min-w-0 w-fit max-w-full rounded-md text-base-default ring-task-default/20 bg-base-bg"
        data-role="task-description"
        data-visible="{{ t.description|yesno }}">{{ t.description or '' }}</p>
     {{- task_details(t, page) -}}
@@ -195,7 +195,7 @@
         data-nav="false"
         data-controls="true"
         data-task="{{ t.hash }}:TaskSettings"
-        data-history="{{ t.hash }}:TaskHistory"
+        {% if t.has_history %}data-history="{{ t.hash }}:TaskHistory"{% endif %}
         data-deferred-route="{{ url_for('tasks.get', key=t.urlsafe_key) }}"
         data-destination="{{ t.hash }}:TaskForm"
         data-form-state='{{ review_state|tojson }}'
@@ -394,7 +394,6 @@
             data-role="date-select"
             data-title="Schedule"
             data-ai-enabled="{{ current_user.access(AI.CREATE)|yesno }}"
-            data-kind="task"
             {% if task and task.properties.schedule.active %}data-schedule='{{ task.schedule|tojson }}'{% endif %}
             {% if task and task.due_date %}data-due-date='{{ task.properties.due_date.form_value }}'{% endif %}
             class="{{ styles.select.button }}"></button>

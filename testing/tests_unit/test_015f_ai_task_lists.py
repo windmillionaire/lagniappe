@@ -47,7 +47,7 @@ class Page:
 
     def __init__(self, tasks):
         self.tasks = [task for task in tasks if not task.completed]
-        self.completed = [task for task in tasks if task.completed]
+        self.completed_tasks = [task for task in tasks if task.completed]
 
     def allowed(self, action, user=None):
         return True
@@ -109,7 +109,7 @@ def test_compact_tasks_preserve_identity_scope_and_followup_references(task_page
     )
     page.tasks[0].description = "x" * 501
     page.tasks[0].due_date = datetime(2026, 9, 9, 2, tzinfo=timezone.utc)
-    page.completed[0].completed_on = datetime(2026, 9, 8, 1)
+    page.completed_tasks[0].completed_on = datetime(2026, 9, 8, 1)
     result = read_tasks(page, user)
     assert result["page"] == {"hash": f"hash:{page.hash}", "name": "Home"}
     (row,) = result["tasks"]
@@ -170,7 +170,7 @@ def test_compact_tasks_reject_stale_or_mismatched_cursors(task_page, change):
     elif change == "membership":
         page.tasks.append(Task(4))
     elif change == "permission":
-        page.completed[0].visible = False
+        page.completed_tasks[0].visible = False
     elif change == "page":
         page.hash = "page00000002"
     elif change == "user":
@@ -209,7 +209,7 @@ def test_compact_tasks_reject_invalid_paging_arguments(task_page, options):
 def test_compact_tasks_empty_and_default_bounded_results(task_page):
     page, user = task_page
     page.tasks = []
-    page.completed = []
+    page.completed_tasks = []
     empty = read_tasks(page, user)
     assert empty["tasks"] == empty["completed_tasks"] == []
     assert empty["task_list"]["total_count"] == 0

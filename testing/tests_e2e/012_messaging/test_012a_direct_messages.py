@@ -120,6 +120,7 @@ def _fetch(user, path, method="GET", data=None):
 
 
 # @matrix mentions : document-view empty-results floating-menu keyboard link-popover mouse node-attributes profile-link recipient-search unlink
+@pytest.mark.e2e_group("owner")
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(
@@ -254,6 +255,7 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
 
 # @matrix messaging : active-polling clear-confirmation clear-horizon compose-modal conversation-page history-page new-after-clear per-copy-delete permission polling-revision read-race unread-count
 # @matrix notifications : aggregate-count exact-count
+@pytest.mark.e2e_group("owner")
 def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     get_user,
     browser_failures,
@@ -303,7 +305,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     )
     expect(aggregate).to_be_visible()
     with recipient.page.expect_navigation():
-        aggregate.locator("a[href='/messages']").click()
+        aggregate.get_by_role("link", name="1 new message", exact=True).click()
 
     recipient_view = recipient.locate("[lp-view][data-kind='messages']")
     expect(recipient_view).to_have_attribute("initialized", "")
@@ -400,8 +402,8 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
 
 
 # @matrix messaging : inline-reply preserve-selection responsive-peer-selector selection-race unread-peer
-def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
-    owner = get_user(Users.OWNER)
+def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, get_user):
+    owner = get_admin()
     user = get_user(_managed_definition("Mobile"), creator=owner, has_touch=True)
     peer = get_user(_managed_definition("Mobile Peer"), creator=owner)
     other_peer = get_user(_managed_definition("Other Mobile Peer"), creator=owner)
@@ -484,8 +486,8 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
 
 # @matrix messaging : compose-eligibility inline-reply reply-permission
 # @pair notifications:menu-open
-def test_inbound_message_allows_reply_without_compose_permission(get_user):
-    owner = get_user(Users.OWNER)
+def test_inbound_message_allows_reply_without_compose_permission(get_admin, get_user):
+    owner = get_admin()
     recipient = get_user(_restricted_definition("Reply Only"), creator=owner)
 
     _go_messages(owner)
@@ -501,7 +503,7 @@ def test_inbound_message_allows_reply_without_compose_permission(get_user):
     aggregate = menu.locator("[role='option']").filter(has_text="1 new message")
     expect(aggregate).to_be_visible()
     with recipient.page.expect_navigation():
-        aggregate.locator("a[href='/messages']").click()
+        aggregate.get_by_role("link", name="1 new message", exact=True).click()
 
     view = recipient.locate("[lp-view][data-kind='messages']")
     expect(view).to_have_attribute("initialized", "")

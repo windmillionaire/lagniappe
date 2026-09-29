@@ -111,9 +111,28 @@ final flush ownership to `FormBuilder`. Collaborative documents leave
 visibility and final save behavior to the widget/component lifecycle plus
 `SyncManager`.
 
+## Document versions (`versions.mjs`)
+
+Collaborative documents own a `DocumentVersions` controller. History selections
+open an isolated read-only editor with **Back to current** and **Restore this
+version** controls. The hidden current editor continues syncing. Restoration
+first pins its current HTML, then makes one replacement edit in its existing Yjs
+document. Failed pin saves leave the current document untouched.
+
+The history menu also offers **Storage backups**, a paginated, dated list loaded
+only on request. Selecting a backup downloads one retained generation into the
+same preview; restoring it follows the same recovery-pin flow. Expired backups
+show an error rather than loading current content in their place.
+
+Remote replacements carry a recovery-pin reference in the CRDT. Active editors
+and headless replay preserve local drafts before merging them, then active
+editors display a dismissible notice linking previous/recovered content. See
+[document sync](SYNC_DOCUMENTS.md#versions-and-recovery) for persistence and
+concurrency details.
+
 ## Editor Construction (`editor.mjs`)
 
-Two factory functions create TipTap `Editor` instances with shared extension configuration:
+Three factory functions create TipTap `Editor` instances with shared extension configuration:
 
 Private `createFormattingExtensions()` and `createEditingExtensions()` helpers
 construct the common blocks. Each call creates fresh arrays and configured
@@ -127,6 +146,9 @@ and undo-origin set remain local to that editor instance.
 **`independentEditor(target, content)`** -- enables built-in history, no
 collaboration extensions. Initial HTML is passed to the editor constructor so
 loading it creates no Undo step; the first Undo only reverses a user edit.
+
+**`previewEditor(target, content)`** -- a read-only history/backup preview with
+the document formatting and mention extensions, without collaboration or undo.
 
 The document editors include: `StarterKit` (with underline; built-in links disabled), `CustomLink`, `Typography`, `Color`, `TextStyle`, `TextAlign`, `Superscript`, `Subscript`, `Youtube`, `CustomImage`, `FontFamily`, `TrackedRanges`, `SelectionHighlight`, `MarkdownSource`, and `EditorPaste`.
 

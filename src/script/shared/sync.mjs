@@ -133,14 +133,18 @@ export class SyncManager {
 					!this._activating.has(widget.syncId)
 				)
 					return false;
-				this._rememberCursor(widget.syncId);
+				if (result.status === "unavailable") {
+					await current.readCache?.clear();
+				}
 				if (result.status !== "changed" || !result.payload) return;
 				// state() consumes its forced result directly, so its cursor is
 				// safe to accept while the editor's async create event is still
 				// completing. Any later result must wait for the mounted widget.
 				if (!current.initialized) return this._activating.has(widget.syncId);
 				current.remote = result.payload;
-				await current.sync();
+				if ((await current.sync()) === false) return false;
+				this._rememberCursor(widget.syncId);
+				await current.readCache?.accept(result.payload);
 				if (
 					!current.readonly &&
 					(result.payload.checkpoint_required ||
@@ -168,16 +172,33 @@ export class SyncManager {
 		await this.ready;
 		const offline = await getSyncRecord(widget.syncId);
 		if (offline) widget.offlineRecord = offline;
-		if (!this.view.online) return null;
+		// Pending edits already include a complete Yjs state. Re-seeding legacy
+		// cached HTML before merging it would create duplicate document nodes.
+		if (!this.view.online)
+			return offline?.ydoc ? null : ((await widget.readCache?.read()) ?? null);
 		this._activating.add(widget.syncId);
 		try {
 			this._subscribe(widget, { force: true });
 			const results = await this.view.PollingCoordinator?.trigger(
 				`document:${widget.syncId}`,
 			);
-			return results?.find(
+			const result = results?.find(
 				(result) => result.id === `document:${widget.syncId}`,
-			)?.payload;
+			);
+			if (result?.payload) {
+				await widget.readCache?.accept(result.payload);
+				return result.payload;
+			}
+			if (!result || result.status === "error") {
+				return offline?.ydoc
+					? null
+					: ((await widget.readCache?.read()) ?? null);
+			}
+			if (result.status === "unavailable") {
+				await widget.readCache?.clear();
+				widget.offlineRecord = null;
+			}
+			return null;
 		} finally {
 			this._activating.delete(widget.syncId);
 		}
@@ -327,7 +348,6 @@ export class SyncManager {
 				generation: descriptor.generation,
 				revision: descriptor.revision,
 			};
-			this._rememberCursor(offline.sync_id, cursor);
 			return { cursor, payload: result.payload ?? null };
 		} finally {
 			unsubscribe();
@@ -385,7 +405,11 @@ export class SyncManager {
 				}
 				widget.remote = current.payload;
 				widget.offlineRecord = offline;
-				await widget.sync();
+				if ((await widget.sync()) === false) {
+					unresolved = true;
+					continue;
+				}
+				this._rememberCursor(offline.sync_id, current.cursor);
 				await widget.waitForRender();
 
 				const saveData = widget.saveData;
@@ -508,6 +532,11 @@ export class SyncManager {
 			if (acknowledgement.checkpoint_persisted) {
 				if (update?.save && update.ydoc) {
 					const widget = this.widgets[acknowledgement.sync_id];
+					await widget?.readCache?.accept({
+						mode: "snapshot",
+						ydoc: update.ydoc,
+						fingerprint: widget.fingerprint,
+					});
 					if (widget?.commitSavedBaseline) {
 						widget.commitSavedBaseline(update.ydoc, update.mentions || []);
 					} else if (widget) {

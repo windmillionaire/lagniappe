@@ -103,8 +103,8 @@ def test_search_page_requires_login(get_user):
 
 # @matrix search : navbar-submit page-navigation results
 # @template nav.html::navbar
-def test_search_from_navbar(get_user):
-    user = get_user(Users.OWNER)
+def test_search_from_navbar(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(SitePages.HOME)
 
@@ -125,8 +125,8 @@ def test_search_from_navbar(get_user):
 
 # @pair search:query-display
 # @template search/search.html::main
-def test_search_page_shows_query(get_user):
-    user = get_user(Users.OWNER)
+def test_search_page_shows_query(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
 
     _go_to_search_page(user, project.definition.name)
@@ -136,8 +136,8 @@ def test_search_page_shows_query(get_user):
 
 
 # @pair search:results
-def test_search_returns_results(get_user):
-    user = get_user(Users.OWNER)
+def test_search_returns_results(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
 
     _go_to_search_page(user, project.definition.name)
@@ -146,8 +146,8 @@ def test_search_returns_results(get_user):
 
 # @pair search:no-results
 # @template search/results.html::search_results
-def test_search_no_results(get_user):
-    user = get_user(Users.OWNER)
+def test_search_no_results(get_admin, get_user):
+    user = get_admin()
 
     _go_to_search_page(user, "zzz-no-search-results-here-zzz")
     expect(user.locate(SEARCH_RESULTS)).to_contain_text("No matches")
@@ -155,8 +155,8 @@ def test_search_no_results(get_user):
 
 # @pair search:result-title
 # @template search/results.html::search_results
-def test_search_result_titles(get_user):
-    user = get_user(Users.OWNER)
+def test_search_result_titles(get_admin, get_user):
+    user = get_admin()
     name = _unique("title")
     _create_project(name, "Search result title fixture.")
 
@@ -169,8 +169,8 @@ def test_search_result_titles(get_user):
 
 # @pair search:primary-name-ranking
 # @template search/results.html::search_results
-def test_primary_name_matches_rank_above_file_name_and_description_matches(get_user):
-    user = get_user(Users.OWNER)
+def test_primary_name_matches_rank_above_file_name_and_description_matches(get_admin, get_user):
+    user = get_admin()
     token = _unique("primary-rank").replace("-", "")
     category = _create_category(f"{token} category")
     page = _create_page(category, f"{token} page")
@@ -195,8 +195,8 @@ def test_primary_name_matches_rank_above_file_name_and_description_matches(get_u
 
 # @matrix search : details-hydration parent-refresh
 # @template search/results.html::search_results
-def test_search_result_parent_details_refresh_after_category_rename(get_user):
-    user = get_user(Users.OWNER)
+def test_search_result_parent_details_refresh_after_category_rename(get_admin, get_user):
+    user = get_admin()
     page_name = _unique("parent-refresh-page")
     original_parent_name = _unique("original-parent")
     updated_parent_name = _unique("updated-parent")
@@ -216,8 +216,8 @@ def test_search_result_parent_details_refresh_after_category_rename(get_user):
 
 # @pair search:snippets
 # @template search/results.html::search_results
-def test_search_result_snippets(get_user):
-    user = get_user(Users.OWNER)
+def test_search_result_snippets(get_admin, get_user):
+    user = get_admin()
     snippet_term = _unique("snippet").replace("-", "")
     name = _unique("snippet-project")
     _create_project(
@@ -236,8 +236,8 @@ def test_search_result_snippets(get_user):
 
 # @pair search:facets
 # @template search/search.html::facet_button
-def test_facets_displayed(get_user):
-    user = get_user(Users.OWNER)
+def test_facets_displayed(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
 
     _go_to_search_page(user, project.definition.name)
@@ -247,8 +247,8 @@ def test_facets_displayed(get_user):
 
 # @matrix search : facet-filter results url-state
 # @template search/search.html::facet_button
-def test_click_facet_filters_results(get_user):
-    user = get_user(Users.OWNER)
+def test_click_facet_filters_results(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
 
     _go_to_search_page(user, project.definition.name)
@@ -265,8 +265,8 @@ def test_click_facet_filters_results(get_user):
 
 # @pair search:facet-state
 # @template search/search.html::facet_button
-def test_facet_selection_visual_state(get_user):
-    user = get_user(Users.OWNER)
+def test_facet_selection_visual_state(get_admin, get_user):
+    user = get_admin()
     term = _unique("facet-state").replace("-", "")
     _create_project(f"{term} project", "Facet state project fixture.")
     _create_category(f"{term} category", "Facet state category fixture.")
@@ -285,8 +285,8 @@ def test_facet_selection_visual_state(get_user):
 
 # @pair search:clear-facet
 # @template search/search.html::main
-def test_clear_facet_filter(get_user):
-    user = get_user(Users.OWNER)
+def test_clear_facet_filter(get_admin, get_user):
+    user = get_admin()
     term = _unique("facet-clear").replace("-", "")
     project = _create_project(f"{term} project", "Facet clear project fixture.")
     category = _create_category(f"{term} category", "Facet clear category fixture.")
@@ -317,8 +317,8 @@ def test_clear_facet_filter(get_user):
 # @matrix search : facet-filter result-links task-model
 # @template search/search.html::facet_button
 # @template search/results.html::search_results
-def test_task_facet_includes_task_and_model_results_with_links(get_user):
-    user = get_user(Users.OWNER)
+def test_task_facet_includes_task_and_model_results_with_links(get_admin, get_user):
+    user = get_admin()
     token = _unique("task-facet").replace("-", "")
     project = _create_project(
         f"{token} project",
@@ -371,8 +371,8 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
 # @matrix template-formatting : safe-json tojson
 # @template nav.html::search_results
 # @template common.html::format_name
-def test_navbar_task_results_render_current_completion_state(get_user):
-    user = get_user(Users.OWNER)
+def test_navbar_task_results_render_current_completion_state(get_admin, get_user):
+    user = get_admin()
     token = _unique("navbar-task").replace("-", "")
     project = _create_project(f"{token} project")
     model = _create_model_task(project, f"{token} model stage")
@@ -411,8 +411,8 @@ def test_navbar_task_results_render_current_completion_state(get_user):
 
 # @pair search:result-navigation
 # @template search/results.html::search_results
-def test_click_result_navigates(get_user):
-    user = get_user(Users.OWNER)
+def test_click_result_navigates(get_admin, get_user):
+    user = get_admin()
     name = _unique("navigate")
     project = _create_project(name, "Search result navigation fixture.")
 
@@ -429,8 +429,8 @@ def test_click_result_navigates(get_user):
 
 # @pair search:result-links
 # @template search/results.html::search_results
-def test_result_links_correct(get_user):
-    user = get_user(Users.OWNER)
+def test_result_links_correct(get_admin, get_user):
+    user = get_admin()
     name = _unique("link")
     project = _create_project(name, "Search result link fixture.")
 
@@ -445,8 +445,8 @@ def test_result_links_correct(get_user):
 
 # @pair search:pagination
 # @template search/results.html::footer
-def test_pagination_controls_visible(get_user):
-    user = get_user(Users.OWNER)
+def test_pagination_controls_visible(get_admin, get_user):
+    user = get_admin()
     term = _unique("pagination").replace("-", "")
     for index in range(12):
         _create_project(
@@ -465,8 +465,8 @@ def test_pagination_controls_visible(get_user):
 
 # @pair search:pagination-next
 # @template search/results.html::footer
-def test_next_page(get_user):
-    user = get_user(Users.OWNER)
+def test_next_page(get_admin, get_user):
+    user = get_admin()
     term = _unique("next-page").replace("-", "")
     for index in range(12):
         _create_project(
@@ -486,8 +486,8 @@ def test_next_page(get_user):
 
 # @pair search:pagination-previous
 # @template search/results.html::footer
-def test_previous_page(get_user):
-    user = get_user(Users.OWNER)
+def test_previous_page(get_admin, get_user):
+    user = get_admin()
     term = _unique("previous-page").replace("-", "")
     for index in range(12):
         _create_project(
@@ -509,8 +509,8 @@ def test_previous_page(get_user):
 
 
 # @pair search:exact-match
-def test_search_exact_match(get_user):
-    user = get_user(Users.OWNER)
+def test_search_exact_match(get_admin, get_user):
+    user = get_admin()
     name = _unique("exact")
     _create_project(name, "Exact search fixture.")
 
@@ -520,8 +520,8 @@ def test_search_exact_match(get_user):
 
 
 # @pair search:partial-match
-def test_search_partial_match(get_user):
-    user = get_user(Users.OWNER)
+def test_search_partial_match(get_admin, get_user):
+    user = get_admin()
     token = f"partial{uuid4().hex[:10]}"
     name = f"{token} complete project"
     _create_project(name, "Partial search fixture.")
@@ -532,8 +532,8 @@ def test_search_partial_match(get_user):
 
 
 # @pair search:special-characters
-def test_search_special_characters(get_user):
-    user = get_user(Users.OWNER)
+def test_search_special_characters(get_admin, get_user):
+    user = get_admin()
     token = uuid4().hex[:8]
     name = f"Special Search {token}: Pipe|Slash/Colon Value"
     _create_project(name, "Special character search fixture.")

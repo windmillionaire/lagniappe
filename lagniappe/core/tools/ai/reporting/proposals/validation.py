@@ -36,7 +36,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
     if not isinstance(actions, list):
         return proposal
     for action in actions:
-        if not isinstance(action, dict) or action.get("type") not in {"create_page", "append_page_document"}:
+        if not isinstance(action, dict) or action.get("type") not in {"create_page", "append_page_document", "replace_page_document"}:
             continue
         data = action.get("data")
         if not isinstance(data, dict) or "document_markdown" not in data:
@@ -297,6 +297,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         ),
         "attach_file": (("entity", {"page", "task", "task_history"}),),
         "append_page_document": (("page", {"page"}),),
+        "replace_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
         "suggest_page_deletion": (("page", {"page"}),),
     }
@@ -398,7 +399,7 @@ def _validate_action_data_shape(
 
     if action_type == "create_form":
         _validate_create_form_action_data(data, action_label)
-    if action_type == "append_page_document":
+    if action_type in {"append_page_document", "replace_page_document"}:
         if not _first_data_reference(data, "page") or not _proposal_string(data.get("document")):
             raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
     if action_type == "attach_file":

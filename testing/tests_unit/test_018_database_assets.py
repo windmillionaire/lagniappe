@@ -668,6 +668,9 @@ def test_configure_bucket_retries_transient_patch_failure(monkeypatch):
 # @matrix database storage : adc
 @pytest.mark.unit
 def test_data_services_initialize_uses_shared_adc(monkeypatch):
+    # Keep this ADC-construction contract independent of the checkout's optional
+    # SDK instrumentation, which has its own real-wrapper behavior tests.
+    monkeypatch.setattr(core.CONFIG, "EXPERIMENTS_ENABLED", False)
     credentials = object()
     datastore_clients = []
     storage_clients = []

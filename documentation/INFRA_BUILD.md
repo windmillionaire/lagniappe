@@ -56,6 +56,10 @@ lagniappe/web/static/
 Chunk filenames are stable. Generated imports carry `?v=<build-id>`, so an
 entry point and all of its static and dynamic imports use one cache generation.
 The service worker warms those exact URLs after an update.
+Its precache requests use normal HTTP cache semantics, allowing a fresh response
+from an HTML preload to be reused. Changed builds use distinct URLs; stale HTTP
+responses still follow the server's revalidation policy.
+Assets already present in the worker's static cache are skipped during precache.
 
 `build.json` is the build completion marker. It records the application
 version, build ID, build mode, a digest of all declared frontend sources, and
@@ -87,17 +91,46 @@ stable named entries under `chunks/views/`. Rollup derives feature chunks from
 module boundaries. Editor, PDF, modal, combobox, offline, sync, notification,
 and similar code stay lazy until their owning surface requests them.
 
+Stable feature groups in `build/utility.mjs` collect modules used together;
+source files and widget activation remain independent. Common code is shared,
+not copied between route bundles.
+
+| Group | Contents / loading policy |
+| --- | --- |
+| `foundation`, `core-foundation`, `entity-foundation`, `index-foundation` | Stable route foundations. Storage/query lifecycle helpers join the shared foundation. |
+| `ui-resources`, `ui-controls` | Generated style/icon resources; shared primitives, buttons and formatting. |
+| `combobox` | Search, dropdowns, entity menus and Floating UI; preloaded on layouts with navigation search. Location lookup stays separate. |
+| `forms` | Common form infrastructure, simple/choice fields, picker adapters and Form creation. Search alone does not import this group. |
+| `form-sections`, `form-complex`, `permissions` | Entity-form sections; table/todo/signature fields; permission controls. Loaded by their owning form. |
+| `document`, `editor-dialogs` | Shared document engine/toolbar; optional dialogs including AI generation. History remains separate so its toolbar control does not pull in dialogs/uploads. |
+| `uploads` | Shared upload UI, File/Ingress upload widgets and Plan creation. Low-level direct-upload transport stays independent. |
+| `page-tools`, `project-tools`, `home-tools` | Their routes preload these tools. Page tools include photo/document settings; Project tools include model tasks. |
+| `task-tools`, `user-tools` | Task form/history/settings/list tools on demand; User Index creation/permissions tools. Personal user settings stay separate. |
+| `index-tools`, `filters` | Table display, sorting, columns and mobile controls on table-index routes; filter tools on demand. Inline editing stays separate. |
+| `admin-tools`, `builder-controls` | Preloaded only on their Admin/Builder routes. Builder HTML controls remain lazy. |
+| `offline-replay`, `account` | Queue/replay helpers and account utilities retain their existing lazy activation. The tiny offline-work probe, polling and sync remain independent. |
+
+Page HTML also preloads forms and the document; Project HTML preloads the
+document. User Index preloads its tools and forms when its tools are available.
+Hints prepare modules without executing them or initializing hidden widgets.
+PDF support and monitoring keep their separate lazy boundaries. Preloading is
+not a service-worker bypass: matching build-versioned requests reuse the
+browser HTTP cache or service-worker Cache Storage through the normal paths.
+
 The main startup path has four measured closures:
 
 | Budget key | Measured closure | Limit (KiB) |
 | --- | --- | ---: |
 | `main` | Main entry alone, including upstream failure recovery | 40 |
 | `shell` | Main plus a shell view | 64 |
-| `core` | Main plus a Core view | 120 |
-| `builder` | Builder view | 288 |
+| `core` | Main plus a Core view | 128 |
+| `builder` | Builder view | 304 |
 
 `build/startupBudget.mjs` measures deduplicated minified static imports and
-fails when a closure exceeds its budget. It also prevents heavy interactive
+fails when a closure exceeds its budget. These limits are reviewable guardrails:
+shared-resource and choice-field consolidation justified modest increases to
+the Core and Builder limits. Compare the actual route preload union as well as
+the static entry closure before changing them. It also prevents heavy interactive
 systems such as sync, edit reconciliation, modals, notifications, and combobox
 from entering every Core view's static closure.
 The edit-reconciliation guard covers the whole `forms/revisions/` directory,

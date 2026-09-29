@@ -32,14 +32,16 @@
     {% if projects.cursor or projects.back %}
       <div class="{{ styles.home.pagination.container }}">
         {% if projects.back %}
-          <button class="{{ styles.home.pagination.button }} bg-project-bg/50"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }} bg-project-bg/50"
                   lp-control="previous"
                   data-route='{{ url_for("internal.get", kind="projects", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if projects.cursor %}
-          <button class="{{ styles.home.pagination.button }} bg-project-bg/50"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }} bg-project-bg/50"
                   lp-control="next"
                   data-route='{{ url_for("internal.get", kind="projects", cursor=projects.cursor) }}'>
             {{ render_icon("next") }}

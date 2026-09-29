@@ -23,6 +23,7 @@ class Survivor:
     properties: set[str] = field(default_factory=set)
     property_updates: set[str] = field(default_factory=lambda: {"modified"})
     reasons: set[str] = field(default_factory=set)
+    refresh_cache: bool = True
 
 
 # @testable infrastructure
@@ -48,6 +49,7 @@ class DeleteCollector:
         entity,
         *properties,
         property_updates=("modified",),
+        refresh_cache=True,
         reason,
     ):
         if entity:
@@ -57,6 +59,7 @@ class DeleteCollector:
                     set(properties),
                     set(property_updates),
                     {reason},
+                    refresh_cache,
                 )
             )
 
@@ -220,7 +223,7 @@ class DeleteCollector:
         self.delete(note)
         owners = {owner.key: owner for owner in (note.parent, note.user) if owner}
         for owner in owners.values():
-            self.repair(owner, reason="note-delete-list-owner")
+            self.repair(owner, refresh_cache=False, reason="note-delete-list-owner")
 
     # @testable false
     # @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.note
@@ -557,7 +560,10 @@ def _merge_survivors(survivors):
                     if getattr(item, "key", None) in kept
                 }
                 relation.value = [attached[key] for key in ordered if key in attached]
-        merged.append(Survivor(canonical, properties, property_updates, reasons))
+        merged.append(Survivor(
+            canonical, properties, property_updates, reasons,
+            any(copy.refresh_cache for copy in copies),
+        ))
     return merged
 
 
@@ -598,7 +604,10 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
             property_updates=tuple(sorted(survivor.property_updates)),
             reason="+".join(sorted(survivor.reasons)),
             effect=MutationEffectType.UNLINK,
+            refresh_cache=survivor.refresh_cache,
         )
+        if not survivor.refresh_cache:
+            builder.cache_invalidate(survivor.entity, reason="modified-owner")
     for kind, entity in collector.search_deletes:
         builder.delete_from_search(
             kind,

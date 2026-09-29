@@ -29,10 +29,10 @@ def document_save_response(text):
 
 # @matrix sync : checkpoint collaboration delta document persistence revision
 def test_two_users_see_document_edits_without_reload(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_sync_document_collaboration.get(owner)
 
@@ -67,8 +67,8 @@ def test_two_users_see_document_edits_without_reload(
 
 
 # @matrix sync : document lifecycle presence
-def test_document_presence_appears_and_clears(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_document_presence_appears_and_clears(get_admin, get_user, browser_failures):
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_sync_document_presence.get(owner)
 

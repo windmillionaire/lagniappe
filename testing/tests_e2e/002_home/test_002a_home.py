@@ -41,7 +41,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import Categories, Projects, SitePages, Users
+from testing.definitions import Categories, Projects, SitePages
 from testing.elements import List
 from testing.utility.test_file import TestFile as _TestFile
 
@@ -50,8 +50,8 @@ pytestmark = pytest.mark.e2e
 
 # @matrix home icons : material-symbol-markup
 # @template home/home.html::main
-def test_home_material_symbols_use_semantic_span_markup(get_user):
-    user = get_user(Users.OWNER)
+def test_home_material_symbols_use_semantic_span_markup(get_admin, get_user):
+    user = get_admin()
     user.go(SitePages.HOME)
 
     expected = {
@@ -135,14 +135,14 @@ def test_home_material_symbols_use_semantic_span_markup(get_user):
 
 
 # @pair home:directory-list
-def test_directory_list(get_user):
+def test_directory_list(get_admin, get_user):
     """
     Verify a home toggle opens and closes its widget through client-side state.
 
     Directory is inline in the home template, so this exercises the shared
     lp-show render path without depending on network timing.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     directory_list = user.locate(home.DIRECTORY_LIST)
@@ -158,7 +158,7 @@ def test_directory_list(get_user):
 
 
 # @matrix home : prefetch task-count task-list
-def test_tasks_prefetch(get_user):
+def test_tasks_prefetch(get_admin, get_user):
     """
     Verify tasks are prefetched on page load.
 
@@ -175,7 +175,7 @@ def test_tasks_prefetch(get_user):
     Framework note:
         Prefetch swaps the server-rendered list in for the initial shell.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     task_list = user.locate(home.TASK_LIST)
@@ -189,9 +189,9 @@ def test_tasks_prefetch(get_user):
 
 
 # @matrix home : category-list lazy-load loading-indicator project-list
-def test_model_lists_load_on_toggle(get_user):
+def test_model_lists_load_on_toggle(get_admin, get_user):
     """Verify project and category home lists load through their /l/get branches on demand."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
     category = Categories.test_create_category_manual_mode.get(user)
     home = user.go(SitePages.HOME)
@@ -220,9 +220,9 @@ def test_model_lists_load_on_toggle(get_user):
 
 
 # @matrix home : layout load mobile
-def test_home_mobile_dashboard_smoke(get_user):
+def test_home_mobile_dashboard_smoke(get_admin, get_user):
     """Smoke-check the homepage dashboard and a representative form at mobile width."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
     user.mobile = True
 
@@ -242,8 +242,8 @@ def test_home_mobile_dashboard_smoke(get_user):
 
 # @matrix notes : body-create combined-input photo-picker preview remove
 # @template notes.html::composer
-def test_create_note_composer_keeps_text_and_photo_from_home(get_user):
-    user = get_user(Users.OWNER)
+def test_create_note_composer_keeps_text_and_photo_from_home(get_admin, get_user):
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     user.locate(home.CREATE_NOTE_TOGGLE).click()

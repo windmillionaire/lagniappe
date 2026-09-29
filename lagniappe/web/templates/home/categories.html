@@ -49,14 +49,16 @@
     {% if categories.cursor or categories.back %}
       <div class="{{ styles.home.pagination.container }}">
         {% if categories.back %}
-          <button class="{{ styles.home.pagination.button }} bg-category-bg/50"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }} bg-category-bg/50"
                   lp-control="previous"
                   data-route='{{ url_for("internal.get", kind="categories", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if categories.cursor %}
-          <button class="{{ styles.home.pagination.button }} bg-category-bg/50"
+          <button type="button"
+                  class="{{ styles.home.pagination.button }} bg-category-bg/50"
                   lp-control="next"
                   data-route='{{ url_for("internal.get", kind="categories", cursor=categories.cursor) }}'>
             {{ render_icon("next") }}

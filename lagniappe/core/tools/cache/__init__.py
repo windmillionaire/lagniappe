@@ -1,6 +1,6 @@
 """Cache package for Redis-backed entity search, storage, and collaboration."""
 
-from .add import delete_entity_from_search, update
+from .add import delete_entity_from_search, invalidate_revisions, update
 from .core import filter_cache, initialize
 from .keys import Keys
 from .details import get_details_by_hash
@@ -52,6 +52,7 @@ from .public_discovery import (
 __all__ = [
     "initialize",
     "update",
+    "invalidate_revisions",
     "delete_entity_from_search",
     "get_details_by_hash",
     "entity_search",

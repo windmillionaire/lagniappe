@@ -86,9 +86,9 @@ def _desktop_photo_toggle(user):
 
 
 # @matrix pages : image-add photo-prompt
-def test_add_image_to_page(get_user):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_image_page)
+def test_add_image_to_page(get_admin, get_user):
+    user = get_admin()
+    page = user.go(Pages.test_add_image_page)
 
     _upload_image_from_prompt(user, page)
 
@@ -98,9 +98,9 @@ def test_add_image_to_page(get_user):
 
 
 # @matrix pages : desktop-tabs photo-prompt
-def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_generated_image_page)
+def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_admin, get_user):
+    user = get_admin()
+    page = user.go(Pages.test_desktop_photo_prompt_page)
     prompt = _photo_prompt(page)
     desktop_photo_toggle = _desktop_photo_toggle(user)
 
@@ -116,9 +116,9 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
 # @matrix entity-layout : dynamic-secondary page-mobile
 # @matrix pages : mobile-photo-tab photo-prompt
 # @template pages/page.html::main
-def test_mobile_photo_prompt_rejoins_section_switching(get_user):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_generated_image_page)
+def test_mobile_photo_prompt_rejoins_section_switching(get_admin, get_user):
+    user = get_admin()
+    page = user.go(Pages.test_mobile_photo_prompt_page)
     user.mobile = True
     prompt = _photo_prompt(page)
 
@@ -136,8 +136,8 @@ def test_mobile_photo_prompt_rejoins_section_switching(get_user):
 
 
 # @pair pages:image-replace
-def test_replace_image_on_page(get_user):
-    user = get_user(Users.OWNER)
+def test_replace_image_on_page(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_image_page)
     form = _ensure_photo_form(user, page)
 
@@ -150,8 +150,8 @@ def test_replace_image_on_page(get_user):
 
 
 # @matrix pages : image-generate photo-prompt
-def test_generate_image_on_page(get_user):
-    user = get_user(Users.OWNER)
+def test_generate_image_on_page(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_generated_image_page)
     prompt = _photo_prompt(page)
 
@@ -191,8 +191,8 @@ def test_generate_image_on_page(get_user):
 
 
 # @pair pages:image-paste
-def test_paste_image_on_page(get_user):
-    user = get_user(Users.OWNER)
+def test_paste_image_on_page(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_image_page)
     form = _ensure_photo_form(user, page)
 
@@ -224,8 +224,8 @@ def test_paste_image_on_page(get_user):
 
 
 # @pair pages:image-remove
-def test_remove_image_from_page(get_user):
-    user = get_user(Users.OWNER)
+def test_remove_image_from_page(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_image_page)
     form = _ensure_photo_form(user, page)
 
@@ -242,12 +242,9 @@ def test_remove_image_from_page(get_user):
 # @template pages/photo.html::image_controls
 # @template pages/page.html::main
 # @template pages/info.html::info_form
-def test_photo_controls_toggle_and_remember_desktop_visibility(get_user):
-    user = get_user(Users.OWNER)
-    page = Pages.test_generated_image_page.get(user)
-    page.entity.properties.image.delete()
-    page.entity.save()
-    user.go(page)
+def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_user):
+    user = get_admin()
+    page = user.go(Pages.test_photo_visibility_page)
     prompt = _photo_prompt(page)
     toggle = prompt.locator(page.PHOTO_PROMPT_UPLOAD)
 
@@ -298,8 +295,8 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_user):
 # @matrix pages : photo-visibility readonly
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::card
-def test_readonly_viewer_can_toggle_image_without_editing(get_user):
-    owner = get_user(Users.OWNER)
+def test_readonly_viewer_can_toggle_image_without_editing(get_admin, get_user):
+    owner = get_admin()
     page = owner.go(Pages.acl_lab_visible)
     _ensure_photo_form(owner, page)
     viewer = get_user(Users.page_acl_one_visible)
@@ -321,6 +318,7 @@ def test_readonly_viewer_can_toggle_image_without_editing(get_user):
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::image
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto
+@pytest.mark.e2e_group("owner")
 def test_site_ai_disabled_upload_has_no_generation_controls(get_user, monkeypatch):
     from lagniappe import CONFIG
     from lagniappe.web import app
@@ -357,8 +355,8 @@ def test_site_ai_disabled_upload_has_no_generation_controls(get_user, monkeypatc
 
 # @matrix pages : image-generate photo-visibility
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto
-def test_cancel_generation_restores_previous_image_visibility(get_user):
-    user = get_user(Users.OWNER)
+def test_cancel_generation_restores_previous_image_visibility(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_image_page.get(user)
     page.entity.properties.image.delete()
     page.entity.save()
@@ -398,8 +396,8 @@ def test_cancel_generation_restores_previous_image_visibility(get_user):
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
 @pytest.mark.parametrize("dirty", [False, True])
-def test_image_changes_preserve_page_info_dom_and_draft(get_user, dirty):
-    user = get_user(Users.OWNER)
+def test_image_changes_preserve_page_info_dom_and_draft(get_admin, get_user, dirty):
+    user = get_admin()
     page = Page(
         user=user,
         definition=replace(
@@ -460,8 +458,8 @@ def test_image_changes_preserve_page_info_dom_and_draft(get_user, dirty):
 
 # @matrix pages : image-replace upload-error
 # @source src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
-def test_failed_image_replacement_preserves_existing_image(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_failed_image_replacement_preserves_existing_image(get_admin, get_user, browser_failures):
+    user = get_admin()
     page = user.go(Pages.test_image_page)
     form = _ensure_photo_form(user, page)
     original_src = form.locator("[data-role='existing-image'] img").get_attribute("src")

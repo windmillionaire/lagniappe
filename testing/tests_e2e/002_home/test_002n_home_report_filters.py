@@ -10,7 +10,7 @@ from werkzeug.datastructures import FileStorage
 
 from lagniappe.core.definitions import AI, Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import SitePages, Users
+from testing.definitions import SitePages
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import Report
 from testing.utility.polling import expect_poll_result
@@ -26,7 +26,6 @@ def _reader(get_user):
             email=f"report-filters-{suffix}@example.test",
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
     )
 
 

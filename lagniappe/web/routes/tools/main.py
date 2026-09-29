@@ -18,7 +18,6 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
 from lagniappe.core.tools.ai.reporting.proposals import selection as report_selection
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_operations, report_history
@@ -270,14 +269,13 @@ def _start_tool_report(
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
 # @matrix ai-report : remote-update async create http-boundary text-only upload validation persistence
-# @matrix ai-report : list stage-labels
+# @matrix ai-report : list
 @tools.route("/ai", methods=["POST"])
 @ai_access(AI.ASK)
 def create_ai_report():
@@ -343,7 +341,7 @@ def _external_plan_mutation_error(outcome):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
@@ -377,90 +375,15 @@ def run_report(key):
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
-    if report.db.get("superseded_by"):
-        return responses.error("This execution was superseded by an approved correction.")
-    result = report.result if isinstance(report.result, dict) else {}
-    retryable = (
-        report.status == "failed"
-        and result.get("ledger_version") == report_ledger.REPORT_LEDGER_VERSION
-        and result.get("status") == "failed"
-    )
-    if report.status == "complete" and result.get("status") == "complete":
-        if not request.headers.get("X-Lagniappe-Request"):
-            return redirect(url_for("tools.report", key=report.urlsafe_key))
-        return responses.tool_report(report)
-
-    operation_id = (request.form.get("operation-id") or "").strip()
-    active_job = report.deferred_job or {}
-    if (
-        report.status == "running"
-        and operation_id
-        and active_job.get("idempotency_key") == operation_id
-    ):
-        job = Entities.fetch_one(active_job.get("key"), request=Fetch.direct())
-        if isinstance(job, Entities.DEFERRED_JOB):
-            if not request.headers.get("X-Lagniappe-Request"):
-                return redirect(url_for("tools.report", key=report.urlsafe_key))
-            return responses.deferred_tool_report(
-                report,
-                job.notification,
-                job=job,
-            )
-
-    if report.status != "ready" and not retryable:
-        return responses.error("Only ready or recoverable failed reports can be run.")
-
-    from lagniappe.core.tools.ai.reporting.schema_updates import prepare_schema_updates
-    from lagniappe.core.tools.forms import (
-        changes as form_changes,
-        schema_updates as form_schema_updates,
-    )
-
+    from lagniappe.core.tools.ai.reporting.execution.request import request_execution
     try:
-        if not retryable:
-            prepare_schema_updates(report.proposal, current_user, verify=True)
-        else:
-            for record in result.get("actions", []):
-                if record.get("migration_id"):
-                    form = Entities.fetch_one(record.get("migration_form"), request=Fetch.direct())
-                    if form and form.db.get(form_changes.PENDING):
-                        form_changes.recover_change(form, current_user, "retry")
-    except exceptions.ValidationError as error:
-        if not retryable and str(error).startswith(form_schema_updates.STALE_MESSAGE):
-            recovery = (
-                "Ask the assistant that created it to refresh this same plan, "
-                "then review the updated conversions."
-                if report.origin == "api"
-                else "Use Revise Plan to refresh it, then review the updated conversions."
-            )
-            return responses.error(
-                "This plan needs another review because the form or saved answers changed. "
-                "Execution hasn't started. " + recovery
-            )
-        return responses.error(str(error))
-
-    try:
-        from lagniappe.core.tools.ai.reporting.corrections import approve_correction
-        approve_correction(report, current_user)
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-
-    try:
-        job, notification = DeferredJobs.start(
-            DeferredJobSpec(
-                job_type=DeferredJobType.REPORT_EXECUTION,
-                actor=current_user._get_current_object(),
-                idempotency_key=operation_id or None,
-                inputs={"report": report},
-                notification_body="Saving report changes...",
-                notification_target=report,
-                client={
-                    "key": report.urlsafe_key,
-                    "source_widget": "CreateToolReport",
-                    "destination": "tools:ToolReportList",
-                },
-            )
+        job, notification = request_execution(
+            report,
+            current_user._get_current_object(),
+            operation_id=(request.form.get("operation-id") or "").strip() or None,
         )
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     except Exception as error:
         message = "Report execution could not be started. Please try again."
         current = _get_report(key) or report
@@ -482,11 +405,13 @@ def run_report(key):
 
     if not request.headers.get("X-Lagniappe-Request"):
         return redirect(url_for("tools.report", key=report.urlsafe_key))
+    if job is None:
+        return responses.tool_report(report)
     return responses.deferred_tool_report(report, notification, job=job)
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access

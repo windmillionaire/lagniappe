@@ -185,7 +185,7 @@ const settleServices = async (view, promises, context) => {
  *
  * @testable infrastructure
  * @tests tests_js/test_029_core_startup.py::test_initial_replay_is_scheduled_after_view_readiness
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_open_pending_report_converges_with_notification
+ * @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
  * @pair deferred-jobs:polling
  */
 export const initializeCoreServices = (view) => {

@@ -67,4 +67,4 @@ MCP_SUBMISSION_INSTRUCTIONS = (
 # Some hosts prepend this to every tool description. Keep tool-specific
 # instructions in the descriptions and working context so short discovery
 # excerpts still expose each tool's purpose.
-MCP_INSTRUCTIONS = "Answer with plan-free reads; save answers only on request. Workspace changes require a proposal and browser review."
+MCP_INSTRUCTIONS = "Read to answer; save only on request. Review edits in browser or use granted execute_plan."

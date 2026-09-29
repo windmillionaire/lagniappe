@@ -27,6 +27,7 @@ from .references import (
     _resolve_action_page,
     _resolve_entity,
 )
+from .checkpoints import _prepared_output_key
 
 
 # @testable true
@@ -118,7 +119,7 @@ def _create_task(action, _report, user, created, context=None):
             "project": project,
             "model": model,
             "due_date": data.get("due_date") or data.get("due-date"),
-        }
+        }, key=_prepared_output_key(context),
     )
     if form is not None and "submission" in data:
         task.ai_submission(data.get("submission") or {})

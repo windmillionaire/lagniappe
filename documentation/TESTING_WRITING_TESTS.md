@@ -97,6 +97,14 @@ resets offline/mobile state, and waits for an initialized authenticated view
 when the resource requires one. Navigate by a real link, history action, or
 native browser control only when that navigation behavior is part of the story.
 
+`User.go()` permits one reload when a same-origin startup script or stylesheet
+returns an unmarked HTTP 503. The reload must fetch the failed assets
+successfully and initialize the view. Recovered resource errors remain in the
+browser diagnostics and are logged; other browser errors still fail. Document
+errors, application requests, missing assets, and failed assertions without a
+matching static 503 are not retried. Direct navigation, reloads, and later test
+actions retain their ordinary behavior.
+
 Keep helpers at the lowest reusable level:
 
 | Scope | Location |
@@ -285,6 +293,11 @@ The E2E browser failure guard fails tests on unaccounted console errors,
 exact method/path/message with `browser_failures.expect(...)` or use
 `browser_failures.expect_offline(user)`. Never add a broad global ignore.
 
+`expect_http_error()` allows the optional Chromium diagnostic for that exact
+context, status and path. Assert the actual response status or final error UI;
+console delivery and duplicate diagnostic counts are not application contracts.
+Explicit counts remain available for tests whose subject is diagnostic delivery.
+
 Use `scoped_browser_route()` for request interception. It always removes the
 route in `finally`; an unscoped route can leak into later actions in the same
 browser context. Playwright interception cannot observe a network request owned
@@ -362,6 +375,68 @@ commands.
 
 Add an abstraction only when it names a stable concept or removes meaningful
 duplication. Do not build a second testing API around a one-off selector.
+
+### Coordinated E2E resources
+
+The default hosted coordinator and local `run.py test --parallel` mode are described
+in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md#coordinated-e2e-workers).
+Use `get_admin()` for a broad-access browser story that does not require the
+actual Owner. It reuses one Administrator per sequential worker, with explicit
+CREATE AI entitlement, while `get_user` creates a fresh browser context for each
+call. Keep permission/Owner-specific stories on their explicitly named actors.
+An Administrator cannot edit another Administrator's personal Page or Tasks.
+Create personal-task fixtures for the current actor instead of reusing a named
+personal Task first created by another worker. UI creation stories should also
+use fresh resources and unique names, leaving shared enum identities intact.
+
+Use `@pytest.mark.e2e_group("owner")` for stories retaining the shared Owner
+identity, including through a helper or fixture. Named groups are placed first
+and kept together on one sequential worker; ordinary cases fill the remaining
+capacity. Other groups may run concurrently. Group names describe a shared
+constraint, not a worker number, and can be set at module scope when applicable.
+An `e2e_serial` marker takes precedence when a story also needs whole-site quietness.
+
+Use full enum members such as `Pages.test_page_loads.get(user)`, rather than
+aliases for unrelated stories. Each test reserves direct named resources,
+including references in local/imported test helpers, constants and collected fixtures. It does
+not lock the whole dependency graph. A Page's Form or Category is shared normally
+unless the test directly names that resource as part of its mutable assumptions.
+Dynamic resource selection still needs explicit review; prefer named enum
+members so the scheduler can see those conflicts. Reservations cover fixture
+setup and teardown as well as the test body; shared-resource tests may be in
+different workers and run sequentially only while their reservations overlap.
+
+Mark stories that demonstrably require whole-site quietness, such as unchanged
+global revision snapshots or deletion of all job/analytics records, with
+`@pytest.mark.e2e_serial` (or
+set it in module `pytestmark`). They run together sequentially after parallel
+workers drain; still restore settings in `finally`. Using the Owner or changing
+a setting does not by itself require an exclusive phase: identify the affected
+consumers and trial ordinary resource reservations first. Adding a story to the
+pilot's explicit selection does not require manually choosing a batch.
+Keep short unchanged-global-revision assertions separate from long browser
+stories; polling and editing a unique entity do not themselves require isolation.
+
+Submit helpers click the button without asserting transient spinners or busy
+text. Assert the story's saved result, final text or expected error instead;
+a fast response may finish before any busy state can be observed.
+
+Use `@pytest.mark.e2e_serial(phase="before")` for destructive environment-reset
+checks that must finish before any story fixtures are created. For example,
+cache/index recreation runs here so it cannot erase already-created fixtures.
+
+Resource `.key` stays available across tests without reading Datastore. Cached
+`.entity` snapshots are cleared between tests and re-fetched on demand. Within a
+test, repeated `.entity` access retains the same object so intentional setup
+edits can still be saved together. Use `refresh_entity(request=...)` when a
+justified backend inspection needs a fresh or deeper relation fetch. Keep the
+behavior under test in the browser and move procedural backend checks to unit
+tests where appropriate.
+
+The first published enum key is its stable identity for the coordinated run.
+A UI creation story may inspect its newly created record locally, but teardown
+must not replace an existing shared key: permission groups and other fixtures
+may already reference it. The next enum lookup resolves the shared identity.
 
 ## Other Test Layers
 

@@ -83,7 +83,12 @@ FILE_ORGANIZATION_GUIDELINES = """
   or document, and explain any schema limitation. Never silently discard facts.
   Apply updates before complete_task and make completion depend on those updates.
 - Attach every uploaded file classified as organize to its intended Page or Task
-  using the exact file reference. Move existing workspace files only as requested;
+  using the exact file reference. Each File has one owning Page or Task. Choose
+  one owner; do not attach the same File to several destinations. attach_file
+  never moves an already-owned File, and repeating the same attachment is a no-op.
+  Use move_file only for an explicit ownership change, or the existing File URL
+  to reference it elsewhere. TaskHistory evidence remains owned by its live Task.
+  Move existing workspace files only as requested;
   they do not need upload classification or new summary actions.
   When summarize_file is allowed, include exactly one summarize_file action per file
   classified as organize, using the summary guidance returned with that action,

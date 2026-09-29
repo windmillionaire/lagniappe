@@ -28,7 +28,7 @@ pytestmark = pytest.mark.e2e
 # @template pages/info.html::info_form
 # @matrix form-migration : informational-notice readonly-modal
 # @matrix edited-entity-notice : clean-state latest-schema
-def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_user, monkeypatch):
+def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_admin, get_user, monkeypatch):
     from dataclasses import replace
     from flask_login import login_user
     from lagniappe.web import app as web_app
@@ -36,7 +36,7 @@ def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_user, 
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
     from testing.resources import Page
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     quantity = SchemaFields.TEXT_INPUT.get(_id="quantity", title="Quantity")
     legacy = SchemaFields.TEXT_INPUT.get(_id="legacy", title="Legacy code")
     form = Form(user=user, definition=FormDefinition(
@@ -88,7 +88,7 @@ def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_user, 
 # @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
 # @source lagniappe/core/tools/forms/changes.py::apply_target
 # @matrix form-migration : preflight batch-job publication recovery partial-read generation removed-link
-def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(get_user, monkeypatch):
+def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(get_admin, get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts, population
@@ -98,7 +98,7 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
     from lagniappe.core.tools.deferred_jobs.errors import DeferredJobInfrastructureError
     from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_key
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     quantity = SchemaFields.TEXT_INPUT.get(_id="quantity", title="Quantity")
     link = SchemaFields.LINK.get(_id="reference", title="Reference", location="in")
@@ -218,13 +218,13 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
 # @source lagniappe/core/mixins/submitter.py::SubmitterMixin.form_submission
 # @source lagniappe/web/routes/tasks/main.py::update
 # @matrix form-migration : stale-generation direct-write
-def test_direct_stale_generation_write_is_rejected_after_migration(get_user, monkeypatch):
+def test_direct_stale_generation_write_is_rejected_after_migration(get_admin, get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     quantity = SchemaFields.TEXT_INPUT.get(_id="quantity", title="Quantity")
     form = Form(user=user, definition=FormDefinition(
@@ -275,6 +275,7 @@ def test_direct_stale_generation_write_is_rejected_after_migration(get_user, mon
 
 
 # @matrix form-migration : form-authority restricted-submissions
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("form_type", ["page", "task"])
 def test_form_editor_migrates_restricted_submissions(get_user, form_type):
     owner = get_user(Users.OWNER)
@@ -341,8 +342,8 @@ def test_form_editor_migrates_restricted_submissions(get_user, form_type):
 # @template forms/builder.html::main
 # @template pages/tasks.html::task_form
 # @template tasks/history.html::completion_history
-def test_deleted_migrated_form_retains_completed_submissions_and_history(get_user):
-    user = get_user(Users.OWNER)
+def test_deleted_migrated_form_retains_completed_submissions_and_history(get_admin, get_user):
+    user = get_admin()
     parent = Pages.acl_lab_visible.get(user)
     quantity = SchemaFields.TEXT_INPUT.get(_id="quantity", title="Quantity")
     notes = SchemaFields.TEXTAREA.get(_id="notes", title="Notes")
@@ -477,6 +478,7 @@ def test_deleted_migrated_form_retains_completed_submissions_and_history(get_use
 # @matrix form-migration : stale-input queued-conflict explicit-review
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("change", ["convert", "remove"])
 def test_offline_submission_survives_schema_migration_until_review(
     get_user, browser_failures, change,
@@ -570,13 +572,13 @@ def test_offline_submission_survives_schema_migration_until_review(
 
 # @matrix form-migration : progress reload saved-job
 # @template forms/builder.html::main
-def test_builder_observes_migration_completion_without_leaving(get_user, monkeypatch):
+def test_builder_observes_migration_completion_without_leaving(get_admin, get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     notes = SchemaFields.TEXTAREA.get(_id="notes", title="Notes")
     form = Form(
@@ -629,14 +631,14 @@ def test_builder_observes_migration_completion_without_leaving(get_user, monkeyp
 # @matrix form-migration : writer-fence completion-race
 # @template pages/tasks.html::task
 def test_completion_during_migration_returns_inline_error_without_saving(
-    get_user, monkeypatch, browser_failures,
+    get_admin, get_user, monkeypatch, browser_failures,
 ):
     from flask_login import login_user
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.forms import changes as form_changes, drafts as form_drafts
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     field = SchemaFields.TEXT_INPUT.get(_id="quantity", title="Quantity")
     form = Form(
@@ -723,8 +725,8 @@ def test_completion_during_migration_returns_inline_error_without_saving(
 # @matrix forms : builder-save stable-identity
 # @matrix form-migration : modify-panel
 # @template forms/builder.html::main
-def test_saved_inputs_use_replacement_panel_after_first_save(get_user):
-    user = get_user(Users.OWNER)
+def test_saved_inputs_use_replacement_panel_after_first_save(get_admin, get_user):
+    user = get_admin()
     form = Form(
         user=user,
         definition=FormDefinition(
@@ -773,8 +775,8 @@ def test_saved_inputs_use_replacement_panel_after_first_save(get_user):
 
 # @matrix form-migration : modify-panel
 # @template forms/builder.html::main
-def test_replacement_choices_and_explanations_match_component_types(get_user):
-    user = get_user(Users.OWNER)
+def test_replacement_choices_and_explanations_match_component_types(get_admin, get_user):
+    user = get_admin()
     options = [{"value": "first", "label": "First"}, {"value": "second", "label": "Second"}]
     fields = {
         "external": SchemaFields.LINK.get(location="out", title="External link"),
@@ -861,8 +863,8 @@ def test_replacement_choices_and_explanations_match_component_types(get_user):
 
 # @matrix form-migration : modify-panel
 # @template forms/builder.html::main
-def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_user):
-    user = get_user(Users.OWNER)
+def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_admin, get_user):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     decision = SchemaFields.CHECKBOX.get(_id="decision", title="Decision")
     form = Form(
@@ -933,8 +935,8 @@ def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_user):
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
 # @template reference/macros.html::modal
-def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_path):
-    user = get_user(Users.OWNER)
+def test_saved_conversion_runs_after_save_and_preserves_originals(get_admin, get_user, tmp_path):
+    user = get_admin()
     parent = Pages.acl_lab_visible.get(user)
     notes = SchemaFields.TEXT_INPUT.get(_id="notes", title="Quantity")
     details = SchemaFields.TEXTAREA.get(_id="details", title="Details")
@@ -1190,10 +1192,10 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_user, tmp_
 
 # @matrix html-field : generated-document-undo retained-editor
 # @template forms/builder.html::generate
-def test_generated_document_uses_editor_undo_before_first_open(get_user):
+def test_generated_document_uses_editor_undo_before_first_open(get_admin, get_user):
     from testing.utility.network import multipart_form_fields, scoped_browser_route
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     instructions = SchemaFields.HTML.get(_id="instructions", title="Instructions")
     form = Form(
         user=user,
@@ -1251,10 +1253,10 @@ def test_generated_document_uses_editor_undo_before_first_open(get_user):
 
 # @matrix form-migration : status recovery retry reload saved-job
 # @template forms/builder.html::main
-def test_failed_preflight_recovers_after_reload(get_user):
+def test_failed_preflight_recovers_after_reload(get_admin, get_user):
     from lagniappe.core.tools.database.utility import save_mutations
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     notes = SchemaFields.TEXT_INPUT.get(_id="notes", title="Notes")
     form = Form(

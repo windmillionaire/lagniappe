@@ -67,8 +67,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @pair filters:tab-open
-def test_filters_tab_opens(get_user):
-    user = get_user(Users.OWNER)
+def test_filters_tab_opens(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
 
@@ -80,8 +80,8 @@ def test_filters_tab_opens(get_user):
 
 
 # @matrix filters : completed conditions
-def test_project_filter_conditions_include_task_fields(get_user):
-    user = get_user(Users.OWNER)
+def test_project_filter_conditions_include_task_fields(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_filter_project.get(user)
     user.go(project)
 
@@ -96,10 +96,10 @@ def test_project_filter_conditions_include_task_fields(get_user):
 # @matrix filters : malformed-contract unavailable-source
 # @pairs permissions:unavailable-source request-errors:stable-status
 def test_filter_preview_rejects_malformed_and_forged_contracts(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     project = Projects.test_filter_project.get(user)
     user.go(project)
     endpoint = f"{project.url.rsplit('/projects/', 1)[0]}/filters/{project.key}/test"
@@ -148,8 +148,8 @@ def test_filter_preview_rejects_malformed_and_forged_contracts(
 
 # @matrix filters : results-layout run-results string-condition
 # @template projects/filters.html::task_filters
-def test_filter_by_task_name(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_task_name(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
 
@@ -176,8 +176,8 @@ def test_filter_by_task_name(get_user):
 
 
 # @matrix filters : exact-match run-results string-condition
-def test_filter_by_task_name_exact(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_task_name_exact(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
 
@@ -199,9 +199,9 @@ def test_filter_by_task_name_exact(get_user):
 
 # @matrix filters : escaping punctuation regex-literal run-results string-condition
 @pytest.mark.parametrize("comparator", ["matches", "contains"])
-def test_filter_string_punctuation_matches_literal_values(get_user, comparator):
+def test_filter_string_punctuation_matches_literal_values(get_admin, get_user, comparator):
     """Prove literal regex values against Redis through the browser filter UI."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     needle = f'Literal {uuid4().hex} Dr. René [a+b] ("x") \\folder ^$.?*|{{2}}'
     name = needle if comparator == "matches" else f"Before {needle} after"
     base = Tasks.test_filter_by_task_name.value.definition
@@ -221,8 +221,8 @@ def test_filter_string_punctuation_matches_literal_values(get_user, comparator):
 
 
 # @matrix filters : date-condition run-results
-def test_filter_by_due_date(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_due_date(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_due_date.get(user)
     project = user.go(task.project)
 
@@ -274,6 +274,7 @@ def _attached_form_filter_context(user):
 # @pair permissions:authorization
 # @template tasks/index.html::view
 # @template forms/restrictions.html::restrict_access
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("mode", ["preview", "saved"])
 @pytest.mark.parametrize("permission_source", ["task_form", "model_form", "page", "page_form"])
 def test_project_filter_results_respect_task_permissions(get_user, mode, permission_source):
@@ -369,8 +370,6 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
         )
         return {"status": response.status_code, "etag": response.headers.get("etag")}
 
-    assert conditional_get(etag)["status"] == 304
-
     # Both records must match before the form's real save changes access.
     visible_row = results.locator(f"tr[data-key='{visible_task.urlsafe_key}']")
     restricted_row = results.locator(f"tr[data-key='{restricted_task.urlsafe_key}']")
@@ -414,9 +413,42 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
             expect(restricted_row).to_be_visible()
 
 
+# @source lagniappe/web/auth.py::permission
+# @matrix cache : conditional-response
+@pytest.mark.e2e_serial
+@pytest.mark.parametrize("mode", ["preview", "saved"])
+def test_unchanged_project_filter_returns_304(get_admin, mode):
+    # Only this negative cache assertion needs a quiet global Tasks revision.
+    # The permission/polling story above can run alongside unrelated mutations.
+    user = get_admin()
+    task = Tasks.test_filter_by_task_name.get(user)
+    project = user.go(task.project)
+    filters = Filters(user, project)
+    filters.set_condition(ProjectFilterConditions.NAME)
+    filters.name_contains(task.definition.name).add_filter()
+    if mode == "preview":
+        with expect_successful_response(user.page, method="GET", path=f"/filters/{project.key}/test") as result:
+            results = filters.run()
+    else:
+        saved = filters.save_filter()
+        with user.page.expect_navigation(url=f"**/filters/{saved.get_attribute('data-key')}") as result:
+            saved.get_by_role("link", name="Run saved filter").click()
+        results = user.locate("[lp-view][data-kind='task'] #table")
+    expect(results.locator(f"tr[data-key='{task.key}']")).to_be_visible()
+    response = result.value
+    assert response.status == 200
+    unchanged = requests.get(
+        response.url,
+        cookies={cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()},
+        headers={"If-None-Match": response.headers["etag"], "User-Agent": user.page.evaluate("navigator.userAgent")},
+        allow_redirects=False, timeout=10,
+    )
+    assert unchanged.status_code == 304 and not unchanged.content
+
+
 # @matrix filters : category entity-condition run-results
-def test_filter_by_category(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_category(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     category = Categories.test_create_page_task.get(user)
     project = user.go(task.project)
@@ -434,8 +466,8 @@ def test_filter_by_category(get_user):
 
 
 # @matrix filters : assigned-user entity-condition run-results
-def test_filter_by_assigned_user(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_assigned_user(get_admin, get_user):
+    user = get_admin()
     assignee = Users.create_user.get(user)
     task = Tasks.test_filter_by_assigned_user.get(user)
     unrelated_task = Tasks.test_filter_by_task_name.get(user)
@@ -457,8 +489,8 @@ def test_filter_by_assigned_user(get_user):
 
 
 # @matrix filters : entity-condition model-task run-results
-def test_filter_by_model_task(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_model_task(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_model_task.get(user)
     model_task = ModelTasks.test_filter_by_model_task.get(user)
     project = user.go(task.project)
@@ -478,8 +510,8 @@ def test_filter_by_model_task(get_user):
 
 
 # @matrix filters : attached-form run-results string-condition
-def test_filter_by_attached_form_text_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_attached_form_text_condition(get_admin, get_user):
+    user = get_admin()
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
     badges = (
@@ -495,8 +527,8 @@ def test_filter_by_attached_form_text_condition(get_user):
 
 
 # @matrix filters : attached-form number-condition run-results
-def test_filter_by_attached_form_number_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_attached_form_number_condition(get_admin, get_user):
+    user = get_admin()
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
     badges = (
@@ -512,8 +544,8 @@ def test_filter_by_attached_form_number_condition(get_user):
 
 
 # @matrix filters : attached-form boolean-condition run-results
-def test_filter_by_attached_form_checkbox_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_attached_form_checkbox_condition(get_admin, get_user):
+    user = get_admin()
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
     badges = (
@@ -527,8 +559,8 @@ def test_filter_by_attached_form_checkbox_condition(get_user):
 
 
 # @matrix filters : attached-form checkbox quick-edit reload-persistence
-def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
-    user = get_user(Users.OWNER)
+def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_admin, get_user):
+    user = get_admin()
     task = Task(
         user=user,
         definition=replace(
@@ -596,8 +628,8 @@ def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
 
 # @matrix filters : attached-form selector
 # @pair permissions:relationship
-def test_filter_by_attached_form_select_condition(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_attached_form_select_condition(get_admin, get_user):
+    user = get_admin()
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
     badges = (
@@ -615,8 +647,8 @@ def test_filter_by_attached_form_select_condition(get_user):
 # @matrix embedded-table : horizontal-scroll run-results table-cell-expand visibility
 # @template cell.html::table_cell
 # @template controls.html::expand
-def test_filter_results_expands_table_submission_cell(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_results_expands_table_submission_cell(get_admin, get_user):
+    user = get_admin()
     filters, matching_task, excluded_task = _attached_form_filter_context(user)
 
     badges = (
@@ -664,8 +696,8 @@ def test_filter_results_expands_table_submission_cell(get_user):
 
 # @matrix filters : boolean-condition run-results
 # @matrix status : boolean-condition computed-column run-results
-def test_filter_by_has_status_renders_status_column(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_by_has_status_renders_status_column(get_admin, get_user):
+    user = get_admin()
     matching_task = Tasks.test_filter_by_has_status_active.get(user)
     excluded_task = Tasks.test_filter_by_has_status_inactive.get(user)
     attached_form = Forms.test_task_status_form.get(user)
@@ -702,8 +734,8 @@ def test_filter_by_has_status_renders_status_column(get_user):
 
 
 # @pair filters:empty-results
-def test_filter_no_results(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_no_results(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
 
@@ -717,8 +749,8 @@ def test_filter_no_results(get_user):
 
 
 # @pair filters:reset
-def test_filter_reset(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_reset(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
 
@@ -734,8 +766,8 @@ def test_filter_reset(get_user):
 
 
 # @matrix filters : delete reload-persistence save saved-filters shared-viewer
-def test_filter_save(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_save(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
 
@@ -778,8 +810,8 @@ def test_filter_save(get_user):
 
 
 # @matrix filters : compound run-results
-def test_filter_multiple_conditions(get_user):
-    user = get_user(Users.OWNER)
+def test_filter_multiple_conditions(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_filter_by_due_date.get(user)
     project = user.go(task.project)
     today = datetime.now().date().isoformat()
@@ -801,9 +833,9 @@ def test_filter_multiple_conditions(get_user):
 # @pair filters:saved-filter
 # @template table.html::row
 def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
-    get_user,
+    get_admin, get_user,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Task(
         user=user,
         definition=replace(
@@ -844,10 +876,10 @@ def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
 # @template tasks/index.html::view
 # @template table.html::row
 def test_saved_in_progress_filter_refreshes_after_reconnect(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Task(
         user=user,
         definition=replace(

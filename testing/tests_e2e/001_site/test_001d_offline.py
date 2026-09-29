@@ -17,7 +17,7 @@ Related Files:
 
 import pytest
 
-from testing.definitions import Projects, SitePages, Users
+from testing.definitions import Projects, SitePages
 from testing.utility.network import (
     expect_successful_response,
     scoped_browser_route,
@@ -29,7 +29,7 @@ pytestmark = pytest.mark.e2e
 
 OFFLINE_INDICATOR = "[data-role='offline']"
 # @matrix offline : browser-state indicator
-def test_offline_indicator_toggles(get_user, browser_failures):
+def test_offline_indicator_toggles(get_admin, browser_failures):
     """
     Test that the offline indicator responds to offline state changes.
 
@@ -43,7 +43,7 @@ def test_offline_indicator_toggles(get_user, browser_failures):
         - Indicator becomes visible when offline
         - Indicator hides when back online
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
 
     indicator = user.locate(OFFLINE_INDICATOR)
@@ -59,7 +59,7 @@ def test_offline_indicator_toggles(get_user, browser_failures):
 
 # @matrix offline : indicator server-health
 def test_failed_ping_marks_view_offline_until_next_sync_event(
-    get_user,
+    get_admin,
     browser_failures,
 ):
     """
@@ -76,7 +76,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
         - Failed server health checks mark the view offline
         - A later browser lifecycle sync restores online state
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
 
     indicator = user.locate(OFFLINE_INDICATOR)
@@ -124,7 +124,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
 
 
 # @matrix offline : browser-state indicator reconnect server-health
-def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
+def test_offline_poll_recovers_without_online_event(get_admin, browser_failures):
     """
     Test that retry polling recovers after the native online event fails.
 
@@ -139,7 +139,7 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
         - Offline state schedules a server health retry
         - A later successful ping restores online UI without another event
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
 
     indicator = user.locate(OFFLINE_INDICATOR)
@@ -189,7 +189,7 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
 
 
 # @matrix sync : offline-replay queue-clear
-def test_offline_prevents_sync_requests(get_user, browser_failures):
+def test_offline_prevents_sync_requests(get_admin, browser_failures):
     """
     Test that going offline prevents sync network requests and that
     coming back online flushes the queue.
@@ -204,7 +204,7 @@ def test_offline_prevents_sync_requests(get_user, browser_failures):
         - No sync POST while offline
         - Sync fires on re-online transition
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     project = user.go(Projects.test_toolbar_loads)
     editor = project.editor
     document_sync_id = project.entity.sync_ids["document"]["id"]
@@ -234,7 +234,7 @@ def test_offline_prevents_sync_requests(get_user, browser_failures):
 
 
 # @matrix offline : indicator view-reset
-def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures):
+def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failures):
     """
     Test that a new testing-mode view rechecks server state after navigation.
 
@@ -248,7 +248,7 @@ def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures
         - View re-initialization from navigation resets online state
           (since __TESTING__ forces server status to true on init)
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
 
     with browser_failures.expect_offline(user):
@@ -265,11 +265,11 @@ def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures
 # @matrix e2e : server-failure upstream-unavailable
 # @matrix request-errors : banner dom-preservation server-failure upstream-unavailable
 def test_upstream_unavailable_preserves_current_form_state(
-    get_user,
+    get_admin,
     browser_failures,
 ):
     """A provider-shaped 503 stays outside the mounted application DOM."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
 
     search = user.locate("[lp-search] input[name='q']")

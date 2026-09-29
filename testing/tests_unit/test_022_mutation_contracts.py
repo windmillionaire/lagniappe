@@ -231,6 +231,29 @@ def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first, m
     assert write.entity.name == "Current contact"
 
 
+# @source lagniappe/core/mutations/executor.py::execute_post_commit
+# @matrix mutations : full-root masked-touch cache
+@pytest.mark.parametrize("note_first", [True, False])
+def test_full_owner_save_supersedes_note_revision_invalidation(note_first, monkeypatch):
+    from lagniappe.core.tools.cache import restrictions
+
+    page = TestEntities.get("PAGE", {"name": "Saved owner", "hash": "note-full-owner"})
+    author = TestEntities.get("USER", {"name": "Author", "hash": "note-full-author"})
+    note = TestEntities.get("NOTE", {"parent": page, "user": author, "body": "Note"})
+    roots = (note, page) if note_first else (page, note)
+    plan = plan_mutation(MutationOperation.SAVE, *roots, registry=Entities)
+    refreshed, invalidated = [], []
+    monkeypatch.setattr(restrictions, "prepare_changes", lambda _entities: [])
+    monkeypatch.setattr(restrictions, "dispatch_changes", lambda _changes: None)
+    monkeypatch.setattr(mutation_executor.cache, "update", lambda *entities: refreshed.extend(entities))
+    monkeypatch.setattr(mutation_executor.cache, "update_owner_projection", lambda *_entities: None)
+    monkeypatch.setattr(mutation_executor.cache, "invalidate_revisions", lambda *entities: invalidated.extend(entities))
+    _completed, errors = mutation_executor.execute_post_commit(plan)
+    assert not errors
+    assert page in refreshed
+    assert invalidated == [author]
+
+
 # @matrix mutations task-scheduling : durable-first post-commit
 # @source lagniappe/core/definitions/mutations.py::MutationIntent.dispatch_scheduled_uncomplete
 def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():

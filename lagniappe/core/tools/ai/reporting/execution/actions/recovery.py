@@ -68,7 +68,7 @@ def _inspect_action_applied(action, report, user, record):
     }:
         return ACTION_APPLIED
 
-    if action_type == "append_page_document":
+    if action_type in {"append_page_document", "replace_page_document"}:
         from .documents import inspect_document_append
 
         return inspect_document_append(record, user)
@@ -108,7 +108,7 @@ def _inspect_action_applied(action, report, user, record):
     if entity is not None and not _recovery_entity_allowed(entity, user):
         return ACTION_DRIFTED
 
-    if action_type in {"update_task", "update_page", "update_project", "update_model_task"}:
+    if action_type in {"update_task", "update_page", "update_project", "update_model_task", "update_file"}:
         from lagniappe.core.tools.entity_patches import _projection
         if entity is not None and _projection(entity) == expected.get("entity_update_after"):
             return ACTION_APPLIED
@@ -179,7 +179,7 @@ def _is_recoverable_action_error(_action, error):
         return False  # A rejected atomic write must remain retryable.
     if _action.get("type") in {"update_form_schema"}:
         return False
-    if _action.get("type") == "append_page_document":
+    if _action.get("type") in {"append_page_document", "replace_page_document"}:
         return False  # A document conflict must remain retryable, not be skipped.
     return isinstance(error, exceptions.ValidationError) and not str(error).startswith(
         "You do not have permission"

@@ -146,7 +146,8 @@
           </div>
           {%- if current_user.is_authenticated -%}
             {# <a href="{{ url_for('pages.view', key=current_user.page.urlsafe_key) }}" #}
-            <button class="{{ styles.nav.link }}"
+            <button type="button"
+                    class="{{ styles.nav.link }}"
                     data-role="notifications"
                     data-visible="true"
                     aria-hidden="false"

@@ -25,7 +25,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.database import notifications as notification_database
 from runner import mcp_environment
-from testing.definitions import Groups, Pages, SitePages, Users
+from testing.definitions import Groups, Pages, SitePages
 from testing.definitions.user_definitions import UserDefinition
 from testing.utility.network import browser_fetch
 
@@ -42,11 +42,12 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
-# Reviewed v10: nullable revision IDs and API-owned validation guidance in contracts.
+# Reviewed v10, including optional installation metadata and the execution capability
+# on get_actor. Ordinary API credentials still cannot execute proposals.
 LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                      'f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d'),
  'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
-               '5467240ac9b25c0e3e6a0fb035a1385501dba9f6470747ae83af4ad808b6f66f'),
+               '67f1f90a7a55e2bf678291801655eb551ca5d979b914f39be9abe1ccc05daaeb'),
  'start_plan': ('6b80b5bbc86766d1de25efec1b3d9db01071fe4418ddca24121e8498650cb1bf',
                 '9db8d984e62c2f4c56ca97010933b002920ed5d4639769cf70a8b7be53a32a56'),
  'get_plan': ('79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9',
@@ -105,7 +106,7 @@ MCP_BOUNDARY_PNG = base64.b64decode(
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
 # @source lagniappe/web/routes/api/main.py::execute_tool
 def test_mcp_original_pdf_download_uses_existing_api_and_storage(
-    get_user,
+    get_admin, get_user,
     tmp_path,
     monkeypatch,
     setup_test_server,
@@ -124,7 +125,7 @@ def test_mcp_original_pdf_download_uses_existing_api_and_storage(
             email=f"pdf-owner-{suffix}@example.test",
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     intruder = get_user(
         UserDefinition(
@@ -132,7 +133,7 @@ def test_mcp_original_pdf_download_uses_existing_api_and_storage(
             email=f"pdf-intruder-{suffix}@example.test",
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     owner.go(SitePages.HOME)
     intruder.go(SitePages.HOME)
@@ -233,7 +234,7 @@ def _canonical_sha256(value) -> str:
 # @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
 # @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
 # @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-def test_rest_and_mcp_share_submission_validation(get_user, tmp_path, monkeypatch, setup_test_server):
+def test_rest_and_mcp_share_submission_validation(get_admin, get_user, tmp_path, monkeypatch, setup_test_server):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
     for cookie in setup_test_server.browser_cookies:
         if cookie["name"] == "__Host-lagniappe-e2e":
@@ -247,7 +248,7 @@ def test_rest_and_mcp_share_submission_validation(get_user, tmp_path, monkeypatc
             groups=[Groups.all_create],
             ai_access=AI.NONE,
         ),
-        creator=get_user(Users.OWNER),
+        creator=get_admin(),
     )
     owner.go(SitePages.HOME)
     task = Entities.TASK.create({"name": "Validation parity task", "page": owner.entity.page})
@@ -654,7 +655,7 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 # @template notifications.html::item
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
-    get_user,
+    get_admin, get_user,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     setup_test_server,
@@ -674,7 +675,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         with pytest.raises(ValueError, match="different origin"):
             _request("GET", "https://storage.googleapis.com/object", token="test-only")
     _prepare_package_environment()
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     owner.go(SitePages.HOME)
     readable_page = Pages.test_create_page.get(owner)
 
@@ -723,6 +724,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "/api/v1/plans/{plan_id}": "get",
             "/api/v1/plans/{plan_id}/contract": "get",
             "/api/v1/plans/{plan_id}/submit": "post",
+            "/api/v1/plans/{plan_id}/execute": "post",
             "/api/v1/plans/{plan_id}/tools/{tool_name}": "post",
             "/api/v1/plans/{plan_id}/uploads": "post",
             "/api/v1/plans/{plan_id}/uploads/finalize": "post",
@@ -733,7 +735,6 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             set(openapi["paths"][path]) == {method}
             for path, method in expected_methods.items()
         )
-        assert all("execute" not in path for path in openapi["paths"])
         upload_schema = openapi["components"]["schemas"]["UploadFile"]
         assert upload_schema["additionalProperties"] is False
         assert upload_schema["required"] == ["filename", "size"]
@@ -763,6 +764,11 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             ),
             201,
         )
+        forbidden_execution = _json_response(_request(
+            "POST", f"/api/v1/plans/{invalid_plan['id']}/execute",
+            token=owner_token, body={},
+        ), 403)
+        assert forbidden_execution["error"]["code"] == "execution_forbidden"
         invalid_upload_path = f"/api/v1/plans/{invalid_plan['id']}/uploads"
         invalid_declarations = (
             (

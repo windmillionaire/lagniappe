@@ -110,7 +110,7 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 		StarterKit.configure({
 			link: false,
 			underline: true,
-			history: false,
+			undoRedo: false,
 		}),
 		...createFormattingExtensions(),
 		Collaboration.configure({
@@ -147,7 +147,6 @@ export const independentEditor = (target, content = "") => {
 		StarterKit.configure({
 			link: false,
 			underline: true,
-			history: true,
 		}),
 		...createFormattingExtensions(),
 		...createEditingExtensions(),
@@ -165,3 +164,17 @@ export const independentEditor = (target, content = "") => {
 
 	return editor;
 };
+
+/** @testable infrastructure */
+export const previewEditor = (target, content) =>
+	new Editor({
+		element: target,
+		injectCSS: false,
+		editable: false,
+		content,
+		extensions: [
+			StarterKit.configure({ link: false, underline: true, undoRedo: false }),
+			...createFormattingExtensions(),
+			LagniappeMention,
+		],
+	});

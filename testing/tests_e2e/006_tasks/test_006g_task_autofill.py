@@ -11,7 +11,7 @@ from lagniappe.core.definitions import DeferredJobStatus, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
-from testing.definitions import Pages, Tasks, Users
+from testing.definitions import Pages, Tasks
 from testing.resources import Page, Task
 from testing.utility.live_ai import run_hosted_autofill
 from testing.utility.network import scoped_browser_route
@@ -72,8 +72,8 @@ def _create_autofill_fixture(user):
 # @source lagniappe/core/tools/deferred_jobs/autofill.py::start_autofill_job
 # @template pages/tasks.html::task_form
 # @matrix ai tasks : autofill cancellation current-answers reload attachment
-def test_autofill_start_snapshots_draft_and_stages_file_without_saving_them(get_user):
-    user = get_user(Users.OWNER)
+def test_autofill_start_snapshots_draft_and_stages_file_without_saving_them(get_admin, get_user):
+    user = get_admin()
     page, task = _create_autofill_fixture(user)
     user.go(page, query_params={"tab": "tasks"})
     form = task.task_form
@@ -125,8 +125,8 @@ def test_autofill_start_snapshots_draft_and_stages_file_without_saving_them(get_
 # @source lagniappe/core/tools/deferred_jobs/autofill.py::autofill_job_spec
 # @template pages/tasks.html::task_form
 # @matrix ai tasks : autofill retry original-prompt staged-upload current-answers
-def test_cancelled_autofill_retry_reuses_prompt_and_file_with_current_draft(get_user):
-    user = get_user(Users.OWNER)
+def test_cancelled_autofill_retry_reuses_prompt_and_file_with_current_draft(get_admin, get_user):
+    user = get_admin()
     page, task = _create_autofill_fixture(user)
     user.go(page, query_params={"tab": "tasks"})
     form = task.task_form
@@ -173,11 +173,11 @@ def test_cancelled_autofill_retry_reuses_prompt_and_file_with_current_draft(get_
 # @template pages/tasks.html::task_form
 # @matrix ai tasks : autofill conflicts review private-refinement
 # @pair forms:submission-choice
-def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(get_user, monkeypatch):
+def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(get_admin, get_user, monkeypatch):
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page, task = _create_autofill_fixture(user)
     user.go(page, query_params={"tab": "tasks"})
     form = task.task_form
@@ -235,11 +235,11 @@ def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(ge
 # @source src/script/widgets/base/formWidget.mjs::FormWidget.prepareLocalRevision
 # @template pages/tasks.html::task_form
 # @pair forms:autofill-review
-def test_autofill_collection_review_applies_to_open_form_without_saving(get_user, monkeypatch):
+def test_autofill_collection_review_applies_to_open_form_without_saving(get_admin, get_user, monkeypatch):
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = Page(
         user=user,
         definition=replace(
@@ -325,11 +325,11 @@ def test_autofill_collection_review_applies_to_open_form_without_saving(get_user
 # @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
 # @matrix ai files tasks : autofill rejected-suggestion staged-upload-cleanup
 @pytest.mark.parametrize("accept", [False, True], ids=["reject", "failed-save-then-accept"])
-def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_user, monkeypatch, browser_failures, accept):
+def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_admin, get_user, monkeypatch, browser_failures, accept):
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page, task = _create_autofill_fixture(user)
     user.go(page, query_params={"tab": "tasks"})
     form = task.task_form
@@ -407,8 +407,8 @@ def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_u
 # @template pages/tasks.html::task_form
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatch, results, live_ai_job_quota):
-    user = get_user(Users.OWNER)
+def test_task_autofill_runs_deferred_with_page_file_context(get_admin, get_user, monkeypatch, results, live_ai_job_quota):
+    user = get_admin()
     page, task = _create_autofill_fixture(user)
     evidence_file = _attach_task_evidence(task)
     user.go(page, query_params={"tab": "tasks"})

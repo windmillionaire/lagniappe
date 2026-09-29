@@ -21,7 +21,7 @@ import pytest
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
-from testing.definitions import Pages, Uploads, Users
+from testing.definitions import Pages, Uploads
 from testing.definitions.page_definitions import PageDefinition
 from testing.elements import MobileNav, Modal, Select, SpinnerButtons, Tabs
 from testing.resources import File, Page
@@ -102,8 +102,8 @@ def _select_file_page_link(info_form, file, page):
 # @matrix file : load tabs text-asset text-tab
 # @template files/file.html::main
 # @template files/text.html::text_tab
-def test_file_text_tab_renders_uploaded_text_content(get_user):
-    user = get_user(Users.OWNER)
+def test_file_text_tab_renders_uploaded_text_content(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.csv_file_input)
 
     user.go(file)
@@ -123,8 +123,8 @@ def test_file_text_tab_renders_uploaded_text_content(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/text.html::text_tab
-def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_user):
-    user = get_user(Users.OWNER)
+def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.plain_text_file)
 
     user.go(file)
@@ -147,8 +147,8 @@ def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_user):
 # @template files/file.html::main
 # @template files/file.html::linked_badges
 # @template badge.html::entity_badge
-def test_file_page_shows_linked_page_and_task_badges(get_user):
-    user = get_user(Users.OWNER)
+def test_file_page_shows_linked_page_and_task_badges(get_admin, get_user):
+    user = get_admin()
     page, file = _upload_file(user, Uploads.plain_text_file)
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
     task_entity = Entities.TASK.create(
@@ -177,8 +177,8 @@ def test_file_page_shows_linked_page_and_task_badges(get_user):
 # @template pages/tasks.html::task_details
 # @template badge.html::entity_badge
 @pytest.mark.parametrize("pending_navigation_ping", [False, True])
-def test_delete_file_removes_attached_task_badge(get_user, pending_navigation_ping):
-    user = get_user(Users.OWNER)
+def test_delete_file_removes_attached_task_badge(get_admin, get_user, pending_navigation_ping):
+    user = get_admin()
     page, file = _upload_file(user, Uploads.plain_text_file)
     file_entity = Entities.fetch_one(file.key, request=Fetch.direct())
     task_entity = Entities.TASK.create(
@@ -248,8 +248,8 @@ def test_delete_file_removes_attached_task_badge(get_user, pending_navigation_pi
 # @matrix file : add linked-pages reload remove
 # @template files/info.html::info_form
 # @template files/file.html::linked_badges
-def test_file_info_moves_between_page_and_task(get_user):
-    user = get_user(Users.OWNER)
+def test_file_info_moves_between_page_and_task(get_admin, get_user):
+    user = get_admin()
     source_page, file = _upload_file(user, Uploads.plain_text_file)
     target_page = Pages.test_category_edit_page.get(user)
 
@@ -290,8 +290,8 @@ def test_file_info_moves_between_page_and_task(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
-def test_page_uploaded_image_shows_desktop_preview(get_user):
-    user = get_user(Users.OWNER)
+def test_page_uploaded_image_shows_desktop_preview(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.editor_test_image)
 
     user.go(file)
@@ -317,8 +317,8 @@ def test_page_uploaded_image_shows_desktop_preview(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
-def test_page_uploaded_pdf_renders_pdf_preview_widget(get_user):
-    user = get_user(Users.OWNER)
+def test_page_uploaded_pdf_renders_pdf_preview_widget(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.pdf_file)
 
     user.go(file)
@@ -348,8 +348,8 @@ def test_page_uploaded_pdf_renders_pdf_preview_widget(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
-def test_pdf_preview_loading_state_paints_before_document_render(get_user):
-    user = get_user(Users.OWNER)
+def test_pdf_preview_loading_state_paints_before_document_render(get_admin, get_user):
+    user = get_admin()
     _, uploaded_file = _upload_file(user, Uploads.pdf_file)
 
     def delay_range_request(route):
@@ -383,8 +383,8 @@ def test_pdf_preview_loading_state_paints_before_document_render(get_user):
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
 # @template files/preview.html::preview_tab
-def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
-    user = get_user(Users.OWNER)
+def test_page_uploaded_pdf_toolbar_navigates_pages(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.pdf_two_page_file)
 
     user.go(file)
@@ -452,8 +452,8 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
 # @matrix file : file-mobile preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
-def test_file_mobile_preview_uses_preview_tab(get_user):
-    user = get_user(Users.OWNER)
+def test_file_mobile_preview_uses_preview_tab(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.editor_test_image)
 
     user.go(file)
@@ -481,8 +481,8 @@ def test_file_mobile_preview_uses_preview_tab(get_user):
 # @matrix file : file-mobile pdf-preview preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
-def test_file_mobile_pdf_preview_renders_canvas(get_user):
-    user = get_user(Users.OWNER)
+def test_file_mobile_pdf_preview_renders_canvas(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.pdf_file)
 
     user.go(file)
@@ -506,8 +506,8 @@ def test_file_mobile_pdf_preview_renders_canvas(get_user):
 
 # @matrix file : display-name info-update summary
 # @template files/file.html::view_header
-def test_file_info_update_persists_name_and_summary(get_user):
-    user = get_user(Users.OWNER)
+def test_file_info_update_persists_name_and_summary(get_admin, get_user):
+    user = get_admin()
     _, file = _upload_file(user, Uploads.plain_text_file)
     updated_name = "Updated page upload notes"
     updated_summary = "A saved summary for a page-uploaded text file."
@@ -546,8 +546,8 @@ def test_file_info_update_persists_name_and_summary(get_user):
 
 
 # @matrix file : download filename mimetype
-def test_file_download_uses_original_filename_and_mimetype(get_user):
-    user = get_user(Users.OWNER)
+def test_file_download_uses_original_filename_and_mimetype(get_admin, get_user):
+    user = get_admin()
     upload = Uploads.plain_text_file
     _, file = _upload_file(user, upload)
 

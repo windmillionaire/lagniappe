@@ -78,6 +78,8 @@ class DeferredJobRunner:
 
         job = Entities.DEFERRED_JOB(raw)
         job = Entities.fetch_one(job, request=Fetch.direct()) or job
+        from lagniappe.core.tools.measurements import link_job
+        link_job(job)
         adapter = self.adapter(job.job_type)
         if not claim.get("claimed"):
             if claim.get("reason") == "terminal":

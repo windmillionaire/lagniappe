@@ -1,3 +1,6 @@
+from html.parser import HTMLParser
+from weakref import WeakSet
+
 from playwright.sync_api import expect
 
 from config import SETTINGS
@@ -10,7 +13,21 @@ from testing.elements import MobileNav
 VIEW_INITIALIZATION_TIMEOUT = 15000
 
 
+class _DataKeyParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.key = None
+
+    def handle_starttag(self, tag, attrs):
+        if self.key:
+            return
+        attr_map = dict(attrs)
+        if "data-key" in attr_map:
+            self.key = attr_map["data-key"]
+
+
 class SiteResource:
+    _instances = WeakSet()
     _user = None
     _url_prefix = SETTINGS.test_config["BASE_URL"]
     _url_suffix = None
@@ -23,6 +40,9 @@ class SiteResource:
     _expected_status = None
 
     def __init__(self, *args, **kwargs):
+        self._key = None
+        self._entity = None
+        self._instances.add(self)
         self._url_suffix = kwargs.get("url")
         self.title = kwargs.get("title")
         self.definition = kwargs.get("definition")
@@ -36,6 +56,13 @@ class SiteResource:
             expect(self.user.locate("[lp-view]")).to_have_attribute(
                 "initialized", "", timeout=VIEW_INITIALIZATION_TIMEOUT
             )
+
+    @staticmethod
+    def entity_key_from_response(response):
+        parser = _DataKeyParser()
+        parser.feed(response.text())
+        assert parser.key, "Create response did not include an entity data-key"
+        return parser.key
 
     def wait_for_interaction_readiness(self):
         """Wait for deferred view startup and its visual transition to settle."""
@@ -105,20 +132,35 @@ class SiteResource:
 
     @property
     def entity(self):
+        if self._entity is None and self._key:
+            self.refresh_entity()
         return self._entity
 
     @entity.setter
     def entity(self, value):
         self._entity = value
+        self._key = value.urlsafe_key if value is not None else None
 
     @property
     def key(self):
-        return self.entity.urlsafe_key if self.entity else None
+        return self._key
 
     @key.setter
     def key(self, value):
-        if not self.entity:
-            self.entity = Entities.fetch_one(value, request=Fetch.root())
+        if value != self._key:
+            self._entity = None
+        self._key = value
+
+    def refresh_entity(self, *, request=None):
+        """Fetch once for explicit durable checks or setup within this test."""
+        self._entity = Entities.fetch_one(self._key, request=request or Fetch.direct()) if self._key else None
+        return self._entity
+
+    @classmethod
+    def forget_entities(cls):
+        """Keep identities and browser metadata, discard per-test row snapshots."""
+        for resource in cls._instances:
+            resource._entity = None
 
     @property
     def user(self):

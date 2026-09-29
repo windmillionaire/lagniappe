@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Forms, Pages, Schemas, SitePages, Uploads, Users
+from testing.definitions import Forms, Pages, Schemas, SitePages, Uploads
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
 from testing.definitions.user_definitions import UserDefinition
@@ -75,8 +75,8 @@ def _set_forms_permission(user, action):
 
 # @pair forms:builder-preview
 # @template forms/builder.html::header
-def test_preview_panel(get_user):
-    user = get_user(Users.OWNER)
+def test_preview_panel(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_preview_panel.get(user)
     form.schema = Schemas.add_fields.get()
 
@@ -161,8 +161,8 @@ def test_preview_panel(get_user):
 
 # @pair forms:builder-delete-components
 # @template forms/builder.html::main
-def test_delete_components(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_components(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_delete_components.get(user)
     builder = form.builder
 
@@ -211,8 +211,8 @@ def test_delete_components(get_user):
 
 # @matrix forms : builder-field-title builder-select-options
 # @pair frontend-icons:material-icon-preservation
-def test_change_select_options(get_user):
-    user = get_user(Users.OWNER)
+def test_change_select_options(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_change_select_options.get(user)
     builder = form.builder
     field = SchemaFields.SELECT.get(title="Snack Choice")
@@ -274,8 +274,8 @@ def test_change_select_options(get_user):
 
 
 # @pair forms:builder-field-visibility
-def test_field_visibility(get_user):
-    user = get_user(Users.OWNER)
+def test_field_visibility(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_field_visibility.get(user)
     builder = form.builder
     checkbox = SchemaFields.CHECKBOX.get(title="Show Private Notes")
@@ -311,8 +311,8 @@ def test_field_visibility(get_user):
 
 
 # @matrix forms : builder-field-visibility select-or-values
-def test_field_visibility_select_multiple_values(get_user):
-    user = get_user(Users.OWNER)
+def test_field_visibility_select_multiple_values(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_field_visibility_select_multiple_values.get(user)
     builder = form.builder
     color = SchemaFields.SELECT.get(title="Color")
@@ -352,8 +352,8 @@ def test_field_visibility_select_multiple_values(get_user):
 
 
 # @pair forms:builder-table-column
-def test_table_column_condition_editor(get_user):
-    user = get_user(Users.OWNER)
+def test_table_column_condition_editor(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_table_column_condition_editor.get(user)
     builder = form.builder
     table = SchemaFields.TABLE.get(title="Line Items")
@@ -399,8 +399,8 @@ def test_table_column_condition_editor(get_user):
 
 
 # @pair forms:builder-status-message
-def test_status_message_condition_editor(get_user):
-    user = get_user(Users.OWNER)
+def test_status_message_condition_editor(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_status_message_condition_editor.get(user)
     builder = form.builder
     approved = SchemaFields.CHECKBOX.get(title="Approved")
@@ -461,8 +461,8 @@ def test_status_message_condition_editor(get_user):
 
 
 # @matrix forms signature : builder-preview builder-signature-field unique-component
-def test_signature_field_builder_unique_component(get_user):
-    user = get_user(Users.OWNER)
+def test_signature_field_builder_unique_component(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_signature_field_builder_unique_component.get(user)
     builder = form.builder
     signature = SchemaFields.SIGNATURE.get(title="Customer Signature")
@@ -493,8 +493,8 @@ def test_signature_field_builder_unique_component(get_user):
 
 # @matrix html-field : asset-lifecycle builder-html-field form-asset html-fields image-upload render-fetch submitter-key unsaved-schema
 # @matrix security : html-sanitization inner-html
-def test_html_field(get_user):
-    user = get_user(Users.OWNER)
+def test_html_field(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_html_field.get(user)
     builder = form.builder
     persisted_before = Entities.fetch_one(form.key, request=Fetch.root())
@@ -592,9 +592,9 @@ def test_html_field(get_user):
 # @style message
 # @style editor.container
 def test_html_editor_recovers_from_failed_load_and_save(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     html = SchemaFields.HTML.get(title="Resilient instructions")
     form = Form(
         user=owner,
@@ -667,8 +667,8 @@ def test_html_editor_recovers_from_failed_load_and_save(
 
 
 # @pair forms:builder-drag-component
-def test_drag_component(get_user):
-    user = get_user(Users.OWNER)
+def test_drag_component(get_admin, get_user):
+    user = get_admin()
     form = Forms.test_drag_component.get(user)
     builder = form.builder
 

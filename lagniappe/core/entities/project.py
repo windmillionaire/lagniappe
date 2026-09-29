@@ -71,8 +71,8 @@ class Project(Entity, AssetMixin):
     # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
     # @matrix ai-report : batching identity dependencies
     @classmethod
-    def create(cls, data):
-        new_project = cls()
+    def create(cls, data, *, key=None):
+        new_project = cls(key)
         new_project.kind = cls.entity_kind
         new_project.properties.model_tasks._value = []
         new_project.update(data)

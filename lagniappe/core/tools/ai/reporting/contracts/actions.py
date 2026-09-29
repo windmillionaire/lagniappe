@@ -20,7 +20,7 @@ READ_ONLY_CONTEXT_TOOLS = (
 
 REPORT_ACTION_DATA_CONTRACTS = {
     **{name: {"fields": ("entity", "changes"), "required": ("entity", "changes")}
-       for name in ("update_task", "update_model_task", "update_project", "update_page")},
+       for name in ("update_task", "update_model_task", "update_project", "update_page", "update_file")},
     "create_form": {
         "fields": ("name", "form_type", "schema"),
         "required": ("name", "form_type", "schema"),
@@ -67,6 +67,11 @@ REPORT_ACTION_DATA_CONTRACTS = {
             "submission_empty_reason",
         ),
         "required": ("name",),
+    },
+    "replace_page_document": {
+        "fields": ("page", "page_action", "page_name", "document_markdown"),
+        "required": ("document_markdown",),
+        "required_groups": (("page", "page_action"),),
     },
     "append_page_document": {
         "fields": ("page", "page_action", "page_name", "document_markdown"),

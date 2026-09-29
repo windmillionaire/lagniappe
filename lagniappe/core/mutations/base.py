@@ -213,6 +213,10 @@ class MutationPlanBuilder:
         self._add_entity_cache_effect(MutationEffectType.CACHE_REFRESH, entity, reason)
 
     # @testable infrastructure
+    def cache_invalidate(self, entity, *, reason):
+        self._add_entity_cache_effect(MutationEffectType.CACHE_INVALIDATE, entity, reason)
+
+    # @testable infrastructure
     def cache_delete(self, entity, *, reason):
         self._add_entity_cache_effect(MutationEffectType.CACHE_DELETE, entity, reason)
 

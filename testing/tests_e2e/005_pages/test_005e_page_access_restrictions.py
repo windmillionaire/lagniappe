@@ -84,6 +84,7 @@ def _save_page_restrictions(user, page):
 
 
 # @matrix pages : access-restrictions owner-restricted
+@pytest.mark.e2e_group("owner")
 def test_owner_restricted_page_is_hidden_from_model_viewer(
     get_user, browser_failures
 ):
@@ -100,6 +101,7 @@ def test_owner_restricted_page_is_hidden_from_model_viewer(
 
 # @matrix pages : access-restrictions group-restricted
 # @template pages/restrictions.html::visible_to
+@pytest.mark.e2e_group("owner")
 def test_group_restricted_page_opens_for_member_only(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)
@@ -123,11 +125,13 @@ def test_group_restricted_page_opens_for_member_only(get_user, browser_failures)
 
     outsider = get_user(Users.admin)
     with browser_failures.expect_http_error(outsider, status=403, path=page.url):
-        outsider.navigate(page.url)
+        response = outsider.navigate(page.url)
+        assert response.status == 403
         expect(outsider.page).to_have_title("Error 403")
 
 
 # @matrix pages : access-restrictions index-filter
+@pytest.mark.e2e_group("owner")
 def test_restricted_page_is_not_listed_for_outsider_on_category_index(get_user):
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)
@@ -152,6 +156,7 @@ def test_restricted_page_is_not_listed_for_outsider_on_category_index(get_user):
 # @template pages/restrictions.html::visible_to
 # @template pages/restrictions.html::restrict_access
 # @template forms/access_restrictions.html::fields
+@pytest.mark.e2e_group("owner")
 def test_page_restrictions_save_drafts_and_show_each_source(get_user):
     owner = get_user(Users.OWNER)
     page_group = Groups.general_models_view_only.get(owner)
@@ -278,6 +283,7 @@ def test_page_restrictions_save_drafts_and_show_each_source(get_user):
 
 # @matrix pages : access-restrictions source-summary
 # @template pages/restrictions.html::visible_to
+@pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("form_admin_only", [False, True])
 def test_page_restriction_summary_does_not_invent_local_badges(get_user, form_admin_only):
     owner = get_user(Users.OWNER)
@@ -313,6 +319,7 @@ def test_page_restriction_summary_does_not_invent_local_badges(get_user, form_ad
 
 # @matrix pages : access-restrictions submitted-reference
 # @source lagniappe/web/routes/pages/main.py::_apply_page_access_restrictions
+@pytest.mark.e2e_group("owner")
 def test_page_restrictions_reject_non_group_references(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     group = Groups.general_models_view_only.get(owner)

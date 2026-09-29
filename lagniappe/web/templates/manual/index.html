@@ -1,5 +1,5 @@
-{% set view_entry = "manual" %}
 {% extends "layouts/base.html" %}
+{% set view_entry = "manual" %}
 {% from "common.html" import home %}
 
 {% macro breadcrumbs() %}
@@ -19,7 +19,8 @@
     <ul class="space-y-3">
       {% for section in sections %}
         <li>
-          <button data-section="{{ section.key }}"
+          <button type="button"
+                  data-section="{{ section.key }}"
                   class="{{ styles.manual.navButton }}">
             {{ render_icon((section.icon), "text-kind-default", section.kind) }}
             <span>{{ section.name }}</span>
@@ -32,7 +33,8 @@
 
 {% macro mobile_nav(sections) %}
   <div class="sm:hidden flex flex-col mb-4">
-    <button id="manual-nav-button"
+    <button type="button"
+            id="manual-nav-button"
             data-sections='{{ sections | tojson }}'
             class="mt-4 flex flex-row items-center rounded-md px-3 py-1.5 font-semibold shadow-sm outline gap-2 w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default justify-between">
       <span class="flex items-center">

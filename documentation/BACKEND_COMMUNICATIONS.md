@@ -94,6 +94,27 @@ creation follows Page edit access.
 Note mutations touch the parent and author. Page and User deletion cascade
 through their Notes and photo assets.
 
+These owner touches write only `modified`. Their post-commit cache effect marks
+existing detail revisions stale and existing filter rows for refresh, preserving
+display and permission projections without loading the owners' relations.
+Normal authorized reads rebuild stale revisions; a full owner save in the same
+mutation takes precedence. Note deletion can then finish cache/photo cleanup
+with the direct Note fetch used by the route.
+
+Page loading skips the notes request only after an unfiltered query has proved
+the list empty. The unindexed `has_notes: false` hint is paired with
+`notes_checked_revision` (the observed Page `modified` value). Unknown, legacy,
+or changed Pages keep the ordinary fetch; the first empty read learns the hint
+without a migration. Note creation/deletion already touches the parent, so a
+late empty-reader write or stale full Page save cannot hide newer notes.
+Private notes count as present even when the current viewer cannot see them.
+
+The hint uses a masked root save, leaves content and collection fingerprints
+unchanged, and participates only in the initial Page HTML validator. The list
+still mounts as loaded for creation and normal collection refresh. Any Page
+revision change conservatively costs one fresh notes read before empty Pages
+can skip again.
+
 ## Notification email
 
 Managed Users choose `NONE`, `IMMEDIATE`, or `DAILY`; public Users use their
@@ -115,6 +136,13 @@ not roll back the Notification, Message, mention, or task assignment.
 best-effort Redis activity hint; `capture.py` creates delivery rows;
 `dispatch.py` schedules Cloud Tasks; `presentation.py` renders provider-neutral
 multipart email; `delivery.py` owns send-time suppression and terminal state.
+
+Authenticated requests record activity at most once per minute in Redis, with
+a ten-minute expiry. A bounded per-worker timing memo skips redundant Redis
+checks between successful observations; failures are retried on the next
+request. This is only an email-suppression hint. If Redis loses a presence key,
+an active worker may take up to one minute to recreate it; permission checks
+never use this memo.
 
 ## Browser surfaces
 

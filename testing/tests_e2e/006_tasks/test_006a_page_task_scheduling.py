@@ -43,8 +43,8 @@ def _add_weekly_schedule(task):
 
 # @matrix task-assignment : assignee-preservation home-list
 # @matrix task-scheduling : add due-date
-def test_page_task_add_due_date(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_add_due_date(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_add_due_date.get(user)
     assignee = Users.create_user.get(user)
     user.go(task)
@@ -74,8 +74,8 @@ def test_page_task_add_due_date(get_user):
 
 
 # @matrix task-scheduling : due-date remove
-def test_page_task_remove_due_date(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_remove_due_date(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_remove_due_date.get(user)
     user.go(task)
 
@@ -87,8 +87,8 @@ def test_page_task_remove_due_date(get_user):
 
 
 # @matrix task-scheduling : due-date today
-def test_page_task_due_today(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_due_today(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_due_today.get(user)
     user.go(task)
 
@@ -100,8 +100,8 @@ def test_page_task_due_today(get_user):
 
 
 # @matrix task-scheduling : complete recurring
-def test_page_task_repeats_when_completed(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_repeats_when_completed(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_repeats_when_completed.get(user)
     user.go(task)
 
@@ -116,8 +116,8 @@ def test_page_task_repeats_when_completed(get_user):
 
 
 # @matrix task-scheduling : add scheduled
-def test_page_task_add_schedule(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_add_schedule(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_add_schedule.get(user)
     user.go(task)
 
@@ -127,8 +127,8 @@ def test_page_task_add_schedule(get_user):
 
 
 # @matrix task-scheduling : remove scheduled
-def test_page_task_remove_schedule(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_remove_schedule(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_remove_schedule.get(user)
     user.go(task)
 
@@ -142,8 +142,8 @@ def test_page_task_remove_schedule(get_user):
 
 
 # @matrix task-scheduling : add recurring
-def test_page_task_add_recurring(get_user):
-    user = get_user(Users.OWNER)
+def test_page_task_add_recurring(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_page_task_add_recurring.get(user)
     user.go(task)
 

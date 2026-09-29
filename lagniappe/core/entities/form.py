@@ -110,9 +110,12 @@ class Form(Entity, AssetMixin):
             if entity.key != self.key
         ]
 
+    # @testable true
+    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
+    # @matrix ai-report : identity
     @classmethod
-    def create(cls, data):
-        form = cls()
+    def create(cls, data, *, key=None):
+        form = cls(key)
         form.kind = cls.entity_kind
         form.update(data)
 

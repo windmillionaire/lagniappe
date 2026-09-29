@@ -349,6 +349,36 @@ test("test_ping_uses_server_owned_cache_policy", async (t) => {
 	assert.equal(new Headers(call.options.headers).has("Cache-Control"), false);
 });
 
+/** @matrix offline : server-health bounded-timeout slow-response */
+test("test_ping_tolerates_slow_response_but_bounds_unresponsive_server", async (t) => {
+	const context = await setupMain(t);
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	let releaseFetch;
+	let signal;
+	context.setFetch(
+		(_url, options) =>
+			new Promise((resolve, reject) => {
+				signal = options.signal;
+				releaseFetch = resolve;
+				signal.addEventListener("abort", () => reject(signal.reason), {
+					once: true,
+				});
+			}),
+	);
+	const slow = context.pingServer();
+	t.mock.timers.tick(750);
+	assert.equal(signal.aborted, false);
+	releaseFetch(new Response(null, { status: 200 }));
+	assert.equal(await slow, true);
+
+	const stalled = context.pingServer();
+	t.mock.timers.tick(4_999);
+	assert.equal(signal.aborted, false);
+	t.mock.timers.tick(1);
+	assert.equal(signal.aborted, true);
+	assert.equal(await stalled, false);
+});
+
 /** @matrix offline : pending-ownership server-health settled-cleanup */
 test("test_ping_clears_only_the_settled_pending_promise", async (t) => {
 	const context = await setupMain(t);

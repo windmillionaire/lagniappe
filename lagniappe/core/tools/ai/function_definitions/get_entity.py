@@ -104,7 +104,10 @@ def edit_entity(entity, user, schemas=None):
     from ..references import hash_reference
     from lagniappe.core.tools.entity_patches import PATCH_FIELDS
     result = entity.to_ai(user)
-    result["description"] = entity.description
+    if entity.entity_kind == "file":
+        result["description"] = entity.summary
+    elif "description" in entity.properties:
+        result["description"] = entity.description
     result["revision"] = str(entity.modified)
     result["editable_fields"] = sorted(PATCH_FIELDS.get(entity.entity_kind, ())) if entity.allowed(Action.EDIT, user=user) and not (entity.entity_kind == "task" and entity.completed) else []
     if entity.entity_kind in {"page", "task"}:

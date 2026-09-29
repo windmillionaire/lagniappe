@@ -11,8 +11,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @matrix table-controls : columns mobile-controls
-def test_category_mobile_controls_open_with_page_columns(get_user):
-    user = get_user(Users.OWNER)
+def test_category_mobile_controls_open_with_page_columns(get_admin, get_user):
+    user = get_admin()
     Pages.test_create_page.get(user)
     user.go(Categories.test_create_page)
 
@@ -32,8 +32,8 @@ def test_category_mobile_controls_open_with_page_columns(get_user):
 
 # @template categories/index.html::view_header
 # @template categories/index.html::view
-def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_user):
-    owner = get_user(Users.OWNER)
+def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_admin, get_user):
+    owner = get_admin()
     category = Categories.acl_create_denied.get(owner)
 
     subject = get_user(Users.single_category_create)
@@ -49,8 +49,8 @@ def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_user
 
 
 # @matrix table-controls : column-visibility mobile-controls
-def test_category_mobile_visibility_toggle_hides_column(get_user):
-    user = get_user(Users.OWNER)
+def test_category_mobile_visibility_toggle_hides_column(get_admin, get_user):
+    user = get_admin()
     Pages.test_create_page.get(user)
     user.go(Categories.test_create_page)
     user.mobile = True
@@ -67,8 +67,8 @@ def test_category_mobile_visibility_toggle_hides_column(get_user):
 
 
 # @matrix table-controls : mobile-controls sorting
-def test_category_mobile_filter_button_opens_sorting_panel(get_user):
-    user = get_user(Users.OWNER)
+def test_category_mobile_filter_button_opens_sorting_panel(get_admin, get_user):
+    user = get_admin()
     Pages.test_create_page.get(user)
     user.go(Categories.test_create_page)
     user.mobile = True
@@ -85,8 +85,8 @@ def test_category_mobile_filter_button_opens_sorting_panel(get_user):
 
 
 # @matrix table-controls : form-columns mobile-controls sorting
-def test_category_mobile_controls_handle_form_columns(get_user):
-    user = get_user(Users.OWNER)
+def test_category_mobile_controls_handle_form_columns(get_admin, get_user):
+    user = get_admin()
     Pages.test_category_filter_match_page.get(user)
     user.go(Categories.test_category_filter_pages)
     user.mobile = True
@@ -121,8 +121,8 @@ def test_category_mobile_controls_handle_form_columns(get_user):
 
 
 # @matrix pages : category-index create mobile-tools
-def test_category_mobile_tools_dropdown_opens_new_page_form(get_user):
-    user = get_user(Users.OWNER)
+def test_category_mobile_tools_dropdown_opens_new_page_form(get_admin, get_user):
+    user = get_admin()
     user.go(Categories.test_empty_category)
 
     user.mobile = True

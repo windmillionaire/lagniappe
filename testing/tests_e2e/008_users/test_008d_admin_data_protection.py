@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import SitePages, Users
+from testing.definitions import SitePages
 
 
 pytestmark = pytest.mark.e2e
@@ -13,8 +13,8 @@ pytestmark = pytest.mark.e2e
 # @pair admin:command-copy
 # @pair permissions:no-store
 # @template home/admin.html::backups_tab
-def test_backups_tab_reveals_static_status_panel(get_user):
-    owner = get_user(Users.OWNER)
+def test_backups_tab_reveals_static_status_panel(get_admin):
+    owner = get_admin()
     with owner.page.expect_response(
         lambda response: response.request.method == "GET"
         and response.url.split("?", 1)[0].rstrip("/").endswith("/admin")

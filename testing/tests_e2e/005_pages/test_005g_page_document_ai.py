@@ -6,7 +6,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import Pages, Tasks, Uploads, Users
+from testing.definitions import Pages, Tasks, Uploads
 from testing.elements import EditorGenerateText, EditorGenerateTextMode
 from testing.resources import File
 from testing.utility.network import (
@@ -78,8 +78,8 @@ def _assert_ordered(text, first, second):
 
 
 # @matrix ai editor : generate-text insert-mode
-def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
-    user = get_user(Users.OWNER)
+def test_generate_text_inserts_ai_markup_with_insert_modes(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_document_generation_page)
     editor = page.editor
 
@@ -158,8 +158,8 @@ def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
 
 
 # @matrix ai editor : generate-text replace-selection selected-text
-def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
-    user = get_user(Users.OWNER)
+def test_generate_text_replaces_selection_and_posts_selected_text(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_document_generation_selection_page)
     editor = page.editor
 
@@ -202,10 +202,10 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
 
 # @matrix ai editor : error generate-text
 def test_generate_text_provider_error_surfaces_in_form(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = user.go(Pages.test_document_generation_page)
     editor = page.editor
     error = "Synthetic provider failure"
@@ -247,14 +247,14 @@ def test_generate_text_provider_error_surfaces_in_form(
 # @matrix ai : document-context generate-text live-provider page-context
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_generate_text_live_page_context_with_tasks_and_files(get_user, request, browser_failures, live_ai_quota):
+def test_generate_text_live_page_context_with_tasks_and_files(get_admin, get_user, request, browser_failures, live_ai_quota):
     """
     Exercise real generation with page context and bounded quota recovery.
 
     The ``ai`` mark automatically attaches ``request.node.ai_results`` so prompt,
     response, and generated document output are saved under reports/test_reports/.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = Pages.test_page_review.get(user)
     seeded_tasks = [
         Tasks.test_page_review_active.get(user),

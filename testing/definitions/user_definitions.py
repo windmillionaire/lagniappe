@@ -38,6 +38,7 @@ class UserDefinition:
     groups: Optional[list[Groups]] = field(default_factory=list)
     user_page: Optional[Pages] = None
     ai_access: Optional[AI] = None
+    admin: Optional[bool] = None
 
 
 owner = UserDefinition(

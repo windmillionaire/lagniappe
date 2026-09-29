@@ -288,6 +288,7 @@ class AIReportAdapter(ReportAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
+# @tests tests_unit/test_034_experiments.py::test_execution_rejects_stale_proposals_and_reuses_exact_operations
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
@@ -296,6 +297,7 @@ class AIReportAdapter(ReportAdapter):
 # @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
 # @matrix ai-report : input-files no-extra-read fresh-read
 # @matrix deferred-jobs : dependency-wait backoff
+# @matrix experiments : execution-policy
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
@@ -313,8 +315,14 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def authorization(self, spec):
         authorization = super().authorization(spec)
-        authorization["proposal_fingerprint"] = _report_proposal_fingerprint(
-            spec.inputs.get("report")
+        report = spec.inputs.get("report")
+        # The MCP request gate checks this submitted identity before new work.
+        # Replays must also match the receipt after legacy execution normalized
+        # its saved proposal; the shared service still compares the entire job.
+        authorization["proposal_fingerprint"] = (
+            (report.agent_manifest or {}).get("proposal_fingerprint")
+            if spec.parameters.get("experiments_execution")
+            else _report_proposal_fingerprint(report)
         )
         return authorization
 
@@ -369,6 +377,10 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def authorize(self, context):
         report = context.input("report")
+        if context.parameters.get("experiments_execution"):
+            from lagniappe.core.tools.experiments import can_execute
+            if not can_execute(context.actor, remote_mcp=True):
+                raise exceptions.ValidationError("Experiments execution is no longer allowed for this actor.")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         super().authorize(context)
@@ -425,7 +437,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         result = report_runner.run_report(
             report,
             context.actor,
-            ensure_active=context.ensure_active,
+            ensure_active=lambda: self._ensure_execution_active(context),
         )
         if result.get("status") != "complete":
             raise exceptions.ValidationError(
@@ -436,6 +448,17 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             "status": report.status,
             "action_count": len(result.get("actions") or []),
         }
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
+    # @reason ledger mutation boundaries recheck the shared execution policy
+    def _ensure_execution_active(self, context):
+        context.ensure_active()
+        if context.parameters.get("experiments_execution"):
+            from lagniappe.core.tools.experiments import can_execute
+            actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+            if not can_execute(actor, remote_mcp=True):
+                raise exceptions.ValidationError("Experiments execution is no longer allowed for this actor.")
 
     def failure(self, context, error):
         report = context.input("report")

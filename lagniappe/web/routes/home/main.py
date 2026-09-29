@@ -74,6 +74,7 @@ def activity():
 # @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
 # @matrix notifications offline : dropdown-refresh target-link
+# @matrix notifications : pending target
 # @pair notifications:assignee-target
 @internal.route("/notifications")
 @logged_in

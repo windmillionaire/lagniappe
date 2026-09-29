@@ -4,14 +4,151 @@ from unittest.mock import Mock
 import pytest
 
 from google.auth.credentials import AnonymousCredentials
-from google.cloud.datastore import Client, Key
-from google.cloud.datastore_v1.types import RunAggregationQueryResponse
+from google.cloud.datastore import Client, Entity, Key, helpers
+from google.cloud.datastore_v1.types import RunAggregationQueryResponse, RunQueryResponse
 
 from lagniappe import CONFIG
 from lagniappe.core.tools.database import get, utility
 from lagniappe.core.definitions import Restriction
 from lagniappe.core.tools.database import filter as database_filter
 from lagniappe.core.tools.database.filter import Filter, Query, Results
+
+
+# @matrix database : id-allocation batching parent
+def test_create_keys_retains_kind_parent_and_numeric_ids(monkeypatch):
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    calls = []
+
+    def allocate(partial, count):
+        calls.append((partial, count))
+        return [partial.completed_key(i + 101) for i in range(count)]
+
+    monkeypatch.setattr(client, "allocate_ids", allocate)
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=client))
+    parent = client.key(utility.KINDS.project.value, 42)
+    keys = utility.create_keys("model", parent, 3)
+    assert len(calls) == 1
+    assert [key.id for key in keys] == [101, 102, 103]
+    assert all(key.parent == parent and key.kind == utility.KINDS.model.value for key in keys)
+    assert utility.create_key("page", None).parent is None
+    assert calls[-1][1] == 1
+    for count in (0, 51):
+        with pytest.raises(ValueError):
+            utility.create_keys("page", None, count)
+    assert len(calls) == 2
+
+
+@pytest.fixture
+def reference_datastore(monkeypatch):
+    """Run real query construction against an explicit Datastore RPC boundary."""
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    rows = {}
+    queries = []
+    lookups = []
+
+    def matches(row, predicate):
+        if predicate._pb.HasField("composite_filter"):
+            branch = predicate.composite_filter
+            values = [matches(row, item) for item in branch.filters]
+            return any(values) if branch.op.name == "OR" else all(values)
+        field = predicate.property_filter
+        # Reference selection must happen in Datastore, not after a type scan.
+        assert field.property.name in {"form", "forms"}
+        assert field.op.name == "IN"
+        keys = {helpers.key_from_protobuf(value.key_value._pb)
+                for value in field.value.array_value.values}
+        value = row.get(field.property.name)
+        return bool(keys.intersection(value if isinstance(value, list) else [value]))
+
+    def run_query(request, **kwargs):
+        from google.cloud.datastore_v1.types import Query as QueryProto
+
+        query = QueryProto(request["query"])
+        queries.append(query)
+        found = [row for row in rows.values() if matches(row, query.filter)]
+        return RunQueryResponse(batch={
+            "entity_results": [{"entity": helpers.entity_to_protobuf(row)} for row in found],
+            "more_results": "NO_MORE_RESULTS",
+        })
+
+    def lookup(keys):
+        lookups.append(list(keys))
+        return [rows[key] for key in keys if key in rows]
+
+    client._datastore_api_internal = SimpleNamespace(run_query=Mock(side_effect=run_query))
+    monkeypatch.setattr(database_filter, "DATA", SimpleNamespace(datastore=client))
+    monkeypatch.setattr(get, "DATA", SimpleNamespace(datastore=SimpleNamespace(get_multi=lookup)))
+
+    def add(name, kind="category", parent=None, **values):
+        row = Entity(client.key(get.KINDS.models.value, name, parent=parent))
+        row.update(type=kind, **values)
+        rows[row.key] = row
+        return row
+
+    return SimpleNamespace(client=client, add=add, queries=queries, lookups=lookups)
+
+
+# @matrix forms database : reference-query primary-secondary owner-deduplication
+def test_form_users_filters_references_and_preserves_owner_set(reference_datastore):
+    db = reference_datastore
+    form = SimpleNamespace(key=db.client.key("models", "requested"))
+    other = db.client.key("models", "other")
+    primary = db.add("primary", form=form.key)
+    secondary = db.add("secondary", form=other, forms=[form.key])
+    both = db.add("both", form=form.key, forms=[form.key], active=False, reserved=True)
+    project = db.add("project", kind="project")
+    model = db.add("model", kind="model", parent=project.key, form=form.key)
+    model_two = db.add("model-two", kind="model", parent=project.key, form=form.key)
+    db.add("unrelated", form=other)
+    db.add("not-an-owner", kind="form", form=form.key)
+
+    result = get.form_users(form)
+
+    assert {row.key for row in result} == {
+        primary.key, secondary.key, both.key, model.key, model_two.key, project.key,
+    }
+    assert len(result) == 6
+    assert next(row for row in result if row.key == both.key)["active"] is False
+    assert len(db.queries) == 1
+    assert db.lookups == [[project.key]]
+
+
+# @matrix forms database : reference-query batching owner-deduplication
+@pytest.mark.parametrize(("count", "query_count"), [(15, 1), (25, 2), (31, 3)])
+def test_form_users_bounds_batches_and_deduplicates_owners(reference_datastore, count, query_count):
+    from math import prod
+
+    db = reference_datastore
+    forms = [SimpleNamespace(key=db.client.key("models", f"form-{i}")) for i in range(count)]
+    owners = [db.add(f"owner-{i}", form=form.key) for i, form in enumerate(forms)]
+    repeated = db.add("repeated", forms=[form.key for form in forms])
+    project = db.add("project", kind="project")
+    model = db.add("model", kind="model", parent=project.key,
+                   form=forms[0].key, forms=[forms[-1].key])
+
+    result = get.form_users(*forms, forms[0])
+
+    assert {row.key for row in result} == {
+        *(row.key for row in owners), repeated.key, model.key, project.key,
+    }
+    assert len(result) == count + 3
+    assert len(db.queries) == query_count
+    assert db.lookups == [[project.key]]
+    def disjunctions(predicate):
+        if predicate._pb.HasField("property_filter"):
+            return len(predicate.property_filter.value.array_value.values)
+        branches = predicate.composite_filter
+        counts = [disjunctions(branch) for branch in branches.filters]
+        return sum(counts) if branches.op.name == "OR" else prod(counts)
+
+    assert all(0 < disjunctions(query.filter) <= 30 for query in db.queries)
+
+
+# @matrix forms database : reference-query empty-input
+def test_form_users_empty_input_does_not_read(reference_datastore):
+    assert get.form_users() == []
+    assert reference_datastore.queries == []
+    assert reference_datastore.lookups == []
 
 
 # @matrix cache user : invalidation acknowledgement concurrency property-mask
@@ -354,6 +491,25 @@ def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     assert [record.key for record in saved] == [("site", "tasks")]
 
 
+# @matrix polling : batching channel mounted-scope
+def test_site_fingerprints_reuses_supplied_records(monkeypatch):
+    client = Client(project="unit-project", credentials=AnonymousCredentials())
+    saved = []
+    client.get_multi = Mock(side_effect=AssertionError("Already read with auth roots"))
+    client.put_multi = saved.extend
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=client))
+    existing = Entity(client.key("site", "pages"))
+    existing["fingerprint"] = "current"
+    revisions = utility.site_fingerprints(
+        ["/pages/index", "/tasks/index", "/pages/index"],
+        records={existing.key: existing},
+    )
+    assert revisions["/pages/index"] == "current"
+    assert len(saved) == 1 and saved[0].key == client.key("site", "tasks")
+    assert saved[0]["fingerprint"] == revisions["/tasks/index"]
+    assert utility.site_fingerprints([], records={}) == {}
+
+
 # @matrix notifications : mutation site-fingerprint-isolation
 @pytest.mark.unit
 def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
@@ -445,6 +601,10 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
         key=("instances", "deferred-reference"),
         db={"type": "page", "deferred_job": '{"key":"operation"}'},
     )
+    notes_hint = SimpleNamespace(
+        key=("instances", "notes-hint"),
+        db={"type": "page", "has_notes": False, "notes_checked_revision": "observed"},
+    )
     fingerprint = {"type": "site", "fingerprint": "next"}
     fingerprinted = []
 
@@ -461,6 +621,7 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
             (masked, ("modified", "forms")),
             (document, ("assets", "document_history")),
             (deferred_reference, ("deferred_job",)),
+            (notes_hint, ("has_notes", "notes_checked_revision")),
         )
     )
 
@@ -478,7 +639,9 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     ]
     assert batch.mutations[3].update is deferred_reference.db
     assert batch.mutations[3].property_mask.paths == ["deferred_job"]
-    assert batch.mutations[4].upsert is fingerprint
+    assert batch.mutations[4].update is notes_hint.db
+    assert batch.mutations[4].property_mask.paths == ["has_notes", "notes_checked_revision"]
+    assert batch.mutations[5].upsert is fingerprint
 
 
 # @matrix forms mutations : archive atomic-delete concurrency

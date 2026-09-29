@@ -38,14 +38,14 @@ Import Widget:
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import SitePages, Uploads, Users
+from testing.definitions import SitePages, Uploads
 from testing.elements import Buttons, Modal
 from testing.resources import File
 
 
 # @pair ingress:upload-form
 @pytest.mark.e2e
-def test_open_import_form(get_user):
+def test_open_import_form(get_admin, get_user):
     """
     Verify import form opens from the Admin Import Data tab.
 
@@ -53,7 +53,7 @@ def test_open_import_form(get_user):
         - Import form hidden initially
         - Toggle button shows form
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     admin = user.go(SitePages.ADMIN)
 
     form = admin.open_import_upload_form()
@@ -62,42 +62,38 @@ def test_open_import_form(get_user):
 
 # @matrix ingress : delete file-input upload-counts
 @pytest.mark.e2e
-def test_import_csv_via_file_input(get_user):
+def test_import_csv_via_file_input(get_admin, get_user):
     """
     Verify CSV upload via direct file input selection.
 
     Tests:
         1. Open import form
         2. Upload file via file input
-        3. Verify file appears in import list with correct row/column counts
-        4. Delete file via delete button and modal
+        3. Upload the same filename again and verify both records' counts
+        4. Delete each file independently via its delete button and modal
 
     Uses Uploads.csv_file_input definition with FILE_INPUT method.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     admin = user.go(SitePages.ADMIN)
     upload = Uploads.csv_file_input
 
-    file_item = admin.import_file(upload)
-    file = File(user)
-    file.key = file_item.get_attribute("data-key")
+    file_items = [admin.import_file(upload), admin.import_file(upload)]
+    assert file_items[0].get_attribute("data-key") != file_items[1].get_attribute("data-key")
+    for file_item in file_items:
+        expect(file_item).to_contain_text(f"Rows: {upload.definition.rows}")
+        expect(file_item).to_contain_text(f"Columns: {upload.definition.columns}")
 
-    # Verify row and column counts
-    expect(file_item).to_contain_text(f"Rows: {upload.definition.rows}")
-    expect(file_item).to_contain_text(f"Columns: {upload.definition.columns}")
-
-    # Delete file
-    file_list = admin.import_list
-    file_item = file_list.get_item(file)
-    file_item.locator(Buttons.LP_DELETE).click()
-    modal = Modal(user.page)
-    modal.delete()
-    expect(file_item).not_to_be_visible()
+    for file_item in file_items:
+        expect(file_item).to_be_visible()
+        file_item.locator(Buttons.LP_DELETE).click()
+        Modal(user.page).delete()
+        expect(file_item).not_to_be_visible()
 
 
 # @matrix ingress : delete drag-drop upload-counts
 @pytest.mark.e2e
-def test_import_csv_via_drag_drop(get_user):
+def test_import_csv_via_drag_drop(get_admin, get_user):
     """
     Verify CSV upload via drag and drop onto dropzone.
 
@@ -109,7 +105,7 @@ def test_import_csv_via_drag_drop(get_user):
 
     Uses Uploads.csv_drag_drop definition with DRAG_DROP method.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     admin = user.go(SitePages.ADMIN)
     upload = Uploads.csv_drag_drop
 

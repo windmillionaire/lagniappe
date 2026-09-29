@@ -1,11 +1,12 @@
 from enum import Enum
 
 from ..resources import Form
+from .base import ResourceEnumMixin
 
 from . import form_definitions as fd
 
 
-class Forms(Enum):
+class Forms(ResourceEnumMixin, Enum):
     test_create_category_with_form = Form(definition=fd.basic_page_form)
     test_create_page_form = Form(definition=fd.create_page_form)
     test_create_task_form = Form(definition=fd.basic_task_form)
@@ -43,7 +44,4 @@ class Forms(Enum):
     test_sync_page_form = Form(definition=fd.sync_page_form)
 
     def get(self, user=None, create=True):
-        self.value.user = user
-        if not self.value.entity and create:
-            return self.value.create()
-        return self.value
+        return super().get(user, create=create)

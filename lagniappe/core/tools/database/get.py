@@ -673,30 +673,36 @@ def forms(start_cursor=None, limit=25):
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_form_users_filters_references_and_preserves_owner_set
+# @tests tests_unit/test_018_database_utility.py::test_form_users_bounds_batches_and_deduplicates_owners
+# @tests tests_unit/test_018_database_utility.py::test_form_users_empty_input_does_not_read
+# @tests tests_e2e/003_forms/test_003h_form_references.py::test_form_reference_lookup_matches_primary_secondary_and_batched_owners
+# @matrix forms database : reference-query primary-secondary batching owner-deduplication empty-input
 def form_users(*forms):
     """Find categories and models that reference any of the given forms."""
-    form_keys = {f.key for f in forms}
-    f = Filter().any_of(
-        Filter().eq("type", "category"),
-        Filter().eq("type", "model"),
-    )
+    form_keys = list(dict.fromkeys(f.key for f in forms))
+    if not form_keys:
+        return []
 
-    parents = []
+    parents = {}
     project_keys = set()
-    for model in Query(KINDS.models).filter(f).fetch_iter():
-        if model.get("form") not in form_keys and not bool(
-            form_keys & set(model.get("forms", []))
-        ):
-            continue
-        elif model.get("type") == "category":
-            parents.append(model)
-        elif model.get("type") == "model":
-            parents.append(model)
-            project_keys.add(model.key.parent)
+    # Two reference properties per Form: keep each OR within 30 disjunctions.
+    # Filter types locally so this needs only the existing property indexes.
+    for start in range(0, len(form_keys), 15):
+        batch = form_keys[start:start + 15]
+        references = Filter().any_of(
+            Filter().contains("form", batch),
+            Filter().contains("forms", batch),
+        )
+        for model in Query(KINDS.models).filter(references).fetch_iter():
+            if model.get("type") not in {"category", "model"}:
+                continue
+            parents[model.key] = model
+            if model.get("type") == "model":
+                project_keys.add(model.key.parent)
 
-    return parents + entities(list(project_keys))
+    return list(parents.values()) + entities(list(project_keys))
 
 
 # @testable false

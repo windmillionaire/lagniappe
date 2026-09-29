@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from testing.definitions import Pages, Users
+from testing.definitions import Pages
 from testing.resources import Task
 
 pytestmark = pytest.mark.e2e
@@ -15,8 +15,8 @@ pytestmark = pytest.mark.e2e
 
 # @matrix form-todo : add check default-persistence delete edit history-fill rename reset
 # @template pages/tasks.html::task_form
-def test_task_todo_list_editing_and_history_restore(get_user):
-    user = get_user(Users.OWNER)
+def test_task_todo_list_editing_and_history_restore(get_admin, get_user):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     suffix = uuid4().hex
     form = Entities.FORM.create(

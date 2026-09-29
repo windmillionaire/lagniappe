@@ -1360,6 +1360,49 @@ test("test_precache_retries_transient_failures_and_preserves_cache_policy", asyn
 });
 
 /** @matrix cache : precache service-worker static-assets */
+test("test_precache_reuses_cached_assets_without_reusing_another_build", async () => {
+	const { context, staticCache, vm } = createServiceWorkerContext();
+	const requests = [];
+	const origin = "https://example.test";
+	staticCache.entries.set(
+		`${origin}/chunks/ready.js?v=bnew`,
+		new Response("already cached"),
+	);
+	staticCache.entries.set(
+		`${origin}/chunks/changed.js?v=bold`,
+		new Response("old build"),
+	);
+	staticCache.entries.set(
+		`${origin}/chunks/private.js?v=bnew`,
+		new Response("must not reuse", {
+			headers: { "Cache-Control": "no-store" },
+		}),
+	);
+	context.fetch = async (request) => {
+		requests.push(request);
+		return new Response("current build");
+	};
+	vm.runInContext(
+		`PRECACHE_URLS.push("/chunks/ready.js?v=bnew", "/chunks/changed.js?v=bnew", "/chunks/private.js?v=bnew")`,
+		context,
+	);
+	await context.precacheStaticAssets();
+	assert.deepEqual(requests.map((request) => request.url).sort(), [
+		`${origin}/chunks/changed.js?v=bnew`,
+		`${origin}/chunks/private.js?v=bnew`,
+	]);
+	assert.ok(requests.every((request) => request.cache === "default"));
+	assert.equal(
+		await staticCache.entries.get(`${origin}/chunks/ready.js?v=bnew`).text(),
+		"already cached",
+	);
+	assert.equal(
+		await staticCache.entries.get(`${origin}/chunks/changed.js?v=bnew`).text(),
+		"current build",
+	);
+});
+
+/** @matrix cache : precache service-worker static-assets */
 test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", async () => {
 	const {
 		cacheNames,
@@ -1427,9 +1470,19 @@ test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", a
 		fetchCalls.filter((request) => request.url === missingUrl).length,
 		3,
 	);
-	if (!fetchCalls.every((request) => request.cache === "reload")) {
-		throw new Error("precache fetches did not bypass the HTTP cache");
+	for (const url of [chunkUrl, noStoreUrl, missingUrl]) {
+		assert.equal(
+			fetchCalls.find((request) => request.url === url).cache,
+			"default",
+		);
 	}
+	assert.ok(
+		fetchCalls
+			.filter((request) => request.url === missingUrl)
+			.slice(1)
+			.every((request) => request.cache === "reload"),
+		"failure retries must bypass a potentially cached error",
+	);
 	if (!fetchCalls.every((request) => request.url.includes("?v=btest123"))) {
 		throw new Error("precache fetches dropped the build version");
 	}

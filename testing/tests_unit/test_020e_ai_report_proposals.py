@@ -64,7 +64,8 @@ def test_schema_repair_leaves_conflicting_form_usage_for_validation():
 
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
 @pytest.mark.unit
-def test_validate_proposal_renders_page_document_markdown():
+@pytest.mark.parametrize("action_type", ["create_page", "append_page_document", "replace_page_document"])
+def test_validate_proposal_renders_page_document_markdown(action_type):
     proposal = {
         "summary": "Create a reference page.",
         "confidence": 0.9,
@@ -72,9 +73,9 @@ def test_validate_proposal_renders_page_document_markdown():
         "actions": [
             {
                 "id": "create-reference",
-                "type": "create_page",
+                "type": action_type,
                 "data": {
-                    "name": "Reference",
+                    **({"name": "Reference"} if action_type == "create_page" else {"page_action": "page"}),
                     "document_markdown": (
                         "# Heading\n\n| Name | Value |\n| --- | --- |\n"
                         "| Safe | <script>alert('no')</script>Yes |"
@@ -84,8 +85,10 @@ def test_validate_proposal_renders_page_document_markdown():
         ],
     }
 
+    if action_type != "create_page":
+        proposal["actions"].insert(0, {"id": "page", "type": "create_page", "data": {"name": "Reference"}})
     validated = proposal_validation.validate_proposal(proposal)
-    data = validated["actions"][0]["data"]
+    data = validated["actions"][-1]["data"]
 
     assert "document_markdown" not in data
     assert "<h1>Heading</h1>" in data["document"]

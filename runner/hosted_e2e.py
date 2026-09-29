@@ -81,6 +81,7 @@ CLOUD_BUILD_ID_RE = re.compile(
 )
 CLOUD_BUILD_PENDING_STATUSES = {"STATUS_UNKNOWN", "QUEUED", "WORKING", "PENDING"}
 HOSTED_E2E_ENVIRONMENTS = ("standard",)
+DEFAULT_BROWSER_WORKERS = 6
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -1073,6 +1074,7 @@ def _hosted_app_descriptor(
     build_id,
     base_url,
     session_key,
+    experiments_workers=DEFAULT_BROWSER_WORKERS,
 ):
     """Return a test descriptor with production-equivalent static delivery."""
     handlers = copy.deepcopy(APP_HANDLERS)
@@ -1105,13 +1107,14 @@ def _hosted_app_descriptor(
         "LAGNIAPPE_HOSTED_E2E_SERVICE": SERVICE,
         "LAGNIAPPE_HOSTED_E2E_CALLER_EMAIL": infrastructure.runtime_email,
         "LAGNIAPPE_HOSTED_E2E_SESSION_KEY": session_key,
+        "LAGNIAPPE_HOSTED_E2E_WORKERS": str(experiments_workers),
     }
     return {
         "runtime": "python314",
         "service": SERVICE,
         "service_account": infrastructure.runtime_email,
-        "entrypoint": "gunicorn -t 3600 -w 3 -b :$PORT main:app",
-        "instance_class": "B2",
+        "entrypoint": f"gunicorn -t 3600 -w {6 if experiments_workers > 3 else 3} -b :$PORT main:app",
+        "instance_class": "B4" if experiments_workers > 3 else "B2",
         "basic_scaling": {"max_instances": 1, "idle_timeout": "15m"},
         # Static build artifacts contain no application or test data. Keep them
         # on App Engine's native static path so isolated browser contexts do not
@@ -1188,6 +1191,13 @@ def _build_runner_image(
     ):
         raise HostedE2EError("The runner image's staged root .gcloudignore is invalid.")
     image = f"{selected.image_base(infrastructure)}:{source}"
+    # Old outcomes stay outside the image. Export only placement hints from the
+    # exact committed evidence; they cannot supply a result for the new run.
+    from runner.e2e_inventory import duration_estimates
+    timings = container_root / "durations.json"
+    if timings.exists() or timings.is_symlink():
+        raise HostedE2EError("The runner image's staged duration hints path is not clean.")
+    timings.write_text(json.dumps(duration_estimates(Path(source_root))), encoding="utf-8")
     result = _gcloud(
         "builds",
         "submit",
@@ -1358,7 +1368,7 @@ def _sync_settings_secret(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_job_grants_only_job_scoped_ci_permissions
-# @matrix hosted-e2e : identity invocation-overrides least-privilege
+# @matrix hosted-e2e : identity invocation-overrides least-privilege secret-mounts
 def _update_job(infrastructure, state, *, environment="standard"):
     selected = _environment(environment)
     job_service_account = infrastructure.runtime_email
@@ -1380,6 +1390,7 @@ def _update_job(infrastructure, state, *, environment="standard"):
         "LAGNIAPPE_HOSTED_E2E_SERVICE": SERVICE,
         "LAGNIAPPE_HOSTED_E2E_JOB": selected.job,
         "LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET": infrastructure.artifact_bucket,
+        "LAGNIAPPE_HOSTED_E2E_WORKERS": str(state.get("experiments_workers", 3)),
     }
     secret_argument = "--clear-secrets"
     job_image = state["image"]
@@ -1392,12 +1403,12 @@ def _update_job(infrastructure, state, *, environment="standard"):
         }
     )
     secret_mounts = [
-        "/workspace/config/files/lagniappe_settings.yaml="
+        "/var/run/secrets/lagniappe-settings/lagniappe_settings.yaml="
         f"{infrastructure.settings_secret}:latest"
     ]
     if SETTINGS.APP.get("REDIS_TLS"):
         secret_mounts.append(
-            "/workspace/config/files/redis_ca.pem="
+            "/var/run/secrets/lagniappe-redis-ca/redis_ca.pem="
             f"{infrastructure.redis_ca_secret}:latest"
         )
     secret_argument = f"--set-secrets={','.join(secret_mounts)}"
@@ -1429,8 +1440,8 @@ def _update_job(infrastructure, state, *, environment="standard"):
         "--parallelism=1",
         "--max-retries=0",
         "--task-timeout=7200s",
-        "--cpu=2",
-        "--memory=4Gi",
+        "--cpu=4" if state.get("experiments_workers", 3) > 3 else "--cpu=2",
+        "--memory=8Gi" if state.get("experiments_workers", 3) > 3 else "--memory=4Gi",
         "--quiet",
         timeout=1800,
     )
@@ -1482,6 +1493,7 @@ def _resumable_create_state(
     source_snapshot,
     build_id,
     environment="standard",
+    experiments_workers=DEFAULT_BROWSER_WORKERS,
 ):
     """Return interrupted exact-source state, or reject an unsafe replacement."""
     selected = _environment(environment)
@@ -1512,6 +1524,8 @@ def _resumable_create_state(
             "The interrupted hosted E2E lifecycle belongs to a different "
             f"committed build ({', '.join(mismatches)}); tear it down first."
         )
+    if previous.get("experiments_workers", 3) != experiments_workers:
+        raise HostedE2EError("The interrupted lifecycle has a different worker capacity; tear it down first.")
     version = str(previous.get("version") or "")
     version_pattern = VERSION_RE
     if not version_pattern.fullmatch(version):
@@ -1558,6 +1572,8 @@ def _hosted_app_version_present(infrastructure, state):
         "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": state["source_snapshot"],
         "LAGNIAPPE_HOSTED_E2E_BUILD_ID": state["build_id"],
     }
+    if "experiments_workers" in state:
+        expected["LAGNIAPPE_HOSTED_E2E_WORKERS"] = str(state["experiments_workers"])
     mismatches = [
         name for name, value in expected.items() if variables.get(name) != value
     ]
@@ -1587,9 +1603,11 @@ def _require_current_setup(infrastructure):
 
 
 # @testable infrastructure
-def create(*, base_ref=None, environment="standard"):
+def create(*, base_ref=None, environment="standard", experiments_workers=DEFAULT_BROWSER_WORKERS):
     """Deploy one committed production build as a test app and runner."""
     selected = _environment(environment)
+    if type(experiments_workers) is not int or not 1 <= experiments_workers <= 6:
+        raise HostedE2EError("--workers must be between 1 and 6")
     source = require_clean_source()
     build_id = _require_committed_production_build(source)
     _run_create_preflight(source, base_ref=base_ref)
@@ -1609,6 +1627,7 @@ def create(*, base_ref=None, environment="standard"):
         source_snapshot=source_snapshot,
         build_id=build_id,
         environment=selected.name,
+        experiments_workers=experiments_workers,
     )
     if state is None:
         version_prefix = "e2e-"
@@ -1630,6 +1649,7 @@ def create(*, base_ref=None, environment="standard"):
             "base_url": base_url,
             "artifact_bucket": infrastructure.artifact_bucket,
             "image": f"{selected.image_base(infrastructure)}:{source}",
+            "experiments_workers": experiments_workers,
         }
     else:
         state["status"] = "creating"
@@ -1684,6 +1704,7 @@ def create(*, base_ref=None, environment="standard"):
                     build_id=build_id,
                     base_url=state["base_url"],
                     session_key=secrets.token_urlsafe(48),
+                    experiments_workers=experiments_workers,
                 )
                 descriptor_path = source_root / ".hosted-e2e-app.yaml"
                 _atomic_write_text(
@@ -2090,18 +2111,27 @@ def execute(
     import_results=True,
     progress=True,
     environment="standard",
+    experiments=False,
 ):
     """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
     selected = _environment(environment)
     targets = tuple(targets or ())
+    if experiments:
+        if targets:
+            raise HostedE2EError("--experiments cannot be combined with --target")
+        if experiments not in {True, "pilot", "all"}:
+            raise HostedE2EError("Unknown coordinated E2E scope")
+        if experiments != "all":
+            from runner.e2e_pilot import TARGETS
+            targets = TARGETS
     if targets:
         try:
             targets = validate_focused_targets(targets)
         except RuntimeError as error:
             raise HostedE2EError(str(error)) from error
-    suite = "focused" if targets else "all"
+    suite = "e2e" if experiments == "all" else "focused" if targets else "all"
 
     _activate(adc=import_results)
     infrastructure = _infrastructure()
@@ -2109,7 +2139,7 @@ def execute(
     # Cloud Run's execution override uses gcloud's UpdateAction parser, which
     # rejects repeated list entries such as separate ``--target`` tokens.
     # ``argparse`` accepts the equivalent equals form inside the container.
-    job_arguments = [f"--target={target}" for target in targets]
+    job_arguments = (["--experiments=all"] if experiments == "all" else ["--experiments"]) if experiments else [f"--target={target}" for target in targets]
     result = _gcloud(
         "run",
         "jobs",
@@ -2763,7 +2793,11 @@ def run_hosted_e2e_command(arguments):
         ),
     )
     add_environment_argument(create_parser)
+    create_parser.add_argument("--workers", "--experiments-workers", dest="experiments_workers",
+                               type=int, choices=range(1, 7), default=DEFAULT_BROWSER_WORKERS,
+                               help="Browser workers (default 6): 1–3 use B2; 4–6 use B4 and a larger Cloud Run driver.")
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
+    execute_parser.add_argument("--experiments", nargs="?", const="pilot", choices=("pilot", "all"), help="Run coordinated E2E: pilot or all.")
     add_environment_argument(execute_parser)
     execute_parser.add_argument(
         "--target",
@@ -2823,6 +2857,8 @@ def run_hosted_e2e_command(arguments):
             )
         elif args.action == "create":
             create_options = {"base_ref": args.base_ref}
+            if args.experiments_workers != DEFAULT_BROWSER_WORKERS:
+                create_options["experiments_workers"] = args.experiments_workers
             if args.environment != "standard":
                 create_options["environment"] = args.environment
             payload = create(**create_options)
@@ -2832,6 +2868,8 @@ def run_hosted_e2e_command(arguments):
                 "targets": args.targets or (),
                 "import_results": not args.no_import_results,
             }
+            if args.experiments:
+                execute_options["experiments"] = args.experiments
             if args.environment != "standard":
                 execute_options["environment"] = args.environment
             payload = execute(

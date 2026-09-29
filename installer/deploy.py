@@ -62,7 +62,7 @@ def deploy_to_app_engine(
     ) as spinner:
         try:
             deploy(
-                build_assets=False,
+                build_assets=SETTINGS.APP.get("EXPERIMENTS_ENABLED", False),
                 deploy_indexes=True,
                 quiet=True,
                 capture_output=True,
@@ -92,6 +92,9 @@ def deploy_to_app_engine(
 
         record_step("verify custom-domain TLS certificate")
         wait_for_managed_certificate(custom_domain, announce_ready=first_install)
+
+    from installer.experiments import verify_bootstrap
+    verify_bootstrap(require_admin=first_install)
 
     if print_final_summary:
         print(ui.success(wrap_text("Deployment complete")))

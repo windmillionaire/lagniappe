@@ -113,6 +113,11 @@ to pass a key or an already-typed entity.
 
 ## Entity types
 
+Pages expose lazy, permission-filtered Task collections as `page.tasks` (active)
+and `page.completed_tasks` (completed). Both share one collection load per Page
+instance. `task.completed` is the individual Task's boolean completion state;
+shared Page/Task helpers must apply completion guards only to Tasks.
+
 `EntityType` in `entities/types.py` maps persisted type names to classes.
 Several names share a class or act as reserved variants.
 
@@ -174,6 +179,12 @@ preserve Datastore query order, load results through `Fetch.direct()` (nested
 for Tasks and Users so their Page/Form dependencies are resolved), and
 publish cursors used by lazy row routes. Task pages combine two ordered query
 streams: due-dated tasks first, then undated tasks by recent modification.
+
+Form owner discovery queries the indexed `form` and `forms` references rather
+than scanning all Categories and model tasks. It batches up to 15 Form keys
+across the two reference properties, deduplicates owners and loads their
+Projects together. The lookup preserves inactive/reserved references for save
+invalidation and deletion; viewer restrictions remain the caller's concern.
 
 Pass `user=viewer` when constructing an index outside an ordinary browser
 request. Query restrictions and final entity visibility checks use that same

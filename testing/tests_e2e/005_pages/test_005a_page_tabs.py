@@ -9,7 +9,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Categories, Forms, Pages, Submissions, Uploads, Users
+from testing.definitions import Categories, Forms, Pages, Submissions, Uploads
 from testing.elements import (
     Buttons,
     EditorAddImage,
@@ -30,8 +30,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @matrix entity-layout : persistence query-tab
-def test_page_url_tab_overrides_saved_tab(get_user):
-    user = get_user(Users.OWNER)
+def test_page_url_tab_overrides_saved_tab(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
@@ -55,20 +55,25 @@ def test_page_url_tab_overrides_saved_tab(get_user):
 
 
 # @matrix pages : default-form submission
-def test_page_with_default_category_form(get_user):
-    user = get_user(Users.OWNER)
+def test_page_with_default_category_form(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_page_with_default_category_form.get(user)
     user.go(page)
 
     submission = Submissions.default_category_form.get()
+
+    # A label click should open the field, just like its Edit button.
+    name_field = page.info_form.locator("[id^='name'].form-element")
+    name_field.locator("[data-role='label'] > span").click()
+    expect(name_field.locator("input")).to_be_visible()
 
     page.set_submission(submission)
     page.submit_and_verify_submission(submission)
 
 
 # @matrix pages : form-switch info-form
-def test_switch_page_form(get_user):
-    user = get_user(Users.OWNER)
+def test_switch_page_form(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_switch_page_form.get(user)
     user.go(page)
 
@@ -86,8 +91,8 @@ def test_switch_page_form(get_user):
 
 
 # @matrix pages : form-clear info-form
-def test_clear_page_info_form_selector_keeps_widget_stable(get_user):
-    user = get_user(Users.OWNER)
+def test_clear_page_info_form_selector_keeps_widget_stable(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_switch_page_form.get(user)
     user.go(page)
 
@@ -118,8 +123,8 @@ def _document_save_response(text):
 
 # @matrix pages : document-visibility private public public-document
 # @pair public-directory:category
-def test_document_visibility_can_toggle_public_private(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_document_visibility_can_toggle_public_private(get_admin, get_user, browser_failures):
+    user = get_admin()
     page = user.go(Pages.test_document_visibility_page)
     category = page.definition.category.get(user)
 
@@ -193,13 +198,13 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
 # @matrix public-pages : document-image metadata preview public-rendering public-route revocation
 # @template public/nav.html::public_nav
 def test_public_document_images_are_anonymous_and_revocable(
-    get_user,
+    get_admin, get_user,
     browser,
     browser_failures,
     setup_test_server,
 ):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_document_visibility_page)
+    user = get_admin()
+    page = user.go(Pages.test_public_document_image_page)
     editor = page.editor
     editor.clear_text()
     marker = "Public image route marker"
@@ -293,8 +298,8 @@ def test_public_document_images_are_anonymous_and_revocable(
 
 # @matrix pages : delete file-upload
 # @template pages/files.html::file_list_item
-def test_add_file_to_page(get_user):
-    user = get_user(Users.OWNER)
+def test_add_file_to_page(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_file_upload_page)
 
     files_tab = page.files_tab
@@ -334,8 +339,8 @@ def test_add_file_to_page(get_user):
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 @pytest.mark.ai
-def test_add_multiple_files_to_page_without_existing_file_select(get_user, request):
-    user = get_user(Users.OWNER)
+def test_add_multiple_files_to_page_without_existing_file_select(get_admin, get_user, request):
+    user = get_admin()
     page = user.go(Pages.test_file_upload_page)
     report = request.node.ai_results
 
@@ -449,9 +454,9 @@ def test_add_multiple_files_to_page_without_existing_file_select(get_user, reque
 
 
 # @pair pages:category-add
-def test_add_category_to_page(get_user):
-    user = get_user(Users.OWNER)
-    page = user.go(Pages.test_category_edit_page)
+def test_add_category_to_page(get_admin, get_user):
+    user = get_admin()
+    page = user.go(Pages.test_add_category_page)
     category = Categories.test_empty_category.get(user)
 
     info_form = page.info_form
@@ -459,7 +464,9 @@ def test_add_category_to_page(get_user):
         category.definition.name
     )
 
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page, method="PUT", path=f"/pages/{page.key}/update", entity_key=page.key,
+    ):
         SpinnerButtons.UPDATE.click(info_form)
 
     user.go(category)
@@ -475,8 +482,8 @@ def test_add_category_to_page(get_user):
 # @template pages/page.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
-def test_delete_page_from_title_menu(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_page_from_title_menu(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_delete_page)
     page.wait_for_interaction_readiness()
 
@@ -503,8 +510,8 @@ def test_delete_page_from_title_menu(get_user):
 
 
 # @pair pages:category-remove
-def test_remove_category_from_page(get_user):
-    user = get_user(Users.OWNER)
+def test_remove_category_from_page(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_category_edit_page)
     original = Categories.test_create_page.get(user)
     added = [

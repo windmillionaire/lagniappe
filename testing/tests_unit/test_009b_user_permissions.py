@@ -118,7 +118,7 @@ def test_authorization_fingerprint_tracks_group_membership():
     assert user.permissions_fingerprint == permissions
 
 
-# @matrix admin : delete edit page privileged-account view
+# @matrix admin : delete edit page privileged-account view personal-page
 # @pair owner:owner-only
 @pytest.mark.unit
 def test_privileged_user_rows_are_owner_managed():
@@ -147,6 +147,14 @@ def test_privileged_user_rows_are_owner_managed():
     assert page.allowed(Action.VIEW, admin)
     assert not page.allowed(Action.EDIT, admin)
     assert page.allowed(Action.EDIT, owner)
+
+    # Administrators can use their own workspace without managing their account.
+    assert page.allowed(Action.EDIT, other_admin)
+    assert page.allowed(Action.CREATE, other_admin)
+    assert not page.allowed(Action.PERMISSIONS, other_admin)
+    assert not page.allowed(Action.DELETE, other_admin)
+    assert not other_admin.allowed(Action.EDIT, other_admin)
+    assert not other_admin.allowed(Action.DELETE, other_admin)
 
 
 # @matrix permissions : global-resources owner resource-gates

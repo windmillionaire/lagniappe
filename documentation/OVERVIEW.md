@@ -81,6 +81,7 @@ begin in the [README](../README.md).
 | --- | --- |
 | [INFRA_CONFIG.md](INFRA_CONFIG.md) | Configuration sources, validation, secrets, browser protocol, and runtime access. |
 | [INFRA_SETUP.md](INFRA_SETUP.md) | Installer phases, focused commands, reruns, and setup ownership. |
+| [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md) | Dedicated experiments installation, admin agent execution, measurement coverage, and durable notebook workflow. |
 | [INFRA_SETUP_CLOUD.md](INFRA_SETUP_CLOUD.md) | GCP, Identity Platform, OAuth, domains, email, Redis, and integrations. |
 | [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md) | Local dependencies, environment, frontend, tests, and emulator assumptions. |
 | [INFRA_SETUP_RECOVERY.md](INFRA_SETUP_RECOVERY.md) | Recovery state, validation, repair, and safe reruns. |

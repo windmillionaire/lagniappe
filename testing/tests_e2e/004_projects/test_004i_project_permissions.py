@@ -30,8 +30,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @pair projects:wrong-entity-type
-def test_project_url_rejects_model_task_key(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_project_url_rejects_model_task_key(get_admin, browser_failures):
+    owner = get_admin()
     model = ModelTasks.test_create_model_task.get(owner)
     url = f"{SETTINGS.test_config['BASE_URL']}/projects/{model.key}"
     with browser_failures.expect_http_error(owner, status=404, path=url):
@@ -41,8 +41,8 @@ def test_project_url_rejects_model_task_key(get_user, browser_failures):
 
 
 # @pair projects:permission-gates
-def test_project_is_forbidden_without_model_permission(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
+def test_project_is_forbidden_without_model_permission(get_admin, get_user, browser_failures):
+    owner = get_admin()
     project = Projects.test_create_project_manual_mode.get(owner)
 
     blocked = get_user(Users.user_no_access)
@@ -52,8 +52,8 @@ def test_project_is_forbidden_without_model_permission(get_user, browser_failure
 
 
 # @matrix projects : load permission-gates readonly
-def test_project_viewer_reads_project_without_editing_controls(get_user):
-    owner = get_user(Users.OWNER)
+def test_project_viewer_reads_project_without_editing_controls(get_admin, get_user):
+    owner = get_admin()
     model_task = ModelTasks.test_create_model_task.get(owner)
     project = model_task.project
 
@@ -103,8 +103,8 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
 
 # @matrix projects : document-tab readonly
 # @template projects/project.html::main
-def test_project_viewer_can_read_document_content(get_user):
-    owner = get_user(Users.OWNER)
+def test_project_viewer_can_read_document_content(get_admin, get_user):
+    owner = get_admin()
     empty_project = Projects.test_readonly_document_visibility.get(owner)
     content_project = Projects.test_readonly_document_content.get(owner)
 
@@ -131,8 +131,8 @@ def test_project_viewer_can_read_document_content(get_user):
 
 
 # @matrix model-tasks : create permission-gates
-def test_project_editor_can_open_model_task_creation(get_user):
-    owner = get_user(Users.OWNER)
+def test_project_editor_can_open_model_task_creation(get_admin, get_user):
+    owner = get_admin()
     project = Projects.test_create_project_manual_mode.get(owner)
 
     editor = get_user(Users.admin)
@@ -145,8 +145,8 @@ def test_project_editor_can_open_model_task_creation(get_user):
 
 
 # @pair model-tasks:parent-membership
-def test_model_task_mutations_require_route_project_membership(get_user):
-    owner = get_user(Users.OWNER)
+def test_model_task_mutations_require_route_project_membership(get_admin):
+    owner = get_admin()
     route_project = Projects.test_create_project_manual_mode.get(owner)
     foreign_model = ModelTasks.test_multi_model_alpha.get(owner)
     assert foreign_model.entity.project.key != route_project.entity.key

@@ -43,6 +43,8 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             "deferred_job",
             "autofill_reviews",
             "public_settings",
+            "has_notes",
+            "notes_checked_revision",
         }
         return frozenset(exclude)
 
@@ -156,18 +158,48 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
         return self._tasks
 
+    # @testable false
+    # @covered-by lagniappe/core/entities/page.py::Page._load_tasks
+    # @reason shares the permission-filtered task collection load
     @property
-    def completed(self):
+    def completed_tasks(self):
         if self._completed is None:
             self._load_tasks()
 
         return self._completed
 
     # @testable true
+    # @tests tests_unit/test_002j_notes.py::test_empty_notes_hint_is_bound_to_the_page_revision
+    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
+    # @matrix notes : empty-presence revision-bound
+    @property
+    def has_notes(self):
+        """Unknown or stale presence requires a read; only proven empty skips it."""
+        return not (
+            self.db.get("has_notes") is False
+            and self.modified is not None
+            and self.db.get("notes_checked_revision") == self.modified
+        )
+
+    # @testable true
+    # @tests tests_unit/test_002j_notes.py::test_empty_notes_hint_is_bound_to_the_page_revision
+    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
+    # @matrix notes : empty-presence revision-bound
+    def remember_empty_notes(self):
+        """Cache an unfiltered empty query without changing content or revisions."""
+        if not self.has_notes or self.modified is None:
+            return
+        self.db["has_notes"] = False
+        self.db["notes_checked_revision"] = self.modified
+        # A racing note mutation advances modified. This old observation then
+        # cannot suppress its notes, even when this masked write commits last.
+        Entities.save_root(self, property_mask=("has_notes", "notes_checked_revision"))
+
+    # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
     # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
     # @tests tests_unit/test_009f_page_view_access.py::test_page_view_does_not_require_loaded_owner
-    # @matrix admin : page privileged-account
+    # @matrix admin : page privileged-account personal-page
     # @matrix page : group-match restricted-access view-owner-short-circuit
     # @matrix page permissions users : models-scope user-page
     # @pair owner:owner-only
@@ -178,12 +210,18 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         if action.value > Action.VIEW.value:
             target_user = self.user
             if target_user and target_user.is_admin and user and not user.is_owner:
-                return False
+                # Personal workspace content is separate from account management.
+                # Keep privileged account deletion and permissions Owner-only.
+                if target_user.key != user.key or action not in {Action.EDIT, Action.CREATE}:
+                    return False
         return super().allowed(action, user=user)
 
+    # @testable true
+    # @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
+    # @matrix ai-report : id-allocation identity
     @classmethod
-    def create(cls, data):
-        new_page = cls()
+    def create(cls, data, *, key=None):
+        new_page = cls(key)
         new_page.kind = cls.entity_kind
 
         new_page.update(data)

@@ -90,6 +90,7 @@ def _post_form_status(user, path, data):
 
 # @matrix users : disabled index-mode-toggle
 # @template users/index.html::public_users_toggle
+@pytest.mark.e2e_group("owner")
 def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
     owner = get_user(Users.OWNER)
     _set_public_users_allowed(owner, False)
@@ -100,19 +101,27 @@ def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
 
 
 # @matrix reconnect-refresh : batched-request root-fingerprint
-# @matrix users : index-mode-toggle refresh table-row
+# @matrix users : index-mode-toggle refresh table-row pagination
 # @pair permissions:authorization
 # @template users/index.html::public_users_toggle
+@pytest.mark.e2e_group("owner")
 def test_users_index_public_toggle_shows_public_users(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     public_name = f"Public Toggle User {uuid4().hex}"
     public_email = f"{uuid4().hex}@public-toggle.example"
     refreshed_public_name = f"Reconnect Public User {uuid4().hex}"
     refreshed_public_email = f"{uuid4().hex}@public-toggle.example"
+    # Keep Owner beyond the first 25-row batch when regular mode is restored.
+    regular_users = [Entities.USER.create({
+        "name": f"Mode pagination {index} {uuid4().hex}",
+        "email": f"{uuid4().hex}@mode-pagination.example",
+        "test_user": True,
+    }) for index in range(26)]
 
     try:
         _set_public_users_allowed(owner, True)
         _create_public_user(public_email, public_name)
+        Entities.save(*regular_users)
 
         user_index = owner.go(SitePages.USER_INDEX)
         table = Table(owner)
@@ -121,7 +130,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(public_toggle).to_be_visible()
         expect(public_toggle).to_have_attribute("data-active", "false")
         expect(table.get_row(public_name)).to_have_count(0)
-        expect(table.get_row(owner.name)).to_be_visible()
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_be_visible()
 
         with owner.page.expect_response(_user_rows_response("public")):
             public_toggle.click()
@@ -131,7 +140,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(public_toggle).to_have_attribute("data-active", "true")
         expect(public_toggle).to_have_attribute("title", "Show regular users")
         expect(table.get_row(public_name)).to_be_visible()
-        expect(table.get_row(owner.name)).to_have_count(0)
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_have_count(0)
 
         _create_public_user(
             refreshed_public_email,
@@ -142,7 +151,7 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
 
         expect(table.get_row(public_name)).to_be_visible()
         expect(table.get_row(refreshed_public_name)).to_be_visible()
-        expect(table.get_row(owner.name)).to_have_count(0)
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_have_count(0)
 
         with owner.page.expect_response(_user_rows_response("regular")):
             public_toggle.click()
@@ -152,8 +161,9 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(public_toggle).to_have_attribute("data-active", "false")
         expect(public_toggle).to_have_attribute("title", "Show public users")
         expect(table.get_row(public_name)).to_have_count(0)
-        expect(table.get_row(owner.name)).to_be_visible()
+        expect(owner.locate(f"#table tbody tr[data-key='{owner.entity.page.urlsafe_key}']")).to_be_visible()
     finally:
+        Entities.delete(*regular_users)
         _set_public_users_allowed(owner, False)
 
 
@@ -172,6 +182,7 @@ def _create_user(user, create_form, definition):
 # @matrix users : ai-access create-form create-form-reset create-submit created-row
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
+@pytest.mark.e2e_group("owner")
 def test_create_user_from_index(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -213,6 +224,7 @@ def test_create_user_from_index(get_user):
 # @matrix user : page-reassign public-adoption submitted-create-data
 # @matrix users : create-form-reset public-user-adoption submitted-form-data
 # @template users/tools.html::create_user
+@pytest.mark.e2e_group("owner")
 def test_owner_create_adopts_public_user_and_resets_form(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -289,6 +301,7 @@ def test_owner_create_adopts_public_user_and_resets_form(get_user):
 
 # @pair users:owner-only
 # @template users/tools.html::create_user
+@pytest.mark.e2e_group("owner")
 def test_non_owner_cannot_set_ai_access_when_creating_user(
     get_user, browser_failures
 ):
@@ -322,6 +335,7 @@ def test_non_owner_cannot_set_ai_access_when_creating_user(
 
 # @matrix users : group-selector multiple
 # @template users/tools.html::create_user
+@pytest.mark.e2e_group("owner")
 def test_create_user_group_selector_accepts_multiple_groups(get_user):
     owner = get_user(Users.OWNER)
     first_group = Groups.general_users_view_only.get(owner)
@@ -377,6 +391,7 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
 # @matrix table-controls : mobile-startup mobile-tools sorting
 # @template users/index.html::view_header
 # @template table.html::mobile_toggles
+@pytest.mark.e2e_group("owner")
 def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user):
     owner = get_user(Users.OWNER)
     user_index = owner.go(SitePages.USER_INDEX)
@@ -403,6 +418,7 @@ def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user
 
 
 # @matrix users : attach-existing-page page-form-preserved
+@pytest.mark.e2e_group("owner")
 def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
@@ -469,6 +485,7 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
 # @template table.html::row
 # @template controls.html::delete
 # @template cell.html::format_table_cell
+@pytest.mark.e2e_group("owner")
 def test_delete_user_can_preserve_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex

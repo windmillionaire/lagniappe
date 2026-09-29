@@ -47,7 +47,7 @@ from lagniappe.core.entities import Entities
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources.form import Form
 
-from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks, Users
+from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks
 from testing.elements import Buttons, FormSelect, Modal, SpinnerButtons
 from testing.resources import Task
 from testing.utility.network import expect_successful_response
@@ -55,8 +55,8 @@ from testing.utility.polling import expect_poll_result
 
 
 # @pair model-tasks:info-form
-def test_click_model_opens_info(get_user):
-    user = get_user(Users.OWNER)
+def test_click_model_opens_info(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_create_model_task.get(user)
     user.go(model_task.project)
 
@@ -72,8 +72,8 @@ def test_click_model_opens_info(get_user):
 
 
 # @matrix model-tasks : name update
-def test_edit_model_task_name(get_user):
-    user = get_user(Users.OWNER)
+def test_edit_model_task_name(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_edit_model_task_name.get(user)
     user.go(model_task.project)
 
@@ -99,8 +99,8 @@ def test_edit_model_task_name(get_user):
 
 
 # @matrix model-tasks : form-change update
-def test_change_model_task_form(get_user):
-    user = get_user(Users.OWNER)
+def test_change_model_task_form(get_admin, get_user):
+    user = get_admin()
 
     new_form = Forms.test_alternate_task_form.get(user)
     model_task = ModelTasks.test_change_model_task_form.get(user)
@@ -124,8 +124,8 @@ def test_change_model_task_form(get_user):
 
 
 # @matrix model-tasks : form-clear update
-def test_delete_model_task_form(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_model_task_form(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_delete_model_task_form.get(user)
     user.go(model_task.project)
 
@@ -173,8 +173,8 @@ def _click_status_filter(model_task, label):
 # @matrix model-tasks : completed status-filter
 # @pairs polling:task-index reconnect-refresh:task-index
 # @template tasks/index.html::view
-def test_completed_button(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_completed_button(get_admin, get_user, browser_failures):
+    user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
     results = _click_status_filter(model_task, "Completed")
@@ -232,8 +232,8 @@ def test_completed_button(get_user, browser_failures):
 
 
 # @matrix model-tasks : in-progress status-filter
-def test_in_progress_button(get_user):
-    user = get_user(Users.OWNER)
+def test_in_progress_button(get_admin, get_user):
+    user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
     results = _click_status_filter(model_task, "In Progress")
@@ -251,8 +251,8 @@ def test_in_progress_button(get_user):
 
 # @matrix model-tasks : status-filter nested-relations
 # @template tasks/index.html::view
-def test_status_filter_loads_task_page_form_permissions(get_user):
-    user = get_user(Users.OWNER)
+def test_status_filter_loads_task_page_form_permissions(get_admin):
+    user = get_admin()
     model_task = ModelTasks.test_status_filter_model_task.get(user)
     form = Form(user=user, definition=FormDefinition(
         name=f"Status page form {uuid4().hex}", form_type="page",
@@ -274,8 +274,8 @@ def test_status_filter_loads_task_page_form_permissions(get_user):
 
 
 # @pair model-tasks:delete
-def test_delete_model_task(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_model_task(get_admin, get_user):
+    user = get_admin()
     model_task = ModelTasks.test_delete_model_task.get(user)
     user.go(model_task.project)
 

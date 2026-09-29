@@ -168,8 +168,8 @@ const STYLES = {
     },
     "elementLabel": "flex flex-col gap-1 font-semibold sm:text-sm text-base-dark",
     "submission": {
-      "default": "submission-outline flex min-h-10 w-fit flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm",
-      "grows": "submission-outline w-fit rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm"
+      "default": "submission-outline flex min-h-10 min-w-0 w-fit max-w-full flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]",
+      "grows": "submission-outline min-w-0 w-fit max-w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]"
     }
   },
   "help": {

@@ -141,6 +141,7 @@ def test_run_report_attach_file_targets_created_task(monkeypatch, get_schema):
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
     assert result["status"] == "complete", result
     assert result["actions"][0]["type"] == "create_task"
@@ -372,6 +373,7 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    file_one, file_two = report.input_files
 
     histories = list({
         entity.key: entity
@@ -511,6 +513,7 @@ def test_run_report_records_dateless_historical_task_completion(monkeypatch):
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
     tasks = {
         entity.key: entity
@@ -621,6 +624,7 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    new_file = report.input_files[0]
 
     histories = list({
         entity.key: entity
@@ -781,6 +785,7 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    file_one, file_two = report.input_files
 
     histories = list({
         entity.key: entity
@@ -1150,6 +1155,7 @@ def test_run_report_reuses_existing_task_for_completed_event(
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
     histories = [
         entity
@@ -1715,6 +1721,7 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
     _patch_task_file_add(monkeypatch)
 
     result = report_runner.run_report(report, user)
+    file = report.input_files[0]
 
     created_tasks = {
         entity.key: entity

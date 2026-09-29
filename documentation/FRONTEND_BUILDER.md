@@ -261,8 +261,8 @@ Generated instruction text may replace an HTML field's content. Existing images
 retain their attributes from the submitted draft before final sanitization,
 including unsaved size/alignment edits. The builder prompt requests ordinary
 Markdown image references; attribute suffixes are parsed instead of displayed
-as text. This does not change normal Page document updates: those remain
-append-only, with a server-generated source/time quote before each addition.
+as text. Reviewed Page document actions use their separate append/replacement
+workflow, including source/time attribution and pinned previous versions.
 Successful generation keeps the prompt open and uses the normal submitted
 checkmark, clearing the prompt's unsaved marker. The Form's Save icon still
 indicates that the generated schema is unsaved. Generation and Undo/Redo do not

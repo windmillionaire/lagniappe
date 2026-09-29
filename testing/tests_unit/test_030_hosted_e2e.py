@@ -13,6 +13,39 @@ from lagniappe.core.tools.hosted_e2e.auth import (
 pytestmark = pytest.mark.unit
 
 
+# @matrix hosted-e2e : authentication cookie
+@pytest.mark.parametrize("inherited", [True, False])
+def test_worker_inherits_run_cookie_without_replaying_bootstrap(monkeypatch, inherited):
+    from types import SimpleNamespace
+    import lagniappe
+    from lagniappe.core.entities import Entities
+    from testing.utility import e2e_runtime, e2e_worker
+
+    base_url = "https://candidate.example.test"
+    cookie = {"name": "__Host-lagniappe-e2e", "value": "test-run-cookie", "url": base_url}
+    record = {"base_url": base_url, "run_id": "test-run",
+              "browser_cookies": [cookie] if inherited else []}
+    monkeypatch.setattr(lagniappe, "CONFIG", SimpleNamespace(
+        testing=True, PREFIX="test-", BASE_URL=base_url, hosted_e2e_runner=True))
+    monkeypatch.setattr(e2e_worker, "context", lambda: record)
+    monkeypatch.setattr(e2e_worker, "assert_owner", lambda record: None)
+    monkeypatch.setattr(Entities, "initialize", lambda: None)
+    monkeypatch.setattr(e2e_runtime, "validate_hosted_e2e_health", lambda: None)
+
+    def forbidden_exchange(_run_id):
+        raise AssertionError("A worker must not exchange another single-use bootstrap token")
+
+    monkeypatch.setattr(e2e_runtime, "hosted_e2e_browser_cookie", forbidden_exchange)
+    if not inherited:
+        with pytest.raises(RuntimeError, match="coordinator's run cookie"):
+            with e2e_worker.worker_runtime():
+                pytest.fail("A hosted worker started without its inherited cookie")
+    else:
+        with e2e_worker.worker_runtime() as runtime:
+            assert runtime.run_id == "test-run"
+            assert runtime.browser_cookies == (cookie,)
+
+
 # @matrix hosted-e2e : audience authentication identity issuer
 def test_validate_google_claims_requires_exact_verified_identity():
     expected = {

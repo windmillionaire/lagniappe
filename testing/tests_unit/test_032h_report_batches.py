@@ -17,7 +17,8 @@ from lagniappe.core.tools.cache import documents
 from lagniappe.core.tools.document_crdt import append_fragment
 from lagniappe.core.properties.common_assets import Document
 from lagniappe.core.mutations import plan_mutation
-from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
+from lagniappe.core.tools.database import utility as database_utility
+from testing.utility.ai_report_fakes import _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
 pytestmark = pytest.mark.unit
@@ -88,6 +89,92 @@ def setup_case(monkeypatch, actions, initial=()):
 
 def create(kind, name, **data):
     return {"id": name, "type": "create_" + kind, "data": {"name": name, **data}}
+
+
+# @matrix ai-report : id-allocation batching identity recovery
+def test_create_batch_reserves_one_key_per_output_and_reuses_receipts(monkeypatch):
+    actions = []
+    for i in range(10):
+        actions.extend([create("page", f"page{i}"),
+                        create("task", f"task{i}a", page_action=f"page{i}"),
+                        create("task", f"task{i}b", page_action=f"page{i}")])
+    state = setup_case(monkeypatch, actions)
+    allocate = database_utility.create_keys
+    reservations = []
+
+    def reserve(kind, parent, count):
+        keys = allocate(kind, parent, count)
+        reservations.append(keys)
+        return keys
+
+    monkeypatch.setattr(database_utility, "create_keys", reserve)
+    monkeypatch.setattr(database_utility, "create_key", lambda *_: pytest.fail("Construction allocated an extra key"))
+    result = runner.run_report(state.report, state.actor)
+    assert result["status"] == "complete", state.report.error
+    assert [len(keys) for keys in reservations] == [30]
+    assert {record["output_key"] for record in result["actions"]} == {key.name for key in reservations[0]}
+    for i in range(10):
+        page_id = result["actions"][i * 3]["entity"]["id"]
+        for record in result["actions"][i * 3 + 1:i * 3 + 3]:
+            assert state.rows[record["entity"]["id"]].page.urlsafe_key == page_id
+    assert runner.run_report(state.report, state.actor) == result
+    assert len(reservations) == 1
+
+
+# @source lagniappe/core/entities/project.py::Project.create
+# @matrix ai-report : id-allocation batching parent bounded
+def test_create_key_batches_are_bounded_and_keep_parent_groups_separate(monkeypatch):
+    actions = [create("project", "first"), create("project", "second"),
+               create("model_task", "first_model", project_action="first"),
+               create("model_task", "second_model", project_action="second")]
+    actions.extend(create("page", f"page{i}") for i in range(60))
+    actions.append({**create("page", "skipped"), "skip": True})
+    state = setup_case(monkeypatch, actions)
+    allocate = database_utility.create_keys
+    calls = []
+
+    def reserve(kind, parent, count):
+        calls.append((kind, parent, count))
+        return allocate(kind, parent, count)
+
+    monkeypatch.setattr(database_utility, "create_keys", reserve)
+    result = runner.run_report(state.report, state.actor)
+    assert result["status"] == "complete", state.report.error
+    assert sum(count for _, _, count in calls) == 64
+    assert max(count for _, _, count in calls) <= 50
+    parents = {parent.name for kind, parent, count in calls if kind == "model"}
+    assert parents == {result["actions"][i]["output_key"] for i in (0, 1)}
+    assert result["actions"][-1]["status"] == "skipped"
+
+
+# @matrix ai-report files : batching attachments recovery
+def test_report_inputs_isolate_attachment_changes_from_retries(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    page = TestEntities.get("PAGE", {"hash": "input-owner-page"})
+    task = TestEntities.get("TASK", {"hash": "input-owner-task"})
+    task.page = page
+    file = _test_file("batch-input.pdf")
+    file.move_to(task)
+    file._mutation_intents = []
+    target = TestEntities.get("PAGE", {"hash": "input-destination"})
+    workspace = batches.WorkingEntities()
+
+    staged = workspace.copy_input(file)
+    assert staged is workspace.copy_input(file)
+    assert staged.task is not task
+    assert staged.task.page is not page
+    assert staged.task.files == [staged]
+    staged.summary = "Uncommitted summary"
+    staged.move_to(target)
+
+    assert file.summary is None
+    assert file.owner is task
+    assert task.files == [file]
+    assert file.mutation_intents == []
+    retried = batches.WorkingEntities().copy_input(file)
+    assert retried.owner.key == task.key
+    assert retried.task.files == [retried]
+    assert retried.summary is None
 
 
 # @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
@@ -209,8 +296,9 @@ def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
     actions = [create("category", "category")]
     for i in range(10):
         actions.extend([create("page", f"page{i}", category_action="category"),
-                        {"id": f"doc{i}", "type": "append_page_document", "data": {"page": f"$page{i}", "document": f"<p>Document {i}</p>"}}])
+                        {"id": f"doc{i}", "type": "append_page_document", "data": {"page": f"$page{i}", "document_markdown": f"Document {i}", "document": f"<p>Document {i}</p>"}}])
     state = setup_case(monkeypatch, actions)
+    submitted = deepcopy(state.report.proposal)
 
     def upload(document, *, html, ydoc):
         state.events.append("upload")
@@ -226,6 +314,10 @@ def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
     pages = [item for item in state.rows.values() if item.entity_kind == "page"]
     assert len(pages) == 10
     assert all(page.assets.get("document") for page in pages)
+    assert len([items for items in state.commits if len(items) > 1]) == 1
+    assert state.report.proposal == submitted
+    assert state.rows[state.report.urlsafe_key].proposal == submitted
+    assert runner.run_report(state.report, state.actor) == result
     assert len([items for items in state.commits if len(items) > 1]) == 1
 
 

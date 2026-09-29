@@ -191,10 +191,11 @@ updates, including paired description cleanup. Read `view="edit"` for complete
 descriptions, exact answer IDs, revisions, and ordered Project models. Task
 edit reads are paginated and share schemas within each response.
 
-Document scope remains append-only for AI/MCP. Inline changes, replacement, and
-removal of existing document content belong in the editor. The cohesive-update
-upgrade does not add `update_document` or new block-editing/replay machinery;
-plans requiring existing text to change must identify that manual editor step.
+AI/MCP documents support appended additions and explicit whole-document
+replacement through `replace_page_document`. Replacement preserves a pinned
+previous version and edits the existing CRDT, with the same checkpoint and retry
+guards as append. Inline changes still belong in the editor; there is no
+block-addressing or separate document replay protocol.
 
 The homepage Plans & Reports panel has independent Active, Executed, and Answers
 filters. Active includes unfinished proposals and pending requests (including
@@ -206,7 +207,7 @@ with their normal Delete control.
 
 List snippets flatten Markdown to plain text and show at most five lines at
 the current screen width. Full summaries remain available in each report.
-Document creation and append details show plain-text previews limited to ten
+Document creation, append, and replacement details show plain-text previews limited to ten
 lines, with a control to expand the full text. The stored proposal retains the
 complete executable HTML; only its review display is shortened.
 
@@ -340,6 +341,13 @@ but unloaded Form members before extending the list, preserving sibling Forms.
 Groups commit at 50 actions or approximately 4 MiB of prepared root data. These
 are general size boundaries, not boundaries between entity types or dependencies.
 Form migrations flush prepared work before starting their asynchronous child job.
+
+Ordinary creations reserve numeric Datastore IDs in bounded groups of at most
+50, grouped by physical kind and resolved parent. Entity factories receive the
+reserved key at construction, so they do not allocate a second unused identity.
+Unresolved Project parents wait until available. Reservations do not write
+entities; unused IDs after a skipped or rejected batch are harmless. Committed
+receipts remain the authority for retry identities.
 
 The report and its action results commit with the workspace writes in a guarded
 transaction. A batch receipt distinguishes rejected writes from a lost commit

@@ -52,20 +52,30 @@ def partition_junit_reports(partitions):
             root_args=(*root_args, f"--junitxml={root_path}"),
             mcp_args=(*mcp_args, f"--junitxml={mcp_path}"),
         )
-        combined = ElementTree.Element("testsuites")
-        for path in (root_path, mcp_path):
-            try:
-                result = ElementTree.parse(path).getroot()
-            except (OSError, ElementTree.ParseError) as error:
-                raise RuntimeError(f"Missing or invalid partition JUnit: {path.name}") from error
-            if result.tag == "testsuites":
-                combined.extend(result)
-            elif result.tag == "testsuite":
-                combined.append(result)
-            else:
-                raise RuntimeError(f"Invalid partition JUnit root: {path.name}")
+        merge_junit_reports((root_path, mcp_path), destination)
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_partition_junit_reports_preserves_single_run_and_rejects_missing_results
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_run_merges_all_phases_without_hiding_failure
+# @matrix testing mcp-package hosted-e2e : junit result-aggregation environment-isolation
+def merge_junit_reports(paths, destination):
+    """Publish every phase's results, rejecting missing or malformed reports."""
+    combined = ElementTree.Element("testsuites")
+    for path in paths:
+        try:
+            result = ElementTree.parse(path).getroot()
+        except (OSError, ElementTree.ParseError) as error:
+            raise RuntimeError(f"Missing or invalid partition JUnit: {path.name}") from error
+        if result.tag == "testsuites":
+            combined.extend(result)
+        elif result.tag == "testsuite":
+            combined.append(result)
+        else:
+            raise RuntimeError(f"Invalid partition JUnit root: {path.name}")
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".pytest-junit-", dir=destination.parent) as temporary:
         merged = Path(temporary) / "merged.xml"
-        ElementTree.ElementTree(combined).write(
-            merged, encoding="utf-8", xml_declaration=True
-        )
+        ElementTree.ElementTree(combined).write(merged, encoding="utf-8", xml_declaration=True)
         os.replace(merged, destination)

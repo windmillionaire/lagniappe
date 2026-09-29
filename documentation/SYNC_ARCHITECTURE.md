@@ -37,6 +37,12 @@ An absent or stale cache row
 falls back to loading and authorizing that entity. Root entity polling still
 loads the canonical permission graph.
 
+Polling batches authenticated User/Page roots, validated subscription roots and
+requested channel revision keys in the initial durable lookup. Direct relations
+then load together; Task/File permission dependencies still expand normally.
+These are request-local records, not a permission cache. A stale session discards
+the preloaded records and takes the ordinary authenticated read path.
+
 ## Browser scheduler
 
 `src/script/shared/polling.mjs` owns scheduling for one mounted view. Each

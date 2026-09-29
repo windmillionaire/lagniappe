@@ -1,6 +1,7 @@
 """Execute authoritative mutation effects in durable-first order."""
 
 import json
+from lagniappe.core.tools.measurements import timed
 
 from ..definitions import (
     MutationEffectType,
@@ -104,7 +105,10 @@ def prepare_durable_writes(plan):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_public_discovery_invalidation_runs_after_durable_write
+# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
 # @matrix mutations : durable-first
+# @matrix mutations : full-root masked-touch cache
+# @matrix mutations notes : delete photo-cleanup post-commit
 # @matrix public-pages public-directory sitemap : invalidation
 def execute_post_commit(plan):
     """Execute declared post-commit effects and return types plus errors."""
@@ -131,6 +135,17 @@ def execute_post_commit(plan):
         dispatch_changes(changes)
         cache.update_owner_projection(*refresh)
         complete(MutationEffectType.CACHE_REFRESH)
+
+    refreshed = {entity.key for entity in refresh}
+    invalidated = [
+        effect.entity for effect in post_commit
+        if effect.effect is MutationEffectType.CACHE_INVALIDATE
+        and effect.entity.key not in refreshed
+    ]
+    if invalidated:
+        cache.invalidate_revisions(*invalidated)
+    if any(effect.effect is MutationEffectType.CACHE_INVALIDATE for effect in post_commit):
+        complete(MutationEffectType.CACHE_INVALIDATE)
 
     deleted = [
         effect.entity
@@ -254,6 +269,7 @@ def execute_post_commit(plan):
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
 # @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
+@timed("entity", "mutation")
 def execute_mutation(plan, *, guards=None):
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):

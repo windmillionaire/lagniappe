@@ -198,8 +198,8 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
 # @matrix notes : cached-response load notes-only
 # @template home/notes.html::list
 # @template home/notes.html::note_item
-def test_home_notes_exclude_notifications(get_user):
-    user = get_user(Users.OWNER)
+def test_home_notes_exclude_notifications(get_admin, get_user):
+    user = get_admin()
     note_body = _unique("Activity note load")
     notification_body = _unique("Activity notification load")
     _save_note(user, note_body)
@@ -217,8 +217,8 @@ def test_home_notes_exclude_notifications(get_user):
 # @matrix notes : asset-lifecycle body create html-stripping parent photo private-default scope visibility
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
-def test_create_note_body_and_photo_from_home(get_user):
-    user = get_user(Users.OWNER)
+def test_create_note_body_and_photo_from_home(get_admin, get_user):
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     raw_body = f"<strong>{_unique('Activity body note')}</strong>"
@@ -313,8 +313,8 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
 
 # @matrix activity notes notifications : delete ownership
 # @template notes.html::note_item
-def test_delete_activity_item_from_home(get_user):
-    user = get_user(Users.OWNER)
+def test_delete_activity_item_from_home(get_admin, get_user):
+    user = get_admin()
     other_user = get_user(Users.create_user, creator=user)
     own_body = _unique("Activity note delete")
     other_body = _unique("Other user activity note")
@@ -347,6 +347,7 @@ def test_delete_activity_item_from_home(get_user):
 
 # @matrix activity notes permissions : home owner private shared
 # @template notes.html::note_item
+@pytest.mark.e2e_group("owner")
 def test_home_note_visibility_across_users(get_user):
     owner = get_user(Users.OWNER)
     author = get_user(Users.create_user, creator=owner)
@@ -372,9 +373,10 @@ def test_home_note_visibility_across_users(get_user):
 
 
 # @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
+# @matrix notifications : body create
 # @template notifications.html::item
-def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
-    user = get_user(Users.OWNER)
+def test_notification_menu_renders_target_and_preserves_pending_state(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_create_page.get(user)
     body = f"{_unique('Notification target pending')} Error:{'x' * 240}"
     notification = _save_notification(user, body, target=page.entity, pending=True)
@@ -447,9 +449,9 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
 # @template nav.html::navbar
 @pytest.mark.parametrize("reconnect_before_open", [False, True])
 def test_notification_menu_deletes_and_clears(
-    get_user, browser_failures, reconnect_before_open,
+    get_admin, get_user, browser_failures, reconnect_before_open,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     suffix = uuid4().hex
     user = get_user(
         UserDefinition(
@@ -529,8 +531,8 @@ def test_notification_menu_deletes_and_clears(
 # @matrix offline : queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
-def test_offline_home_create_mutations_persist_after_reload(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user, browser_failures):
+    user = get_admin()
     home = user.go(SitePages.HOME)
     home = home.reload()
 
@@ -614,8 +616,8 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
 # @matrix offline : optimistic-mutation reload replay server-first
 # @template home/notes.html::list
 # @template home/tasks.html::list
-def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user, browser_failures):
+    user = get_admin()
     note_body = _unique("Offline cached note")
     task_name = _unique("Offline cached task")
     task = _save_personal_task(user, task_name)
@@ -681,8 +683,8 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
 
 # @matrix offline : queue-clear replay
 # @template home/notes.html::note_item
-def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_offline_home_mutations_replay_when_online(get_admin, get_user, browser_failures):
+    user = get_admin()
     home = user.go(SitePages.HOME)
     note_body = _unique("Offline replay note")
 
@@ -714,8 +716,8 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
 
 # @matrix tasks : complete offline-queue
 # @template home/tasks.html::task
-def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_offline_task_complete_replays_after_reload(get_admin, get_user, browser_failures):
+    user = get_admin()
     task_name = _unique("Offline complete task")
     task = _save_personal_task(user, task_name)
     mutation_id = f"complete:{task.key}"

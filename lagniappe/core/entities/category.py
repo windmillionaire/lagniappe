@@ -47,9 +47,12 @@ class Category(Entity):
     def schema(self):
         return self.form.schema if self.form else None
 
+    # @testable true
+    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
+    # @matrix ai-report : identity
     @classmethod
-    def create(cls, data):
-        new_category = cls()
+    def create(cls, data, *, key=None):
+        new_category = cls(key)
         new_category.kind = cls.entity_kind
 
         new_category.update(data)

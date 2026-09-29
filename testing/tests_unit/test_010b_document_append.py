@@ -445,7 +445,8 @@ def test_skipped_document_append_needs_no_receipt_on_retry(monkeypatch):
 
 # @matrix ai-report editor : document append retry
 @pytest.mark.parametrize("existing", [False, True])
-def test_report_append_retry_preserves_content(monkeypatch, existing):
+@pytest.mark.parametrize("action_type", ["append_page_document", "replace_page_document"])
+def test_report_append_retry_preserves_content(monkeypatch, existing, action_type):
     _patch_fake_keys(monkeypatch)
     user = _test_user("append-owner")
     page = TestEntities.get("PAGE", {"name": "MCP", "hash": "append-page"})
@@ -483,12 +484,13 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
     monkeypatch.setattr(Document, "save", lambda document, **kwargs: save(document.entity, **kwargs))
     monkeypatch.setattr(actions, "_resolve_entity", lambda *args, **kwargs: page)
     monkeypatch.setattr(actions, "_load_result_entity", lambda *_: page)
-    def make_version(entity, *, key=None):
+    def make_version(entity, *, key=None, html=None, **kwargs):
         history = actions.Entities.DOCUMENT_HISTORY(testing=True)
         class HistoryKey:
             parent = page.key
         history._key = HistoryKey()
-        history._assets = {"document": copy.deepcopy(entity.assets["document"])}
+        history._assets = {"document": copy.deepcopy(entity.assets.get("document") or {"type": "html", "path": "empty"})}
+        stored_html["empty"] = "<p></p>"
         return history
 
     monkeypatch.setattr(actions.Entities.DOCUMENT_HISTORY, "create", make_version)
@@ -497,7 +499,7 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
 
     monkeypatch.setattr(assets, "get_text", lambda path, *args: stored_html[path])
     action = {
-        "type": "append_page_document",
+        "type": action_type,
         "data": {"page": page.urlsafe_key, "document": "<p>Added</p>"},
     }
     from lagniappe.core.tools.ai.reporting.execution.batch import ExecutionBatch, WorkingEntities
@@ -526,14 +528,14 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
     batch.commit()
     assert "Remote MCP" in page.properties.document.html
     assert page.properties.document.html.startswith(
-        "<p>Keep</p><blockquote>" if existing else "<blockquote>"
+        "<p>Keep</p><blockquote>" if existing and action_type == "append_page_document" else "<blockquote>"
     )
     assert actions.inspect_document_append(prepared, user) == "applied"
     assert prepared["document_after"] == metadata["document_after"]
     snapshot = page.properties.document.ydoc
-    assert len(histories) == int(existing)
+    assert len(histories) == int(existing or action_type == "replace_page_document")
     if existing:
-        assert histories["saved-version"].name.startswith("Before report append")
+        assert histories["saved-version"].name == ("Before report append" if action_type == "append_page_document" else "Before document replacement")
         assert histories["saved-version"].get_asset("document").html() == "<p>Keep</p>"
     actions._append_page_document(action, report, user, {}, {"action_record": prepared, "batch": batch})
     assert page.properties.document.ydoc == snapshot
@@ -568,4 +570,36 @@ def test_report_append_retry_preserves_content(monkeypatch, existing):
         assert page.properties.document.ydoc == edited_snapshot
         assert page.properties.document.html == edited_html
         assert page.assets == saved_assets
-        assert len(histories) == int(existing)
+        assert len(histories) == int(existing or action_type == "replace_page_document")
+
+
+# @matrix editor sync : document replacement idempotency offline-replay
+@pytest.mark.parametrize("offline_edit", ["existing-paragraph", "new-paragraph"])
+def test_replacement_preserves_crdt_lineage_and_retry_receipts(offline_edit):
+    from pycrdt import XmlElement, XmlText
+
+    baseline, _ = crdt.append_fragment(None, "<p>Original</p>", "initial")
+    offline = crdt.load_document(baseline)
+    if offline_edit == "existing-paragraph":
+        offline["default"].children[0].children[0].insert(8, " unsent edit")
+    else:
+        paragraph = XmlElement("paragraph")
+        offline["default"].children.append(paragraph)
+        paragraph.children.append(XmlText("Unsent paragraph"))
+    snapshot, receipt = crdt.replace_fragment(baseline, "<p>Replacement</p>", "replacement", previous_version="saved-pin", name="Before replacement")
+    doc = crdt.load_document(snapshot)
+    assert str(doc["default"]) == "<paragraph>Replacement</paragraph>"
+    assert doc["lagniappeReplacements"]["replacement"]["key"] == "saved-pin"
+    assert "initial" in doc["lagniappeReports"]
+    assert crdt.replace_fragment(snapshot, "<p>Wrong retry</p>", "replacement", previous_version="another", name="Retry") == (snapshot, receipt)
+    assert crdt.document_structure(crdt.merge_documents(snapshot, baseline)) == crdt.document_structure(snapshot)
+    branch = crdt.encode_document(offline)
+    left = crdt.merge_documents(snapshot, branch)
+    right = crdt.merge_documents(branch, snapshot)
+    assert crdt.document_structure(left) == crdt.document_structure(right)
+    visible = str(crdt.load_document(left)["default"])
+    assert "Original" not in visible
+    assert ("Unsent paragraph" in visible) == (offline_edit == "new-paragraph")
+    cleared, _ = crdt.replace_fragment(snapshot, "", "clear", previous_version="clear-pin", name="Before clear")
+    assert str(crdt.load_document(crdt.merge_documents(cleared, snapshot))["default"]) == ""
+    assert "replacement" in crdt.load_document(cleared)["lagniappeReports"]

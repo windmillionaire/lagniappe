@@ -1,5 +1,9 @@
-{% set view_entry = "builder" %}
 {% extends "layouts/base.html" %}
+{% set view_entry = "builder" %}
+{% block extras %}
+  <link rel="modulepreload"
+        href="/chunks/builder-controls.js?v={{ CONFIG.BUILD_ID }}">
+{% endblock extras %}
 {% from 'common.html' import desktop %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
@@ -183,7 +187,8 @@
         <div class="{{ styles.home.card.actions }}">
           {{ help('form_settings') }}
           {% if can_generate_form or can_restrict_form %}
-            <button class="{{ styles.toggle.container }}"
+            <button type="button"
+                    class="{{ styles.toggle.container }}"
                     data-role="form-settings"
                     data-kind="{{ form.form_type }}"
                     aria-label="Form settings"

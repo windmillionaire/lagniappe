@@ -2,7 +2,7 @@
 
 from contextlib import ExitStack
 from contextlib import nullcontext
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import replace as replace_intent
 import json
 from uuid import uuid4
@@ -47,7 +47,9 @@ def publish_pending_documents(report, workspace=None):
 # @testable true
 # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
 # @tests tests_unit/test_032h_report_batches.py::test_updates_reuse_loaded_entities_and_merge_final_state
-# @matrix ai-report : batching identity dependencies
+# @tests tests_unit/test_032h_report_batches.py::test_report_inputs_isolate_attachment_changes_from_retries
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
+# @matrix ai-report files : batching identity dependencies attachments recovery
 class WorkingEntities(dict):
     """Resolve saved references once and share staged outputs by key and alias."""
 
@@ -68,6 +70,33 @@ class WorkingEntities(dict):
             entity = self.remember(entity, replace=False)
             self.references[reference] = entity.key
         return entity
+
+    def copy_input(self, entity):
+        """Keep report inputs and their loaded relations outside staged edits."""
+        pending, copied = [entity], []
+        while pending:
+            current = pending.pop()
+            if current.key in self:
+                continue
+            candidate = copy(current)
+            candidate._db = deepcopy(current.db)
+            candidate._processes = deepcopy(current._processes)
+            if hasattr(current, "_assets"):
+                candidate._assets = deepcopy(current._assets)
+            candidate._mutation_intents = list(current.mutation_intents)
+            candidate._properties = candidate._relations = candidate._related_keys = None
+            candidate._details = candidate._to_cache = candidate._readonly = None
+            for relation in current.relations:
+                if relation.is_set:
+                    candidate.properties[relation.id].attach(relation.attached_entities)
+            self[current.key] = self[current.urlsafe_key] = candidate
+            copied.append(candidate)
+            pending.extend(current.related_entities.values())
+        for candidate in copied:
+            for relation in candidate.relations:
+                if relation.is_set:
+                    relation.attach(self)
+        return self[entity.key]
 
     def remember(self, entity, *, replace=True):
         pending = [entity]
@@ -111,7 +140,8 @@ class WorkingEntities(dict):
 # @tests tests_unit/test_032h_report_batches.py::test_batch_failure_and_ambiguous_commit_do_not_duplicate_creations
 # @tests tests_unit/test_032h_report_batches.py::test_documents_upload_before_combined_commit_and_publish_after
 # @tests tests_unit/test_032h_report_batches.py::test_batch_boundaries_resume_without_replaying_completed_work
-# @matrix ai-report : batching atomicity documents dependencies recovery
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
+# @matrix ai-report : batching atomicity documents dependencies recovery attachments
 class ExecutionBatch:
     """Stage final entity states; publish documents only after their receipt commits."""
 
@@ -214,6 +244,10 @@ class ExecutionBatch:
                 report._mutation_intents = previous_intents
 
             publish_pending_documents(report, self.workspace)
+        # Keep report inputs at the last committed state. A later rejected
+        # batch must not retain ownership or summaries from discarded edits.
+        if getattr(report, "input_files", None):
+            report.input_files = [self.workspace.get(file.key, file) for file in report.input_files]
         self.previous_commit = token
         self.previous_documents = []
         self.before = deepcopy(self.result)

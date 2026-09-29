@@ -1,11 +1,12 @@
 from enum import Enum
 
 from ..resources import ModelTask
+from .base import ResourceEnumMixin
 
 from . import model_task_definitions as mtd
 
 
-class ModelTasks(Enum):
+class ModelTasks(ResourceEnumMixin, Enum):
     test_create_model_task = ModelTask(definition=mtd.create_model_task)
     test_create_model_task_with_form = ModelTask(
         definition=mtd.create_model_task_with_form
@@ -32,11 +33,9 @@ class ModelTasks(Enum):
     )
 
     def get(self, user, create=True):
-        self.value.user = user
-        if not self.value.entity and create:
-            return self.value.create()
-        if self.value.entity:
-            project = self.value.project
+        resource = super().get(user, create=create)
+        if resource.key:
+            project = resource.project
             if project.entity:
-                self.value.entity.project = project.entity
-        return self.value
+                resource.entity.project = project.entity
+        return resource

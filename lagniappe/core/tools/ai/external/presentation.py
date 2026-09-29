@@ -157,7 +157,7 @@ def public_plan_proposal(report, user=None):
         action.pop("_schema_change", None)
         action.pop("_entity_update", None)
         data = action.get("data") if isinstance(action, dict) else None
-        if isinstance(data, dict) and action.get("type") in {"create_page", "append_page_document"}:
+        if isinstance(data, dict) and action.get("type") in {"create_page", "append_page_document", "replace_page_document"}:
             data.pop("document", None)
     public.pop("answer_html", None)
     if user is not None:

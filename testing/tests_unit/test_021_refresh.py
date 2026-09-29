@@ -473,6 +473,24 @@ def test_warm_refresh_preserves_rows_without_expanding_relations(monkeypatch, ki
 
 
 # @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
+# @matrix notes cache : masked-touch authorized-refresh
+@pytest.mark.unit
+def test_invalidated_owner_revision_requires_authorized_refresh(monkeypatch):
+    entity = TestEntities.get("PAGE", {"name": "Touched owner", "hash": "touched-owner"})
+    details = {**_cached_row(entity), "revision_stale": True}
+    monkeypatch.setattr("lagniappe.core.tools.polling.refresh._load_cached_details", lambda _hashes: {entity.hash: details})
+    entity.allowed = lambda _action, user: True
+    collection = RefreshCollection("page-index", None, None)
+    with patch.object(Entities, "fetch", return_value=[entity]) as fetch:
+        resolve_refresh_delta(collection, [_manifest(entity)], _viewer())
+    assert fetch.call_count == 1  # Cannot accept the stale cached revision.
+    entity.allowed = lambda _action, user: False
+    with patch.object(Entities, "fetch", return_value=[entity]):
+        delta = resolve_refresh_delta(collection, [_manifest(entity)], _viewer())
+    assert delta.remove == (entity.urlsafe_key,)
+
+
+# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 # @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
 @pytest.mark.unit
 @pytest.mark.parametrize("source_state", ["current", "missing", "legacy-pointer", "before-cache-write"])

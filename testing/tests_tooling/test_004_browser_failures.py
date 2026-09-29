@@ -117,6 +117,47 @@ def test_collector_tracks_only_console_errors_on_existing_and_later_context_page
     ]
 
 
+@pytest.mark.parametrize("console_first", [False, True])
+def test_http_failure_details_preserve_origin_without_changing_error_scopes(console_first):
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+    other_tab = context.new_page()
+    url = "http://test.local/l/poll"
+    message = SimpleNamespace(
+        type="error", text="Failed to load resource: the server responded with a status of 503 ()",
+        location={"url": url, "lineNumber": 0},
+    )
+    def forbidden_read():
+        pytest.fail("Successful response bodies must not be inspected")
+    page.emit("response", SimpleNamespace(status=200, text=forbidden_read))
+    assert collector.events == []
+    other_tab.emit("console", message)
+    with collector.expect_http_error(_user(page), status=503, path="/l/poll", count=1):
+        if console_first:
+            page.emit("console", message)
+        page.emit("response", SimpleNamespace(
+            status=503, url=url, request=SimpleNamespace(method="POST"),
+            headers={"server": "upstream", "x-lagniappe-upstream-status": "502",
+                     "set-cookie": "private", "authorization": "private"},
+            text=lambda: "Unavailable " * 300,
+        ))
+        if not console_first:
+            page.emit("console", message)
+    assert "http_status" not in collector.events[0].details
+    failure = collector.events[1]
+    assert failure.expected_by is not None
+    assert failure.details["http_status"] == "503"
+    assert failure.details["http_method"] == "POST"
+    assert json.loads(failure.details["http_headers"]) == {
+        "server": "upstream", "x-lagniappe-upstream-status": "502",
+    }
+    assert len(failure.details["http_body"]) == 2048
+    with pytest.raises(AssertionError, match="Unexpected browser failures"):
+        collector.assert_clean()
+
+
 def test_expected_request_failure_requires_exact_context_bound_count():
     collector = BrowserFailureCollector()
     first_context = FakeContext()
@@ -343,7 +384,8 @@ def test_http_error_scope_matches_status_path_and_count():
     collector.assert_clean()
 
 
-def test_http_error_scope_supports_bounded_optional_console_reporting():
+@pytest.mark.parametrize("count", [0, 1, 3])
+def test_http_error_scope_supports_optional_console_reporting(count):
     collector = BrowserFailureCollector()
     context = FakeContext()
     collector.monitor_context(context, label="Owner")
@@ -353,12 +395,31 @@ def test_http_error_scope_supports_bounded_optional_console_reporting():
         _user(page),
         status=400,
         path="http://test.local/auth",
-        count=0,
-        max_count=1,
     ):
-        pass
+        for _ in range(count):
+            page.emit("console", SimpleNamespace(
+                type="error",
+                text="Failed to load resource: the server responded with a status of 400 ()",
+                location={"url": "http://test.local/auth", "lineNumber": 0},
+            ))
 
     collector.assert_clean()
+
+
+@pytest.mark.parametrize("status,path", [(403, "/auth"), (400, "/elsewhere")])
+def test_optional_http_diagnostic_does_not_hide_other_errors(status, path):
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+    with collector.expect_http_error(_user(page), status=400, path="/auth"):
+        page.emit("console", SimpleNamespace(
+            type="error",
+            text=f"Failed to load resource: the server responded with a status of {status} ()",
+            location={"url": f"http://test.local{path}", "lineNumber": 0},
+        ))
+    with pytest.raises(AssertionError, match="Unexpected browser failures"):
+        collector.assert_clean()
 
 
 @pytest.mark.parametrize("count", [0, 2])

@@ -1,4 +1,4 @@
-"""Reviewed, attributed, append-only Page document changes."""
+"""Reviewed Page document edits with durable recovery versions and receipts."""
 
 from datetime import datetime, timezone
 from html import escape
@@ -9,6 +9,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.cache.documents import document_write_lock
 from lagniappe.core.tools.document_crdt import (
     append_fragment,
+    replace_fragment,
     load_document,
 )
 from lagniappe.core.tools.document_updates import (
@@ -81,17 +82,29 @@ def _append_page_document(action, report, user, created, context):
             document_source_quote(report, record["document_at"])
             + _data(action)["document"]
         )
-        html = (document.html or "") + addition
-        snapshot, receipt = append_fragment(
-            document.ydoc, addition, record["idempotency_key"], html_after=html
-        )
-        if first_append and page.get_asset("document"):
-            history = Entities.DOCUMENT_HISTORY.create(page)
+        replacing = action["type"] == "replace_page_document"
+        history = None
+        if replacing or (first_append and page.get_asset("document")):
+            history = (
+                Entities.DOCUMENT_HISTORY.create(page)
+                if page.get_asset("document") else
+                Entities.DOCUMENT_HISTORY.create(page, name="Before document replacement", html="", allow_empty=True)
+            )
             if history is None or history.get_asset("document") is None:
-                raise exceptions.ValidationError("Could not preserve the document version; append stopped.")
-            history.name = f"Before report append — {record['document_at']}"
+                raise exceptions.ValidationError("Could not preserve the document version; edit stopped.")
+            history.name = "Before document replacement" if replacing else "Before report append"
             page.add_mutation_intents(
                 MutationIntent.standard(history, reason="report-document-version")
+            )
+        html = addition if replacing else (document.html or "") + addition
+        if replacing:
+            snapshot, receipt = replace_fragment(
+                document.ydoc, html, record["idempotency_key"],
+                previous_version=history.urlsafe_key, name=history.name,
+            )
+        else:
+            snapshot, receipt = append_fragment(
+                document.ydoc, addition, record["idempotency_key"], html_after=html
             )
         document.save(html=html, ydoc=snapshot)
         return page, [], {"document_after": receipt["signature"]}

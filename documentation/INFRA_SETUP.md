@@ -17,6 +17,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | Command | Purpose |
 | --- | --- |
 | no arguments | Install or recover a complete instance. |
+| `--experiments` | Create a dedicated experiments installation with an admin agent, MCP execution and request measurements; see [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md). |
 | `auth` | Refresh the saved gcloud account and align human ADC. |
 | `doctor` | Read-only local/provider audit. |
 | `repair` | Explicit full reconciliation, followed by validation. |

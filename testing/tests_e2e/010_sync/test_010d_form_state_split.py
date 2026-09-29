@@ -62,10 +62,10 @@ def _create_reconciliation_page(user):
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
 def test_form_submission_reconciliation_uses_latest_schema(
-    get_user,
+    get_admin, get_user,
     browser_failures,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     page, form = _create_reconciliation_page(owner)
     page = owner.go(page)
@@ -186,9 +186,9 @@ def test_form_submission_reconciliation_uses_latest_schema(
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
 def test_task_collection_refresh_preserves_active_form_for_revision_review(
-    get_user,
+    get_admin, get_user,
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     task = Task(
         user=owner,

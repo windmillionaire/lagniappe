@@ -16,8 +16,11 @@ permission-bounded read tools as the built-in AI workflows. Ordinary questions
 and task lookups use plan-free reads and are answered in the conversation. Only
 when the user requests saving an answer or workspace changes does the client
 create a Plan. All requests share one contract; the server derives output_kind
-from actions. Proposals require browser approval, and the API never executes
-workspace mutations or calls Lagniappe's model.
+from actions. Ordinary connections require browser approval of proposals. A
+dedicated [experiments installation](INFRA_EXPERIMENTS.md) can grant its admin
+agent the `execute_plan` tool through verified remote MCP; direct API keys
+remain on the browser review workflow. External requests do not call Lagniappe's
+model.
 
 Database operation claims and publication notifications use the shared
 `REPORT_FORMAT_VERSION`, just like report creation and availability checks.
@@ -514,7 +517,7 @@ reference its action id in `move_file.data.to_task_action` and `depends_on`.
 Task Form submissions must contain final values.
 
 The cohesive update contracts are `update_task`, `update_model_task`,
-`update_project`, and `update_page`. Every action supplies an exact `entity`
+`update_project`, `update_page`, and `update_file`. Every action supplies an exact `entity`
 and a nonempty `changes` object. Earlier outputs use `$action_id` references.
 
 ```json
@@ -528,6 +531,15 @@ Use `get_entity(view="edit")` or paginated `get_page_tasks(view="edit")` for
 complete descriptions, answer IDs, revisions, relationships, and shared schemas.
 Contract 10 removes superseded atomic updates and aliases. Schema migrations,
 completion, file movement and document append remain distinct actions.
+
+`update_file` edits the display `name` and/or `description` of an existing File.
+Use `get_entity(view="edit")` for its complete description and editable fields.
+Omitted fields are preserved; `description: null` clears it. The original bytes,
+filename and attachment location remain unchanged. Description search follows
+whether the new description is nonempty, as in File Info, without launching AI
+processing. File edit permission is checked during both review and execution.
+Existing Files need no upload or `file_usage` entry, even when the same Plan also
+organizes new uploads. `summarize_file` remains the summary step for new uploads.
 
 After execution starts, `start_plan(revises_plan_id=..., instructions=...)`
 creates a linked correction. Read its source snapshot and current workspace
@@ -577,21 +589,31 @@ or the on-site builder. There is no external candidate-upload endpoint.
 
 `attach_file` takes `file` (the exact report upload reference) and either `entity`
 (an existing Page, Task, or TaskHistory) or `entity_action` (an earlier Page/Task
-creation action). `entity_name` is display context only. This creates a file
-link, not document text. Completed-occurrence evidence stays on that occurrence.
+creation action). `entity_name` is display context only. Each File has one owning
+Page or Task. An unowned upload acquires that owner; repeating the same attachment
+is a no-op without File writes. An attachment to another owner fails with guidance
+to use `move_file` for an explicit ownership change, or to reference the existing
+File URL elsewhere. Attaching does not convert the File into document text.
+Completed-occurrence evidence stays on that occurrence, owned by its live Task;
+it cannot implicitly move a File from another Page or Task.
 
-`append_page_document` takes `page` or `page_action` and `document_markdown`.
-Supply only the requested addition; it starts a missing document but never
-replaces existing text. New AI-created Page documents and each addition begin
+`append_page_document` and `replace_page_document` take `page` or `page_action`
+and `document_markdown`. Append takes only the requested addition and never
+replaces existing text. Replace takes the full new document and preserves a
+pinned previous version, including an empty starting document. Use replacement
+only when the requested change explicitly replaces the document. New AI-created
+Page documents and each reviewed addition/replacement begin
 with a server-generated UTC timestamp/source quote. Sources distinguish
 Application, Email, Remote MCP, and External API / skill using trusted intake,
 not proposal fields. Manual editor typing receives no header.
 
-Document append execution requires a checkpointed collaborative baseline. Unsaved
+Document edit execution requires a checkpointed collaborative baseline. Unsaved
 edits stop execution for a retry; HTML-only older documents must be opened and
-saved once first. Retry receipts prevent duplicate additions. Edit or remove
-existing text in the document editor.
-See [document sync](SYNC_DOCUMENTS.md#reviewed-document-appends) for persistence.
+saved once first. Retry receipts prevent duplicate application, even if users
+later edit the result. Replacement is a normal CRDT edit, so active/offline
+editors use their ordinary sync path and preserve local drafts before merging.
+Use the editor for selective inline changes.
+See [document sync](SYNC_DOCUMENTS.md#reviewed-document-edits) for persistence.
 
 Pending uploads always block submission. Finalized files classified as
 `organize` require summaries and placements; `evidence` files do not. Uploads
@@ -601,7 +623,10 @@ Submitting actions saves a `ready` report and returns a compact
 receipt with the full `review_url`, shorter creator-session `preview_url`,
 `status_url`, and `proposal_fingerprint`. Present the preview and direct the
 user to review and approve it on the authenticated website. The
-external API deliberately has no `/execute` operation. The existing browser
+ordinary direct API connection cannot use `/execute`. A verified experiments
+MCP connection with `capabilities.execute_plan` may call
+`POST /api/v1/plans/{plan_id}/execute` with the submitted fingerprint and a stable
+operation ID; see [the experiments workflow](INFRA_EXPERIMENTS.md). The existing browser
 Execute control starts the normal deterministic runner and applies the exact
 validated proposal without a model call.
 
@@ -795,7 +820,8 @@ curl --fail-with-body --silent --show-error \
 ```
 
 Present the returned `preview_url` and direct the user to the authenticated
-website to review and approve the proposal there. The API performs no further
+website to review and approve the proposal there, unless the explicitly granted
+experiments `execute_plan` tool is available. Ordinary API connections perform no further
 write step. A client may fetch the plan later to observe its top-level state:
 
 ```bash

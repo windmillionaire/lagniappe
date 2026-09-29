@@ -82,9 +82,9 @@ def _browser_http_context(user):
 # @matrix permissions : authorization-before-cache etag resource-gates
 # @pair cache:permissions
 def test_task_route_is_forbidden_without_model_or_page_permission(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     task = Tasks.test_create_page_task.get(owner)
 
     blocked = get_user(Users.user_no_access)
@@ -118,8 +118,8 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
 
 
 # @pairs task-combine:authorization tasks:history
-def test_task_history_routes_are_forbidden_without_permission(get_user):
-    owner = get_user(Users.OWNER)
+def test_task_history_routes_are_forbidden_without_permission(get_admin, get_user):
+    owner = get_admin()
     task = Tasks.test_create_page_task.get(owner)
 
     blocked = get_user(Users.user_no_access)
@@ -144,8 +144,8 @@ def test_task_history_routes_are_forbidden_without_permission(get_user):
 
 
 # @matrix tasks : permission-gates readonly
-def test_page_task_viewer_sees_task_without_edit_controls(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_task_viewer_sees_task_without_edit_controls(get_admin, get_user):
+    owner = get_admin()
     task = Tasks.test_view_only_page_task.get(owner)
 
     viewer = get_user(Users.page_acl_one_visible)
@@ -165,8 +165,8 @@ def test_page_task_viewer_sees_task_without_edit_controls(get_user):
 
 # @matrix tasks : completed-only empty-state
 # @template pages/tasks.html::task_list
-def test_completed_only_task_list_hides_empty_marker(get_user):
-    owner = get_user(Users.OWNER)
+def test_completed_only_task_list_hides_empty_marker(get_admin, get_user):
+    owner = get_admin()
     task = Tasks.test_completed_only_page_task.get(owner)
     if not task.entity.completed:
         task.mark_completed()
@@ -183,8 +183,8 @@ def test_completed_only_task_list_hides_empty_marker(get_user):
 # @matrix tasks : attached-form empty-fields permission-gates readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
-def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_user):
-    owner = get_user(Users.OWNER)
+def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_admin, get_user):
+    owner = get_admin()
     task = Tasks.test_view_only_page_task_with_empty_form.get(owner)
 
     viewer = get_user(Users.page_acl_one_visible)
@@ -214,8 +214,8 @@ def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_us
 
 
 # @matrix tasks : assignee permission-gates
-def test_assigned_user_can_work_their_assigned_task(get_user):
-    owner = get_user(Users.OWNER)
+def test_assigned_user_can_work_their_assigned_task(get_admin, get_user):
+    owner = get_admin()
     assignee = get_user(Users.create_user)
     Tasks.test_filter_by_assigned_user.get(owner)
     task = Tasks.test_assigned_permission_task.get(owner)
@@ -229,8 +229,8 @@ def test_assigned_user_can_work_their_assigned_task(get_user):
 
 
 # @matrix file pages tasks : submitted-reference
-def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_user):
-    owner = get_user(Users.OWNER)
+def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_admin, get_user):
+    owner = get_admin()
     category = Categories.test_create_category_manual_mode.get(owner)
     hidden_file_resource = File.upload_from_page(
         owner,
@@ -320,8 +320,8 @@ def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_us
 
 
 # @pair tasks:signed-claim
-def test_new_task_attachment_claim_is_required_and_scope_bound(get_user):
-    owner = get_user(Users.OWNER)
+def test_new_task_attachment_claim_is_required_and_scope_bound(get_admin, get_user):
+    owner = get_admin()
     category = Categories.test_create_category_manual_mode.get(owner)
     upload_page = _submitted_reference_page(category, "upload")
     other_page = _submitted_reference_page(category, "other-scope")

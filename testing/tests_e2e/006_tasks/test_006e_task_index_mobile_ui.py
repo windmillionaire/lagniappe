@@ -12,7 +12,7 @@ Verified against:
 import pytest
 from playwright.sync_api import expect
 
-from testing.definitions import SitePages, Tasks, Users
+from testing.definitions import SitePages, Tasks
 from testing.elements import MobileTableControls
 from testing.resources.site import TaskIndex
 
@@ -20,8 +20,8 @@ pytestmark = pytest.mark.e2e
 
 
 # @matrix table-controls : columns mobile-controls
-def test_task_index_mobile_controls_open_with_task_columns(get_user):
-    user = get_user(Users.OWNER)
+def test_task_index_mobile_controls_open_with_task_columns(get_admin, get_user):
+    user = get_admin()
     Tasks.test_mobile_index_task.get(user)
     user.go(SitePages.TASK_INDEX)
 
@@ -38,8 +38,8 @@ def test_task_index_mobile_controls_open_with_task_columns(get_user):
 
 
 # @matrix table-controls : column-visibility mobile-controls
-def test_task_index_mobile_visibility_toggle_hides_column(get_user):
-    user = get_user(Users.OWNER)
+def test_task_index_mobile_visibility_toggle_hides_column(get_admin, get_user):
+    user = get_admin()
     Tasks.test_mobile_index_task.get(user)
     user.go(SitePages.TASK_INDEX)
     user.mobile = True
@@ -55,8 +55,8 @@ def test_task_index_mobile_visibility_toggle_hides_column(get_user):
 
 
 # @matrix table-controls : mobile-controls sorting
-def test_task_index_mobile_filter_button_opens_sorting_panel(get_user):
-    user = get_user(Users.OWNER)
+def test_task_index_mobile_filter_button_opens_sorting_panel(get_admin, get_user):
+    user = get_admin()
     Tasks.test_mobile_index_task.get(user)
     user.go(SitePages.TASK_INDEX)
     user.mobile = True

@@ -366,7 +366,7 @@ def _reference_key(reference):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_report_file_by_exact_url_and_file_prefix
 # @matrix ai-report files : deterministic-run exact-id report-file-reference
-def _resolve_report_file(reference, report):
+def _resolve_report_file(reference, report, created=None):
     if isinstance(reference, dict):
         reference = (
             reference.get("file")
@@ -382,6 +382,10 @@ def _resolve_report_file(reference, report):
             candidate in {file.urlsafe_key, file.key, file.name, file.filename}
             for candidate in references
         ):
+            if hasattr(created, "copy_input"):
+                # Report inputs outlive a rejected batch. Mutate only the
+                # workspace's copy, reusing any already-staged File edits.
+                return created.copy_input(file)
             return file
 
     raise exceptions.ValidationError("Referenced report file was not found.")

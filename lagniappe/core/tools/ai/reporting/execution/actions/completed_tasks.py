@@ -534,7 +534,7 @@ def _page_task_candidates(page):
     if not candidates:
         try:
             candidates.extend(page.tasks or [])
-            candidates.extend(page.completed or [])
+            candidates.extend(page.completed_tasks or [])
         except Exception:
             pass
 

@@ -113,16 +113,21 @@ def _pytest_command(
     targets=(),
     *,
     environment="standard",
+    experiments=False,
+    parallel=False,
+    suites=("unit", "js", "tooling", "e2e"),
+    report="junit.xml",
 ) -> list[str]:
     if environment not in HOSTED_E2E_ENVIRONMENTS:
         raise RuntimeError("Hosted E2E job received an invalid environment.")
     targets = tuple(targets or ())
-    if not targets:
+    if parallel:
+        pytest_targets = ["--parallel"]
+    elif experiments:
+        pytest_targets = ["--experiments=all" if experiments == "all" else "--experiments"]
+    elif not targets:
         pytest_targets = [
-            "unit",
-            "js",
-            "tooling",
-            "e2e",
+            *suites,
             "-m",
             "not unfinished",
         ]
@@ -136,10 +141,47 @@ def _pytest_command(
         sys.executable,
         str(REPOSITORY_ROOT / "run.py"),
         "test",
-        "--strict",
+        *([] if experiments or parallel else ["--strict"]),
         *pytest_targets,
-        f"--junitxml={HOSTED_REPORT_ROOT / 'junit.xml'}",
+        f"--junitxml={HOSTED_REPORT_ROOT / report}",
     ]
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_run_merges_all_phases_without_hiding_failure
+# @matrix hosted-e2e testing : suite-scope result-aggregation failure-retention
+def _run_complete_suites(environment):
+    """Keep non-browser suites serial, then coordinate the complete E2E suite."""
+    from runner.pytest_reports import merge_junit_reports
+    from testing.utility.traceability_common import load_json
+    from testing.utility.traceability_results import _write_manifest
+
+    # Each hosted execution owns its container. Historical or partial evidence
+    # must never masquerade as part of this execution's complete selection.
+    EVIDENCE_PATH.unlink(missing_ok=True)
+    destination = HOSTED_REPORT_ROOT / "junit.xml"
+    destination.unlink(missing_ok=True)
+    statuses, reports = [], []
+    for name, options in (
+        ("support", {"suites": ("unit", "js", "tooling")}),
+        ("e2e", {"parallel": True}),
+    ):
+        report = HOSTED_REPORT_ROOT / f"{name}.xml"
+        report.unlink(missing_ok=True)
+        reports.append(report)
+        print(f"Hosted suite phase: {name}", flush=True)
+        result = subprocess.run(
+            _pytest_command(environment=environment, report=report.name, **options),
+            cwd=REPOSITORY_ROOT,
+        )
+        statuses.append(result.returncode)
+    status = next((code for code in statuses if code), 0)
+    merge_junit_reports(reports, destination)
+    evidence = load_json(EVIDENCE_PATH)
+    if not evidence or evidence.get("kind") != "test-run":
+        raise RuntimeError("Hosted phases did not produce traceability evidence")
+    _write_manifest(REPOSITORY_ROOT, _pytest_command(environment=environment), evidence["tests"], status)
+    return status
 
 
 def _artifact_manifest(
@@ -261,23 +303,34 @@ def main(arguments=None) -> int:
         default=[],
         help="Run one test nodeid; repeat for more. Omit to run all complete suites.",
     )
+    parser.add_argument("--experiments", nargs="?", const="pilot", choices=("pilot", "all"), help="Run coordinated E2E: pilot or all.")
     args = parser.parse_args(arguments)
 
     environment = _hosted_environment()
-    targets = validate_focused_targets(args.target) if args.target else ()
-    suite = "focused" if targets else "all"
+    if args.experiments and args.target:
+        parser.error("--experiments cannot be combined with --target")
+    if args.experiments and args.experiments != "all":
+        from runner.e2e_pilot import TARGETS
+        targets = validate_focused_targets(TARGETS)
+    else:
+        targets = validate_focused_targets(args.target) if args.target else ()
+    suite = "e2e" if args.experiments == "all" else "focused" if targets else "all"
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
     started_at = datetime.now(timezone.utc)
-    result = subprocess.run(
-        _pytest_command(targets, environment=environment),
-        cwd=REPOSITORY_ROOT,
-    )
+    if suite == "all":
+        exit_status = _run_complete_suites(environment)
+    else:
+        result = subprocess.run(
+            _pytest_command(targets, environment=environment, experiments=args.experiments),
+            cwd=REPOSITORY_ROOT,
+        )
+        exit_status = result.returncode
     finished_at = datetime.now(timezone.utc)
     manifest = _artifact_manifest(
         suite=suite,
-        exit_status=result.returncode,
+        exit_status=exit_status,
         execution=execution,
         started_at=started_at,
         finished_at=finished_at,
@@ -288,13 +341,13 @@ def main(arguments=None) -> int:
         _upload_artifacts(manifest)
     except Exception as error:
         print(f"Hosted E2E artifact upload failed: {error}", file=sys.stderr)
-        return result.returncode or 2
+        return exit_status or 2
     print(
         "Hosted E2E artifacts uploaded to "
         f"gs://{os.environ['LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET']}/"
         f"executions/{execution}/"
     )
-    return result.returncode
+    return exit_status
 
 
 if __name__ == "__main__":

@@ -23,5 +23,8 @@
     },
     "search.exclude": {
         "**/lagniappe/web/static": true
+    },
+    "[django-html][jinja][jinja-html][jinja2][html]": {
+        "editor.defaultFormatter": "monosans.djlint"
     }
 }

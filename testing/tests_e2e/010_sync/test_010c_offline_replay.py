@@ -5,7 +5,9 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.web import app
 from testing.definitions import Projects, SitePages, Users
+from testing.resources.core import SiteResource
 from testing.utility.network import expect_successful_response
 from testing.utility.offline import (
     expect_offline_sync_replay,
@@ -19,8 +21,125 @@ SYNC_TEXT_FIELD = "sync-text"
 OFFLINE_INDICATOR = "[data-role='offline']"
 
 
+# @matrix offline sync : cached-read empty-content reload save-guard
+# @template pages/document.html::document_tab
+# @template projects/document.html::document_tab
+@pytest.mark.parametrize("kind,content", [("page", "Read without editing"), ("project", "")])
+def test_read_document_survives_offline_reload_without_saving(get_admin, get_user, browser_failures, kind, content):
+    user = get_admin()
+    with app.test_request_context("/"):
+        entity = getattr(Entities, kind.upper()).create({"name": _unique("offline-read")})
+        if content:
+            entity.properties.document.html = f"<p>{content}</p>"
+        Entities.save(entity)
+    before = dict(Entities.fetch_one(entity.key, request=Fetch.root()).db)
+    url = f"{kind}s/{entity.urlsafe_key}?tab=document"
+    sync_id = entity.sync_ids["document"]["id"]
+    writes = []
+
+    def observe(request):
+        if request.method == "POST" and request.url.endswith("/l/sync"):
+            writes.extend((request.post_data_json or {}).get("updates", []))
+
+    user.page.on("request", observe)
+    user.go(SiteResource(url=url, user=user))
+    editor = user.locate("#document [data-role='editor']")
+    expect(editor).to_have_attribute("initialized", "")
+    expect(editor).to_have_text(content)
+    user.page.wait_for_function("Boolean(navigator.serviceWorker.controller)")
+    # Repeat under worker control so the HTML and its used assets are cached.
+    user.page.reload()
+    expect(editor).to_have_attribute("initialized", "")
+    expect(editor).to_have_text(content)
+    user.page.wait_for_function("""async () => {
+        const cache = await caches.open('response-cache');
+        const entries = await cache.keys();
+        const document = entries.find(key => new URL(key.url).pathname.startsWith('/offline-document/'));
+        if (!document || !await cache.match(location.href)) return false;
+        const assets = performance.getEntriesByType('resource').map(entry => entry.name)
+            .filter(url => new URL(url).origin === location.origin && /\\.(js|css)(\\?|$)/.test(url));
+        return (await Promise.all(assets.map(url => caches.match(url)))).every(Boolean);
+    }""", timeout=60000)
+    try:
+        with (
+            browser_failures.expect_offline(user, ping_count=2, max_ping_count=3),
+            browser_failures.expect_http_error(user, status=503, path="/analytics/track", count=1, max_count=1),
+            browser_failures.expect_http_error(user, status=503, path="/l/poll", count=0, max_count=2),
+        ):
+            _go_offline(user)
+            user.page.reload()
+            expect(editor).to_have_attribute("initialized", "", timeout=30000)
+            expect(editor).to_have_text(content)
+            expect(user.locate("[data-role='document-status']")).not_to_be_attached()
+            wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
+        user.offline = False
+        wait_for_connectivity_replay(user)
+        expect(editor).to_have_text(content)
+        assert not any(update.get("save") or update.get("touch_parent") or update.get("update") for update in writes)
+        after = Entities.fetch_one(entity.key, request=Fetch.root()).db
+        # Page reads may populate the unrelated empty-notes hint.
+        for field in ("modified", "assets", "document_history"):
+            assert after.get(field) == before.get(field)
+    finally:
+        user.offline = False
+        user.page.remove_listener("request", observe)
+
+
 def _unique(label):
     return f"test-sync-{label}-{uuid4().hex[:8]}"
+
+
+# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument.sync
+# @source lagniappe/core/tools/document_history.py::recovery_pin
+# @matrix editor sync : replacement recovery offline-replay
+# @matrix document-history : recovery
+# @template projects/document.html::document_tab
+@pytest.mark.parametrize("headless", [False, True])
+def test_offline_draft_is_pinned_before_document_replacement(get_admin, browser_failures, headless):
+    from lagniappe.core.tools.document_crdt import append_fragment, replace_fragment
+    from lagniappe.core.tools.document_updates import save_checkpoint
+    from lagniappe.core.tools.database import get as database_get
+    from testing.resources import Project
+
+    owner = get_admin()
+    entity = Entities.PROJECT.create({"name": _unique("replacement-recovery")})
+    baseline, _ = append_fragment(None, "<p>Original paragraph</p>", "seed")
+    entity.properties.document.save(html="<p>Original paragraph</p>", ydoc=baseline)
+    Entities.save(entity)
+    project = Project(user=owner)
+    project.entity = entity
+    owner.go(project)
+    editor = project.editor
+    expect(editor.text_entry).to_have_text("Original paragraph")
+    sync_id = entity.sync_ids["document"]["id"]
+    draft = _unique("unsent-local-text")
+    _offline_document_edit(owner, browser_failures, editor, draft, sync_id=sync_id)
+
+    current = Entities.fetch_one(entity.key, request=Fetch.direct())
+    previous = Entities.DOCUMENT_HISTORY.create(current)
+    previous.name = "Before replacement"
+    Entities.save(previous)
+    replacement, _ = replace_fragment(current.properties.document.ydoc, "<p>Replacement shared text</p>", "replace", previous_version=previous.urlsafe_key, name=previous.name)
+    save_checkpoint(current, html="<p>Replacement shared text</p>", ydoc=replacement)
+
+    if headless:
+        _replace_page(owner)
+    with owner.page.expect_response("**/document/history/pin") as recovery_response:
+        if headless:
+            owner.go(SitePages.HOME)
+        else:
+            owner.offline = False
+            wait_for_connectivity_replay(owner)
+    assert recovery_response.value.ok
+    recovered = recovery_response.value.json()["entry"]
+    assert recovered["name"].startswith("Recovered local edits")
+    wait_for_offline_sync_records(owner, sync_id=sync_id, exact=0)
+    owner.go(project)
+    expect(project.editor.text_entry).to_have_text("Replacement shared text")
+    versions = Entities.fetch(*database_get.document_history(current), request=Fetch.root())
+    saved_drafts = [version for version in versions if version.urlsafe_key == recovered["key"]]
+    assert len(saved_drafts) == 1
+    assert draft in saved_drafts[0].get_asset("document").get()
 
 
 def _document_save_response(*parts):
@@ -101,8 +220,8 @@ def _reconnect_with_sync(user, sync_id):
 
 
 # @matrix sync : offline-replay queue-clear replay-order
-def test_offline_document_edits_replay_in_order(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_offline_document_edits_replay_in_order(get_admin, get_user, browser_failures):
+    user = get_admin()
     project = Projects.test_offline_document_replay.get(user)
     user.go(project)
     editor = project.editor
@@ -127,8 +246,8 @@ def test_offline_document_edits_replay_in_order(get_user, browser_failures):
 
 
 # @matrix sync : offline-replay queue-preserved
-def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, browser_failures):
+    user = get_admin()
     project = Projects.test_offline_document_retry.get(user)
     user.go(project)
     editor = project.editor
@@ -191,9 +310,9 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
 # @matrix polling : current-state cursor document
 # @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
 def test_headless_offline_replay_merges_concurrent_remote_edits(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
+    owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_offline_document_concurrent_replay.get(owner)
     document_sync_id = project.entity.sync_ids["document"]["id"]

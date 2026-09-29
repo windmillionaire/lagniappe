@@ -478,6 +478,9 @@ def _project_runtime_settings(app_settings, overrides, environment):
                 "ANALYTICS": True,
                 "AI_OBSERVABILITY": True,
                 "PUBLIC_MANUAL": True,
+                "EXPERIMENTS_ENABLED": False,
+                "EXPERIMENTS_EXECUTION_ENABLED": False,
+                "EXPERIMENTS_DIAGNOSTICS": "off",
             }
         )
     projected.update(overrides)

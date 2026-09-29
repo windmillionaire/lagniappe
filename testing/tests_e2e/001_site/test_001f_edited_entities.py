@@ -44,6 +44,8 @@ def poll(user, subscriptions):
 
 
 # @matrix polling : authorization batching channel entity fingerprint identifiers permissions protocol revision unavailable validation
+@pytest.mark.e2e_group("owner")
+@pytest.mark.e2e_serial
 def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.test_sync_form_page.get(owner)
@@ -177,6 +179,7 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
 # @matrix notifications : cold-seed ping redis-projection
 # @matrix polling : personal-state piggyback
 # @pair web-headers:notification-state
+@pytest.mark.e2e_group("owner")
 def test_cold_notification_state_seeds_through_one_poll(get_user):
     owner = get_user(Users.OWNER)
     actor = Entities.USER.load(owner.email)

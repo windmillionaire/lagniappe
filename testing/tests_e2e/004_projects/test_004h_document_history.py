@@ -25,16 +25,16 @@ from playwright.sync_api import expect
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import Fetch
 
-from testing.definitions import Projects, Users
-from testing.utility.network import assert_lagniappe_error_response
+from testing.definitions import Projects
+from testing.utility.network import assert_lagniappe_error_response, expect_successful_response
 
 
 pytestmark = pytest.mark.e2e
 
 
 # @pair editor:history-list
-def test_document_saves_do_not_create_automatic_history(get_user):
-    user = get_user(Users.OWNER)
+def test_document_saves_do_not_create_automatic_history(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_document_history_created)
     editor = project.editor
 
@@ -68,13 +68,15 @@ def test_document_saves_do_not_create_automatic_history(get_user):
     panel = user.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
     expect(panel.get_by_role("option", name="Clear Unpinned Versions")).to_have_count(0)
-    expect(panel.get_by_role("option")).to_have_count(1)
+    expect(panel.get_by_role("option", name="Storage backups", exact=True)).to_be_visible()
+    expect(panel.get_by_role("option")).to_have_count(2)
     expect(editor.text_entry).to_have_text("Second version of the document")
 
 
 # @pair editor:history-restore
-def test_document_history_restore(get_user):
-    user = get_user(Users.OWNER)
+# @matrix editor sync : preview restore
+def test_document_history_restore(get_admin, get_user):
+    user = get_admin()
     project = user.go(Projects.test_document_history_restore)
     editor = project.editor
 
@@ -107,18 +109,47 @@ def test_document_history_restore(get_user):
     with user.page.expect_response("**/history/*"):
         earliest_history.click()
 
+    preview = user.page.locator('[data-role="document-version-preview"]')
+    expect(preview.locator('[data-role="version-content"]')).to_have_text("Original content to preserve")
+    expect(preview.locator('[contenteditable="false"]')).to_be_visible()
+    preview.get_by_role("button", name="Back to current").click()
+    expect(editor.text_entry).to_have_text("Replacement content")
+    editor.history.get_by_role("option", name=re.compile(r"Original notes — .+")).click()
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/sync",
+        request_payload_contains=['"save":true', "Original content to preserve"],
+    ):
+        preview.get_by_role("button", name="Restore this version").click()
+    expect(preview).not_to_be_attached()
+    notice = user.page.locator('[data-role="document-version-notice"]')
+    expect(notice).to_contain_text("Version restored")
     expect(editor.text_entry).to_contain_text("Original content to preserve")
-    editor.focus()
-    editor.blur()
+    notice.get_by_role("button", name="View previous version").click()
+    expect(preview.locator('[data-role="version-content"]')).to_have_text("Replacement content")
+    expect(notice).to_be_hidden()
+    preview.get_by_role("button", name="Back to current").click()
+    expect(notice).to_be_visible()
+    expect(editor.text_entry).to_have_text("Original content to preserve")
     user.go(project)
     expect(project.editor.text_entry).to_have_text("Original content to preserve")
+    # Restored content remains the editable live document, and its recovery pin
+    # still offers the version that was current before restoration.
+    editor = project.editor
+    editor.type_text(" Further edits")
+    editor.blur()
+    editor.history.get_by_role("option", name=re.compile(r"Before document restore — .+")).click()
+    expect(preview.locator('[data-role="version-content"]')).to_have_text("Replacement content")
+    preview.get_by_role("button", name="Back to current").click()
+    expect(editor.text_entry).to_contain_text("Further edits")
 
 
 # @matrix editor : confirmation current-content history-clear history-pin history-positioning parent-scope validation
 # @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
-def test_pin_and_clear_document_history(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_pin_and_clear_document_history(get_admin, get_user, browser_failures):
+    user = get_admin()
     project = user.go(Projects.test_document_history_pinned)
     other_project = Projects.test_formatting_persists.get(user)
     editor = project.editor
@@ -202,7 +233,9 @@ def test_pin_and_clear_document_history(get_user, browser_failures):
     expect(pinned_option).to_be_visible()
     with user.page.expect_response("**/document/history/*"):
         pinned_option.click()
-    expect(editor.text_entry).to_have_text("Pinned but not saved checkpoint")
+    preview = user.page.locator('[data-role="document-version-preview"]')
+    expect(preview.locator('[data-role="version-content"]')).to_have_text("Pinned but not saved checkpoint")
+    preview.get_by_role("button", name="Back to current").click()
 
     # Keep the parent-scope route boundary here: lower-level entity tests own
     # ordering and cleanup, but cannot exercise the deployed permission route.
@@ -262,3 +295,50 @@ def test_pin_and_clear_document_history(get_user, browser_failures):
                 "edge": edge,
             },
         )
+
+
+# @source lagniappe/core/tools/document_history.py::list_backups
+# @source lagniappe/core/tools/document_history.py::read_backup
+# @matrix editor document-history : backups permissions preview
+# @template projects/document.html::document_tab
+def test_storage_backup_preview_is_read_only(get_admin, get_user):
+    from uuid import uuid4
+    from lagniappe.core.tools.document_crdt import append_fragment
+    from testing.resources import Project
+
+    user = get_admin()
+    entity = Entities.PROJECT.create({"name": f"test-storage-history-{uuid4().hex[:8]}"})
+    snapshot, _ = append_fragment(None, "<p>Retained storage version</p>", "seed")
+    entity.properties.document.save(html="<p>Retained storage version</p>", ydoc=snapshot)
+    Entities.save(entity)
+    snapshot, _ = append_fragment(snapshot, "<p>Current addition</p>", "add")
+    entity.properties.document.save(html="<p>Retained storage version</p><p>Current addition</p>", ydoc=snapshot)
+    Entities.save_document_checkpoint(entity)
+    project = Project(user=user)
+    project.entity = entity
+    user.go(project)
+    editor = project.editor
+    expect(editor.text_entry).to_contain_text("Current addition")
+    before = Entities.fetch_one(entity.key, request=Fetch.root()).db["assets"]
+    with user.page.expect_response("**/history/backups?*") as listing:
+        editor.history.get_by_role("option", name="Storage backups", exact=True).click()
+    assert listing.value.ok
+    backup = user.page.get_by_role("option", name=re.compile(r"Storage backup — .+"))
+    expect(backup).to_have_count(1)
+    backup.click()
+    preview = user.page.locator('[data-role="document-version-preview"]')
+    expect(preview.locator('[data-role="version-content"]')).to_have_text("Retained storage version")
+    preview.get_by_role("button", name="Back to current").click()
+    expect(editor.text_entry).to_contain_text("Current addition")
+    assert Entities.fetch_one(entity.key, request=Fetch.root()).db["assets"] == before
+
+    other = Projects.test_formatting_persists.get(user)
+    token = listing.value.json()["entries"][0]["key"]
+    cross_document = requests.get(
+        f"{user.page.url.split('/projects/', 1)[0]}/assets/{other.key}/document/history/backups/{token}",
+        cookies={cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()},
+        headers={"X-Lagniappe-Request": "true"}, allow_redirects=False, timeout=10,
+    )
+    assert cross_document.status_code == 422
+    assert "Invalid or expired backup" in cross_document.text
+    assert "Retained storage version" not in cross_document.text

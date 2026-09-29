@@ -9,6 +9,7 @@ from ..mutations import (
 )
 from ..mutations.delete import plan_delete
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.measurements import timed
 
 
 # @testable infrastructure
@@ -141,6 +142,7 @@ class EntityRegistry:
     # @matrix entities : batch explicit-fetch-depth
     # @matrix relations : direct nested root
     # @pairs entities:fetch entities:no-extra-read entities:typed-entity relations:stale-key
+    @timed("entity", "fetch")
     def fetch(self, *identifiers, request):
         """Load unique roots in caller order, then expand to the requested depth.
 

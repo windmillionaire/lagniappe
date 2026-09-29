@@ -286,7 +286,8 @@ def _form_versions(roots, hashes, details):
 # @reason cached row identity and base revisions are checked before skipping a render
 def _cached_fingerprint(key, kind, details, root=None, *, form_version=None):
     if (
-        form_version is None or identify_entity(details) != (key, kind)
+        details.get("revision_stale")
+        or form_version is None or identify_entity(details) != (key, kind)
         or (root is not None and (
             not getattr(root, "modified", None)
             or details.get("modified") != base_fingerprint(root.modified or root.created)
@@ -313,6 +314,7 @@ def _cached_fingerprint(key, kind, details, root=None, *, form_version=None):
 # @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
 # @matrix reconnect-refresh : root-fingerprint membership
 # @matrix reconnect-refresh user-index : page-canonical authorization
+# @matrix notes cache : masked-touch authorized-refresh
 # @matrix user-index : page-canonical user-fields no-extra-read
 def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
     """Compare cached fingerprints and expand only rows needing authorization."""

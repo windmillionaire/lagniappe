@@ -45,7 +45,8 @@
     </p>
     <nav class="{{ styles.search.pagination.navigation }}">
       {% if pagination.previous != None %}
-        <button data-page="{{ pagination.previous }}"
+        <button type="button"
+                data-page="{{ pagination.previous }}"
                 data-role="pagination"
                 data-kind="default"
                 class="{{ styles.search.pagination.button }}">
@@ -54,7 +55,8 @@
         </button>
       {% endif %}
       {% if pagination.next %}
-        <button data-page="{{ pagination.next }}"
+        <button type="button"
+                data-page="{{ pagination.next }}"
                 data-role="pagination"
                 data-kind="default"
                 class="{{ styles.search.pagination.button }}">

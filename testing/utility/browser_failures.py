@@ -16,6 +16,10 @@ from .artifacts import TEST_RUNS_DIR
 
 logger = logging.getLogger(__name__)
 DIAGNOSTIC_PATH = TEST_RUNS_DIR / "browser_failure_diagnostics.json"
+HTTP_DIAGNOSTIC_HEADERS = frozenset({
+    "content-type", "server", "x-cloud-trace-context", "x-lagniappe-error",
+    "x-lagniappe-upstream-status", "x-lagniappe-upstream-server",
+})
 
 
 @dataclass
@@ -27,6 +31,7 @@ class BrowserFailure:
     context_label: str
     page_url: str
     details: dict[str, str | None]
+    page_id: int | None = None
     expected_by: str | None = None
     ignored_reason: str | None = None
 
@@ -69,6 +74,7 @@ class BrowserFailureCollector:
         self.events: list[BrowserFailure] = []
         self._contexts: dict[int, tuple[str, list[str] | None]] = {}
         self._pages: set[int] = set()
+        self._http_failures: dict[tuple[int, str], dict[str, str]] = {}
 
     def monitor_context(
         self,
@@ -92,7 +98,7 @@ class BrowserFailureCollector:
         user: Any,
         *,
         kind: str,
-        count: int = 1,
+        count: int | None = 1,
         max_count: int | None = None,
         method: str | None = None,
         path: str | None = None,
@@ -106,9 +112,9 @@ class BrowserFailureCollector:
         source_path: str | None = None,
     ) -> "ExpectedBrowserFailure":
         """Return a scope that consumes an intentional failure pattern."""
-        if count < 0:
+        if count is not None and count < 0:
             raise ValueError("Expected browser failure count cannot be negative.")
-        if max_count is not None and max_count < count:
+        if max_count is not None and max_count < (count or 0):
             raise ValueError(
                 "Maximum browser failure count must be at least the minimum count."
             )
@@ -138,10 +144,10 @@ class BrowserFailureCollector:
         *,
         status: int,
         path: str,
-        count: int = 1,
+        count: int | None = None,
         max_count: int | None = None,
     ) -> "ExpectedBrowserFailure":
-        """Account for an intentional HTTP error reported by Chromium."""
+        """Allow Chromium's optional diagnostic; callers assert the HTTP/UI result."""
         source_path = urlsplit(path).path
         return self.expect(
             user,
@@ -224,6 +230,34 @@ class BrowserFailureCollector:
         page.on("console", lambda message: self._capture_console(page, message))
         page.on("pageerror", lambda error: self._capture_pageerror(page, error))
         page.on("requestfailed", lambda request: self._capture_request(page, request))
+        page.on("response", lambda response: self._capture_response(page, response))
+
+    def _capture_response(self, page: Any, response: Any) -> None:
+        """Enrich existing console failures without changing expected-error rules."""
+        if response.status < 500:
+            return
+        details = {
+            "http_status": str(response.status),
+            "http_method": response.request.method,
+            "http_headers": json.dumps({
+                key: value for key, value in response.headers.items()
+                if key.lower() in HTTP_DIAGNOSTIC_HEADERS
+            }, sort_keys=True),
+        }
+        try:
+            details["http_body"] = response.text()[:2048]
+        except Exception:
+            details["http_body"] = "Unavailable after navigation/context close"
+        self._http_failures[id(page), response.url] = details
+        if len(self._http_failures) > 100:
+            self._http_failures.pop(next(iter(self._http_failures)))
+        # Chromium may deliver its console message before or after the response.
+        for event in self.events:
+            if (event.page_id == id(page)
+                    and event.kind == "console"
+                    and event.details.get("source_url") == response.url
+                    and "Failed to load resource" in (event.details.get("text") or "")):
+                event.details.update(details)
 
     def _context(self, page: Any) -> tuple[int, str, list[str] | None]:
         context_id = id(page.context)
@@ -239,6 +273,7 @@ class BrowserFailureCollector:
                 context_label=label,
                 page_url=page.url,
                 details=details,
+                page_id=id(page),
             )
         )
 
@@ -268,8 +303,13 @@ class BrowserFailureCollector:
                     if location.get("lineNumber") is not None
                     else None,
                 },
+                page_id=id(page),
             )
         )
+        if "Failed to load resource" in message.text:
+            self.events[-1].details.update(
+                self._http_failures.get((id(page), source_url), {})
+            )
         if (
             message.text
             == "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
@@ -315,14 +355,14 @@ class ExpectedBrowserFailure(AbstractContextManager[None]):
         *,
         context_id: int,
         kind: str,
-        count: int,
+        count: int | None,
         max_count: int | None,
         criteria: dict[str, str | None],
     ):
         self.collector = collector
         self.context_id = context_id
         self.kind = kind
-        self.min_count = count
+        self.min_count = count or 0
         self.max_count = count if max_count is None else max_count
         self.criteria = criteria
         self.start_index = 0
@@ -343,9 +383,12 @@ class ExpectedBrowserFailure(AbstractContextManager[None]):
         description = self._description()
         for event in matches:
             event.expected_by = description
-        if not self.min_count <= len(matches) <= self.max_count:
+        if len(matches) < self.min_count or (
+            self.max_count is not None and len(matches) > self.max_count
+        ):
             expected_count = (
-                str(self.min_count)
+                f"at least {self.min_count}"
+                if self.max_count is None else str(self.min_count)
                 if self.min_count == self.max_count
                 else f"between {self.min_count} and {self.max_count}"
             )

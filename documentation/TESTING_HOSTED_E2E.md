@@ -36,7 +36,10 @@ Its invoker can execute the exact Cloud Run job and read only the dedicated
 seven-day result bucket.
 
 The runner image excludes `config/files/`. Secret Manager mounts the settings
-and optional Redis CA into the Cloud Run job. The App Engine version receives
+and optional Redis CA into separate directories under `/var/run/secrets/` in
+the Cloud Run job. Image symlinks expose the fixed `config/files/` paths;
+mounting both secrets directly there would make their directory volumes collide.
+The App Engine version receives
 settings through the trusted local deployment boundary.
 
 Dynamic application/testing routes are gated. A run exchanges an ID token for
@@ -177,6 +180,128 @@ ephemeral App Engine version, and removes only that version's test-bucket CORS
 origin.
 
 Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
+
+## Coordinated E2E workers
+
+Normal `hosted-e2e execute` and CI use one Cloud Run coordinator with six
+browser workers by default. Unit, JavaScript and tooling tests run first in
+their existing environments; the complete E2E selection then runs concurrently.
+Both phases contribute to one JUnit report and traceability manifest with
+`all` scope. A failure in either phase fails the run. Application experiments
+mode and measurement diagnostics remain disabled.
+
+```bash
+# Default hosted/CI profile: one B4 candidate, six Gunicorn and browser workers.
+venv/bin/python run.py hosted-e2e create
+venv/bin/python run.py hosted-e2e execute
+# Local complete coordinated E2E, three browsers by default:
+venv/bin/python run.py test --parallel
+venv/bin/python run.py test --parallel --workers=6
+# Optional smaller hosted profile:
+venv/bin/python run.py hosted-e2e create --workers=3
+# Legacy bounded pilot and E2E-only hosted selection remain available:
+venv/bin/python run.py test --experiments
+venv/bin/python run.py hosted-e2e execute --experiments
+venv/bin/python run.py hosted-e2e execute --experiments=all
+```
+
+Focused `--target` runs remain sequential. Local `test e2e` also retains its
+sequential path for debugging; `test --parallel` selects the complete E2E suite
+without additional pytest filters. `--experiments=all` remains an alias for it,
+and `--experiments-workers` remains an alias for `--workers`.
+
+The bounded selection contains representative existing browser cases and five
+coordination checks, with three pytest/browser processes by default against
+one server URL. It covers forms, documents, mobile Pages, Tasks, Categories,
+search, file previews, messaging and site settings, plus quota fallback,
+task-history cleanup, and global Home ETag regression stories. Each sequential
+story worker reuses its own Administrator through `get_admin`; each test still
+gets an isolated browser context. The Administrator has explicit CREATE AI
+entitlement as well as ordinary administrative permissions.
+
+Local coordinated runs accept `--workers=1` through `=6`. Hosted creation records
+the count and execution inherits it: 1–3 use one B2 instance with three Gunicorn
+processes and a 2-CPU/4-GiB Cloud Run driver; 4–6 use one B4 instance with six
+Gunicorn processes and a 4-CPU/8-GiB driver. Six workers are the retained default, not a measured throughput optimum. The coordinator remains one Cloud Run job,
+with multiple browser workers sharing the candidate URL. A worker override
+cannot exceed the hosted candidate's declared capacity. Capacity changes require
+a new candidate, and interrupted creation cannot resume with a different count.
+
+Pytest first collects exact parameter cases and fixtures. An AST inventory
+follows direct enum references, local and imported test helpers/constants and fixture functions.
+Markers provide the first partition: `e2e_serial` reserves a quiet phase;
+`e2e_group("owner")` (or another named group) keeps its cases together on one
+ordinary worker without blocking unrelated groups. Groups are placed first,
+then ungrouped cases fill the available capacity. Per-test resource claims
+still apply, including conflicts crossing group boundaries.
+Cases are balanced across the selected long-lived workers using the most
+recent passing E2E durations in `testing/evidence/latest.json`; unmeasured cases
+use the median duration (five seconds without history). Timings only guide
+placement and never count as current evidence. Hosted creation exports only a
+duration map from the committed evidence into the image, outside its source
+tree; old result records remain excluded. Each worker reserves a test's
+direct named resources through setup, call and teardown, releasing them before
+the next test. Overlapping claims wait; independent tests can run together even
+when an intermediate test references both resources. Claims are conservative
+exclusive reservations, not inferred read/write permissions. This does not traverse the related entity graph:
+Pages sharing a Form or Category can run together. Dynamic resource lookups still need review; use explicit enum members where
+possible. Import discovery follows named helpers under `testing/`, not arbitrary
+application calls or the related-entity graph.
+`@pytest.mark.e2e_serial` puts stories requiring whole-site quietness into an
+exclusive batch after the parallel workers finish. Owner access alone is not
+exclusive. Public-user, user-index, provider and site-settings stories are part
+of the concurrent trial; their directly named resources still reserve affected
+records. New tests do not choose a worker or batch manually.
+Environment-reset checks use `@pytest.mark.e2e_serial(phase="before")` and finish
+before protocol checks or ordinary stories create fixtures. Workers publish
+atomic progress counts; the coordinator prints those counts every 30 seconds.
+
+A run-local locked registry shares enum keys between processes, making lazy
+prerequisite creation idempotent. Its lock covers fixture creation only; the
+scheduler controls test conflicts. Per-test reservations use OS file locks in
+the private run directory shared by the local or Cloud Run workers. They acquire
+all claims together, release partial acquisitions before waiting, check outer
+authority while waiting, and fail after ten minutes instead of hanging forever.
+Process exit releases locks; the coordinator still reaps browser descendants
+before cleanup. `resource-events.jsonl` records wait, acquisition and release
+times per worker so the trial can distinguish execution from conflict waiting.
+Resources retain keys across tests and
+forget cached Python entity snapshots after each test. A later `.entity` access
+re-fetches from Datastore; browser-only uses of `.key` do not. No cached browser
+cookies are shared between the Administrator accounts.
+
+The five small coordination checks exercise overlapping independent workers,
+serialized shared-Page mutations, an exclusive barrier, and continued work
+after another worker's teardown. They run before the broader story batches.
+
+Only the coordinator acquires and renews the shared lease and performs global
+setup/cleanup. Workers inherit an exact run/server binding through temporary
+private context files, monitor coordinator/lease liveness, and never clean or
+release shared state. In hosted runs the coordinator exchanges the single-use
+Google bootstrap token once and supplies its run-scoped cookie to each private
+worker context; ordinary browser user sessions remain distinct. The scheduler stops and reaps active worker process groups
+before outer cleanup on cancellation, timeout or lost authority. This cannot
+undo provider writes that were already in flight when authority was lost.
+
+Worker logs, browser diagnostics, HTML reports and JUnit have separate paths
+under `reports/e2e-pilot/ATTEMPT/`. The coordinator checks exact selected-nodeid,
+attempt and source identity, merges JUnit, then records ordinary traceability
+evidence once. Missing/crashed workers become explicit failed selected results;
+old passing evidence cannot fill a missing worker. Explicit pilot and E2E-only
+invocations report `focused` and `e2e` scope respectively. The normal hosted
+job combines the support suites and coordinated E2E results into `all` scope,
+retaining failures from both phases. CI invokes this same default job.
+
+`--experiments` here selects the harness trial; it does not enable application
+experiments mode or measurement diagnostics. Full coordinated runs automatically
+collect exact parameter cases; no manual target list or 50-nodeid override is
+needed. Shared-cache reset and assertions about unchanged global revision
+snapshots run exclusively. Ordinary
+all-access stories use `get_admin`; Owner/permission-specific stories keep
+their exact identities. Tests retain collection order within each worker;
+there is no cross-worker order guarantee or work stealing. The browser runner and App Engine server have
+separate CPU/memory budgets; increasing browser concurrency does not require
+additional server URLs.
 
 ## GitHub release path
 

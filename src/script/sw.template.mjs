@@ -45,6 +45,7 @@ async function updateCaches() {
  * @testable true
  * @tests tests_js/test_008_service_worker.mjs::test_precache_static_assets_warms_configured_urls_and_ignores_failures
  * @tests tests_js/test_008_service_worker.mjs::test_precache_retries_transient_failures_and_preserves_cache_policy
+ * @tests tests_js/test_008_service_worker.mjs::test_precache_reuses_cached_assets_without_reusing_another_build
  * @matrix cache : precache service-worker static-assets
  * @matrix cache : retry no-store
  */
@@ -52,9 +53,11 @@ async function precacheStaticAssets() {
 	const cache = await caches.open(CACHE);
 	await Promise.allSettled(
 		PRECACHE_URLS.map(async (url) => {
-			const request = new Request(new URL(url, self.location.origin).href, {
-				cache: "reload",
-			});
+			// Build-versioned URLs can reuse fresh HTTP-cached responses, including
+			// modules fetched by HTML preloads before this worker took control.
+			const request = new Request(new URL(url, self.location.origin).href);
+			const cached = await cache.match(request, { ignoreVary: true });
+			if (cached && !responsePreventsStorage(cached)) return;
 			const response = await fetchStaticAsset(request);
 			if (response.ok && !responsePreventsStorage(response)) {
 				await cache.put(request, response.clone());

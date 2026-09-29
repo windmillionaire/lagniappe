@@ -53,7 +53,7 @@
          data-key="__message_aggregate__"
          data-action="open-messages"
          class="{{ styles.dropdown.search.result }} text-base-default">
-      <a href="/messages" class="block whitespace-normal text-sm font-medium">
+      <a href="{{ url_for('messages.index') }}" class="block whitespace-normal text-sm font-medium">
         {{ render_icon("email", styles.dropdown.icon) }}
         {{ aggregate.unread_message_count }} new message{{ '' if aggregate.unread_message_count == 1 else 's' }}
       </a>

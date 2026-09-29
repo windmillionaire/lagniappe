@@ -228,6 +228,12 @@ live Task remains the permission owner after a completion is archived. Removing
 a current attachment does not erase that ownership. `File.move_to()` updates
 current Task attachment lists and both owners' refresh intents.
 
+Report `attach_file` assigns an unowned upload but never changes an existing
+owner. Repeating the same attachment writes no File state; a different owner
+requires explicit `move_file`. TaskHistory attachments retain the live Task as
+owner and cannot bypass this check. Ordinary links can reference a File elsewhere
+without changing its ownership, permissions, or deletion lifecycle.
+
 Report saves update the Report and its parent/user lists without touching input
 Files. Upload, summary, and execution operations save the Files they change.
 
@@ -247,6 +253,9 @@ File's computed fields; the File's `requires` calculation depends on its owner.
 Other patch/touch intents retain their default dependency on the emitting entity.
 
 AI report batches reuse working entities and submit their final states together.
+Report input Files and their loaded relations are copied into that workspace;
+only committed versions replace the Report's in-memory inputs. Discarding a batch
+therefore cannot leak a staged attachment or summary into its retry.
 Additional transaction guards are consumed after every successful upsert, including
 masked writes; they must not remain attached to an in-memory entity and reject its
 next save. Report document appends stage Storage uploads and merge masked document

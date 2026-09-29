@@ -18,6 +18,16 @@ from lagniappe.core.tools.deferred_jobs.errors import (
 )
 
 
+@pytest.fixture(autouse=True)
+def provider_config(monkeypatch):
+    """Mocked provider calls do not discover real workstation/cloud credentials."""
+    monkeypatch.setattr(provider_session, "CONFIG", SimpleNamespace(
+        GOOGLE_CLOUD_PROJECT="unit-project",
+        AI_LOCATION="global",
+        google_credentials=object(),
+    ))
+
+
 # @matrix ai : cancellation deadline retry-ownership
 def test_blocked_request_is_cancelled_and_closed(monkeypatch):
     events = []

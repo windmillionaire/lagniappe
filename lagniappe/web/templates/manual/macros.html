@@ -70,14 +70,16 @@
 {% macro nav_buttons(prev=None, next=None) %}
   <div class="flex flex-row gap-4 flex-wrap justify-center mt-6">
     {% if prev %}
-      <button data-section="{{ prev.key }}"
+      <button type="button"
+              data-section="{{ prev.key }}"
               data-kind="{{ prev.kind }}"
               class="{{ styles.manual.button }}">
         Previous: {{ prev.name }}
       </button>
     {% endif %}
     {% if next %}
-      <button data-section="{{ next.key }}"
+      <button type="button"
+              data-section="{{ next.key }}"
               data-kind="{{ next.kind }}"
               class="{{ styles.manual.button }}">
         Next: {{ next.name }}

@@ -319,7 +319,7 @@ def _report_action_data_properties():
         },
         "document_markdown": {
             "type": "string",
-            "description": "Markdown for the new document or requested addition only. append_page_document preserves existing content; the server prefixes trusted source/time attribution.",
+            "description": "Markdown for the new document, requested addition, or complete explicit replacement. append_page_document preserves existing text; replace_page_document pins it before replacement. The server prefixes trusted source/time attribution.",
         },
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
@@ -360,9 +360,9 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     }
     if required:
         schema["required"] = required
-    if action_type in {"update_task", "update_model_task", "update_project", "update_page"}:
+    if action_type in {"update_task", "update_model_task", "update_project", "update_page", "update_file"}:
         from lagniappe.core.tools.entity_patches import PATCH_FIELDS
-        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_page": "page"}[action_type]
+        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_page": "page", "update_file": "file"}[action_type]
         fields = {}
         for field in sorted(PATCH_FIELDS[kind]):
             if field in {"categories", "model_tasks"}:

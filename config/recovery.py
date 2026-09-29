@@ -392,6 +392,12 @@ def validate_recovery_document(settings):
         )
     recovered["AUTH_EMAIL_CONFIG"] = normalized_auth_email
 
+    from config.experiments import normalize_experiments_config
+    try:
+        normalize_experiments_config(recovered)
+    except ValueError as error:
+        raise RecoveryConfigurationError(f"Experiments configuration is invalid: {error}") from error
+
     from config.ai_settings import normalize_ai_features
     from config.remote_mcp import normalize_mcp_config
     try:

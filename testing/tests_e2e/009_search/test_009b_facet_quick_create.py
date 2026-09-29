@@ -117,8 +117,8 @@ def _quick_create_from_combobox(user, combobox, label, name, response_glob):
 # @matrix facets : command-row permissions
 # @matrix quick-create : command-row opt-in permissions
 # @matrix search : permissions search-results
-def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
-    owner = get_user(Users.OWNER)
+def test_quick_create_command_requires_opt_in_and_create_permission(get_admin, get_user):
+    owner = get_admin()
     owner.go(SitePages.HOME)
     query = _unique("project-command")
 
@@ -146,8 +146,8 @@ def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
 
 
 # @pairs permissions:category-edit search:permission-filter
-def test_category_search_permission_filter_returns_editable_categories(get_user):
-    owner = get_user(Users.OWNER)
+def test_category_search_permission_filter_returns_editable_categories(get_admin, get_user):
+    owner = get_admin()
     allowed = Categories.acl_create_allowed.get(owner)
     denied = Categories.acl_create_denied.get(owner)
 
@@ -168,8 +168,8 @@ def test_category_search_permission_filter_returns_editable_categories(get_user)
 # @matrix combobox search : permission-filter
 # @pair permissions:assign
 # @template pages/tasks.html::action_buttons
-def test_user_assign_search_permission_filter_returns_assignable_users(get_user):
-    owner = get_user(Users.OWNER)
+def test_user_assign_search_permission_filter_returns_assignable_users(get_admin, get_user):
+    owner = get_admin()
     assignable = get_user(Users.assignable_user, creator=owner)
     denied = get_user(Users.create_user, creator=owner)
 
@@ -210,6 +210,7 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
 # @pair task-assignment:owner-opt-in
 # @template pages/tasks.html::action_buttons
 # @template pages/info.html::user_settings
+@pytest.mark.e2e_group("owner")
 def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -250,8 +251,8 @@ def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
 
 
 # @matrix quick-create : create-entity create-route created-option default-category
-def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
-    user = get_user(Users.OWNER)
+def test_page_quick_create_uses_visible_uncategorized_pages_category(get_admin, get_user):
+    user = get_admin()
     user.go(SitePages.HOME)
 
     first = _fetch_json(
@@ -284,8 +285,8 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
 
 # @matrix quick-create : create-entity create-route created-option
 # @template pages/tasks.html::action_buttons
-def test_project_combobox_quick_create_selects_new_project(get_user):
-    user = get_user(Users.OWNER)
+def test_project_combobox_quick_create_selects_new_project(get_admin, get_user):
+    user = get_admin()
     page = Pages.test_create_page_task.get(user)
     user.go(page)
     project_name = _unique("project-combobox")
@@ -305,8 +306,8 @@ def test_project_combobox_quick_create_selects_new_project(get_user):
 
 # @matrix quick-create : create-entity create-route created-option form-type
 # @template projects/model_tasks.html::create_model_task
-def test_model_task_form_selector_quick_creates_form(get_user):
-    user = get_user(Users.OWNER)
+def test_model_task_form_selector_quick_creates_form(get_admin, get_user):
+    user = get_admin()
     project = Projects.test_create_model_task.get(user)
     user.go(project)
 
@@ -334,8 +335,8 @@ def test_model_task_form_selector_quick_creates_form(get_user):
 
 # @matrix quick-create : create-entity create-route created-option form-type
 # @template home/categories.html::create
-def test_home_create_category_form_selector_quick_creates_form(get_user):
-    user = get_user(Users.OWNER)
+def test_home_create_category_form_selector_quick_creates_form(get_admin, get_user):
+    user = get_admin()
     home = user.go(SitePages.HOME)
     category_name = _unique("category")
     form_name = _unique("category-form")
@@ -361,8 +362,8 @@ def test_home_create_category_form_selector_quick_creates_form(get_user):
 
 # @matrix quick-create : create-entity create-route created-option
 # @template pages/info.html::info_form
-def test_page_info_category_multiselect_quick_creates_category(get_user):
-    user = get_user(Users.OWNER)
+def test_page_info_category_multiselect_quick_creates_category(get_admin, get_user):
+    user = get_admin()
     page = user.go(Pages.test_category_edit_page)
     page.wait_for_interaction_readiness()
     category_name = _unique("page-info-category")

@@ -71,8 +71,11 @@ def _move_file(action, _report, user, created):
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_attach_file_preserves_single_owner
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_attach_file_repeated_destination_is_noop
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_second_file_owner
 # @matrix ai-report : attachment attachments deterministic-run exact-page-name page-reference partial-result prior-task-page repair validation created-task persistence submission-completion task-attachment
-# @matrix files : attachment exact-page-name page-reference prior-task-page repair
+# @matrix files : attachment deterministic-run exact-page-name page-reference partial-result prior-task-page repair validation
 # @matrix files tasks : task-attachment
 def _attach_file(action, report, user, created):
     data = _data(action)
@@ -88,11 +91,18 @@ def _attach_file(action, report, user, created):
         target.allowed(Action.EDIT, user=user),
         "You do not have permission to attach files to this target.",
     )
-    file = _resolve_report_file(data.get("file"), report)
+    file = _resolve_report_file(data.get("file"), report, created)
     if file.has_references:
-        _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to move this file.")
-    _add_file_to_endpoint(file, target)
-    writes = [file, target] if isinstance(target, Entities.TASK_HISTORY) else [file]
+        _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to attach this file.")
+        owner = target.task if isinstance(target, Entities.TASK_HISTORY) else target
+        if file.owner.key != owner.key:
+            raise exceptions.ValidationError(
+                "This File already belongs to another Page or Task. "
+                "A File has one owner; attach_file cannot move it. "
+                "Use move_file for an explicit ownership change, or link to the File's existing URL."
+            )
+    changed = _add_file_to_endpoint(file, target)
+    writes = ([file, target] if isinstance(target, Entities.TASK_HISTORY) else [file]) if changed else []
     return file, writes, {"file_summary": _file_summary_result(file), "target": _entity_result(target)}
 
 
@@ -100,11 +110,12 @@ def _attach_file(action, report, user, created):
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_report_file_by_exact_url_and_file_prefix
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:file-summary
-def _summarize_file(action, report, _user, _created):
+def _summarize_file(action, report, _user, created):
     data = _data(action)
     file = _resolve_report_file(
         data.get("file") or data.get("file_id") or data.get("file_ref"),
         report,
+        created,
     )
     summary = (data.get("summary") or data.get("description") or "").strip()
     if not summary:

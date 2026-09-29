@@ -20,7 +20,7 @@ from lagniappe.core.tools.ai.core import ai_model
 from lagniappe.core.tools.ai.references import normalize_hash_references
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import app as web_app
-from testing.definitions import SitePages, Users
+from testing.definitions import SitePages
 from testing.elements import List
 from testing.resources import Report
 from testing.utility.network import expect_successful_response
@@ -361,12 +361,14 @@ def _medical_project(owner, case, slug):
     return project, matching, distractor
 
 
-# @matrix ai-report : ask async live-provider persistence usable-answer workspace-tools
+# @source src/script/widgets/home/lists.mjs::ToolReportList
+# @matrix ai-report : ask async deferred-refresh live-provider operation-poll persistence stage-labels usable-answer workspace-tools
+# @matrix deferred-jobs : polling progress status
 # @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
 # @matrix polling : operation owner progress timing
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_ask_answers_from_attached_corpus_receipt(get_user, request, live_ai_job_quota):
-    user = get_user(Users.OWNER)
+def test_ask_answers_from_attached_corpus_receipt(get_admin, get_user, request, live_ai_job_quota):
+    user = get_admin()
     owner = _owner(user)
     slug = _slug("receipt")
     page, file = _receipt_workspace(owner, RECEIPT_CASE, slug)
@@ -418,9 +420,9 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, live_ai_job
 # @matrix polling : operation owner progress timing
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_ask_uses_structured_filter_for_form_submission_query(
-    get_user, request, live_ai_job_quota,
+    get_admin, get_user, request, live_ai_job_quota,
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     owner = _owner(user)
     slug = _slug("filter")
     project, matching, distractor = _medical_project(owner, MEDICAL_CASE, slug)

@@ -68,6 +68,9 @@ app = Flask(
 )
 configure_flask_security(app)
 
+from .experiments import initialize_measurements
+initialize_measurements(app, CONFIG)
+
 csrf = CSRFProtect()
 csrf.init_app(app)
 initialize_app(app, csrf)
@@ -144,7 +147,7 @@ def record_authenticated_site_activity(response):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
-# @tests tests_e2e/001_site/test_001b_login.py::test_google_button_styles_apply_before_first_paint
+# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_uses_response_specific_style_nonces
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
 # @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress

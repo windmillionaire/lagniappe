@@ -1,5 +1,6 @@
 {% macro delete_action(route, label, role="delete", disabled=false) -%}
-  <button data-role="{{ role }}"
+  <button type="button"
+          data-role="{{ role }}"
           data-route="{{ route }}"
           data-kind="delete"
           class="{{ styles.button.submit }}"{% if disabled %} disabled{% endif %}>
@@ -19,7 +20,7 @@
         {% block name %}
         {% endblock name %}
       </h2>
-      <button lp-control="close" class="{{ styles.button.close }}">Cancel</button>
+      <button type="button" lp-control="close" class="{{ styles.button.close }}">Cancel</button>
     </div>
     <div class="p-6">
       <div class="space-y-6">

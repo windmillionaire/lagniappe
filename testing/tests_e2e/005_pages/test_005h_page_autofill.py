@@ -1,14 +1,16 @@
 from dataclasses import replace
+import json
 from uuid import uuid4
 
 import pytest
+from bs4 import BeautifulSoup
 from playwright.sync_api import expect
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import DeferredJobStatus, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
-from testing.definitions import Pages, Users
+from testing.definitions import Pages
 from testing.resources import Page
 from testing.utility.live_ai import run_hosted_autofill
 
@@ -17,6 +19,55 @@ pytestmark = pytest.mark.e2e
 FIELD_ID = "input-textab12"
 FILE_SUMMARY = "Parcel 123 is assessed at $245,000 from the attached report."
 EXPECTED_VALUE = "$245,000"
+
+
+# @source lagniappe/web/deferred_autofill.py::form_state
+# @source lagniappe/web/deferred_autofill.py::form_fingerprint
+# @pair ai:autofill
+# @template pages/info.html::info_form
+@pytest.mark.parametrize("task_state", ["none", "active", "completed"])
+def test_page_form_state_does_not_load_task_collection(get_admin, get_user, monkeypatch, task_state):
+    """Page form state survives completed Tasks without reading the collection."""
+    from lagniappe.core.tools.database import get as database_get
+    from lagniappe.web import app
+
+    user = get_admin()
+    page = Page(
+        user=user,
+        definition=replace(
+            Pages.test_page_autofill.value.definition,
+            name=f"Page form state {task_state} {uuid4().hex}",
+        ),
+    ).create()
+    if task_state != "none":
+        task = Entities.TASK.create({"name": "Unrelated Task", "page": page.entity})
+        if task_state == "completed":
+            task.complete(user=user.entity)
+        task.save()
+
+    task_queries = []
+    original = database_get.page_tasks
+
+    def record_page_tasks(target):
+        if target.key == page.entity.key:
+            task_queries.append(target.key)
+        return original(target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(database_get, "page_tasks", record_page_tasks)
+        with app.test_client() as client:
+            for cookie in user.page.context.cookies():
+                client.set_cookie(cookie["name"], cookie["value"])
+            response = client.get(f"/pages/{page.key}")
+            assert response.status_code == 200
+            form = BeautifulSoup(response.get_data(as_text=True), "html.parser").select_one(
+                "[data-widget='PageInfo']"
+            )
+            state = json.loads(form["data-form-state"])
+            assert state["revision"]
+            assert state["operation"] is None
+            assert state["reviews"] == []
+            assert task_queries == [], "Page form validation must not query its Tasks"
 
 
 def _attach_evidence(page):
@@ -38,9 +89,9 @@ def _attach_evidence(page):
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_page_autofill_runs_deferred_with_attached_file_context(
-    get_user, monkeypatch, browser_failures, results, live_ai_job_quota
+    get_admin, get_user, monkeypatch, browser_failures, results, live_ai_job_quota
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     page = Page(
         user=user,
         definition=replace(

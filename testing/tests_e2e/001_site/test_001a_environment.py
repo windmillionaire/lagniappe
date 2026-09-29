@@ -51,7 +51,7 @@ from lagniappe.core.tools.database import notifications as notification_database
 from testing.definitions import SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import User
-from testing.utility.network import assert_same_etag, manual_mutation_headers
+from testing.utility.network import assert_same_etag, manual_mutation_headers, scoped_browser_route
 
 pytestmark = pytest.mark.e2e
 
@@ -112,6 +112,7 @@ def test_database_setup():
 
 
 # @matrix cache : cleanup index-recreation redis-connection
+@pytest.mark.e2e_serial(phase="before")
 def test_cache_setup():
     """
     Verify Redis cache is connected and using test-prefixed index.
@@ -204,6 +205,7 @@ def test_server_running(get_user):
 
 # @matrix notifications : ping redis-projection
 # @pair web-headers:notification-state
+@pytest.mark.e2e_group("owner")
 def test_ping_notification_state_is_redis_only_and_optional(get_user):
     """A real notification reaches a reloaded page through the ping header."""
     user = get_user(Users.OWNER)
@@ -255,9 +257,10 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
 
 # @matrix cache : build-id etag missing-fingerprint standard-header
 # @matrix web-headers : conditional-request etag missing-fingerprint security
-def test_authenticated_home_response_headers_include_etag(get_user, browser_failures):
+@pytest.mark.e2e_serial
+def test_authenticated_home_response_headers_include_etag(get_admin, browser_failures):
     """Authenticated app responses should carry the common header envelope."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     with user.page.expect_response("**/l/update-session") as session_info:
         user.page.goto(f"{SETTINGS.test_config['BASE_URL']}/")
     assert session_info.value.ok
@@ -377,8 +380,8 @@ def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
 
 
 # @matrix cache session timezone : permissions-preserved
-def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setup_test_server):
-    owner = get_user(Users.OWNER)
+def test_timezone_update_preserves_permissions_and_cache_revision(get_admin, setup_test_server):
+    owner = get_admin()
     actor = User(user=owner, definition=UserDefinition(
         name="Timezone HTTP", email=f"timezone-{uuid4().hex}@example.test",
     )).create()
@@ -422,9 +425,9 @@ def test_timezone_update_preserves_permissions_and_cache_revision(get_user, setu
 
 # @matrix location session timezone : atomic-update coordinates validation
 def test_update_session_rejects_invalid_timezone_and_location_atomically(
-    get_user, browser_failures
+    get_admin, browser_failures
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
     persisted = Entities.USER.load(user.email)
     timezone_before = persisted.db.get("timezone")
@@ -561,10 +564,10 @@ def test_error_handling(get_user, browser_failures):
 
 
 def test_browser_failure_guard_detects_unhandled_page_errors(
-    get_user, browser_failures
+    get_admin, browser_failures
 ):
     """The guard rejects a real page error unless a narrow scope accounts for it."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     sentinel = "browser-failure-guard-sentinel"
 
     with browser_failures.expect(
@@ -582,3 +585,29 @@ def test_browser_failure_guard_detects_unhandled_page_errors(
         assert str(page_error.value) == sentinel
         with pytest.raises(AssertionError, match="Unexpected browser failures"):
             browser_failures.assert_clean()
+
+
+# @matrix e2e : navigation static-assets bounded-retry failure-reporting
+def test_setup_navigation_recovers_a_static_503(get_admin, browser_failures):
+    """A failed cold module fetch gets one reload, then the real Home works."""
+    user = get_admin()
+    requests = []
+
+    def transient(route):
+        requests.append(route.request.url)
+        if len(requests) == 1:
+            route.fulfill(status=503, content_type="text/html", body="Temporarily unavailable")
+        else:
+            route.continue_()
+
+    with scoped_browser_route(user.page, "**/chunks/foundation.js?*", transient):
+        home = user.go(SitePages.HOME)
+        expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
+        user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
+        expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_be_visible()
+
+    assert len(requests) == 2
+    recovered = [event for event in browser_failures.events
+                 if event.ignored_reason == "static-503-recovered-by-navigation"]
+    assert recovered and all(event.details["http_status"] == "503" for event in recovered)
+    browser_failures.assert_clean()

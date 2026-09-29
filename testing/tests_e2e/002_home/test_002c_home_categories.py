@@ -33,7 +33,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
-from testing.definitions import Categories, SitePages, Users
+from testing.definitions import Categories, SitePages
 from testing.elements import (
     HeaderSearch,
     FormSelect,
@@ -46,7 +46,7 @@ from testing.utility.network import browser_fetch, expect_successful_response
 from testing.utility.live_ai import submit_live_ai
 
 
-def _create_category(user, home, definition, *, results=None, browser_failures=None, live_ai_quota=None):
+def _create_category(user, home, definition, *, results=None, browser_failures=None):
     create_form = home.create_category_form()
     if not definition.description_for_ai:
         create_form.locator(FormElements.NAME).fill(definition.name)
@@ -71,13 +71,10 @@ def _create_category(user, home, definition, *, results=None, browser_failures=N
             create_form.locator(FormElements.NAME).fill(definition.name or "Books quota fallback")
             results.record("alternate_verification", "Manual creation validates the same save and list workflow; AI content remains unverified.")
             return manual_submit()
-        with live_ai_quota(user, "/categories/create"):
-            response = submit_live_ai(
-                # A mocked quota response can finish before a spinner is observed.
-                # The response and resulting form/list state are the boundaries.
-                user, path="/categories/create", submit=lambda: create_form.get_by_role("button", name="Create Category", exact=True).click(),
-                results=results, browser_failures=browser_failures, fallback=fallback,
-            )
+        response = submit_live_ai(
+            user, path="/categories/create", submit=lambda: create_form.get_by_role("button", name="Create Category", exact=True).click(),
+            results=results, browser_failures=browser_failures, fallback=fallback,
+        )
     else:
         response = manual_submit()
     expect(create_form).not_to_be_visible()
@@ -91,7 +88,7 @@ def _create_category(user, home, definition, *, results=None, browser_failures=N
 
 # @matrix categories : attach-form manual-form
 @pytest.mark.e2e
-def test_create_category_form(get_user):
+def test_create_category_form(get_admin, get_user):
     """
     Verify create category form opens with expected fields.
 
@@ -104,7 +101,7 @@ def test_create_category_form(get_user):
     Note: Categories have a form selector (Buttons.ASSIGN_FORM) for
     attaching a Form entity that defines page fields.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     form = user.locate(home.CREATE_CATEGORY_FORM)
@@ -125,14 +122,14 @@ def test_create_category_form(get_user):
 
 # @matrix categories : ai-form manual-form
 @pytest.mark.e2e
-def test_category_form_generate_toggle(get_user):
+def test_category_form_generate_toggle(get_admin, get_user):
     """
     Verify manual/AI mode toggle switches form fields.
 
     Manual mode shows name field.
     AI mode shows AI description prompt field.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     user.locate(home.CREATE_CATEGORY_TOGGLE).click()
@@ -156,9 +153,9 @@ def test_category_form_generate_toggle(get_user):
 # @matrix categories : retired-preview no-create
 @pytest.mark.e2e
 def test_retired_initial_prompt_request_cannot_create_category(
-    get_user, browser_failures
+    get_admin, get_user, browser_failures
 ):
-    user = get_user(Users.OWNER)
+    user = get_admin()
     user.go(SitePages.HOME)
 
     with browser_failures.expect_http_error(
@@ -180,14 +177,14 @@ def test_retired_initial_prompt_request_cannot_create_category(
 
 # @pair categories:create-manual
 @pytest.mark.e2e
-def test_create_category_manual_mode(get_user):
+def test_create_category_manual_mode(get_admin, get_user):
     """
     Verify category creation in manual mode.
 
     Uses Categories.test_create_category_manual_mode definition.
     Verifies category appears in search after creation.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_create_category_manual_mode.get(user, create=False)
     home = user.go(SitePages.HOME)
     category.key = _create_category(user, home, category.definition)
@@ -198,28 +195,27 @@ def test_create_category_manual_mode(get_user):
 
 # @matrix categories : ai-create ai-generated
 @pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_create_category_ai_mode(get_user, results, browser_failures, live_ai_quota):
+def test_create_category_ai_mode(get_admin, get_user, results, browser_failures):
     """
     Verify category creation in AI mode.
 
     Uses AI to generate category name and description from a prompt.
     The provider-backed create request gets the complete configured retry budget.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_create_category_ai_mode.get(user, create=False)
     home = user.go(SitePages.HOME)
 
     category.key = _create_category(
         user, home, category.definition, results=results,
-        browser_failures=browser_failures, live_ai_quota=live_ai_quota,
+        browser_failures=browser_failures,
     )
     results.record("category", category.entity.db)
 
 
 # @pair categories:navigate
 @pytest.mark.e2e
-def test_navigate_to_category(get_user):
+def test_navigate_to_category(get_admin, get_user):
     """
     Verify navigation from category list to category index page.
 
@@ -227,7 +223,7 @@ def test_navigate_to_category(get_user):
         - home.category_list: Opens list and asserts List.is_loaded
         - Link helper: Clicks the title link
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_navigate_to_category.get(user)
     home = user.go(SitePages.HOME)
 
@@ -238,7 +234,7 @@ def test_navigate_to_category(get_user):
 
 # @matrix categories : attach-form create-manual
 @pytest.mark.e2e
-def test_create_category_with_form(get_user):
+def test_create_category_with_form(get_admin, get_user):
     """
     Verify category with attached form shows form fields.
 
@@ -250,7 +246,7 @@ def test_create_category_with_form(get_user):
         - category.schema: List of field definitions from attached form
         - category.new_page_form(): Opens and returns the create page form
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_create_category_with_form.get(user, create=False)
     home = user.go(SitePages.HOME)
     category.key = _create_category(user, home, category.definition)
@@ -266,9 +262,9 @@ def test_create_category_with_form(get_user):
 # @template categories/index.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
-def test_delete_category(get_user):
+def test_delete_category(get_admin, get_user):
     """Deleting a category from its menu deletes pages created in it."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     category = Categories.test_delete_category.get(user)
     page = Entities.PAGE.create({
         "name": "Category deletion page",

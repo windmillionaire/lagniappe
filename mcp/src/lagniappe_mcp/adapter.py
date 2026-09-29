@@ -229,7 +229,7 @@ class LagniappeAdapter:
     async def initialize(self) -> None:
         discovery, actor, catalog = await self.rest.startup()
         validate_value(ACTOR_SCHEMA, actor, phase="actor")
-        registry = build_tool_registry(catalog)
+        registry = build_tool_registry(catalog, execute_plan=actor["capabilities"].get("execute_plan") is True)
         published_tools = [
             definition.as_mcp_tool().model_dump(
                 mode="json", by_alias=True, exclude_none=True
@@ -279,6 +279,14 @@ class LagniappeAdapter:
                 )
             elif definition.kind == "submit":
                 result = await self._submit_plan(value)
+            elif definition.kind == "execute_plan":
+                raw, _request_id = await self.rest.request_json(
+                    "POST", f"plans/{quote_path_segment(value['plan_id'])}/execute",
+                    body={key: value[key] for key in ("proposal_fingerprint", "operation_id")},
+                )
+                if not isinstance(raw, dict) or set(raw) != {"plan", "operation"}:
+                    raise TransportError("invalid_response", "Execution returned an invalid receipt.")
+                result = AdapterResult({"plan": self._safe_plan(raw["plan"], expected_plan_id=value["plan_id"]), "operation": raw["operation"]})
             elif definition.kind == "upload":
                 result = await self._upload_files(value)
             elif definition.kind == "read":

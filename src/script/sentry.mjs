@@ -1,7 +1,19 @@
-import * as Sentry from "@sentry/browser";
+import {
+	addEventProcessor,
+	captureException,
+	captureMessage,
+	getClient,
+	init,
+} from "@sentry/browser";
 import { configureSentry } from "./shared/errors.mjs";
 
 if (typeof window !== "undefined") {
-	window.Sentry = Sentry;
+	window.Sentry = {
+		addEventProcessor,
+		captureException,
+		captureMessage,
+		getClient,
+		init,
+	};
 	configureSentry();
 }

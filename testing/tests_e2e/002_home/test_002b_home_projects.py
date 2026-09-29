@@ -31,7 +31,7 @@ import re
 from playwright.sync_api import expect
 import pytest
 
-from testing.definitions import Projects, SitePages, Users
+from testing.definitions import Projects, SitePages
 from testing.elements import (
     Buttons,
     FormElements,
@@ -48,7 +48,7 @@ pytestmark = pytest.mark.e2e
 
 # @matrix projects : ai-form create-help manual-form
 # @template home/projects.html::create
-def test_create_project_form(get_user):
+def test_create_project_form(get_admin, get_user):
     """
     Verify create project form opens with expected fields and controls.
 
@@ -60,7 +60,7 @@ def test_create_project_form(get_user):
         - Close button hides form
         - Modal: Helper for modal interactions
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     form = user.locate(home.CREATE_PROJECT_FORM)
@@ -98,7 +98,7 @@ def test_create_project_form(get_user):
 
 # @matrix projects : create-manual navigate search
 # @template home/projects.html::create
-def test_create_project_manual_mode(get_user):
+def test_create_project_manual_mode(get_admin, get_user):
     """
     Verify project creation in manual mode.
 
@@ -106,7 +106,7 @@ def test_create_project_manual_mode(get_user):
     creates a project via the UI with manual name/description entry.
     Verifies the project appears in search results after creation.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
 
     project = Projects.test_create_project_manual_mode.get(user, create=False)
@@ -124,14 +124,14 @@ def test_create_project_manual_mode(get_user):
 # @template home/projects.html::project
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
-def test_create_project_ai_mode(get_user, results, browser_failures, live_ai_quota):
+def test_create_project_ai_mode(get_admin, get_user, results, browser_failures, live_ai_quota):
     """
     Verify project creation in AI mode.
 
     Uses AI to generate project name and description from a prompt.
     The provider-backed create request gets the complete configured retry budget.
     """
-    user = get_user(Users.OWNER)
+    user = get_admin()
     home = user.go(SitePages.HOME)
     create_form = home.create_project_form()
 
@@ -170,9 +170,9 @@ def test_create_project_ai_mode(get_user, results, browser_failures, live_ai_quo
 # @template projects/project.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
-def test_delete_project(get_user):
+def test_delete_project(get_admin, get_user):
     """Verify project deletion from its title menu."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     project = Projects.test_delete_project.get(user)
     user.go(project)
 

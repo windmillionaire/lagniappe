@@ -603,7 +603,13 @@ def me():
         "credential": g.agent_api_credential,
         "capabilities": {
             "plans": True,
+            **({"execute_plan": _experiments_execution_allowed()} if CONFIG.EXPERIMENTS_ENABLED else {}),
         },
+        **({"installation": {
+            "project": CONFIG.GOOGLE_CLOUD_PROJECT,
+            "experiments": True,
+            "source_id": CONFIG.EXPERIMENTS_SOURCE_ID or None,
+        }} if CONFIG.EXPERIMENTS_ENABLED else {}),
     }
 
 
@@ -725,6 +731,39 @@ def get_plan(plan_id):
     return _plan_payload(_load_plan(plan_id))
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/api/main.py::execute_plan
+# @reason capability discovery and the write boundary share this gate
+def _experiments_execution_allowed():
+    from lagniappe.core.tools.experiments import can_execute
+    return can_execute(g.agent_api_user, remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)))
+
+
+# @testable true
+# @tests tests_e2e/013_agent_api/test_013g_experiments.py::test_experiments_execute_requires_remote_admin_and_exact_proposal
+# @matrix experiments : http-execution
+@api.post("/plans/<plan_id>/execute")
+@_route
+def execute_plan(plan_id):
+    if not _experiments_execution_allowed():
+        raise APIProblem("execution_forbidden", "This connection cannot execute experiments plans.", 403)
+    data = _json_body()
+    if set(data) != {"proposal_fingerprint", "operation_id"} or not isinstance(data.get("proposal_fingerprint"), str) or not re.fullmatch(r"[a-f0-9]{64}", data["proposal_fingerprint"]) or not isinstance(data.get("operation_id"), str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", data["operation_id"]):
+        raise APIProblem("invalid_execution", "Supply the submitted proposal_fingerprint and a stable operation_id (1–128 letters, digits, dots, underscores or hyphens).", 422)
+    report = _load_plan(plan_id)
+    from lagniappe.core.tools.ai.reporting.execution.request import request_execution
+    job, _notification = request_execution(
+        report, g.agent_api_user,
+        operation_id=data["operation_id"],
+        expected_fingerprint=data["proposal_fingerprint"],
+        remote_mcp=True,
+    )
+    return {
+        "plan": _plan_payload(_load_plan(plan_id)),
+        "operation": {"id": job.idempotency_key, "status": job.status},
+    }, 202
+
+
 # @testable true
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix agent-api : proposal-contract
@@ -749,6 +788,7 @@ def get_plan_contract(plan_id):
         ),
         **({"actions": actions} if actions is not None else {}),
         **({"view": request.args["view"]} if "view" in request.args else {}),
+        execution_allowed=_experiments_execution_allowed(),
     )
     LOGGER.info(
         "agent_api_contract request_id=%s user_hash=%s plan=%s "

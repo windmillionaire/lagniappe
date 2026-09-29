@@ -2859,7 +2859,7 @@ def test_get_page_tasks_returns_active_and_completed_tasks(monkeypatch):
 
         def __init__(self):
             self.tasks = [FakeTask("Refill Lisinopril", False)]
-            self.completed = [FakeTask("Atorvastatin Prescription", True)]
+            self.completed_tasks = [FakeTask("Atorvastatin Prescription", True)]
 
         def allowed(self, action, user=None):
             return True

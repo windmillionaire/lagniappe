@@ -3,8 +3,11 @@
 from datetime import datetime, timezone
 import hashlib
 import json
+from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
+from xml.etree import ElementTree
 
 import pytest
 import yaml
@@ -731,7 +734,7 @@ def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
 
 
 # @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
-@pytest.mark.parametrize("focused", [False, True], ids=["complete", "nodeid"])
+@pytest.mark.parametrize("focused", [False, True, "experiments", "experiments-all"], ids=["complete", "nodeid", "experiments", "experiments-all"])
 def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     tmp_path, monkeypatch, focused,
 ):
@@ -761,18 +764,34 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
     )
     monkeypatch.setattr(hosted_e2e_job, "_stamp_evidence", stamped.append)
     monkeypatch.setattr(hosted_e2e_job, "_upload_artifacts", uploaded.append)
+    complete_phases = []
+    monkeypatch.setattr(hosted_e2e_job, "_run_complete_suites",
+                        lambda environment: complete_phases.append(environment) or 1)
 
-    assert hosted_e2e_job.main([f"--target={target}"] if focused else []) == 1
+    pilot = focused in {"experiments", "experiments-all"}
+    full_e2e = focused == "experiments-all"
+    flag = "--experiments=all" if full_e2e else "--experiments"
+    arguments = [flag] if pilot else ([f"--target={target}"] if focused else [])
+    assert hosted_e2e_job.main(arguments) == 1
 
-    command, options = commands[0]
     selection = [target] if focused else ["unit", "js", "tooling", "e2e"]
-    assert command[command.index("--strict") + 1 : -1] == [
-        *selection, "-m", "not unfinished"
-    ]
-    assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
+    if focused:
+        command, options = commands[0]
+        assert options == {"cwd": hosted_e2e_job.REPOSITORY_ROOT}
+    if pilot:
+        from runner.e2e_pilot import TARGETS
+        assert command[3:-1] == [flag]
+        selection = [] if full_e2e else list(TARGETS)
+    elif focused:
+        assert command[command.index("--strict") + 1 : -1] == [
+            *selection, "-m", "not unfinished"
+        ]
+    else:
+        assert complete_phases == ["standard"]
+        assert commands == []
     assert stamped == uploaded
-    assert uploaded[0]["suite"] == ("focused" if focused else "all")
-    assert uploaded[0].get("targets", []) == ([target] if focused else [])
+    assert uploaded[0]["suite"] == ("e2e" if full_e2e else "focused" if focused else "all")
+    assert uploaded[0].get("targets", []) == (selection if focused else [])
     assert uploaded[0]["exit_status"] == 1
 
     for suite in ("all", "full", "focused"):
@@ -781,12 +800,66 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
         assert error.value.code == 2
     with pytest.raises(RuntimeError, match="individual"):
         hosted_e2e_job.main(["--target", target.split("::")[0]])
-    assert len(commands) == 1
+    assert len(commands) == int(bool(focused))
     assert len(uploaded) == 1
 
 
+# @matrix hosted-e2e testing : suite-scope result-aggregation failure-retention junit environment-isolation
+# @matrix mcp-package : junit result-aggregation environment-isolation
+@pytest.mark.parametrize("statuses", [(0, 0), (1, 0), (0, 1)])
+def test_hosted_complete_run_merges_all_phases_without_hiding_failure(tmp_path, monkeypatch, statuses):
+    from testing.utility.traceability_results import _write_manifest
+
+    report_root = tmp_path / "reports/hosted-e2e"
+    report_root.mkdir(parents=True)
+    evidence = tmp_path / "testing/evidence/latest.json"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text('{"kind":"test-run","tests":{"stale":{"outcome":"passed"}}}')
+    monkeypatch.setattr(hosted_e2e_job, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(hosted_e2e_job, "HOSTED_REPORT_ROOT", report_root)
+    monkeypatch.setattr(hosted_e2e_job, "EVIDENCE_PATH", evidence)
+    targets = ["tests_unit/test_support.py::test_support", "tests_e2e/test_browser.py::test_browser"]
+    for target in targets:
+        path = tmp_path / "testing" / target.split("::")[0]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"def {target.split('::')[1]}():\n    pass\n")
+    commands = []
+
+    def run(command, **kwargs):
+        index = len(commands)
+        if index == 0:
+            assert not evidence.exists()
+        commands.append(command)
+        nodeid = targets[index]
+        outcome = "failed" if statuses[index] else "passed"
+        _write_manifest(tmp_path, command, {nodeid: {"outcome": outcome, "duration": 1}}, statuses[index])
+        suite = ElementTree.Element("testsuite", name=("support", "e2e")[index])
+        case = ElementTree.SubElement(suite, "testcase", name=nodeid)
+        if statuses[index]:
+            ElementTree.SubElement(case, "failure", message="genuine failure")
+        destination = Path(command[-1].split("=", 1)[1])
+        ElementTree.ElementTree(suite).write(destination)
+        return subprocess.CompletedProcess(command, statuses[index])
+
+    monkeypatch.setattr(hosted_e2e_job, "subprocess", SimpleNamespace(run=run))
+    assert hosted_e2e_job._run_complete_suites("standard") == int(any(statuses))
+    assert commands[0][4:-1] == ["unit", "js", "tooling", "-m", "not unfinished"]
+    assert commands[1][3:-1] == ["--parallel"]
+    merged = json.loads(evidence.read_text())
+    assert set(merged["tests"]) == set(targets)
+    assert merged["exit_status"] == int(any(statuses))
+    assert merged["sessions"][0]["tests"] == 2
+    assert merged["sessions"][0]["exit_status"] == int(any(statuses))
+    assert [merged["tests"][target]["outcome"] for target in targets] == [
+        "failed" if status else "passed" for status in statuses]
+    junit = ElementTree.parse(report_root / "junit.xml")
+    assert len(junit.findall(".//testcase")) == 2
+    assert len(junit.findall(".//failure")) == sum(bool(status) for status in statuses)
+
+
 # @matrix hosted-e2e : cloud-run focused-execution local-dispatch override
-def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
+@pytest.mark.parametrize("pilot", [False, True])
+def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch, pilot):
     target = "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup"
     second_target = (
         "testing/tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached"
@@ -822,23 +895,22 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
         lambda *_arguments, **_options: ({"status": {}}, 0),
     )
 
-    result = hosted_e2e.execute(
-        targets=[target, second_target],
-        import_results=False,
-    )
+    options = {"experiments": True} if pilot else {"targets": [target, second_target]}
+    result = hosted_e2e.execute(**options, import_results=False)
 
     assert result == {
         "execution": "lagniappe-e2e-focus1",
         "exit_status": 0,
         "suite": "focused",
     }
-    assert (
-        f"--args=--target={target},--target={second_target}"
-        in calls[0][0]
-    )
+    argument = "--args=--experiments" if pilot else f"--args=--target={target},--target={second_target}"
+    assert argument in calls[0][0]
     assert "--async" in calls[0][0]
     assert "--wait" not in calls[0][0]
-    assert writes[0][1]["last_targets"] == [target, second_target]
+    from runner.e2e_pilot import TARGETS
+    assert writes[0][1]["last_targets"] == (list(TARGETS) if pilot else [target, second_target])
+    with pytest.raises(hosted_e2e.HostedE2EError):
+        hosted_e2e.execute(targets=[target], experiments=True)
 
 
 # @matrix hosted-e2e : execution-name failure-recovery
@@ -1100,6 +1172,11 @@ def test_hosted_create_command_routes_preflight_base(monkeypatch, capsys):
 
     assert calls == [{"base_ref": "release-base"}]
     assert "Hosted E2E version ready" in capsys.readouterr().out
+    assert hosted_e2e.DEFAULT_BROWSER_WORKERS == 6
+    assert hosted_e2e.run_hosted_e2e_command(["create", "--workers=3"]) == 0
+    assert calls[-1] == {"base_ref": None, "experiments_workers": 3}
+    assert hosted_e2e.run_hosted_e2e_command(["create", "--experiments-workers=3"]) == 0
+    assert calls[-1] == {"base_ref": None, "experiments_workers": 3}
 
 
 # @pair hosted-e2e:cli-routing
@@ -1868,6 +1945,7 @@ def test_committed_source_export_ignores_generated_worktree_churn(tmp_path):
 
 # @matrix hosted-e2e : deployment-source image-boundary
 def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
+    monkeypatch.delenv("LAGNIAPPE_E2E_DURATIONS", raising=False)
     container_root = tmp_path / hosted_e2e.CONTAINER_RELATIVE_ROOT
     container_root.mkdir(parents=True)
     (tmp_path / ".gcloudignore").write_text(
@@ -1877,6 +1955,12 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     (container_root / "cloudbuild.yaml").write_text("steps: []\n", encoding="utf-8")
     (container_root / "gcloudignore").write_text("config/files/\n", encoding="utf-8")
     calls = []
+    evidence = tmp_path / "testing/evidence/latest.json"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text(json.dumps({"tests": {
+        "tests_e2e/test_sample.py::test_pass": {"outcome": "passed", "duration": 12.5},
+        "tests_e2e/test_sample.py::test_fail": {"outcome": "failed", "duration": 30},
+    }}))
     cloud_build_id = "12345678-1234-1234-1234-123456789abc"
 
     def gcloud(*arguments, **options):
@@ -1909,6 +1993,9 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     assert "--async" in arguments
     assert "--format=json" in arguments
     assert options == {"timeout": 600}
+    assert json.loads((container_root / "durations.json").read_text()) == {
+        "tests_e2e/test_sample.py::test_pass": 12.5,
+    }
     assert (container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY).read_text(
         encoding="utf-8"
     ) == (tmp_path / ".gcloudignore").read_text(encoding="utf-8")
@@ -2000,6 +2087,7 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
         "build_id": "b1234567",
         "image": f"{infrastructure.image_base}:{source}",
         "cloud_build_id": "12345678-1234-1234-1234-123456789abc",
+        "experiments_workers": 6,
     }
     monkeypatch.setattr(
         hosted_e2e,
@@ -2017,6 +2105,11 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
 
     assert resumed == state
     assert resumed is not state
+    with pytest.raises(HostedE2EError, match="different worker capacity"):
+        hosted_e2e._resumable_create_state(
+            state, infrastructure, source=source, source_snapshot=snapshot,
+            build_id="b1234567", experiments_workers=3,
+        )
 
     mismatched = dict(state, source="c" * 40)
     with pytest.raises(HostedE2EError, match="different committed build"):
@@ -2085,7 +2178,8 @@ def test_hosted_app_resume_requires_exact_deployment_metadata(monkeypatch):
 
 
 # @matrix hosted-e2e : authentication deployment-binding deterministic-topology performance static-assets zero-traffic
-def test_hosted_descriptor_preserves_native_static_handlers():
+@pytest.mark.parametrize("workers", [3, 6])
+def test_hosted_descriptor_preserves_native_static_handlers(workers):
     infrastructure = _infrastructure()
 
     descriptor = _hosted_app_descriptor(
@@ -2098,6 +2192,7 @@ def test_hosted_descriptor_preserves_native_static_handlers():
             "https://e2e-abcdef1234567890-dot-e2e-dot-project-1.uc.r.appspot.com"
         ),
         session_key="s" * 48,
+        experiments_workers=workers,
     )
 
     assert descriptor["handlers"][:-1] == hosted_e2e.APP_HANDLERS[:-1]
@@ -2124,8 +2219,9 @@ def test_hosted_descriptor_preserves_native_static_handlers():
         "secure": "always",
         "redirect_http_response_code": 301,
     }
-    assert descriptor["entrypoint"] == "gunicorn -t 3600 -w 3 -b :$PORT main:app"
-    assert descriptor["instance_class"] == "B2"
+    assert descriptor["entrypoint"] == f"gunicorn -t 3600 -w {workers} -b :$PORT main:app"
+    assert descriptor["instance_class"] == ("B4" if workers == 6 else "B2")
+    assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_WORKERS"] == str(workers)
     assert descriptor["basic_scaling"] == {
         "max_instances": 1,
         "idle_timeout": "15m",
@@ -2190,8 +2286,10 @@ def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
     ]
 
 
-# @matrix hosted-e2e : identity invocation-overrides least-privilege
-def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
+# @matrix hosted-e2e : identity invocation-overrides least-privilege secret-mounts
+@pytest.mark.parametrize("redis_tls", [False, True], ids=["plain", "tls"])
+@pytest.mark.parametrize("workers", [3, 6])
+def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch, redis_tls, workers):
     calls = []
     monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
     monkeypatch.setattr(
@@ -2199,7 +2297,7 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
         "_deployer_member",
         lambda: "user:operator@example.test",
     )
-    monkeypatch.setattr(hosted_e2e.SETTINGS, "APP", {"REDIS_TLS": True})
+    monkeypatch.setattr(hosted_e2e.SETTINGS, "APP", {"REDIS_TLS": redis_tls})
     monkeypatch.setattr(
         hosted_e2e,
         "_gcloud",
@@ -2213,6 +2311,7 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
         "source_snapshot": "b" * 64,
         "build_id": "b1234567",
         "image": "us-central1-docker.pkg.dev/project-1/lagniappe-e2e/runner:source",
+        "experiments_workers": workers,
     }
 
     hosted_e2e._update_job(infrastructure, state)
@@ -2246,11 +2345,25 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch):
         if arguments[:3] == ("run", "jobs", "create")
     )
     assert "--args=" in job_update
+    assert ("--cpu=4" if workers == 6 else "--cpu=2") in job_update
+    assert ("--memory=8Gi" if workers == 6 else "--memory=4Gi") in job_update
+    assert any(f"LAGNIAPPE_HOSTED_E2E_WORKERS={workers}" in argument for argument in job_update)
     secret_argument = next(
         argument for argument in job_update if argument.startswith("--set-secrets=")
     )
-    assert "lagniappe_settings.yaml=lagniappe-e2e-settings:latest" in secret_argument
-    assert "redis_ca.pem=lagniappe-e2e-redis-ca:latest" in secret_argument
+    mounts = dict(value.split("=", 1) for value in secret_argument.removeprefix("--set-secrets=").split(","))
+    expected = {
+        "/var/run/secrets/lagniappe-settings/lagniappe_settings.yaml": "lagniappe-e2e-settings:latest",
+    }
+    if redis_tls:
+        expected["/var/run/secrets/lagniappe-redis-ca/redis_ca.pem"] = "lagniappe-e2e-redis-ca:latest"
+    assert mounts == expected
+    # Cloud Run rejects two secrets in one directory and hides existing contents.
+    assert len({Path(path).parent for path in mounts}) == len(mounts)
+    dockerfile = " ".join((hosted_e2e.CONTAINER_ROOT / "Dockerfile").read_text().split())
+    for mounted_path in mounts:
+        canonical_path = f"config/files/{Path(mounted_path).name}"
+        assert f"ln -s {mounted_path} {canonical_path}" in dockerfile
 
 
 # @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed

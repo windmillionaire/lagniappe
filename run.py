@@ -213,9 +213,12 @@ def run_tests(test_args: list[str]) -> int:
         python run.py test --strict unit
         python run.py test -- -k "keyword"
     """
+    requested_args = list(test_args)
+    from runner.e2e_pilot import pilot_arguments
     try:
+        pilot, pilot_workers, test_args = pilot_arguments(test_args)
         invocation = normalize_pytest_invocation(test_args, REPOSITORY_ROOT)
-    except PytestRoutingError as error:
+    except (PytestRoutingError, ValueError) as error:
         print(f"Test argument error: {error}", file=sys.stderr)
         return 4
 
@@ -265,7 +268,7 @@ def run_tests(test_args: list[str]) -> int:
         sys.executable,
         str(REPOSITORY_ROOT / "run.py"),
         "test",
-        *test_args,
+        *requested_args,
     ]
     os.environ[command_variable] = json.dumps(full_command)
     authority = None
@@ -314,9 +317,15 @@ def run_tests(test_args: list[str]) -> int:
         statuses = []
         with partition_junit_reports(partitions) as reports:
             if reports.root_args is not None:
-                statuses.append(
-                    _run_pytest_subprocess(pytest_command(list(reports.root_args)))
-                )
+                if pilot:
+                    from runner.e2e_pilot import pilot_authority, run_pilot
+                    with pilot_authority(authority) as coordinator:
+                        statuses.append(run_pilot(coordinator, full_command, reports.root_args,
+                                                  scope=pilot, workers=pilot_workers))
+                else:
+                    statuses.append(
+                        _run_pytest_subprocess(pytest_command(list(reports.root_args)))
+                    )
             if reports.mcp_args is not None:
                 from runner.mcp_environment import run_pytest as run_mcp_pytest
 
@@ -702,14 +711,6 @@ def _nul_paths(result: subprocess.CompletedProcess) -> set[str]:
     return {path for path in result.stdout.split("\0") if path}
 
 
-def _diff_changes_build_id(result: subprocess.CompletedProcess) -> bool:
-    return any(
-        re.match(r"^[+-]BUILD_ID\s*=", line)
-        for line in result.stdout.splitlines()
-        if not line.startswith(("+++", "---"))
-    )
-
-
 def _read_release_text(
     repo_root: Path,
     relative_path: str,
@@ -913,6 +914,8 @@ def _migration_release_issues(
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
 # @matrix release : build-mode delivery-tree
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_reuses_valid_production_build
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_stale_or_modified_build
 # @matrix migrations release : major-version release-note version-metadata
 def release_readiness_issues(
     repo_root: Path,
@@ -946,34 +949,6 @@ def release_readiness_issues(
         issues.append(
             "Installation-local files are present in the release: "
             + ", ".join(local_paths)
-        )
-
-    for required_path in (
-        RELEASE_BUILD_METADATA_PATH,
-        RELEASE_SERVICE_WORKER_PATH,
-    ):
-        if required_path not in changed_paths:
-            issues.append(
-                f"{required_path} was not changed by a fresh production build."
-            )
-
-    build_id_changed = _diff_changes_build_id(
-        _run_release_git(
-            repo_root,
-            [
-                "diff",
-                "--cached",
-                "--unified=0",
-                "--no-color",
-                merge_base,
-                "--",
-                RELEASE_BUILD_ID_PATH,
-            ],
-        )
-    )
-    if not build_id_changed:
-        issues.append(
-            f"{RELEASE_BUILD_ID_PATH} does not contain a newly generated BUILD_ID."
         )
 
     package = _read_release_json(repo_root, "package.json", issues)

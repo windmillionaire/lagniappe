@@ -1292,6 +1292,68 @@ test("test_task_list_refresh_keeps_open_task_in_place", async (t) => {
 	assert.deepEqual(order(), ["open", "first", "last"]);
 });
 
+/** @matrix tasks : delta concurrent-create dirty-form-preservation */
+test("test_task_delta_loads_unknown_rows_without_discarding_local_edits", async (t) => {
+	createBrowser(t);
+	const { PageTaskList } = await loadPageTaskList();
+	const row = (key, fingerprint) =>
+		`<li id="${key}" lp-component lp-entity data-kind="task" data-key="${key}" data-fingerprint="${fingerprint}" data-completed="false">${fingerprint}</li>`;
+	const target = document.createElement("div");
+	target.setAttribute("loaded", "");
+	target.innerHTML = `<ul data-role="active-tasks">${row("winner", "old")}${row("removed", "old")}${row("dirty", "local edit")}</ul><div data-role="completed-header"></div><ul data-role="completed-tasks"></ul>`;
+	document.body.append(target);
+	const dirty = target.querySelector("#dirty");
+	const html = document.createElement("div");
+	html.innerHTML =
+		row("winner", "combined") +
+		row("new", "other client") +
+		row("dirty", "remote edit");
+	let requests = 0;
+	let fail = true;
+	const list = Object.create(PageTaskList.prototype);
+	Object.assign(list, {
+		target,
+		route: "/pages/page/tasks",
+		_updated: [],
+		_created: [],
+		_added: [],
+		_removed: [],
+		_replaced: [],
+		component: { active: list },
+		view: {
+			components: {},
+			addFlash() {},
+			getComponent: (node) =>
+				node === dirty
+					? { widgets: { TaskForm: { unsavedState: true } } }
+					: null,
+			async load(component, route) {
+				assert.equal(component, list.component);
+				assert.equal(route, "/pages/page/tasks");
+				requests += 1;
+				return fail ? null : { html };
+			},
+		},
+	});
+	const delta = {
+		remove: ["removed"],
+		upsert: [{ key: "winner", html: row("winner", "combined") }],
+		order: ["winner", "new", "dirty"],
+	};
+	await list.refreshDelta(delta);
+	assert.equal(target.querySelector("#winner").textContent, "old");
+	assert.ok(target.querySelector("#removed"));
+	fail = false;
+	await list.refreshDelta(delta);
+	assert.equal(target.querySelector("#winner").textContent, "combined");
+	assert.equal(target.querySelector("#new").textContent, "other client");
+	assert.equal(target.querySelector("#removed"), null);
+	assert.equal(target.querySelector("#dirty"), dirty);
+	assert.equal(dirty.textContent, "local edit");
+	await list.refreshDelta({ order: ["winner", "new", "dirty"] });
+	assert.equal(requests, 2, "Complete deltas should not request the full list");
+});
+
 /**
  * @pair tasks:refresh-order
  */

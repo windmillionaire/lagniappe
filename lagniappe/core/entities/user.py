@@ -193,7 +193,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @matrix public-users : create personal-page public-group public-user
     # @matrix user : cache-invalidation create groups new-user-default owner page page-reassign personal-page public-adoption public-group public-user submitted-create-data
     @classmethod
-    def create(cls, data, *, adopt_public=False):
+    def create(cls, data, *, adopt_public=False, key=None):
         if not data.get("name"):
             raise ValueError("name is required")
         if not data.get("email"):
@@ -212,7 +212,7 @@ class User(AssetMixin, UserMixin, Entity):
             )
             previous_page = new_user.page
         else:
-            new_user = cls()
+            new_user = cls(key) if key is not None else cls()
 
         new_user.kind = cls.entity_kind
         new_user.name = data.get("name")

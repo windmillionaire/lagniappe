@@ -28,6 +28,7 @@ test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 	let checkpointAccepted = true;
 	let headlessFactory = async () => null;
 	let offlineRecords = [];
+	let pendingRead = null;
 	let pollResult = null;
 	let responseOk = true;
 	const subscriptions = new Map();
@@ -79,7 +80,7 @@ test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 		deleteSyncRecord: async (syncId) => deletedSyncIds.push(syncId),
 		deleteSyncRecords: async () => undefined,
 		getAllOfflineRecords: async () => ({ sync: offlineRecords }),
-		getSyncRecord: async () => null,
+		getSyncRecord: async () => pendingRead,
 		updateSyncRecord: async (record) => offlineWrites.push(record),
 	};
 	const request = {
@@ -199,6 +200,53 @@ test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 
 	const remote = await manager.state(widget);
 	assert.equal(remote?.generation, "generation-1", "state comes from polling");
+	let cachedRead = { mode: "snapshot", markup: "Previously read" };
+	widget.readCache = {
+		read: async () => cachedRead,
+		accept: async (payload) => {
+			cachedRead = payload;
+		},
+		clear: async () => {
+			cachedRead = null;
+		},
+	};
+	view.online = false;
+	assert.equal((await manager.state(widget)).markup, "Previously read");
+	assert.equal(
+		widget.offlineRecord,
+		undefined,
+		"cached reads aren't pending edits",
+	);
+	assert.equal(offlineWrites.length, 0);
+	pendingRead = {
+		ydoc: "full-pending-state",
+		html: "Previously read plus edits",
+	};
+	assert.equal(
+		await manager.state(widget),
+		null,
+		"pending state must not be re-seeded from cached HTML",
+	);
+	assert.equal(widget.offlineRecord, pendingRead);
+	pendingRead = null;
+	widget.offlineRecord = null;
+	view.online = true;
+	pollResult = { status: "error" };
+	assert.equal((await manager.state(widget)).markup, "Previously read");
+	pollResult = { status: "unavailable" };
+	assert.equal(
+		await manager.state(widget),
+		null,
+		"denial never falls back to cached content",
+	);
+	assert.equal(cachedRead, null);
+	pollResult = null;
+	await manager.state(widget);
+	assert.equal(
+		cachedRead.generation,
+		"generation-1",
+		"network state replaces old content",
+	);
 	let subscription = subscriptions.get("document:entity:document");
 	assert.equal(
 		subscription?.descriptor.type,

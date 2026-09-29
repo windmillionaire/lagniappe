@@ -50,7 +50,7 @@ def compact_task_list(
         }
 
     scope = "active_and_completed" if include_completed else "active"
-    tasks = [*page.tasks, *(page.completed if include_completed else [])]
+    tasks = [*page.tasks, *(page.completed_tasks if include_completed else [])]
     tasks = [task for task in tasks if task.allowed(Action.VIEW, user=user)]
     tasks.sort(
         key=lambda task: (bool(task.completed), (task.name or "").casefold(), task.hash)

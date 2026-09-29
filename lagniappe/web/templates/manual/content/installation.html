@@ -768,19 +768,21 @@
         account before asking about installation type or listing projects.
       </p>
       {% call callout("warning", False) %}
-        If Google shows permission checkboxes or a <strong>Select all</strong>
-        option during either sign-in, choose <strong>Select all</strong> before
-        clicking <strong>Continue</strong> or <strong>Allow</strong>. Do not
-        deselect individual permissions: Google supports partial approval, but
-        every permission requested here is needed to configure, verify, or
-        deploy your installation. The list should not include permission to
-        connect to Cloud SQL instances.
-        <br>
-        <br>
-        In practical terms, you are granting these permissions to
-        <strong>yourself</strong>: they let Google Cloud CLI and the setup code
-        on your own computer act for you in your project. They do not give the
-        Lagniappe maintainer access to your account, project, or credentials.
+        <p class="mb-3">
+          If Google shows permission checkboxes or a <strong>Select all</strong>
+          option during either sign-in, choose <strong>Select all</strong> before
+          clicking <strong>Continue</strong> or <strong>Allow</strong>. Do not
+          deselect individual permissions: Google supports partial approval, but
+          every permission requested here is needed to configure, verify, or
+          deploy your installation. The list should not include permission to
+          connect to Cloud SQL instances.
+        </p>
+        <p>
+          In practical terms, you are granting these permissions to
+          <strong>yourself</strong>: they let Google Cloud CLI and the setup code
+          on your own computer act for you in your project. They do not give the
+          Lagniappe maintainer access to your account, project, or credentials.
+        </p>
       {% endcall %}
     {% endcall %}
     {% call step(3, "Run setup") %}

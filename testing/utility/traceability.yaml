@@ -32,8 +32,10 @@ test_roots:
   - testing/tests_tooling/test_001i_setup_monitoring.py
   - testing/tests_tooling/test_001j_setup_ai_mcp.py
   - testing/tests_tooling/test_001k_setup_console.py
+  - testing/tests_tooling/test_001l_setup_experiments.py
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_004_reports.py
+  - testing/tests_tooling/test_004_navigation.py
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_005_test_session.py
   - testing/tests_tooling/test_005a_frontend_build.py
@@ -45,6 +47,7 @@ test_roots:
   - testing/tests_tooling/test_012_mcp_environment.py
   - testing/tests_tooling/test_012c_remote_mcp_config.py
   - testing/tests_tooling/test_014_dependency_upgrade.py
+  - testing/tests_tooling/test_015_e2e_parallel.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:
@@ -61,10 +64,12 @@ annotated_source_roots:
   - config/form_schema.py
   - config/public_pages.py
   - config/remote_mcp.py
+  - config/experiments.py
   - testing/utility/runtime_outbound_http.py
   - testing/utility/hosted_deferred_jobs.py
   - testing/utility/hosted_e2e_job.py
   - testing/utility/live_ai.py
+  - testing/utility/navigation.py
   - run.py
   - runner/context.py
   - runner/console.py
@@ -72,6 +77,7 @@ annotated_source_roots:
   - runner/terminal.py
   - runner/adc.py
   - runner/deploy.py
+  - runner/experiments.py
   - runner/development.py
   - runner/frontend_build.py
   - runner/gcloud.py
@@ -80,6 +86,12 @@ annotated_source_roots:
   - runner/process.py
   - runner/pytest_routing.py
   - runner/pytest_reports.py
+  - runner/e2e_parallel.py
+  - runner/e2e_pilot.py
+  - runner/e2e_inventory.py
+  - runner/e2e_claims.py
+  - testing/utility/e2e_worker.py
+  - testing/utility/e2e_resources.py
   - runner/testing.py
   - runner/test_session.py
   - runner/upgrade.py
@@ -91,6 +103,7 @@ annotated_source_roots:
   - lagniappe/core/exceptions
   - lagniappe/web/__init__.py
   - lagniappe/web/auth.py
+  - lagniappe/web/experiments.py
   - lagniappe/web/deferred_autofill.py
   - lagniappe/web/direct_uploads.py
   - lagniappe/web/responses.py

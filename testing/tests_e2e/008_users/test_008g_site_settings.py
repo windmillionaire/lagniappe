@@ -75,6 +75,7 @@ def _assert_site_image_links(site_image, image_data):
 # @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
+@pytest.mark.e2e_group("owner")
 def test_site_settings_sections_expand_help_and_configuration(get_user):
     owner = get_user(Users.OWNER)
     _, settings_panel = open_owner_site_settings(owner)
@@ -179,6 +180,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
 
 # @matrix admin : deployment-settings metadata scaling-controls validation
 # @template home/site_settings.html::site_settings
+@pytest.mark.e2e_group("owner")
 def test_site_settings_deployment_form_saves_and_updates_summary(
     get_user,
     browser_failures,
@@ -247,6 +249,7 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
 
 # @matrix admin : ai-settings metadata model-selection saved-values validation
 # @template home/site_settings.html::site_settings
+@pytest.mark.e2e_group("owner")
 def test_site_settings_ai_form_saves_current_models_through_route(
     get_user,
     browser_failures,
@@ -320,6 +323,7 @@ def test_site_settings_ai_form_saves_current_models_through_route(
 # @matrix public-pages sitemap : disabled enabled redis-cache
 # @matrix robots : disabled enabled
 # @template home/site_settings.html::site_settings
+@pytest.mark.e2e_group("owner")
 def test_site_settings_public_page_indexing_saves_live_setting(
     get_user,
     browser_failures,
@@ -393,6 +397,8 @@ def test_site_settings_public_page_indexing_saves_live_setting(
 # @matrix admin : site-update success
 # @pair cache:current
 # @template home/site_settings.html::site_settings
+# Rebuild clears the entire test cache, including active document write locks.
+@pytest.mark.e2e_serial
 def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     owner = get_user(Users.OWNER)
     _, settings_panel = open_owner_site_settings(owner)
@@ -415,6 +421,7 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
 
 # @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
 # @template home/site_settings.html::site_settings
+@pytest.mark.e2e_group("owner")
 def test_site_settings_image_upload_generates_and_persists_site_images(get_user):
     owner = get_user(Users.OWNER)
     admin, settings_panel = open_owner_site_settings(owner)

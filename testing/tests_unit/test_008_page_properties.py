@@ -105,7 +105,7 @@ def test_page_deferred_job_reference_round_trips():
 # @matrix page : table-editability task-load
 @pytest.mark.unit
 def test_column_editable_does_not_load_page_tasks():
-    """Generic table editability should not treat Page.completed as task state."""
+    """Generic table editability must not load a Page's task collections."""
     page = TestEntities.get("PAGE", {"name": "Editable", "hash": "pg008edit"})
     page._load_tasks = MagicMock(side_effect=AssertionError("_load_tasks called"))
     field = _EditablePageColumn()

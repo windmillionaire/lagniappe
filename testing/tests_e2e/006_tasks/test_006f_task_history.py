@@ -8,6 +8,7 @@ Verified against:
 - lagniappe/core/entities/task.py
 """
 
+from contextlib import contextmanager
 from dataclasses import replace
 import re
 import json
@@ -21,7 +22,7 @@ from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.tasks.ordering import page_task_roots
 from lagniappe.core.tools.forms.drafts import archive_form_generation
-from testing.definitions import ModelTasks, Pages, Tasks, Users
+from testing.definitions import ModelTasks, Pages, Tasks
 from testing.resources import Task
 from testing.utility.network import (
     expect_successful_response,
@@ -32,9 +33,12 @@ from testing.utility.network import (
 pytestmark = pytest.mark.e2e
 
 
+@contextmanager
 def _add_task_row_pressure(task, count=40):
     """Keep the history story representative of a well-populated task page."""
-    page = task.entity.page
+    # A reused Task fixture attaches only its Page. Creating additional Tasks
+    # also needs that Page's permission relations, unlike merely displaying it.
+    page = Entities.fetch_one(task.entity.page, request=Fetch.direct())
     filler_tasks = [
         Entities.TASK.create(
             {
@@ -45,7 +49,12 @@ def _add_task_row_pressure(task, count=40):
         )
         for index in range(count)
     ]
-    Entities.save(*filler_tasks, page)
+    try:
+        # Task saves already refresh their parent list; the Page has no edits.
+        Entities.save(*filler_tasks)
+        yield
+    finally:
+        Entities.delete(*filler_tasks)
 
 
 def _complete_then_uncomplete(task, *, reload=True):
@@ -97,11 +106,11 @@ def _open_history_visibility(history):
 # @matrix task-completion : original-view archive uncomplete
 # @template tasks/history.html::completion_history
 # @template pages/tasks.html::task_form
-def test_completion_views_follow_generation_and_archive_original_answers(get_user):
+def test_completion_views_follow_generation_and_archive_original_answers(get_admin, get_user):
     """Uncompletion archives the displayed answers after an optional original view."""
     from testing.resources.form import Form
 
-    user = get_user(Users.OWNER)
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     suffix = uuid4().hex[:8]
     form = Entities.FORM.create({
@@ -413,8 +422,8 @@ def _open_combine_form(user, task):
 # @template pages/tasks.html::task_history
 # @style table.container
 # @style table.thead.th
-def test_task_history_appears_after_completion_cycle(get_user):
-    user = get_user(Users.OWNER)
+def test_task_history_appears_after_completion_cycle(get_admin, get_user):
+    user = get_admin()
     task_name = f"History Task {uuid4().hex}"
     task = _create_combine_task(
         user,
@@ -481,8 +490,8 @@ def test_task_history_appears_after_completion_cycle(get_user):
 
 # @matrix tasks : active-widget complete history-refresh uncomplete
 # @template pages/tasks.html::task
-def test_uncomplete_from_loaded_task_history_closes_task(get_user):
-    user = get_user(Users.OWNER)
+def test_uncomplete_from_loaded_task_history_closes_task(get_admin, get_user):
+    user = get_admin()
     task_name = f"History Uncomplete Task {uuid4().hex}"
     task = _create_combine_task(
         user,
@@ -524,8 +533,8 @@ def test_uncomplete_from_loaded_task_history_closes_task(get_user):
 # @matrix tasks : active-widget history-refresh uncomplete
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::task_history
-def test_reopening_discards_inactive_history_until_next_click(get_user):
-    user = get_user(Users.OWNER)
+def test_reopening_discards_inactive_history_until_next_click(get_admin, get_user):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     form = Entities.FORM.create({
         "name": f"History refresh {uuid4().hex[:8]}", "form-type": "task",
@@ -582,8 +591,8 @@ def test_reopening_discards_inactive_history_until_next_click(get_user):
 # @matrix tasks : active-widget complete uncomplete update-state
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
-def test_completion_waits_for_acceptance_and_moves_closed_task(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_completion_waits_for_acceptance_and_moves_closed_task(get_admin, get_user, browser_failures):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     form = Entities.FORM.create({
         "name": f"Completion transition {uuid4().hex[:8]}", "form-type": "task",
@@ -651,53 +660,67 @@ def test_completion_waits_for_acceptance_and_moves_closed_task(get_user, browser
 # @matrix table-controls : column-visibility persistence
 # @matrix tasks : history reload
 # @template pages/tasks.html::task_tab
-def test_task_history_visibility_persists_after_reload(get_user):
-    user = get_user(Users.OWNER)
+def test_task_history_visibility_persists_after_reload(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_history_form_task.get(user)
-    _add_task_row_pressure(task)
-    user.go(task)
+    with _add_task_row_pressure(task):
+        user.go(task)
 
-    _complete_then_uncomplete(task)
+        _complete_then_uncomplete(task)
 
-    history = _open_history(task)
-    form_column = history.locator("th[data-column='input-textab12']")
-    expect(form_column).to_be_hidden()
+        history = _open_history(task)
+        form_column = history.locator("th[data-column='input-textab12']")
+        expect(form_column).to_be_hidden()
 
-    controller = _open_history_visibility(history)
-    form_column_toggle = controller.locator(
-        "input[type='checkbox'][name='input-textab12']"
-    )
-    expect(form_column_toggle).not_to_be_checked()
-    form_column_toggle.set_checked(True)
-    expect(form_column).to_be_visible()
+        controller = _open_history_visibility(history)
+        form_column_toggle = controller.locator(
+            "input[type='checkbox'][name='input-textab12']"
+        )
+        expect(form_column_toggle).not_to_be_checked()
+        form_column_toggle.set_checked(True)
+        expect(form_column).to_be_visible()
 
-    user.reload()
-    task.wait_for_load()
+        user.reload()
+        task.wait_for_load()
 
-    history = _open_history(task)
-    expect(history.locator("th[data-column='completed_on']")).to_be_visible()
-    expect(history.locator("th[data-column='input-textab12']")).to_be_visible()
-    expect(history.locator("tbody tr")).not_to_have_count(0)
+        history = _open_history(task)
+        expect(history.locator("th[data-column='completed_on']")).to_be_visible()
+        expect(history.locator("th[data-column='input-textab12']")).to_be_visible()
+        expect(history.locator("tbody tr")).not_to_have_count(0)
 
-    controller = _open_history_visibility(history)
-    expect(
-        controller.locator("input[type='checkbox'][name='input-textab12']")
-    ).to_be_checked()
+        controller = _open_history_visibility(history)
+        expect(
+            controller.locator("input[type='checkbox'][name='input-textab12']")
+        ).to_be_checked()
 
 
 # @matrix tasks : history-fill latest-submission live-update
 # @matrix task-completion : field-reset uncomplete
 # @source lagniappe/core/entities/task.py::Task.uncomplete
 # @template pages/tasks.html::task_form
-def test_task_form_field_fills_from_latest_history(get_user):
+def test_task_form_field_fills_from_latest_history(get_admin, get_user):
     """History restores this submission only; the next cycle starts empty."""
-    user = get_user(Users.OWNER)
+    user = get_admin()
     task = Tasks.test_history_fill_task.get(user)
     saved_settings = {
         name: task.entity.db.get(name)
         for name in ("form", "page", "name", "description")
     }
-    user.go(task)
+    assert not task.entity.has_history
+    history_requests = []
+
+    def record_history_request(request):
+        if f"/tasks/{task.key}/history/latest-submission" in request.url:
+            history_requests.append(request.url)
+
+    user.page.context.on("request", record_history_request)
+    try:
+        user.go(task)
+        expect(task.task_form).to_have_attribute("initialized", "")
+        expect(task.task_form.locator("[data-role='history-fill']")).to_have_count(0)
+        assert history_requests == [], "A Task without history must not fetch it"
+    finally:
+        user.page.context.remove_listener("request", record_history_request)
 
     _complete_then_uncomplete(task, reload=False)
 
@@ -763,8 +786,8 @@ def test_task_form_field_fills_from_latest_history(get_user):
 
 # @matrix tasks : history-fill latest-submission incompatible-value
 # @template pages/tasks.html::task_form
-def test_history_fill_converts_selected_fields_and_reports_invalid_values(get_user, browser_failures):
-    user = get_user(Users.OWNER)
+def test_history_fill_converts_selected_fields_and_reports_invalid_values(get_admin, get_user, browser_failures):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     source = [{"id": key, "type": "input", "input": "text", "title": title}
               for key, title in (("quantity", "Quantity"), ("invalid", "Invalid quantity"), ("notes", "Notes"))]
@@ -832,8 +855,8 @@ def test_history_fill_converts_selected_fields_and_reports_invalid_values(get_us
 
 # @matrix tasks : element-matrix history-fill latest-submission live-update
 # @template pages/tasks.html::task_form
-def test_task_history_fill_controls_cover_submission_elements(get_user):
-    user = get_user(Users.OWNER)
+def test_task_history_fill_controls_cover_submission_elements(get_admin, get_user):
+    user = get_admin()
     parent = Pages.test_create_page_task.get(user)
     suffix = uuid4().hex
     options = [
@@ -1017,8 +1040,8 @@ def test_task_history_fill_controls_cover_submission_elements(get_user):
 # @template cell.html::table_cell
 # @template controls.html::expand
 # @template tasks/history.html::completion_history
-def test_task_history_expands_table_submission_cell(get_user):
-    user = get_user(Users.OWNER)
+def test_task_history_expands_table_submission_cell(get_admin, get_user):
+    user = get_admin()
     task = Tasks.test_history_table_task.get(user)
     user.go(task)
 
@@ -1049,8 +1072,8 @@ def test_task_history_expands_table_submission_cell(get_user):
 # @matrix task-combine : checkbox-form compatible lazy-form lazy-reload linked-page no-model same-model same-page view-page
 # @pair web-headers:no-store
 # @template pages/tasks.html::combine_form
-def test_combine_task_form_filters_compatible_tasks(get_user):
-    user = get_user(Users.OWNER)
+def test_combine_task_form_filters_compatible_tasks(get_admin, get_user):
+    user = get_admin()
     fixture = Tasks.test_history_task.get(user)
     page = fixture.entity.page
     model_one = ModelTasks.test_create_model_task.get(user).entity
@@ -1127,8 +1150,9 @@ def test_combine_task_form_filters_compatible_tasks(get_user):
 # @template pages/tasks.html::combine_form
 # @template pages/tasks.html::task
 # @template tasks/history.html::completion_history
-def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
-    user = get_user(Users.OWNER)
+# @matrix tasks : delta concurrent-create
+def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get_user):
+    user = get_admin()
     fixture = Tasks.test_history_form_task.get(user)
     page = fixture.entity.page
     form = fixture.entity.form
@@ -1179,6 +1203,11 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     combine_form.get_by_role("checkbox", name=secondary.entity.name).check()
     combine_form.get_by_role("checkbox", name=winner.entity.name).check()
 
+    # Another client adds a Task after this browser loaded the list. The
+    # combine response must not assume its order is entirely mounted here.
+    concurrent = _create_combine_task(user, page, "Created while combining")
+    expect(user.locate(f"li[data-key='{concurrent.key}']")).not_to_be_attached()
+
     with user.page.expect_response(
         lambda response: response.url.split("?", 1)[0]
         .rstrip("/")
@@ -1199,6 +1228,7 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
     expect(winner_row).to_have_attribute("data-completed", "true")
     expect(user.locate(f"[data-key='{source.key}']")).not_to_be_attached()
     expect(user.locate(f"[data-key='{secondary.key}']")).not_to_be_attached()
+    expect(user.locate(f"li[data-key='{concurrent.key}']")).to_be_visible()
 
     fixture.definition.origin.get(user).completed_task_list
     expect(winner_row).to_be_visible()

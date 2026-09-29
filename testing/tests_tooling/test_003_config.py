@@ -54,6 +54,9 @@ def saved_projection_settings(settings_config):
             "AI_OBSERVABILITY": False,
             "AGENT_ACCESS_ENABLED": False,
             "PUBLIC_MANUAL": False,
+            "EXPERIMENTS_ENABLED": True,
+            "EXPERIMENTS_EXECUTION_ENABLED": True,
+            "EXPERIMENTS_DIAGNOSTICS": "summary",
             "NESTED": {"items": [{"label": "saved"}]},
         }
     )
@@ -180,6 +183,9 @@ def test_runtime_and_draft_projections_preserve_environment_precedence(
         assert projected["AI_OBSERVABILITY"] is True
         assert projected["AGENT_ACCESS_ENABLED"] is True
         assert projected["PUBLIC_MANUAL"] is True
+        assert projected["EXPERIMENTS_ENABLED"] is False
+        assert projected["EXPERIMENTS_EXECUTION_ENABLED"] is False
+        assert projected["EXPERIMENTS_DIAGNOSTICS"] == "off"
         assert (
             projected["AGENT_ACCESS_EMAIL"]
             == config.constants.DEFAULT_AGENT_ACCESS_EMAIL
@@ -198,6 +204,9 @@ def test_runtime_and_draft_projections_preserve_environment_precedence(
                 "AGENT_ACCESS_ENABLED": False,
                 "PUBLIC_MANUAL": False,
                 "AGENT_ACCESS_CODE": "explicit-code",
+                "EXPERIMENTS_ENABLED": True,
+                "EXPERIMENTS_EXECUTION_ENABLED": True,
+                "EXPERIMENTS_DIAGNOSTICS": "trace",
             }
         )
         draft.save(config.File.DEV_YAML)
@@ -211,6 +220,13 @@ def test_runtime_and_draft_projections_preserve_environment_precedence(
         ):
             assert updated[key] is False
         assert updated["AGENT_ACCESS_CODE"] == "explicit-code"
+        assert updated["EXPERIMENTS_ENABLED"] is True
+        assert updated["EXPERIMENTS_EXECUTION_ENABLED"] is True
+        assert updated["EXPERIMENTS_DIAGNOSTICS"] == "trace"
+    else:
+        assert projected["EXPERIMENTS_ENABLED"] is True
+        assert projected["EXPERIMENTS_EXECUTION_ENABLED"] is True
+        assert projected["EXPERIMENTS_DIAGNOSTICS"] == "summary"
 
 
 # @matrix config : configuration transactional-state
@@ -369,6 +385,9 @@ def test_hosted_runtime_projection_preserves_validated_overrides(
         == "runner@project-1.iam.gserviceaccount.com"
     )
     assert projected["HOSTED_E2E_BUILD_ID"] == "b1234567"
+    assert projected["EXPERIMENTS_ENABLED"] is False
+    assert projected["EXPERIMENTS_EXECUTION_ENABLED"] is False
+    assert projected["EXPERIMENTS_DIAGNOSTICS"] == "off"
     monkeypatch.setenv(
         "LAGNIAPPE_HOSTED_E2E_RUNTIME_SERVICE_ACCOUNT_EMAIL",
         "runner@wrong.iam.gserviceaccount.com",
