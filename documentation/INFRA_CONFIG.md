@@ -39,9 +39,9 @@ isolated tests.
 The deployment descriptor, indexes, and files under `config/files/` are local
 to each installation and ignored by Git. Their reusable defaults and builders
 are tracked; setup generates the files for each installation. The PWA manifest
-is tracked and uses the project name `Lagniappe` for both `name` and `short_name`,
-independently of the installation's `APP_NAME`. Setup and deployment preserve
-that branding while refreshing icon cache versions.
+is tracked; setup and deployment regenerate both `name` and `short_name` from
+the current installation's `APP_NAME` while refreshing icon cache versions.
+The checked-in manifest does not select an installation or override its settings.
 
 `Directory` and `File` enums expose the known project paths and parse/save
 helpers. Do not add dynamic path discovery or upward searching to runtime

@@ -2538,8 +2538,8 @@ def test_config_builders_preserve_inputs_and_generate_independent_documents(scal
     assert built_test["PREFIX"] == "custom-test"
     assert built_indexes["custom"] == "preserved"
     assert built_app["APP_NAME"] == "Independent App"
-    assert built_manifest["name"] == "Lagniappe"
-    assert built_manifest["short_name"] == "Lagniappe"
+    assert built_manifest["name"] == "Independent App"
+    assert built_manifest["short_name"] == "Independent App"
     assert built_manifest["icons"] == [{"src": "/icon.png?v=7"}]
     assert (app, gcloud, deployment, dev, test, indexes, manifest) == inputs
     assert config_builders.build_manifest(built_app, manifest) == built_manifest
@@ -2580,8 +2580,8 @@ def test_update_config_refreshes_preloaded_builders_and_current_settings(
     assert config.SETTINGS.APP is app
     assert config.File.APP_SETTINGS_YAML.load()["VERSION"] == "9.9.9"
     assert config.SETTINGS.APP["APP_NAME"] == "Refreshed App"
-    assert config.SETTINGS.MANIFEST["name"] == "Lagniappe"
-    assert config.SETTINGS.MANIFEST["short_name"] == "Lagniappe"
+    assert config.SETTINGS.MANIFEST["name"] == "Refreshed App"
+    assert config.SETTINGS.MANIFEST["short_name"] == "Refreshed App"
 
 
 def _configure_adc_quota_test(monkeypatch, spinner):

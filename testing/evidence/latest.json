@@ -6463,6 +6463,10 @@
     ],
     [
       "testing/tests_tooling/test_001a_setup_validation_config.py",
+      "20e45b2f2b7eafee47fa80fdc47df7b5c1fcdd1192cfeea15d87ff4f42ca43c6"
+    ],
+    [
+      "testing/tests_tooling/test_001a_setup_validation_config.py",
       "359b816be8f322d571d0d027cde8f573efc211575590688e49d38a4f36df5ad7"
     ],
     [
@@ -7448,14 +7452,15 @@
   ],
   "kind": "test-run",
   "provenance": {
-    "behavior_snapshot": "5d6bf98b6ae1b334bb9930c6afd8d1a3ec6730f9c0a7def14159d9611de2dd0d",
+    "behavior_snapshot": "848332fc2eea928501da9700061db5b1f39b0e12d7e1726ac82b846c9911d7d1",
     "command": [
       "/home/swifty/experiments/lagniappe/venv/bin/python",
       "/home/swifty/experiments/lagniappe/run.py",
       "test",
-      "testing/tests_tooling/test_013_ai_workflow_cases.py"
+      "testing/tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents",
+      "testing/tests_tooling/test_001a_setup_validation_config.py::test_update_config_refreshes_preloaded_builders_and_current_settings"
     ],
-    "generated_at": "2026-09-29T09:49:00.045628+00:00"
+    "generated_at": "2026-09-29T09:56:42.127442+00:00"
   },
   "schema_version": 3,
   "sessions": [
@@ -7464,12 +7469,13 @@
         "/home/swifty/experiments/lagniappe/venv/bin/python",
         "/home/swifty/experiments/lagniappe/run.py",
         "test",
-        "testing/tests_tooling/test_013_ai_workflow_cases.py"
+        "testing/tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents",
+        "testing/tests_tooling/test_001a_setup_validation_config.py::test_update_config_refreshes_preloaded_builders_and_current_settings"
       ],
       "exit_status": 0,
-      "generated_at": "2026-09-29T09:49:00.045628+00:00",
-      "snapshot": "5d6bf98b6ae1b334bb9930c6afd8d1a3ec6730f9c0a7def14159d9611de2dd0d",
-      "tests": 4
+      "generated_at": "2026-09-29T09:56:42.127442+00:00",
+      "snapshot": "848332fc2eea928501da9700061db5b1f39b0e12d7e1726ac82b846c9911d7d1",
+      "tests": 3
     }
   ],
   "snapshots": {
@@ -9085,7 +9091,6 @@
         1612,
         1613,
         1614,
-        1616,
         1617,
         1618,
         1619,
@@ -9329,7 +9334,8 @@
         1857,
         1858,
         1859,
-        1860
+        1860,
+        1861
       ]
     },
     "5d6bf98b6ae1b334bb9930c6afd8d1a3ec6730f9c0a7def14159d9611de2dd0d": {
@@ -10944,8 +10950,7 @@
         1612,
         1613,
         1614,
-        1615,
-        1617,
+        1616,
         1618,
         1619,
         1620,
@@ -11188,10 +11193,11 @@
         1857,
         1858,
         1859,
-        1860
+        1860,
+        1861
       ]
     },
-    "c35fe74ce69120df97a8c744fea91b68f1cf70a182a2446775e9ff64e8621316": {
+    "848332fc2eea928501da9700061db5b1f39b0e12d7e1726ac82b846c9911d7d1": {
       "fingerprints": [
         0,
         1,
@@ -12234,7 +12240,7 @@
         1041,
         1042,
         1043,
-        1045,
+        1044,
         1046,
         1047,
         1048,
@@ -12496,7 +12502,7 @@
         1304,
         1305,
         1306,
-        1307,
+        1308,
         1309,
         1310,
         1311,
@@ -12804,7 +12810,6 @@
         1613,
         1614,
         1615,
-        1617,
         1618,
         1619,
         1620,
@@ -13047,7 +13052,8 @@
         1857,
         1858,
         1859,
-        1860
+        1860,
+        1861
       ]
     }
   },
@@ -19208,14 +19214,14 @@
       "snapshot": "4328316b91c22443aa825c842f1c79ca9e2d82831ae5bcb1f3fcefa0d401d680"
     },
     "tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents[automatic]": {
-      "duration": 0.006915872014360502,
+      "duration": 0.00525181699777022,
       "outcome": "passed",
-      "snapshot": "c35fe74ce69120df97a8c744fea91b68f1cf70a182a2446775e9ff64e8621316"
+      "snapshot": "848332fc2eea928501da9700061db5b1f39b0e12d7e1726ac82b846c9911d7d1"
     },
     "tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents[basic]": {
-      "duration": 0.0009160549961961806,
+      "duration": 0.0009164069488178939,
       "outcome": "passed",
-      "snapshot": "c35fe74ce69120df97a8c744fea91b68f1cf70a182a2446775e9ff64e8621316"
+      "snapshot": "848332fc2eea928501da9700061db5b1f39b0e12d7e1726ac82b846c9911d7d1"
     },
     "tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects": {
       "duration": 0.006461194999985764,
@@ -19323,9 +19329,9 @@
       "snapshot": "4328316b91c22443aa825c842f1c79ca9e2d82831ae5bcb1f3fcefa0d401d680"
     },
     "tests_tooling/test_001a_setup_validation_config.py::test_update_config_refreshes_preloaded_builders_and_current_settings": {
-      "duration": 0.015051789989229292,
+      "duration": 0.013162137969629839,
       "outcome": "passed",
-      "snapshot": "c35fe74ce69120df97a8c744fea91b68f1cf70a182a2446775e9ff64e8621316"
+      "snapshot": "848332fc2eea928501da9700061db5b1f39b0e12d7e1726ac82b846c9911d7d1"
     },
     "tests_tooling/test_001a_setup_validation_config.py::test_update_config_sets_application_version_from_package": {
       "duration": 0.006225565999955052,

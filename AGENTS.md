@@ -24,7 +24,8 @@ These instructions apply to the whole repository unless a more specific
   notebook through the current installation and the user's task authorization.
 - Keep generated installation settings and deployment descriptors out of Git.
   Project branding and filenames such as `Lagniappe` and `lagniappe_settings.yaml`
-  are shared across installations; the tracked PWA manifest uses that branding.
+  are shared across installations. Setup and deployment regenerate the tracked
+  PWA manifest using the current installation's `APP_NAME`.
 
 ## Python
 
