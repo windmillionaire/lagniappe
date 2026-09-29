@@ -678,7 +678,7 @@ def forms(start_cursor=None, limit=25):
 # @tests tests_unit/test_018_database_utility.py::test_form_users_bounds_batches_and_deduplicates_owners
 # @tests tests_unit/test_018_database_utility.py::test_form_users_empty_input_does_not_read
 # @tests tests_e2e/003_forms/test_003h_form_references.py::test_form_reference_lookup_matches_primary_secondary_and_batched_owners
-# @matrix forms database : reference-query primary-secondary batching owner-deduplication
+# @matrix forms database : reference-query primary-secondary batching owner-deduplication empty-input
 def form_users(*forms):
     """Find categories and models that reference any of the given forms."""
     form_keys = list(dict.fromkeys(f.key for f in forms))
