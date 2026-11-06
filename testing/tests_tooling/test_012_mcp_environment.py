@@ -19,7 +19,7 @@ import pytest
 
 pytestmark = pytest.mark.tooling
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-UV_SCRIPT = b"#!/bin/sh\nprintf '%s\\n' 'uv 0.12.9'\n"
+UV_SCRIPT = b"#!/bin/sh\nprintf '%s\\n' 'uv 0.13.7'\n"
 
 
 class _ArchiveResponse(io.BytesIO):
@@ -76,7 +76,7 @@ def _archive(*, unsafe_member=None):
 def _write_manifest(path, payload, *, digest=None, member_digest=None):
     manifest = {
         "schema": 1,
-        "version": "0.12.9",
+        "version": "0.13.7",
         "allowed_redirect_hosts": [
             "github.com",
             "release-assets.githubusercontent.com",
@@ -88,7 +88,7 @@ def _write_manifest(path, payload, *, digest=None, member_digest=None):
                 "libc": "gnu",
                 "url": (
                     "https://github.com/astral-sh/uv/releases/download/"
-                    "0.12.9/uv-x86_64-unknown-linux-gnu.tar.gz"
+                    "0.13.7/uv-x86_64-unknown-linux-gnu.tar.gz"
                 ),
                 "sha256": digest or hashlib.sha256(payload).hexdigest(),
                 "archive_size": len(payload),
@@ -108,7 +108,7 @@ def _uv_runner(command, **_kwargs):
         content = executable.read_bytes()
     except OSError:
         return subprocess.CompletedProcess(command, 1, stdout="", stderr="missing")
-    version = "uv 0.12.9\n" if content == UV_SCRIPT else "uv corrupt\n"
+    version = "uv 0.13.7\n" if content == UV_SCRIPT else "uv corrupt\n"
     return subprocess.CompletedProcess(command, 0, stdout=version, stderr="")
 
 
@@ -190,18 +190,18 @@ def test_uv_bootstrap_manifest_and_managed_context_path():
         )
     )
 
-    assert manifest.version == "0.12.9"
-    assert project["tool"]["uv"]["required-version"] == "==0.12.9"
+    assert manifest.version == "0.13.7"
+    assert project["tool"]["uv"]["required-version"] == "==0.13.7"
     assert project["dependency-groups"]["test"] == [
-        "pytest==9.1.1",
-        "uv-build==0.12.9",
+        "pytest==9.2.0",
+        "uv-build==0.13.7",
     ]
     root_package = next(
         package for package in lock["package"] if package["name"] == "lagniappe-mcp"
     )
     assert root_package["metadata"]["requires-dev"]["test"] == [
-        {"name": "pytest", "specifier": "==9.1.1"},
-        {"name": "uv-build", "specifier": "==0.12.9"},
+        {"name": "pytest", "specifier": "==9.2.0"},
+        {"name": "uv-build", "specifier": "==0.13.7"},
     ]
     assert manifest.allowed_redirect_hosts == {
         "github.com",
@@ -209,15 +209,15 @@ def test_uv_bootstrap_manifest_and_managed_context_path():
     }
     assert artifact.platform_key == "linux-x86_64-gnu"
     assert artifact.sha256 == (
-        "ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460"
+        "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
     )
-    assert artifact.archive_size == 19423276
+    assert artifact.archive_size == 16671812
     assert artifact.member == "uv-x86_64-unknown-linux-gnu/uv"
     assert artifact.member_sha256 == (
-        "671793498fe0a545432e2524b6691ffb9eea4540d9fda43ca2f978df2dbf8426"
+        "4b5e59bc557ff2cd70934beb59d0eaa92820702853d49f0066b50aa11a8f0c52"
     )
     assert "/latest/" not in artifact.url
-    assert context.UV_CLI == (REPOSITORY_ROOT / "venv/tools/uv/0.12.9/uv")
+    assert context.UV_CLI == (REPOSITORY_ROOT / "venv/tools/uv/0.13.7/uv")
     assert "uv" not in context.TOOL_PATHS
 
 
@@ -239,22 +239,22 @@ def test_uv_bootstrap_manifest_preserves_supported_macos_development_hosts():
 
     assert apple_silicon.platform_key == "darwin-aarch64-none"
     assert apple_silicon.sha256 == (
-        "301f72afaf54060f92da7016cb0115bd077f43a9c8e39c1d8170a0bac80fd398"
+        "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731"
     )
-    assert apple_silicon.archive_size == 16636737
+    assert apple_silicon.archive_size == 14347867
     assert apple_silicon.member == "uv-aarch64-apple-darwin/uv"
     assert apple_silicon.member_sha256 == (
-        "5e2e4133be3e61a25f819b95f6d6bb38c61fb3062eddf3e0857bb72fa3c69205"
+        "0f333833a6d011710d3edc0e45b55d3d934aef15bb83a25b29848c241ac513b4"
     )
 
     assert intel.platform_key == "darwin-x86_64-none"
     assert intel.sha256 == (
-        "e1ca175824f1056589ce9908f7631879ebc3c36535b5e63dc06510beb370b4c1"
+        "20c47e4c1f630b8abaff8c291fa9b9aa300fef92c4fbff95adf198b55287cda7"
     )
-    assert intel.archive_size == 19952135
+    assert intel.archive_size == 17026382
     assert intel.member == "uv-x86_64-apple-darwin/uv"
     assert intel.member_sha256 == (
-        "935ac2592d1f6975571fc332b02527049fc4c4fc3604917a9936b2cf329aa821"
+        "b345904c70c5bb715cda5a58cb74b6c53158346e806258e270a774fdaa3d7739"
     )
 
 
@@ -274,7 +274,7 @@ def test_mcp_containers_isolate_production_source_and_test_dependencies():
         assert dockerfile.index(metadata_copy) < dockerfile.index(source_copy)
         assert "--locked --group test --no-install-project --no-editable" in dockerfile
         assert "--locked --group test --no-editable --no-build-isolation --offline" in dockerfile
-        assert "ghcr.io/astral-sh/uv:0.12.9@sha256:" in dockerfile
+        assert "ghcr.io/astral-sh/uv:0.13.7@sha256:" in dockerfile
         assert f"{container_root.relative_to(REPOSITORY_ROOT)}/Dockerfile" in cloudbuild
         final = dockerfile.rsplit("\nFROM ", 1)[1]
         assert "pipx" not in final
@@ -327,7 +327,7 @@ def test_uv_bootstrap_rejects_malformed_manifest(tmp_path):
 
     manifest.pop("unexpected")
     manifest["platforms"]["linux-x86_64-gnu"]["url"] = (
-        "http://github.com/astral-sh/uv/releases/download/0.12.9/uv.tar.gz"
+        "http://github.com/astral-sh/uv/releases/download/0.13.7/uv.tar.gz"
     )
     manifest_path.write_text(
         f"{json.dumps(manifest)}\n",
@@ -466,7 +466,7 @@ def test_uv_bootstrap_check_rejects_wrong_version_and_permissions(tmp_path):
             run=lambda command, **_kwargs: subprocess.CompletedProcess(
                 command,
                 0,
-                stdout="uv 0.12.9\n",
+                stdout="uv 0.13.7\n",
                 stderr="",
             ),
         )
@@ -703,7 +703,7 @@ def _configure_mcp_environment(monkeypatch, tmp_path):
     python = environment / "bin/python"
     project.mkdir(parents=True)
     (project / "pyproject.toml").write_text(
-        '[tool.uv]\nrequired-version = "==0.12.9"\n',
+        '[tool.uv]\nrequired-version = "==0.13.7"\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(mcp_environment, "MCP_PROJECT", project)

@@ -42,15 +42,23 @@ Raw exports stay ignored: they can contain private records or credentials.
 The entire library is excluded from App Engine uploads; Cloud Build contexts
 also exclude raw artifacts. Do not force-add transcripts or signed URLs.
 
+Historical paths in results and reviews use `<historical-checkout>` and
+`<historical-captures>` in place of the original operator's private directories.
+They identify provenance; the referenced raw captures may be unavailable in
+this checkout. Resolve new runs and exports from the current checkout and its
+local settings, as described in
+[INFRA_CONFIG.md](../../documentation/INFRA_CONFIG.md#current-installation).
+
 ## Run a case
 
-1. Read its rubric yourself, checking that the required workspace records still
+1. Verify the app and MCP connection against this checkout's local settings.
+   Read the case's rubric yourself, checking that the required workspace records
    exist and dates are sensible. Do not paste the rubric into the model chat.
 2. Start a fresh client in a **neutral working copy of the case's fixtures**,
    outside the application checkout, with the intended profile/model/reasoning.
    The checkout's ancestor `AGENTS.md` would otherwise add application-coding
    instructions that were absent from the Desktop baselines. The September 5
-   remote captures used `/home/swifty/Desktop/cases/<case>/fixtures/`; the
+   remote captures used `<historical-captures>/cases/<case>/fixtures/`; the
    operator returned those cases to this library after the runs. Prepare a
    neutral copy again for a later trial rather than running inside this repo.
    Paste the natural request from `PROMPT.md` for MCP, or `PROMPT_ON_SITE.md`
@@ -201,10 +209,10 @@ change merits 03 + 10; filing changes merit 06/08/12/13; Project/Form changes
 merit 09. Upload/action permissions merit U1 + U2. [Round 3](ROUND_3.md) selects five specific cases. Rubrics name both
 expected results and acceptable variance; they do not prescribe a tool sequence.
 
-The operator's living demo workspace is not automatically seeded or reset.
+The selected installation's workspace is not automatically seeded or reset.
 Case rubrics describe prerequisites. Missing/renamed/completed records, prior
 proposal execution and accumulated uploads are comparison caveats, not an
 invitation for the evaluator to repair production fixtures silently.
 
 The fuller process and entry-point boundaries are in
-[TESTING_AI_PROCESS.md](../documentation/TESTING_AI_PROCESS.md).
+[TESTING_AI_PROCESS.md](../../documentation/TESTING_AI_PROCESS.md).

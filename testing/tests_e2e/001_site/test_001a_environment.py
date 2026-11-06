@@ -592,6 +592,11 @@ def test_setup_navigation_recovers_a_static_503(get_admin, browser_failures):
     """A failed cold module fetch gets one reload, then the real Home works."""
     user = get_admin()
     requests = []
+    navigations = []
+
+    def navigated(frame):
+        if frame == user.page.main_frame:
+            navigations.append(frame.url)
 
     def transient(route):
         requests.append(route.request.url)
@@ -600,13 +605,19 @@ def test_setup_navigation_recovers_a_static_503(get_admin, browser_failures):
         else:
             route.continue_()
 
-    with scoped_browser_route(user.page, "**/chunks/foundation.js?*", transient):
-        home = user.go(SitePages.HOME)
-        expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
-        user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
-        expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_be_visible()
+    user.page.on("framenavigated", navigated)
+    try:
+        with scoped_browser_route(user.page, "**/chunks/foundation.js?*", transient):
+            home = user.go(SitePages.HOME)
+            expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
+            user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
+            expect(user.locate(home.CREATE_TOOL_REPORT_FORM)).to_be_visible()
+    finally:
+        user.page.remove_listener("framenavigated", navigated)
 
-    assert len(requests) == 2
+    # Module preloads may fetch more than once; document navigation owns retry.
+    assert len(requests) >= 2
+    assert len(navigations) == 2
     recovered = [event for event in browser_failures.events
                  if event.ignored_reason == "static-503-recovered-by-navigation"]
     assert recovered and all(event.details["http_status"] == "503" for event in recovered)

@@ -5,6 +5,11 @@ workflows. Start with the narrowest guide that owns the code you are changing,
 then follow its links for adjacent contracts. Installation commands for users
 begin in the [README](../README.md).
 
+For work on a deployed app, first identify the
+[current installation](INFRA_CONFIG.md#current-installation) from this
+checkout's local settings. These guides apply across installations; experiments
+is an optional mode described in [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md).
+
 ## First reads
 
 | Area | Start here |
@@ -81,7 +86,7 @@ begin in the [README](../README.md).
 | --- | --- |
 | [INFRA_CONFIG.md](INFRA_CONFIG.md) | Configuration sources, validation, secrets, browser protocol, and runtime access. |
 | [INFRA_SETUP.md](INFRA_SETUP.md) | Installer phases, focused commands, reruns, and setup ownership. |
-| [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md) | Dedicated experiments installation, admin agent execution, measurement coverage, and durable notebook workflow. |
+| [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md) | Optional experiments mode, admin agent execution, measurement coverage, and installation-local notebooks. |
 | [INFRA_SETUP_CLOUD.md](INFRA_SETUP_CLOUD.md) | GCP, Identity Platform, OAuth, domains, email, Redis, and integrations. |
 | [INFRA_SETUP_DEVELOPMENT.md](INFRA_SETUP_DEVELOPMENT.md) | Local dependencies, environment, frontend, tests, and emulator assumptions. |
 | [INFRA_SETUP_RECOVERY.md](INFRA_SETUP_RECOVERY.md) | Recovery state, validation, repair, and safe reruns. |

@@ -263,12 +263,12 @@ with an eligible Lagniappe account. Availability follows the ChatGPT account
 and workspace policy. See OpenAI's
 [connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt).
 
-For Codex, configure the server URL and fixed public client. This example
-assumes setup saved `MCP_NAME: cwright-mcp`:
+For Codex, use this installation's saved `MCP_NAME` and `MCP_RESOURCE` with the
+fixed public client. Replace the two uppercase placeholders with those values:
 
 ```bash
-codex mcp add cwright-mcp --url https://MCP-ENDPOINT/mcp --oauth-client-id lagniappe-codex
-codex mcp login cwright-mcp
+codex mcp add MCP_NAME --url MCP_RESOURCE --oauth-client-id lagniappe-codex
+codex mcp login MCP_NAME
 ```
 
 The AI Integration manual gives signed-in non-public users the setup command

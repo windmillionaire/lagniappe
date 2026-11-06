@@ -90,6 +90,11 @@ rejects new migration catalog entries without a major increase, matching
 ### 1. Finish release preparation
 
 - Freeze source changes.
+- Verify the selected checkout's local installation settings. Use an authorized
+  test installation for rehearsal and hosted validation, and verify GitHub's
+  `hosted-e2e` environment matches its setup record. See
+  [Hosted testing](TESTING_HOSTED_E2E.md#one-time-setup). Publishing source and
+  tags does not deploy to other installations or change their saved modes.
 - Finalize release notes, migrations, dependency locks, privacy-notice
   applicability, and test evidence.
 - For a major release, include the owner-run maintenance instructions and

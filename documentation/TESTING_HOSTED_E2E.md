@@ -61,6 +61,11 @@ create, and teardown probe that guard before handling runnable versions.
 
 ## One-time setup
 
+Hosted tests use the installation selected by this checkout's local settings.
+Verify its [current installation](INFRA_CONFIG.md#current-installation) before
+setup or candidate creation. The application experiments mode is independent
+of hosted testing and is not required to use this workflow.
+
 Complete installation, deploy current production, and run development setup.
 Then:
 
@@ -90,6 +95,12 @@ from setup output:
 
 They are resource identifiers, not secrets. Environment review is appropriate
 because execution consumes provider resources and mutates test-prefixed data.
+
+The GitHub environment is shared repository configuration. Before creating a
+release candidate, compare its variables with the setup record for the intended
+checkout. Coordinate any change of hosted-test installation with the repository
+operator; switching directories does not retarget GitHub. A historical result
+or another checkout's setup record is not the current target configuration.
 
 ## Create and execute
 

@@ -1,6 +1,6 @@
 # Lagniappe Maintainer Error-Reporting Privacy Notice
 
-**Applies to:** Lagniappe 2.4.0
+**Applies to:** Lagniappe 2.4.1
 
 **Effective date:** July 27, 2026
 

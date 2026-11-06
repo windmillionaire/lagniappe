@@ -123,6 +123,31 @@ def pilot_authority(local_authority):
 
 
 # @testable true
+# @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_targets_resolve_collected_browser_parameters
+# @matrix testing : parallel-e2e collection browser-parameters
+def resolve_pilot_targets(records, targets):
+    """Resolve bounded selectors to actual pytest IDs, failing on missing cases."""
+    selected = {}
+    for target in targets:
+        base, separator, parameters = target.removeprefix("testing/").partition("[")
+        matches = []
+        for record in records:
+            node_base, _, node_parameters = record["nodeid"].removeprefix("testing/").partition("[")
+            if node_base != base:
+                continue
+            if separator:
+                expected = parameters.removesuffix("]")
+                actual = node_parameters.removesuffix("]")
+                if actual not in {expected, f"chromium-{expected}"}:
+                    continue
+            matches.append(record)
+        if not matches or (separator and len(matches) != 1):
+            raise ValueError(f"Pilot target must resolve unambiguously: {target}")
+        selected.update((record["nodeid"], record) for record in matches)
+    return list(selected.values())
+
+
+# @testable true
 # @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
 # @matrix testing : parallel-e2e
 def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
@@ -153,11 +178,8 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
         # callers. Exchange once for the run, then share only its scoped cookie.
         cookies = (hosted_e2e_browser_cookie(run_id),)
     local = load_session_state() if not CONFIG.hosted_e2e_runner else None
-    batches = [Batch(case, target, frozenset({"shared-page"}) if case.startswith("shared")
-                     else frozenset(), exclusive=case == "exclusive")
-               for case, target in zip(CASES, PROTOCOL_TARGETS)]
     collection = root / "collection.json"
-    story_targets = STORY_TARGETS if scope == "pilot" else ("testing/tests_e2e", f"--ignore={PILOT_FILE}", "-m", "not unfinished")
+    story_targets = tuple(dict.fromkeys(target.split("::", 1)[0] for target in TARGETS)) if scope == "pilot" else ("testing/tests_e2e", "-m", "not unfinished")
     collected = subprocess.run(
         [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini", "--collect-only", "-q",
          "-p", "runner.e2e_inventory", *story_targets], cwd=REPOSITORY_ROOT,
@@ -167,7 +189,17 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     (root / "collection.log").write_text(collected.stdout + collected.stderr, encoding="utf-8")
     if collected.returncode:
         raise RuntimeError(f"Pilot collection failed; see {root / 'collection.log'}")
-    stories, inventory = story_batches(REPOSITORY_ROOT, json.loads(collection.read_text(encoding="utf-8")),
+    records = json.loads(collection.read_text(encoding="utf-8"))
+    protocol = resolve_pilot_targets(records, PROTOCOL_TARGETS)
+    batches = [Batch(case, "testing/" + record["nodeid"].removeprefix("testing/"),
+                     frozenset({"shared-page"}) if case.startswith("shared") else frozenset(),
+                     exclusive=case == "exclusive")
+               for case, record in zip(CASES, protocol)]
+    story_records = resolve_pilot_targets(records, STORY_TARGETS) if scope == "pilot" else [
+        record for record in records
+        if not record["nodeid"].removeprefix("testing/").startswith(PILOT_FILE.removeprefix("testing/") + "::")
+    ]
+    stories, inventory = story_batches(REPOSITORY_ROOT, story_records,
                                        workers=workers, durations=duration_estimates(REPOSITORY_ROOT))
     by_node = {row["nodeid"].removeprefix("testing/"): row for row in inventory}
     batches = ([batch for batch in stories if batch.name == "stories-before"] + batches

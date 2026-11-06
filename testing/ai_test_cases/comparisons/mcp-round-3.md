@@ -70,7 +70,7 @@ telemetry or export format is needed.
 ## What worked, and what did not
 
 Archive references below are line numbers in the preserved round-2 capture (B)
-at `/home/swifty/Desktop/lagniappe-mcp-trial/<case>/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl`
+at `<historical-captures>/lagniappe-mcp-trial/<case>/artifacts/mcp_round_2/CODEX_ARCHIVE.jsonl`
 or the round-3 capture (C), now at each case's
 `artifacts/baseline/CODEX_ARCHIVE.jsonl`. The September 5 rollover changed their
 library locations after this review; all archive bytes and line numbers are

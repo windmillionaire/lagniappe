@@ -22,7 +22,7 @@ supporting file and the workspace mention several suitable subject Pages.
 
 ## Historical evidence and controls
 
-Source: `/home/swifty/Desktop/FILE_USE_AI_TEST/file-use-ai-after/05-apiary-task-create`.
+Source: `<historical-captures>/FILE_USE_AI_TEST/file-use-ai-after/05-apiary-task-create`.
 The historical external run failed: four Tasks and no uploaded/attached note,
 despite an accepted fileless proposal. It used a stale skill; on-site evidence
 also exposed then-existing MIME/completion problems. See `RESULTS.md`,
