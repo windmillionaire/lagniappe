@@ -67,6 +67,7 @@ export const createRollupConfig = ({
 		input: `./src/script/${name}.mjs`,
 		output: {
 			file: `./lagniappe/web/static/${name}.js`,
+			inlineDynamicImports: true,
 			format: "esm",
 			name,
 			banner: thirdPartyLicenseBanner,

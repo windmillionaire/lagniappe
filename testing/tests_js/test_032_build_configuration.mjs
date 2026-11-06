@@ -439,6 +439,8 @@ test("test_rollup_modes_preserve_bundle_and_publication_contracts", async () => 
 			assert.equal(login.input, "./src/script/login.mjs");
 			assert.equal(sentry.input, "./src/script/sentry.mjs");
 			assert.equal(login.output.file, "./lagniappe/web/static/login.js");
+			assert.equal(login.output.inlineDynamicImports, true);
+			assert.equal(sentry.output.inlineDynamicImports, true);
 			assert.equal(sentry.output.file, "./lagniappe/web/static/sentry.js");
 			assert.equal(main.input.main, "./src/script/main.mjs");
 			assert.equal(main.input.public, "./src/script/public.mjs");

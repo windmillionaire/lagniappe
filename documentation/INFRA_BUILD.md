@@ -29,7 +29,9 @@ version replacements and Sentry releases use that same package version.
 `build/rollup.shared.mjs` owns the common login, monitoring, and main bundle
 construction: registry-derived inputs, output names, browser resolution,
 warning handling, chunk versioning, and artifact recording. It creates fresh
-plugins for each standalone entry. `rollup.dev.config.mjs` and
+plugins for each standalone entry. Standalone login and monitoring bundles inline
+dynamic imports to preserve their single-file output when dependencies add lazy
+modules. `rollup.dev.config.mjs` and
 `rollup.config.mjs` keep their ordered mode-specific plugins and version values
 explicit, including CSS transforms, minification, source maps, startup budgets,
 Sentry uploads, and visualizer options. Publication still runs through

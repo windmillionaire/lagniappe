@@ -53,7 +53,14 @@ def test_htmlize_preserves_markdown_tables_and_sanitizes_cells():
     assert "<script" not in html
     assert "<img" not in html
     assert "javascript:" not in html
-    assert "onerror" not in html
+    # Markdown may escape rejected markup into harmless visible text.
+    # Check executable attributes in the parsed document, not words in text.
+    soup = BeautifulSoup(html, "html.parser")
+    assert all(
+        not attribute.lower().startswith("on")
+        for tag in soup.find_all(True)
+        for attribute in tag.attrs
+    )
 
 
 # @matrix files security : html html-sanitization
