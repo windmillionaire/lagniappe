@@ -57,6 +57,12 @@ venv/bin/python run.py test -v --tb=long
 Normal hosted runs and CI use six coordinated browser workers on one B4
 candidate; their unit/JavaScript/tooling coverage remains sequential and is
 merged with E2E evidence. Local `test e2e` and focused paths stay sequential.
+Coordinated protocol and smoke stories resolve their selectors against pytest's
+collected Chromium test IDs; missing or ambiguous parameter selections fail.
+The browser failure collector retains expected transition cancellations as
+diagnostics, including Chromium's exact opt-in-disabled abort; other transition
+errors still fail. Static-retry checks count document navigations so module
+preload requests cannot hide an extra reload.
 Use `test --parallel --workers=6` to override the local parallel default of
 three workers. See [hosted testing](TESTING_HOSTED_E2E.md#coordinated-e2e-workers).
 

@@ -11,12 +11,32 @@ from xml.etree import ElementTree as ET
 import pytest
 
 from runner.e2e_parallel import Batch, await_worker_file, merge_results, schedule
-from runner.e2e_pilot import TARGETS, pilot_arguments
+from runner.e2e_pilot import TARGETS, pilot_arguments, resolve_pilot_targets
 from runner.e2e_inventory import discover_resources, duration_estimates, pytest_collection_finish, story_batches
 from runner.e2e_claims import reserve_resources
 
 
 pytestmark = pytest.mark.tooling
+
+
+# @matrix testing : parallel-e2e collection browser-parameters
+def test_pilot_targets_resolve_collected_browser_parameters():
+    records = [{"nodeid": name} for name in (
+        "tests_e2e/test_worker.py::test_worker[chromium-independent-a]",
+        "tests_e2e/test_worker.py::test_worker[chromium-shared-a]",
+        "tests_e2e/test_story.py::test_story[chromium-quota-fallback]",
+        "tests_e2e/test_story.py::test_story[chromium-live]",
+        "tests_e2e/test_story.py::test_unselected",
+    )]
+    targets = ("testing/tests_e2e/test_worker.py::test_worker[independent-a]",
+               "testing/tests_e2e/test_story.py::test_story")
+    assert resolve_pilot_targets(records, targets) == [records[0], records[2], records[3]]
+    quota = "testing/tests_e2e/test_story.py::test_story[quota-fallback]"
+    assert resolve_pilot_targets(records, (quota, quota)) == [records[2]]
+    for invalid_records, target in ((records, quota.replace("quota-fallback", "missing")),
+                                    ([records[2], records[2]], quota)):
+        with pytest.raises(ValueError, match="resolve unambiguously"):
+            resolve_pilot_targets(invalid_records, (target,))
 
 
 # @matrix testing : parallel-e2e

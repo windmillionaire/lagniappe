@@ -328,7 +328,10 @@ class BrowserFailureCollector:
             message=str(error),
             stack=getattr(error, "stack", None),
         )
-        if str(error) == "Transition was skipped":
+        if str(error) in {
+            "Transition was skipped",
+            "Transition was aborted because of invalid state. ViewTransition opt-in disabled",
+        }:
             self.events[-1].ignored_reason = "browser-view-transition-skip"
 
     def _capture_request(self, page: Any, request: Any) -> None:
