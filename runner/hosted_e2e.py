@@ -27,10 +27,12 @@ from config.constants import (
     RUNTIME_BUCKET_ROLES,
     RUNTIME_PROJECT_ROLES,
 )
+from config.hosted_e2e import hosted_test_service_cors_origin
 from config.storage import (
     BUCKET_CORS_HEADERS,
     BUCKET_CORS_MAX_AGE_SECONDS,
     BUCKET_CORS_METHODS,
+    has_browser_cors_origin,
     storage_bucket_names,
 )
 from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
@@ -1132,14 +1134,21 @@ def _hosted_app_descriptor(
     }
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_preserves_standing_and_exact_origin_lifecycles
+# @matrix hosted-e2e storage : cors teardown
 def _change_test_bucket_cors(infrastructure, origin, *, present):
     from google.cloud import storage
 
     client = storage.Client(project=infrastructure.project)
+    service_origin = hosted_test_service_cors_origin(
+        infrastructure.project, origin, from_candidate=True
+    )
     for bucket_name in _test_bucket_names():
         bucket = client.get_bucket(bucket_name)
         rules = copy.deepcopy(list(bucket.cors or []))
+        if present and has_browser_cors_origin(rules, service_origin):
+            continue
         if present and not rules:
             rules = [
                 {
@@ -1154,17 +1163,18 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
         for rule in rules:
             origins = list(rule.get("origin") or [])
             if present and origin not in origins:
-                origins.append(origin)
+                rule["origin"] = sorted({*origins, origin})
                 changed = True
-            if not present and origin in origins:
-                origins = [value for value in origins if value != origin]
+            elif not present and origin in origins:
+                remaining = [value for value in origins if value != origin]
                 changed = True
-            if origins:
-                rule["origin"] = sorted(set(origins))
-                updated.append(rule)
+                if not remaining:
+                    continue
+                rule["origin"] = remaining
+            updated.append(rule)
         if changed:
             bucket.cors = updated
-            bucket.patch()
+            bucket.patch(if_metageneration_match=bucket.metageneration)
 
 
 # @testable true

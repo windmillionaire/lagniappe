@@ -28,6 +28,16 @@ An inert App Engine anchor remains as the service traffic owner. Teardown keeps
 the reusable Artifact Registry repository, Secret Manager mounts, WIF provider,
 result bucket, service accounts, and anchor.
 
+By default, creation adds the exact candidate's browser origin to each test
+bucket and teardown removes it. An installation owner can opt into a standing
+origin for the project's `e2e` service. On each test bucket, add
+`https://*-dot-e2e-dot-APP_DEFAULT_HOSTNAME` to the existing Lagniappe CORS
+rule, using the default hostname returned by `gcloud app describe` for that
+project. This permits browser requests from future versions of that service.
+Create and teardown can then use the buckets without updating their CORS.
+Teardown still removes an exact origin added by an earlier runner. Development
+setup preserves a previously installed service origin on the test buckets.
+
 ## Security boundary
 
 GitHub receives no settings, Redis credential, service-account key, or test

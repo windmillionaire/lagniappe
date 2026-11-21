@@ -57,6 +57,26 @@ def is_reserved_hosted_e2e_hostname(hostname: str) -> bool:
 
 
 # @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_only_recognizes_this_test_service
+# @matrix hosted-e2e storage : cors project-identity
+def hosted_test_service_cors_origin(project, url, *, from_candidate=False):
+    """Return the test-service origin pattern for this project's App Engine URL."""
+    scheme, _, hostname = str(url or "").removesuffix("/").partition("://")
+    if scheme != "https" or not re.fullmatch(
+        r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project or ""
+    ):
+        return None
+    if from_candidate:
+        if not is_reserved_hosted_e2e_hostname(hostname):
+            return None
+        _, _, hostname = hostname.partition(f"-dot-{HOSTED_E2E_SERVICE_NAME}-dot-")
+    app_hostname = rf"{re.escape(project)}(?:\.[a-z0-9-]+\.r)?\.appspot\.com"
+    if not re.fullmatch(app_hostname, hostname):
+        return None
+    return f"https://*-dot-{HOSTED_E2E_SERVICE_NAME}-dot-{hostname}"
+
+
+# @testable true
 # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
 # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
 # @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix

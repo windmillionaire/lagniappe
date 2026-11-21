@@ -1,5 +1,6 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
+from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -64,6 +65,83 @@ def _git(repo, *arguments):
         capture_output=True,
         text=True,
     )
+
+
+# @matrix hosted-e2e storage : cors project-identity
+def test_hosted_cors_only_recognizes_this_test_service():
+    from config.hosted_e2e import hosted_test_service_cors_origin
+
+    project = "project-1"
+    for host in ("project-1.uc.r.appspot.com", "project-1.appspot.com"):
+        service = f"https://*-dot-e2e-dot-{host}"
+        assert hosted_test_service_cors_origin(project, f"https://{host}/") == service
+        candidate = f"https://e2e-1234567890abcdef-dot-e2e-dot-{host}"
+        assert hosted_test_service_cors_origin(project, candidate, from_candidate=True) == service
+        for wrong in (
+            f"https://{host}",
+            candidate.replace("project-1", "project-2"),
+            candidate.replace("-dot-e2e-dot-", "-dot-default-dot-"),
+            candidate.replace("https:", "http:"),
+            candidate + "/asset",
+            candidate + ".example.com",
+            candidate.replace("1234567890abcdef", "other"),
+        ):
+            assert hosted_test_service_cors_origin(project, wrong, from_candidate=True) is None
+
+
+# @matrix hosted-e2e storage : cors teardown
+def test_hosted_cors_preserves_standing_and_exact_origin_lifecycles(monkeypatch):
+    from google.cloud import storage
+
+    site = "https://project-1.uc.r.appspot.com"
+    hosted = "https://*-dot-e2e-dot-project-1.uc.r.appspot.com"
+    candidate = hosted.replace("*", "e2e-1234567890abcdef")
+    unrelated = {"origin": ["https://docs.example.com"], "method": ["GET"]}
+    base = {
+        "method": hosted_e2e.BUCKET_CORS_METHODS,
+        "responseHeader": hosted_e2e.BUCKET_CORS_HEADERS,
+        "maxAgeSeconds": 3600,
+    }
+
+    class Bucket:
+        def __init__(self, rules):
+            self.cors = deepcopy(rules)
+            self.metageneration = 3
+
+        def patch(self, *, if_metageneration_match):
+            assert if_metageneration_match == self.metageneration
+            self.metageneration += 1
+
+    installed = [dict(base, origin=[site, hosted]), unrelated]
+    exact = [dict(base, origin=[site])]
+    partial = [*exact, {"origin": [hosted], "method": ["GET"]}]
+    buckets = {
+        "standing": Bucket(installed),
+        "exact": Bucket(exact),
+        "partial": Bucket(partial),
+        "empty": Bucket([]),
+    }
+    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: tuple(buckets))
+    monkeypatch.setattr(storage, "Client", lambda **_: SimpleNamespace(get_bucket=buckets.__getitem__))
+    infrastructure = SimpleNamespace(project="project-1")
+    for _ in range(2):
+        hosted_e2e._change_test_bucket_cors(infrastructure, candidate, present=True)
+    assert buckets["standing"].cors == installed
+    assert buckets["standing"].metageneration == 3
+    for name in ("exact", "partial", "empty"):
+        assert candidate in buckets[name].cors[0]["origin"]
+        assert buckets[name].metageneration == 4
+
+    # An older candidate may have added its exact origin before the standing rule existed.
+    buckets["older"] = Bucket([dict(base, origin=[site, candidate, hosted]), unrelated])
+    for _ in range(2):
+        hosted_e2e._change_test_bucket_cors(infrastructure, candidate, present=False)
+    assert buckets["standing"].metageneration == 3
+    assert buckets["older"].metageneration == 4
+    assert buckets["older"].cors == installed
+    assert buckets["exact"].cors == exact
+    assert buckets["partial"].cors == partial
+    assert buckets["empty"].cors == []
 
 
 # @matrix hosted-e2e : deletion-safety provider-errors
