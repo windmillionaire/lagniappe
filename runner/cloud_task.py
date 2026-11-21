@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from runner import cloud_settings as settings
 from runner.context import GCLOUD_CLI
@@ -15,6 +15,7 @@ from runner.context import GCLOUD_CLI
 
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_requires_target_identity
+# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_accepts_only_the_configured_relay
 # @matrix auth setup : adc project-identity
 def connection_file(account):
     path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
@@ -36,10 +37,26 @@ def connection_file(account):
     if not path:
         raise RuntimeError("Attach the environment's Google OIDC connection first.")
     credentials = json.loads(Path(path).read_text())
-    expected = f"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{account}:generateAccessToken"
+    endpoint = urlsplit(credentials.get("service_account_impersonation_url", ""))
+    target = f"/v1/projects/-/serviceAccounts/{account}:generateAccessToken"
+    route = unquote(endpoint.path)
+    if endpoint.hostname == "iamcredentials.googleapis.com":
+        matches_target = endpoint.port in (None, 443) and route == target
+    else:
+        # Cloud's identity relay adds a routing prefix on the managed proxy host.
+        proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
+        matches_target = (
+            bool(endpoint.hostname)
+            and endpoint.hostname == urlsplit(proxy).hostname
+            and route.endswith(target)
+        )
     if (
         credentials.get("type") != "external_account"
-        or unquote(credentials.get("service_account_impersonation_url", "")) != expected
+        or endpoint.scheme != "https"
+        or endpoint.username is not None
+        or endpoint.query
+        or endpoint.fragment
+        or not matches_target
     ):
         raise RuntimeError(
             "The Cloud connection must federate into the selected project service account."
@@ -87,6 +104,7 @@ def probe(project):
 
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_task_reuses_pinned_version
+# @tests tests_tooling/test_016_cloud_operator.py::test_check_connection_uses_task_identity_before_restore
 # @matrix setup : cli-routing project-identity
 def main(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -97,6 +115,11 @@ def main(arguments=None):
     )
     parser.add_argument("--account", default=os.environ.get("LAGNIAPPE_CLOUD_ACCOUNT"))
     parser.add_argument(
+        "--check-connection",
+        action="store_true",
+        help="Verify the federated gcloud login and exit before restoring settings.",
+    )
+    parser.add_argument(
         "--version",
         help="Numeric version or current. Defaults to the version already pinned in this checkout.",
     )
@@ -106,6 +129,8 @@ def main(arguments=None):
         help="A command after --, or omit to check Redis and hosted status.",
     )
     args = parser.parse_args(arguments)
+    if args.check_connection and (args.version or args.command):
+        parser.error("--check-connection runs by itself.")
     project = args.project
     account = args.account or f"lagniappe-codex@{project}.iam.gserviceaccount.com"
     if not settings.PROJECT.fullmatch(project) or not account.endswith(
@@ -139,6 +164,10 @@ def main(arguments=None):
             env["CLOUDSDK_ACTIVE_CONFIG_NAME"] = name
             _gcloud("auth", "login", f"--cred-file={credentials}", "--brief", env=env)
             _gcloud("config", "set", "project", project, env=env)
+            if args.check_connection:
+                settings.cli_token(project, name, account, env=env)
+                print(f"Verified federated Google login as {account} for {project}.")
+                return 0
             receipt = settings._receipt(settings.APP_DIR)
             version = args.version or receipt.get("version", "current")
             root = settings.APP_DIR

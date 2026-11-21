@@ -212,7 +212,7 @@ def _record(root, project, version, source, **extra):
 
 
 # @testable infrastructure
-def cli_token(project, configuration, account):
+def cli_token(project, configuration, account, *, env=None):
     """Get a short-lived token for the project's explicitly selected CLI identity."""
     if (
         not GCLOUD_CLI
@@ -235,6 +235,7 @@ def cli_token(project, configuration, account):
         ],
         capture_output=True,
         text=True,
+        env=env,
     )
     if properties.returncode:
         raise CloudSettingsError("The named gcloud configuration is unavailable.")
@@ -253,6 +254,7 @@ def cli_token(project, configuration, account):
         ],
         capture_output=True,
         text=True,
+        env=env,
     )
     if auth.returncode or not auth.stdout.strip():
         raise CloudSettingsError(

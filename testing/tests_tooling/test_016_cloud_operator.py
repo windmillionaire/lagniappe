@@ -325,20 +325,111 @@ def test_cloud_connection_requires_target_identity(tmp_path, monkeypatch):
     path = tmp_path / "native.json"
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(path))
     monkeypatch.delenv("OIC_MANIFEST_PATH", raising=False)
-    path.write_text(json.dumps({"type": "service_account"}))
+    credentials = {
+        "type": "service_account",
+        "service_account_impersonation_url": f"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{ACCOUNT}:generateAccessToken",
+    }
+    path.write_text(json.dumps(credentials))
     with pytest.raises(RuntimeError, match="federate"):
         cloud_task.connection_file(ACCOUNT)
-    path.write_text(
-        json.dumps(
-            {
-                "type": "external_account",
-                "service_account_impersonation_url": f"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{ACCOUNT}:generateAccessToken",
-            }
-        )
-    )
+    credentials["type"] = "external_account"
+    path.write_text(json.dumps(credentials))
     assert cloud_task.connection_file(ACCOUNT) == str(path)
     with pytest.raises(RuntimeError, match="federate"):
         cloud_task.connection_file("wrong@" + PROJECT + ".iam.gserviceaccount.com")
+
+
+# @matrix auth setup : adc project-identity
+def test_cloud_connection_accepts_only_the_configured_relay(tmp_path, monkeypatch):
+    native = tmp_path / "connection.json"
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {"connections": [{"is_default": True, "credentials_file": str(native)}]}
+        )
+    )
+    monkeypatch.setenv("OIC_MANIFEST_PATH", str(manifest))
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.setenv("https_proxy", "http://proxy:8080")
+    account = ACCOUNT.replace("@", "%40")
+    route = f"/identity/gcp/v1/projects/-/serviceAccounts/{account}:generateAccessToken"
+    relay = "https://proxy" + route
+    credentials = {
+        "type": "external_account",
+        "service_account_impersonation_url": relay,
+    }
+    original = json.dumps(credentials)
+    native.write_text(original)
+    assert cloud_task.connection_file(ACCOUNT) == str(native)
+    assert native.read_text() == original
+    with pytest.raises(RuntimeError, match="federate"):
+        cloud_task.connection_file(f"other@{PROJECT}.iam.gserviceaccount.com")
+
+    for url in (
+        "https://proxy.example.org" + route,
+        "https://iamcredentials.googleapis.com" + route,
+        "http://proxy" + route,
+        "https://someone@proxy" + route,
+        relay + "?alternate=route",
+        relay + "#fragment",
+        relay.replace(":generateAccessToken", ":signBlob"),
+    ):
+        native.write_text(
+            json.dumps(dict(credentials, service_account_impersonation_url=url))
+        )
+        with pytest.raises(RuntimeError, match="federate"):
+            cloud_task.connection_file(ACCOUNT)
+    native.write_text(original)
+    monkeypatch.delenv("https_proxy")
+    with pytest.raises(RuntimeError, match="federate"):
+        cloud_task.connection_file(ACCOUNT)
+
+
+# @matrix setup : cli-routing project-identity
+@pytest.mark.parametrize("active_account", [ACCOUNT, "other@example.com"])
+def test_check_connection_uses_task_identity_before_restore(
+    tmp_path, monkeypatch, capsys, active_account
+):
+    monkeypatch.setattr(settings, "APP_DIR", tmp_path)
+    monkeypatch.setattr(settings, "GCLOUD_CLI", "gcloud")
+    monkeypatch.setattr(cloud_task, "GCLOUD_CLI", "gcloud")
+    monkeypatch.setattr(cloud_task, "connection_file", lambda account: "/native.json")
+    token_requests = []
+    configs = set()
+
+    def gcloud(args, *, env, capture_output, text=False):
+        assert args[0] == "gcloud" and capture_output
+        assert env["GOOGLE_APPLICATION_CREDENTIALS"] == "/native.json"
+        configs.add(Path(env["CLOUDSDK_CONFIG"]))
+        assert Path(env["CLOUDSDK_CONFIG"]).is_dir()
+        output = ""
+        if "describe" in args:
+            output = json.dumps(
+                {
+                    "properties": {
+                        "core": {"project": PROJECT, "account": active_account}
+                    }
+                }
+            )
+        if "print-access-token" in args:
+            token_requests.append(args)
+            output = "private-test-token"
+        return subprocess.CompletedProcess(
+            args, 0, output if text else output.encode(), b""
+        )
+
+    monkeypatch.setattr(subprocess, "run", gcloud)
+    status = cloud_task.main(["--project", PROJECT, "--check-connection"])
+    output = capsys.readouterr()
+    if active_account == ACCOUNT:
+        assert status == 0 and ACCOUNT in output.out
+        assert len(token_requests) == 1 and f"--account={ACCOUNT}" in token_requests[0]
+    else:
+        assert status == 1 and "different account or project" in output.err
+        assert not token_requests
+    assert "private-test-token" not in output.out + output.err
+    assert len(configs) == 1 and not configs.pop().exists()
+    assert not list(tmp_path.iterdir())
 
 
 # @matrix setup : cli-routing project-identity

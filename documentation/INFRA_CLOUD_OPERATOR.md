@@ -33,6 +33,12 @@ The initial checkpoint imports a completed hosted setup and torn-down state from
 
 The task launcher uses the selected connection's native external-account file, an isolated temporary gcloud configuration, and short-lived credentials. Its account comes from the verified federation target. Select a nondefault connection with `LAGNIAPPE_OIDC_ALIAS`. The Google project can be passed as `--project` or set as `LAGNIAPPE_CLOUD_PROJECT` in the private environment.
 
+Before publishing the setup image, run this check on the branch that fresh tasks will use. It verifies that the selected service account can obtain a short-lived token through Google IAM or the environment's configured HTTPS relay. It keeps the token out of the output and exits before reading installation settings.
+
+```sh
+venv/bin/python -m runner.cloud_task --project PROJECT --check-connection
+```
+
 The provider guides cover connection claims and version aliases. [Codex Cloud environments](https://learn.chatgpt.com/docs/environments/cloud-environments) · [Google Secret Manager version aliases](https://docs.cloud.google.com/secret-manager/docs/assign-alias-to-secret-version)
 
 ## Use a fresh task
