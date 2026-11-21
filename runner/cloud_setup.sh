@@ -16,7 +16,7 @@ if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node')" != "$
         exit 1
     fi
     # shellcheck source=/dev/null
-    source "$nvm_script"
+    source "$nvm_script" --no-use
     nvm install "$node_version"
     nvm alias default "$node_version"
 fi
