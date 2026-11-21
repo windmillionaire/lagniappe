@@ -18,6 +18,7 @@ trusted clean commit with production build
        acquire shared Redis lease
        clean test-prefixed data
        run complete suites or individual nodeids against exact version
+       clean test-prefixed data before releasing the lease
        upload reports, JUnit, evidence, manifest-last
   -> validate and merge exact-source evidence
   -> hosted-e2e teardown removes runnable version/job
@@ -184,11 +185,17 @@ venv/bin/python run.py hosted-e2e status
 venv/bin/python run.py hosted-e2e teardown
 ```
 
-The Redis lease serializes local and hosted sessions outside the test cleanup
-prefix. Teardown refuses an active execution unless `--force` is explicit,
-acquires the data lease before cleanup, deletes only the Cloud Run job and
-ephemeral App Engine version, and removes only that version's test-bucket CORS
-origin.
+The E2E runner owns test-data cleanup. While holding the shared Redis lease,
+it clears the reserved Redis and database test namespaces before initialization
+and again when the session finishes, including after a test failure. If the
+runner is killed before its final cleanup, the next E2E session cleans the
+namespace after it acquires the lease.
+
+`hosted-e2e teardown` uses Google APIs and can run from an operator with HTTPS
+access alone. It checks for active Cloud Run executions before deleting the job
+and ephemeral App Engine version and removing that version's test-bucket CORS
+origin. With `--force`, it first cancels active executions and waits for
+cancellation.
 
 Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 

@@ -75,12 +75,12 @@ def _gcloud(*arguments, env):
         )
 
 
-# @testable infrastructure
-def probe(project):
+# @testable true
+# @tests tests_tooling/test_016_cloud_operator.py::test_startup_checks_identity_and_optional_redis
+# @matrix auth setup : adc project-identity
+def probe(project, *, check_redis=False):
     from config import SETTINGS
     from config.experiments import normalize_experiments_config
-    from config.redis import redis_client_kwargs
-    from redis import Redis
     from runner.gcloud import activate_repository_gcloud
 
     policy = normalize_experiments_config(SETTINGS.APP)
@@ -91,6 +91,13 @@ def probe(project):
     activate_repository_gcloud(
         ensure_adc=True, ensure_cli_token=True, allow_adc_login=False
     )
+    print(f"Verified CLI and ADC for {project}.", flush=True)
+    if not check_redis:
+        return
+
+    from config.redis import redis_client_kwargs
+    from redis import Redis
+
     client = Redis(
         **redis_client_kwargs(SETTINGS.APP, socket_timeout=5, socket_connect_timeout=5)
     )
@@ -99,12 +106,13 @@ def probe(project):
             raise RuntimeError("Redis did not answer PING.")
     finally:
         client.close()
-    print(f"Verified CLI, ADC, and authenticated Redis connectivity for {project}.")
+    print(f"Verified direct Redis connectivity for {project}.")
 
 
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_task_reuses_pinned_version
 # @tests tests_tooling/test_016_cloud_operator.py::test_check_connection_uses_task_identity_before_restore
+# @tests tests_tooling/test_016_cloud_operator.py::test_default_startup_reads_hosted_status
 # @matrix setup : cli-routing project-identity
 def main(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -114,10 +122,16 @@ def main(arguments=None):
         required=not os.environ.get("LAGNIAPPE_CLOUD_PROJECT"),
     )
     parser.add_argument("--account", default=os.environ.get("LAGNIAPPE_CLOUD_ACCOUNT"))
-    parser.add_argument(
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument(
         "--check-connection",
         action="store_true",
         help="Verify the federated gcloud login and exit before restoring settings.",
+    )
+    checks.add_argument(
+        "--check-redis",
+        action="store_true",
+        help="Also test direct Redis access from this task during startup.",
     )
     parser.add_argument(
         "--version",
@@ -126,7 +140,7 @@ def main(arguments=None):
     parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
-        help="A command after --, or omit to check Redis and hosted status.",
+        help="A command after --, or omit to verify Google identity and read hosted status.",
     )
     args = parser.parse_args(arguments)
     if args.check_connection and (args.version or args.command):
@@ -193,17 +207,21 @@ def main(arguments=None):
                     check=True,
                 )
             cmd = args.command[1:] if args.command[:1] == ["--"] else args.command
-            if not cmd:
+            if not cmd or args.check_redis:
                 subprocess.run(
                     [
                         sys.executable,
                         "-c",
-                        "import os; from runner.cloud_task import probe; probe(os.environ['LAGNIAPPE_CLOUD_PROJECT'])",
+                        "import sys; from runner.cloud_task import probe; "
+                        "probe(sys.argv[1], check_redis='--check-redis' in sys.argv[2:])",
+                        project,
+                        *(["--check-redis"] if args.check_redis else []),
                     ],
                     cwd=root,
                     env=env,
                     check=True,
                 )
+            if not cmd:
                 cmd = [*cli, "hosted-e2e", "status"]
             return subprocess.run(cmd, cwd=root, env=env).returncode
     except (settings.CloudSettingsError, RuntimeError) as error:

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 from google.api_core.exceptions import PreconditionFailed
 import pytest
@@ -448,6 +449,56 @@ def test_task_reuses_pinned_version(monkeypatch):
     assert calls[0][0][-2:] == ["--version", "9"]
     assert calls[1][0] == ["example-command"]
     assert calls[1][1]["env"]["LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT"] == PROJECT
+
+
+# @matrix auth setup : adc project-identity
+def test_startup_checks_identity_and_optional_redis(monkeypatch):
+    app = {
+        "EXPERIMENTS_ENABLED": True,
+        "EXPERIMENTS_PROJECT": PROJECT,
+        "GOOGLE_CLOUD_PROJECT": PROJECT,
+        "ADMIN_EMAIL": "owner@example.com",
+        "AGENT_ACCESS_EMAIL": "agent@example.com",
+    }
+    monkeypatch.setattr("config.SETTINGS", SimpleNamespace(APP=app))
+    activate = Mock()
+    monkeypatch.setattr("runner.gcloud.activate_repository_gcloud", activate)
+    redis = Mock()
+    monkeypatch.setattr("redis.Redis", redis)
+
+    cloud_task.probe(PROJECT)
+    activate.assert_called_once_with(
+        ensure_adc=True, ensure_cli_token=True, allow_adc_login=False
+    )
+    redis.assert_not_called()
+    with pytest.raises(RuntimeError, match="selected experiments installation"):
+        cloud_task.probe("other-project")
+    redis.return_value.ping.return_value = False
+    with pytest.raises(RuntimeError, match="PING"):
+        cloud_task.probe(PROJECT, check_redis=True)
+    redis.return_value.ping.assert_called_once_with()
+    redis.return_value.close.assert_called_once_with()
+
+
+# @matrix setup : cli-routing project-identity
+@pytest.mark.parametrize("options", [[], ["--check-redis"]])
+def test_default_startup_reads_hosted_status(monkeypatch, options):
+    monkeypatch.setattr(cloud_task, "connection_file", lambda account: "/native")
+    monkeypatch.setattr(cloud_task, "_gcloud", lambda *args, **kwargs: None)
+    monkeypatch.setattr(settings, "_receipt", lambda root: {})
+    run = Mock(return_value=SimpleNamespace(returncode=0))
+    monkeypatch.setattr(subprocess, "run", run)
+    assert cloud_task.main(["--project", PROJECT, *options]) == 0
+    restore, probe, status = [call.args[0] for call in run.call_args_list]
+    assert restore[-5:] == [
+        "cloud-settings",
+        "restore",
+        "--operator",
+        "--version",
+        "current",
+    ]
+    assert probe[1] == "-c" and probe[3:] == [PROJECT, *options]
+    assert status[-2:] == ["hosted-e2e", "status"]
 
 
 # @matrix release : protected-branch source-integrity

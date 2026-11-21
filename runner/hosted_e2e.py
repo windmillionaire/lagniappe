@@ -9,7 +9,6 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import secrets
@@ -2520,26 +2519,9 @@ def results(
     return manifest
 
 
-# @testable infrastructure
-def _acquire_cleanup_lease():
-    """Clean stale data and keep the lease until provider teardown finishes."""
-    os.environ["FLASK_ENV"] = "testing"
-    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
-    from runner.testing import cleanup_test_data
-
-    lease = E2ELease()
-    lease.__enter__()
-    try:
-        lease.assert_active()
-        cleanup_test_data(lease)
-        lease.assert_active()
-    except BaseException:
-        lease.__exit__(None, None, None)
-        raise
-    return lease
-
-
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_checks_all_executions
+# @matrix hosted-e2e : deletion-safety teardown
 def _active_job_executions(infrastructure, *, job=None):
     job = job or infrastructure.job
     result = _gcloud(
@@ -2550,11 +2532,10 @@ def _active_job_executions(infrastructure, *, job=None):
         f"--job={job}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
-        "--limit=20",
-        "--format=json",
+        "--format=json(name,metadata.name,completionTime,status.completionTime)",
     )
     try:
-        executions = json.loads(result.stdout or "[]")
+        executions = json.loads(result.stdout)
     except json.JSONDecodeError as error:
         raise HostedE2EError(
             "Cloud Run execution listing returned invalid JSON."
@@ -2565,7 +2546,7 @@ def _active_job_executions(infrastructure, *, job=None):
     active = []
     for execution in executions:
         if not isinstance(execution, dict):
-            continue
+            raise HostedE2EError("Cloud Run returned an invalid hosted execution.")
         status = execution.get("status")
         status = status if isinstance(status, dict) else {}
         if execution.get("completionTime") or status.get("completionTime"):
@@ -2576,8 +2557,15 @@ def _active_job_executions(infrastructure, *, job=None):
             name = metadata.get("name")
         if isinstance(name, str) and "/" in name:
             name = name.rsplit("/", 1)[-1]
-        if isinstance(name, str) and EXECUTION_RE.fullmatch(name):
-            active.append(name)
+        if (
+            not isinstance(name, str)
+            or not name.startswith(job + "-")
+            or not EXECUTION_RE.fullmatch(name)
+        ):
+            raise HostedE2EError(
+                "Cloud Run returned an unidentified active hosted execution."
+            )
+        active.append(name)
     return tuple(sorted(set(active)))
 
 
@@ -2598,10 +2586,10 @@ def _clear_local_result_artifacts(*, environment="standard"):
 
 
 # @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_downloaded_results_after_success
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_resources_and_results_without_redis
 # @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
 def teardown(*, force=False, environment="standard"):
-    """Delete ephemeral resources and downloaded artifacts for the lifecycle."""
+    """Remove the hosted resources. Each E2E runner owns its test-data cleanup."""
     selected = _environment(environment)
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
     _activate(adc=True)
@@ -2657,59 +2645,44 @@ def teardown(*, force=False, environment="standard"):
                 "--quiet",
             )
 
-    cleanup_lease = None
-    try:
-        cleanup_lease = _acquire_cleanup_lease()
-    except Exception as error:
-        if not force:
-            raise HostedE2EError(
-                "Could not acquire the shared data lease for final cleanup; "
-                f"wait for an active run or resolve the cleanup error ({error}), "
-                "then retry or use --force."
-            ) from error
-
-    try:
-        if job is not None:
-            _gcloud(
-                "run",
-                "jobs",
-                "delete",
-                selected.job,
-                f"--region={infrastructure.region}",
-                f"--project={infrastructure.project}",
-                "--quiet",
-            )
-        app_version = _describe(
-            [
-                "app",
-                "versions",
-                "describe",
-                version,
-                f"--service={SERVICE}",
-                f"--project={infrastructure.project}",
-            ]
+    if job is not None:
+        _gcloud(
+            "run",
+            "jobs",
+            "delete",
+            selected.job,
+            f"--region={infrastructure.region}",
+            f"--project={infrastructure.project}",
+            "--quiet",
         )
-        if app_version is not None:
-            _gcloud(
-                "app",
-                "versions",
-                "delete",
-                version,
-                f"--service={SERVICE}",
-                f"--project={infrastructure.project}",
-                "--quiet",
-                timeout=1800,
-            )
-        if base_url.startswith("https://"):
-            _change_test_bucket_cors(infrastructure, base_url, present=False)
-        state["status"] = "torn-down"
-        state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
-        _write_json(selected.state_path, state, owner_only=True)
-        _clear_local_result_artifacts(environment=selected.name)
-        return state
-    finally:
-        if cleanup_lease is not None:
-            cleanup_lease.__exit__(None, None, None)
+    app_version = _describe(
+        [
+            "app",
+            "versions",
+            "describe",
+            version,
+            f"--service={SERVICE}",
+            f"--project={infrastructure.project}",
+        ]
+    )
+    if app_version is not None:
+        _gcloud(
+            "app",
+            "versions",
+            "delete",
+            version,
+            f"--service={SERVICE}",
+            f"--project={infrastructure.project}",
+            "--quiet",
+            timeout=1800,
+        )
+    if base_url.startswith("https://"):
+        _change_test_bucket_cors(infrastructure, base_url, present=False)
+    state["status"] = "torn-down"
+    state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
+    _write_json(selected.state_path, state, owner_only=True)
+    _clear_local_result_artifacts(environment=selected.name)
+    return state
 
 
 # @testable true

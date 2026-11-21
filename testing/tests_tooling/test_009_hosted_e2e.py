@@ -1275,11 +1275,40 @@ def test_hosted_results_can_skip_large_report_archive(tmp_path, monkeypatch, cap
     assert "downloading manifest.json" in output
 
 
+# @matrix hosted-e2e : deletion-safety teardown
+def test_hosted_teardown_checks_all_executions(monkeypatch):
+    infrastructure = _infrastructure()
+    job = infrastructure.job
+    executions = [{"status": {"completionTime": "2026-01-01T00:00:00Z"}}] * 21
+    executions.extend(
+        [
+            {"metadata": {"name": f"{job}-older"}},
+            {"name": f"projects/demo/locations/test/jobs/{job}/executions/{job}-newer"},
+        ]
+    )
+
+    def list_executions(*arguments):
+        assert arguments[:4] == ("run", "jobs", "executions", "list")
+        assert f"--job={job}" in arguments
+        assert not any(arg.startswith("--limit=") for arg in arguments)
+        return SimpleNamespace(stdout=json.dumps(executions))
+
+    monkeypatch.setattr(hosted_e2e, "_gcloud", list_executions)
+    assert hosted_e2e._active_job_executions(infrastructure) == (
+        f"{job}-newer", f"{job}-older",
+    )
+    executions.append({"status": {}})
+    with pytest.raises(HostedE2EError, match="unidentified active"):
+        hosted_e2e._active_job_executions(infrastructure)
+
+
 # @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
-def test_hosted_teardown_removes_downloaded_results_after_success(
+@pytest.mark.parametrize("force", [False, True])
+def test_hosted_teardown_removes_resources_and_results_without_redis(
     tmp_path,
     monkeypatch,
     capsys,
+    force,
 ):
     infrastructure = _infrastructure()
     state_root = tmp_path / "reports/hosted-e2e"
@@ -1306,10 +1335,6 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     }
     hosted_e2e._write_json(state_path, state)
 
-    class CleanupLease:
-        def __exit__(self, *_arguments):
-            return None
-
     monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
     monkeypatch.setattr(hosted_e2e, "STATE_ROOT", state_root)
     monkeypatch.setattr(hosted_e2e, "STATE_PATH", state_path)
@@ -1329,7 +1354,10 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
         "_gcloud",
         lambda *arguments, **options: provider_calls.append((arguments, options)),
     )
-    monkeypatch.setattr(hosted_e2e, "_acquire_cleanup_lease", CleanupLease)
+    monkeypatch.setattr(
+        "redis.Redis.execute_command",
+        lambda *args, **kwargs: pytest.fail("Resource teardown issued a Redis command"),
+    )
     monkeypatch.setattr(
         hosted_e2e,
         "_version_url",
@@ -1347,13 +1375,20 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     assert provider_calls == []
     assert result_root.exists()
 
-    active_executions.clear()
-    result = hosted_e2e.teardown()
+    if not force:
+        active_executions.clear()
+    result = hosted_e2e.teardown(force=force)
 
     assert result["status"] == "torn-down"
     assert hosted_e2e._load_json(state_path)["status"] == "torn-down"
     assert not result_root.exists()
     assert setup_path.exists()
+    if force:
+        cancellation, _ = provider_calls.pop(0)
+        assert cancellation[:5] == (
+            "run", "jobs", "executions", "cancel", "lagniappe-e2e-active1",
+        )
+        assert "--no-async" in cancellation
     assert [call[0][:4] for call in provider_calls] == [
         ("run", "jobs", "delete", infrastructure.job),
         ("app", "versions", "delete", version),
