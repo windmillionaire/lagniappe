@@ -12,6 +12,9 @@
 .npmrc
 .cursorignore
 .vscode/
+/.agents/
+/.codex/
+/.github/
 package.json
 package-lock.json
 

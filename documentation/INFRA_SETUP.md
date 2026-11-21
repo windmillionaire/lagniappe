@@ -1,5 +1,7 @@
 # Infrastructure Setup
 
+Disposable development and experiments tasks can restore a configured installation from a private settings bundle. [Codex Cloud operator setup](INFRA_CLOUD_OPERATOR.md)
+
 `installer/` is the interactive operator CLI for installation, repair, focused
 provider configuration, and source/configuration updates. Platform launchers
 create and invoke this checkout's `venv`; the installer process must run from

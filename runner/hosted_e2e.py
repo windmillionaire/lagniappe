@@ -35,6 +35,7 @@ from config.storage import (
     storage_bucket_names,
 )
 from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
+from runner import cloud_checkpoints
 from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.gcloud import activate_repository_gcloud
 from runner.process import run_command
@@ -322,6 +323,9 @@ def _infrastructure(*, project_number=None):
 
 # @testable infrastructure
 def _write_json(path: Path, payload: dict, *, owner_only=False):
+    checkpoint = cloud_checkpoints.ACTIVE.get()
+    if checkpoint and path in checkpoint.paths:
+        return checkpoint.write(path, payload)
     return _atomic_write_text(
         path,
         f"{json.dumps(payload, indent=2, sort_keys=True)}\n",
@@ -347,6 +351,9 @@ def _setup_contract_fingerprint():
 
 # @testable infrastructure
 def _load_json(path: Path):
+    checkpoint = cloud_checkpoints.ACTIVE.get()
+    if checkpoint and path in checkpoint.paths:
+        return copy.deepcopy(checkpoint.doc[checkpoint.paths[path]])
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
@@ -2763,6 +2770,11 @@ def run_hosted_e2e_command(arguments):
         description="Run repository tests in an isolated Google-hosted environment.",
     )
     commands = parser.add_subparsers(dest="action", required=True)
+    parser.add_argument("--recover-generation", type=int, metavar="GENERATION",
+                        help="Take over this GCS generation after the previous operator stopped.")
+    init_parser = commands.add_parser("checkpoint-init", help="Seed private Cloud storage from a torn-down installation.")
+    init_parser.add_argument("--from-checkout", type=Path, required=True)
+    init_parser.add_argument("--project", required=True)
 
     # @testable true
     # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cli_routes_closed_environment
@@ -2848,6 +2860,23 @@ def run_hosted_e2e_command(arguments):
     args = parser.parse_args(arguments)
 
     try:
+        if args.action == "checkpoint-init":
+            cloud_checkpoints.seed(args.from_checkout.resolve(), args.project)
+            return 0
+        return _dispatch_hosted_command(args)
+    except HostedE2EError as error:
+        print(f"Hosted E2E command stopped: {error}")
+        return 2
+    except RuntimeError as error:
+        print(f"Hosted E2E command failed: {error}")
+        return 1
+
+
+# @testable false
+# @covered-by runner/hosted_e2e.py::run_hosted_e2e_command
+# @reason command execution inside the optional project checkpoint transaction
+def _dispatch_hosted_command(args):
+    with cloud_checkpoints.lifecycle(sys.modules[__name__], args):
         if args.action == "setup":
             payload = setup(args.github_repository)
             print(json.dumps(payload, indent=2, sort_keys=True))
@@ -2930,12 +2959,6 @@ def run_hosted_e2e_command(arguments):
                 teardown_options["environment"] = args.environment
             payload = teardown(**teardown_options)
             print(f"Hosted E2E version {payload['version']} was torn down.")
-    except HostedE2EError as error:
-        print(f"Hosted E2E command stopped: {error}")
-        return 2
-    except RuntimeError as error:
-        print(f"Hosted E2E command failed: {error}")
-        return 1
     return 0
 
 

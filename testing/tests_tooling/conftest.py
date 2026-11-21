@@ -11,7 +11,7 @@ import pytest
 def tooling_tests_use_local_runner_environment(monkeypatch):
     """Keep local runner contracts independent of a hosted job's envelope."""
     for name in tuple(os.environ):
-        if name == "LAGNIAPPE_HOSTED_E2E" or name.startswith(
+        if name in {"LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT", "LAGNIAPPE_HOSTED_E2E"} or name.startswith(
             "LAGNIAPPE_HOSTED_E2E_"
         ):
             monkeypatch.delenv(name, raising=False)

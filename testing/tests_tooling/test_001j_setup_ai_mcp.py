@@ -755,3 +755,21 @@ def test_disabling_ai_skips_model_and_external_prompts(monkeypatch, capsys):
     assert saved.APP["AI_MODEL"] == "custom-model"
     assert len(prompts) == len(saves) == 1
     assert "AI models:" not in capsys.readouterr().out
+
+
+# @matrix mcp-install : bootstrap configuration source-version update-order
+def test_cloud_operator_requires_preprovisioned_mcp_and_oauth_controls(cloud, monkeypatch):
+    config = dict(settings(), EXPERIMENTS_ENABLED=True, EXPERIMENTS_PROJECT="demo-project")
+    prepared = mcp.prepare_deployment(config)
+    cloud.service = service(prepared, resource=config["MCP_RESOURCE"])
+    monkeypatch.setenv("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT", "demo-project")
+    cloud.calls.clear()
+    assert mcp.prepare_deployment(config) == prepared
+    assert not any("set-iam-policy" in call or "enable" in call for call in cloud.calls)
+    cloud.fields.clear()
+    with pytest.raises(SetupError, match="TTL"):
+        mcp.prepare_deployment(config)
+    assert not cloud.fields
+    cloud.service = None
+    with pytest.raises(SetupError, match="existing MCP service"):
+        mcp.prepare_deployment(config)

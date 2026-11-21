@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Reusable Cloud image setup. Run in a fresh checkout before publishing the image.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+if [[ -d config/files && -n "$(find config/files -type f -print -quit)" ]]; then
+    echo 'Use a clean checkout for the reusable Cloud image. Installation settings are present.' >&2
+    exit 1
+fi
+command -v gcloud >/dev/null
+command -v gh >/dev/null
+node_version=$(cat .nvmrc)
+if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node')" != "$node_version" ]]; then
+    nvm_script="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+    if [[ ! -r "$nvm_script" ]]; then
+        echo "Select Node $node_version or install nvm in this environment." >&2
+        exit 1
+    fi
+    # shellcheck source=/dev/null
+    source "$nvm_script"
+    nvm install "$node_version"
+    nvm alias default "$node_version"
+fi
+if [[ ! -x venv/bin/python ]]; then
+    python3.14 -m venv venv
+fi
+venv/bin/python -m pip install -r requirements-dev.txt
+npm ci
+venv/bin/python -m playwright install chromium
+venv/bin/python -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); p.chromium.launch().close(); p.stop()'
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
+venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'

@@ -371,3 +371,6 @@ user agents; narrow and sanitize them before sharing.
 
 Successful teardown removes downloaded execution bundles after provider and
 test-data cleanup. Imported evidence and reusable setup metadata remain.
+## Resume from a fresh Cloud task
+
+The private experiments operator stores setup, candidate state, source commit, numeric settings version and execution name in its project-owned checkpoint bucket. A generation precondition excludes simultaneous lifecycle writers. Use the same hosted commands inside the operator shell. [Cloud setup and two-task rehearsal](INFRA_CLOUD_OPERATOR.md#rehearse-before-moving-the-release-gate)
