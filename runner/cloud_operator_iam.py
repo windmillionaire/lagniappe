@@ -11,7 +11,7 @@ from config.storage import storage_bucket_names
 from runner import cloud_settings
 from runner.context import GCLOUD_CLI
 
-# These roles have no policy-administration or service-account-key permissions.
+# Only the hosted job role can change an IAM policy, on the job where it is bound.
 CUSTOM = {
     "lagniappeSettingsPublisher": (
         "Publish Lagniappe settings",
@@ -41,13 +41,18 @@ CUSTOM = {
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_operator_grants_stay_in_experiments
 # @matrix hosted-e2e setup : iam project-identity
-def bindings(project, app, setup, build_account):
+def bindings(
+    project, app, setup, build_account, *, app_engine_account=None, hosted_job_exists=False
+):
+    from runner.hosted_e2e import JOB
+
     policy = normalize_experiments_config(app)
     if (
         not policy["EXPERIMENTS_ENABLED"]
         or policy["EXPERIMENTS_PROJECT"] != project
         or setup["project"] != project
         or setup["project_number"] == ""
+        or setup["job"] != JOB
     ):
         raise ValueError(
             "Select the same experiments installation for settings and hosted setup."
@@ -65,16 +70,21 @@ def bindings(project, app, setup, build_account):
         "logging.viewer",
     ):
         grants.append((project_target, "roles/" + role))
-    job = f"projects/{project}/locations/{setup['region']}/jobs/{setup['job']}"
-    condition = (
-        f"--condition=title=LagniappeHostedJob,expression=resource.name == '{job}'"
-    )
-    grants.append(([*project_target, condition], roles + "lagniappeHostedJobPolicy"))
-    for account in {
+    if hosted_job_exists:
+        grants.append(
+            (
+                ["run", "jobs", "add-iam-policy-binding", JOB, f"--region={setup['region']}"],
+                roles + "lagniappeHostedJobPolicy",
+            )
+        )
+    deployment_accounts = {
         build_account,
         setup["runtime_email"],
         app["RUNTIME_SERVICE_ACCOUNT_EMAIL"],
-    }:
+    }
+    if app_engine_account:
+        deployment_accounts.add(app_engine_account)
+    for account in sorted(deployment_accounts):
         grants.append(
             (
                 ["iam", "service-accounts", "add-iam-policy-binding", account],
@@ -168,6 +178,43 @@ def bindings(project, app, setup, build_account):
     return grants
 
 
+# @testable true
+# @tests tests_tooling/test_016_cloud_operator.py::test_operator_checks_both_build_accounts_before_granting_access
+# @matrix hosted-e2e setup : iam project-identity
+def _build_accounts(base, project, *, apply):
+    """Discover the two build identities and check the privileges actAs would convey."""
+    build = subprocess.check_output(
+        [
+            *base, "builds", "get-default-service-account",
+            "--format=value(serviceAccountEmail)",
+        ],
+        text=True,
+    ).strip().rsplit("/", 1)[-1]
+    app = json.loads(subprocess.check_output(
+        [*base, "app", "describe", "--format=json(id,serviceAccount)"], text=True
+    ))
+    app_engine = app.get("serviceAccount")
+    if app.get("id") != project or not app_engine or not build:
+        raise SystemExit("Could not identify both build accounts for the selected project.")
+    policy = json.loads(subprocess.check_output(
+        [*base, "projects", "get-iam-policy", project, "--format=json(bindings)"],
+        text=True,
+    ))
+    members = {f"serviceAccount:{account}" for account in (app_engine, build)}
+    for binding in policy["bindings"]:
+        if binding["role"] in {"roles/editor", "roles/owner"}:
+            broad = members.intersection(binding["members"])
+            if broad:
+                message = (
+                    f"{', '.join(sorted(broad))} has {binding['role']} in {project}. "
+                    "Replace the broad project role with build permissions before granting actAs."
+                )
+                if apply:
+                    raise SystemExit(message)
+                print(message)
+    return build, app_engine
+
+
 # @testable infrastructure
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -190,14 +237,17 @@ def main():
         f"--configuration={target['NAME']}",
         f"--account={target['ACCOUNT']}",
     ]
-    build = (
-        subprocess.check_output(
-            [*base, "builds", "get-default-service-account"], text=True
-        )
-        .strip()
-        .split("/")[-1]
+    build, app_engine = _build_accounts(base, project, apply=args.apply)
+    job_names = subprocess.check_output(
+        [*base, "run", "jobs", "list", f"--region={setup['region']}", "--format=value(metadata.name)"],
+        text=True,
+    ).splitlines()
+    job_exists = setup["job"] in job_names
+    grants = bindings(
+        project, app, setup, build, app_engine_account=app_engine, hosted_job_exists=job_exists
     )
-    grants = bindings(project, app, setup, build)
+    if not job_exists:
+        print(f"Grant the hosted job policy role on {setup['job']} after the job is created.")
     member = (
         f"--member=serviceAccount:lagniappe-codex@{project}.iam.gserviceaccount.com"
     )

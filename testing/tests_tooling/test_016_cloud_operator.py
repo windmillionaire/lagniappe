@@ -613,20 +613,63 @@ def test_operator_grants_stay_in_experiments(bundle):
         artifact_bucket="results",
         artifact_repository="e2e",
     )
-    grants = bindings(PROJECT, app, setup, "build@example.com")
+    app_engine = f"{PROJECT}@appspot.gserviceaccount.com"
+    grants = bindings(
+        PROJECT, app, setup, "build@example.com", app_engine_account=app_engine, hosted_job_exists=True
+    )
+    assert [
+        role for command, role in grants
+        if command == ["iam", "service-accounts", "add-iam-policy-binding", app_engine]
+    ] == ["roles/iam.serviceAccountUser"]
+    job_policy = f"projects/{PROJECT}/roles/lagniappeHostedJobPolicy"
+    assert [command for command, role in grants if role == job_policy] == [
+        ["run", "jobs", "add-iam-policy-binding", "lagniappe-e2e", "--region=us-central1"]
+    ]
+    assert all(role != job_policy for _, role in bindings(PROJECT, app, setup, "build@example.com"))
     for command, role in grants:
         if role.endswith("lagniappeTestBucketCors"):
             assert command[-1].startswith("gs://test-")
         if role.endswith("lagniappeSettingsPublisher"):
             assert command == ["secrets", "add-iam-policy-binding", settings.SECRET]
-        if role.endswith("lagniappeHostedJobPolicy"):
-            assert (
-                f"projects/{PROJECT}/locations/us-central1/jobs/lagniappe-e2e"
-                in command[-1]
-            )
         assert role not in {"roles/owner", "roles/editor", "roles/secretmanager.admin"}
     with pytest.raises(ValueError):
         bindings("other-project", app, setup, "build@example.com")
+    with pytest.raises(ValueError):
+        bindings(PROJECT, app, dict(setup, job="unrelated-job"), "build@example.com", hosted_job_exists=True)
+
+
+# @matrix hosted-e2e setup : iam project-identity
+def test_operator_checks_both_build_accounts_before_granting_access(monkeypatch, capsys):
+    from runner.cloud_operator_iam import _build_accounts
+
+    compute = "123-compute@developer.gserviceaccount.com"
+    app_engine = f"app-build@{PROJECT}.iam.gserviceaccount.com"
+    app = {"id": PROJECT, "serviceAccount": app_engine}
+    policy = {"bindings": []}
+    base = ["gcloud", f"--project={PROJECT}"]
+
+    def discover(argv, *, text):
+        assert argv[:len(base)] == base
+        command = argv[len(base):-1]
+        if command == ["builds", "get-default-service-account"]:
+            return f"projects/{PROJECT}/serviceAccounts/{compute}\n"
+        if command == ["app", "describe"]:
+            return json.dumps(app)
+        assert command == ["projects", "get-iam-policy", PROJECT]
+        return json.dumps(policy)
+
+    monkeypatch.setattr(subprocess, "check_output", discover)
+    for account, role in ((compute, "roles/editor"), (app_engine, "roles/owner")):
+        policy["bindings"] = [{"role": role, "members": [f"serviceAccount:{account}"]}]
+        assert _build_accounts(base, PROJECT, apply=False) == (compute, app_engine)
+        assert account in capsys.readouterr().out
+        with pytest.raises(SystemExit, match=role):
+            _build_accounts(base, PROJECT, apply=True)
+    policy["bindings"] = [{"role": "roles/editor", "members": ["user:owner@example.com"]}]
+    assert _build_accounts(base, PROJECT, apply=True) == (compute, app_engine)
+    app["id"] = "different-project"
+    with pytest.raises(SystemExit, match="selected project"):
+        _build_accounts(base, PROJECT, apply=True)
 
 
 # @matrix deploy setup : project-identity

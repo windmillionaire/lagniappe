@@ -33,6 +33,14 @@ The initial checkpoint imports a completed hosted setup and torn-down state from
 
 The task launcher uses the selected connection's native external-account file, an isolated temporary gcloud configuration, and short-lived credentials. Its account comes from the verified federation target. Select a nondefault connection with `LAGNIAPPE_OIDC_ALIAS`. The Google project can be passed as `--project` or set as `LAGNIAPPE_CLOUD_PROJECT` in the private environment.
 
+App Engine can build a version with its app-level default account even when the version runs as the dedicated E2E runtime. Operator setup looks up both the default Cloud Build account and the App Engine account and grants Service Account User on each. Preview reports direct project Editor or Owner grants on those accounts. Applying the operator grants stops until those broad roles have been replaced. Check the installation’s current workloads and successful builds before changing a default account. For the experiments installation, each builder writes its own Artifact Registry repository, accesses its own staging and log buckets, and has project-level Logs Writer and Service Usage Consumer. [Google Cloud build service account permissions](https://docs.cloud.google.com/build/docs/securing-builds/configure-user-specified-service-accounts)
+
+The hosted job's IAM policy is set on the job resource. If creation stops while assigning invoker roles, the installer can run the following once the job exists. Then resume `hosted-e2e create` from the same commit and numeric settings version. Include this grant in installation-side provisioning each time the job is recreated. [Cloud Run resource access](https://docs.cloud.google.com/run/docs/securing/managing-access)
+
+```sh
+gcloud run jobs add-iam-policy-binding lagniappe-e2e --region=REGION --project=PROJECT --configuration=CONFIG --account=ACCOUNT --member=serviceAccount:lagniappe-codex@PROJECT.iam.gserviceaccount.com --role=projects/PROJECT/roles/lagniappeHostedJobPolicy
+```
+
 Before publishing the setup image, run this check on the branch that fresh tasks will use. It verifies that the selected service account can obtain a short-lived token through Google IAM or the environment's configured HTTPS relay. It keeps the token out of the output and exits before reading installation settings.
 
 ```sh
