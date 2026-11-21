@@ -11,7 +11,7 @@ from config.storage import storage_bucket_names
 from runner import cloud_settings
 from runner.context import GCLOUD_CLI
 
-# Only the hosted job role can change an IAM policy, on the job where it is bound.
+# The only custom role that changes IAM can change Cloud Run job policies.
 CUSTOM = {
     "lagniappeSettingsPublisher": (
         "Publish Lagniappe settings",
@@ -42,7 +42,8 @@ CUSTOM = {
 # @tests tests_tooling/test_016_cloud_operator.py::test_operator_grants_stay_in_experiments
 # @matrix hosted-e2e setup : iam project-identity
 def bindings(
-    project, app, setup, build_account, *, app_engine_account=None, hosted_job_exists=False
+    project, app, setup, build_account, *, app_engine_account=None,
+    hosted_job_exists=False, project_job_policy=False,
 ):
     from runner.hosted_e2e import JOB
 
@@ -70,7 +71,9 @@ def bindings(
         "logging.viewer",
     ):
         grants.append((project_target, "roles/" + role))
-    if hosted_job_exists:
+    if project_job_policy:
+        grants.append((project_target, roles + "lagniappeHostedJobPolicy"))
+    elif hosted_job_exists:
         grants.append(
             (
                 ["run", "jobs", "add-iam-policy-binding", JOB, f"--region={setup['region']}"],
@@ -220,6 +223,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True)
     parser.add_argument("--from-checkout", type=Path, required=True)
+    parser.add_argument(
+        "--project-job-policy", action="store_true",
+        help="Grant the operator IAM policy access to every Cloud Run job in this experiments project.",
+    )
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     root = args.from_checkout.resolve()
@@ -238,16 +245,19 @@ def main():
         f"--account={target['ACCOUNT']}",
     ]
     build, app_engine = _build_accounts(base, project, apply=args.apply)
-    job_names = subprocess.check_output(
-        [*base, "run", "jobs", "list", f"--region={setup['region']}", "--format=value(metadata.name)"],
-        text=True,
-    ).splitlines()
-    job_exists = setup["job"] in job_names
+    job_exists = False
+    if not args.project_job_policy:
+        job_names = subprocess.check_output(
+            [*base, "run", "jobs", "list", f"--region={setup['region']}", "--format=value(metadata.name)"],
+            text=True,
+        ).splitlines()
+        job_exists = setup["job"] in job_names
     grants = bindings(
-        project, app, setup, build, app_engine_account=app_engine, hosted_job_exists=job_exists
+        project, app, setup, build, app_engine_account=app_engine,
+        hosted_job_exists=job_exists, project_job_policy=args.project_job_policy,
     )
-    if not job_exists:
-        print(f"Grant the hosted job policy role on {setup['job']} after the job is created.")
+    if not args.project_job_policy and not job_exists:
+        print(f"Job-scoped provisioning requires {setup['job']} to exist for its IAM grant.")
     member = (
         f"--member=serviceAccount:lagniappe-codex@{project}.iam.gserviceaccount.com"
     )

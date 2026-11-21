@@ -2056,8 +2056,10 @@ def test_committed_source_export_ignores_generated_worktree_churn(tmp_path):
         ) == "committed production bundle\n"
 
 
-# @matrix hosted-e2e : deployment-source image-boundary
-def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
+# @matrix hosted-e2e : deployment-source image-boundary project-identity
+# @pair storage:project-identity
+@pytest.mark.parametrize("cloud_operator", [False, True], ids=["installer", "cloud-operator"])
+def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch, cloud_operator):
     monkeypatch.delenv("LAGNIAPPE_E2E_DURATIONS", raising=False)
     container_root = tmp_path / hosted_e2e.CONTAINER_RELATIVE_ROOT
     container_root.mkdir(parents=True)
@@ -2078,6 +2080,10 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
 
     def gcloud(*arguments, **options):
         calls.append((arguments, options))
+        if arguments[:3] == ("storage", "buckets", "describe"):
+            return subprocess.CompletedProcess(
+                arguments, 0, '{"name":"project-1_cloudbuild","projectNumber":"1234"}', "",
+            )
         return subprocess.CompletedProcess(
             ["gcloud"],
             returncode=0,
@@ -2091,15 +2097,25 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
         gcloud,
     )
 
-    image, returned_build_id = hosted_e2e._build_runner_image(
-        _infrastructure(),
-        "a" * 40,
-        tmp_path,
-    )
+    infrastructure = _infrastructure()
+    checkpoint = SimpleNamespace(project=infrastructure.project) if cloud_operator else None
+    with hosted_e2e.cloud_checkpoints.ACTIVE.set(checkpoint):
+        image, returned_build_id = hosted_e2e._build_runner_image(
+            infrastructure, "a" * 40, tmp_path,
+        )
 
     assert image.endswith(":" + "a" * 40)
     assert returned_build_id == cloud_build_id
-    arguments, options = calls[0]
+    arguments, options = calls[-1]
+    if cloud_operator:
+        assert [args for args, _ in calls[:-1]] == [(
+            "storage", "buckets", "describe", "gs://project-1_cloudbuild", "--raw",
+            "--project=project-1", "--format=json",
+        )]
+        assert "--gcs-source-staging-dir=gs://project-1_cloudbuild/source" in arguments
+    else:
+        assert len(calls) == 1
+        assert not any(str(arg).startswith("--gcs-source-staging-dir=") for arg in arguments)
     assert arguments[:3] == ("builds", "submit", tmp_path)
     assert f"--config={container_root / 'cloudbuild.yaml'}" in arguments
     assert f"--ignore-file={container_root / 'gcloudignore'}" in arguments
@@ -2112,6 +2128,19 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     assert (container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY).read_text(
         encoding="utf-8"
     ) == (tmp_path / ".gcloudignore").read_text(encoding="utf-8")
+
+
+# @matrix hosted-e2e storage : project-identity
+@pytest.mark.parametrize("metadata", [
+    None,
+    {"name": "project-1_cloudbuild"},
+    {"name": "project-1_cloudbuild", "projectNumber": "5678"},
+    {"name": "other-bucket", "projectNumber": "1234"},
+])
+def test_cloud_build_source_requires_the_operators_own_bucket(monkeypatch, metadata):
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda args: metadata)
+    with pytest.raises(HostedE2EError, match="gs://project-1_cloudbuild.*belong to project project-1"):
+        hosted_e2e._operator_build_staging_dir(_infrastructure())
 
 
 # @matrix hosted-e2e : deployment-source image-boundary symlink-safety

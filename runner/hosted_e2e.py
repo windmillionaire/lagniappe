@@ -1179,6 +1179,29 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_uses_the_exported_commit
+# @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_source_requires_the_operators_own_bucket
+# @matrix hosted-e2e storage : project-identity
+def _operator_build_staging_dir(infrastructure):
+    """Select the operator's provisioned build bucket after a direct ownership check."""
+    name = f"{infrastructure.project}_cloudbuild"
+    uri = f"gs://{name}"
+    bucket = _describe(
+        ["storage", "buckets", "describe", uri, "--raw", f"--project={infrastructure.project}"]
+    )
+    if (
+        not bucket
+        or bucket.get("name") != name
+        or str(bucket.get("projectNumber") or "") != infrastructure.project_number
+    ):
+        raise HostedE2EError(
+            f"Cloud Build source staging requires {uri} to exist and belong to "
+            f"project {infrastructure.project} ({infrastructure.project_number})."
+        )
+    return f"{uri}/source"
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_uses_the_exported_commit
 # @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_refuses_an_unsafe_staged_root_ignore
 # @matrix hosted-e2e : deployment-source image-boundary symlink-safety
 def _build_runner_image(
@@ -1214,10 +1237,16 @@ def _build_runner_image(
     if timings.exists() or timings.is_symlink():
         raise HostedE2EError("The runner image's staged duration hints path is not clean.")
     timings.write_text(json.dumps(duration_estimates(Path(source_root))), encoding="utf-8")
+    staging_args = []
+    if cloud_checkpoints.ACTIVE.get() is not None:
+        staging_dir = _operator_build_staging_dir(infrastructure)
+        print(f"Using verified Cloud Build source staging at {staging_dir}.", flush=True)
+        staging_args.append(f"--gcs-source-staging-dir={staging_dir}")
     result = _gcloud(
         "builds",
         "submit",
         source_root,
+        *staging_args,
         f"--config={container_root / 'cloudbuild.yaml'}",
         f"--ignore-file={container_root / 'gcloudignore'}",
         f"--substitutions=_IMAGE={image}",

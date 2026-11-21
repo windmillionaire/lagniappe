@@ -33,9 +33,17 @@ The initial checkpoint imports a completed hosted setup and torn-down state from
 
 The task launcher uses the selected connection's native external-account file, an isolated temporary gcloud configuration, and short-lived credentials. Its account comes from the verified federation target. Select a nondefault connection with `LAGNIAPPE_OIDC_ALIAS`. The Google project can be passed as `--project` or set as `LAGNIAPPE_CLOUD_PROJECT` in the private environment.
 
+Run candidate creation through the launcher with that connection in place. Tooling tests that simulate other accounts set their own test credentials. For the runner image, candidate creation verifies ownership of `gs://PROJECT_cloudbuild` and sends the source to its `source/` prefix. The operator needs access to that bucket. [Cloud Build source staging](https://docs.cloud.google.com/sdk/gcloud/reference/builds/submit#--gcs-source-staging-dir)
+
 App Engine can build a version with its app-level default account even when the version runs as the dedicated E2E runtime. Operator setup looks up both the default Cloud Build account and the App Engine account and grants Service Account User on each. Preview reports direct project Editor or Owner grants on those accounts. Applying the operator grants stops until those broad roles have been replaced. Check the installation’s current workloads and successful builds before changing a default account. For the experiments installation, each builder writes its own Artifact Registry repository, accesses its own staging and log buckets, and has project-level Logs Writer and Service Usage Consumer. [Google Cloud build service account permissions](https://docs.cloud.google.com/build/docs/securing-builds/configure-user-specified-service-accounts)
 
-The hosted job's IAM policy is set on the job resource. If creation stops while assigning invoker roles, the installer can run the following once the job exists. Then resume `hosted-e2e create` from the same commit and numeric settings version. Include this grant in installation-side provisioning each time the job is recreated. [Cloud Run resource access](https://docs.cloud.google.com/run/docs/securing/managing-access)
+Each candidate gets a new Cloud Run job. The runner grants its test invoker access to that job. For a dedicated experiments project, the installer can give the operator standing permission to manage job access. Preview the grants with the following command, then repeat with `--apply`. The custom role grants `run.jobs.getIamPolicy` and `run.jobs.setIamPolicy` on all current and future Cloud Run jobs in that project. Teardown deletes the candidate and job. The next job inherits the operator grant. [Cloud Run job permissions](https://docs.cloud.google.com/run/docs/reference/iam/permissions)
+
+```sh
+venv/bin/python -m runner.cloud_operator_iam --project PROJECT --from-checkout INSTALLATION --project-job-policy
+```
+
+For installations that choose job-scoped access, grant the role on the named job after each creation. If a candidate is waiting at that step, resume `hosted-e2e create` from the same commit and numeric settings version after applying the grant. [Cloud Run resource access](https://docs.cloud.google.com/run/docs/securing/managing-access)
 
 ```sh
 gcloud run jobs add-iam-policy-binding lagniappe-e2e --region=REGION --project=PROJECT --configuration=CONFIG --account=ACCOUNT --member=serviceAccount:lagniappe-codex@PROJECT.iam.gserviceaccount.com --role=projects/PROJECT/roles/lagniappeHostedJobPolicy

@@ -9,11 +9,15 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def tooling_tests_use_local_runner_environment(monkeypatch):
-    """Keep local runner contracts independent of a hosted job's envelope."""
+    """Give tooling tests their own hosted job and Cloud operator settings."""
     for name in tuple(os.environ):
-        if name in {"LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT", "LAGNIAPPE_HOSTED_E2E"} or name.startswith(
-            "LAGNIAPPE_HOSTED_E2E_"
-        ):
+        if name in {
+            "LAGNIAPPE_CLOUD_ACCOUNT",
+            "LAGNIAPPE_CLOUD_PROJECT",
+            "LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT",
+            "LAGNIAPPE_OIDC_ALIAS",
+            "LAGNIAPPE_HOSTED_E2E",
+        } or name.startswith("LAGNIAPPE_HOSTED_E2E_"):
             monkeypatch.delenv(name, raising=False)
 
 

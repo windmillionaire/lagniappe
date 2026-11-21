@@ -594,7 +594,7 @@ def test_publication_retries_with_annotated_tag(tmp_path, monkeypatch):
 
 # @matrix hosted-e2e setup : iam project-identity
 def test_operator_grants_stay_in_experiments(bundle):
-    from runner.cloud_operator_iam import bindings
+    from runner.cloud_operator_iam import CUSTOM, bindings
 
     app = dict(
         yaml.safe_load(bundle["app"]),
@@ -626,6 +626,17 @@ def test_operator_grants_stay_in_experiments(bundle):
         ["run", "jobs", "add-iam-policy-binding", "lagniappe-e2e", "--region=us-central1"]
     ]
     assert all(role != job_policy for _, role in bindings(PROJECT, app, setup, "build@example.com"))
+    assert set(CUSTOM["lagniappeHostedJobPolicy"][1]) == {
+        "run.jobs.getIamPolicy", "run.jobs.setIamPolicy",
+    }
+    for exists in (False, True):
+        standing = bindings(
+            PROJECT, app, setup, "build@example.com",
+            hosted_job_exists=exists, project_job_policy=True,
+        )
+        assert [command for command, role in standing if role == job_policy] == [
+            ["projects", "add-iam-policy-binding", PROJECT]
+        ]
     for command, role in grants:
         if role.endswith("lagniappeTestBucketCors"):
             assert command[-1].startswith("gs://test-")
@@ -634,6 +645,8 @@ def test_operator_grants_stay_in_experiments(bundle):
         assert role not in {"roles/owner", "roles/editor", "roles/secretmanager.admin"}
     with pytest.raises(ValueError):
         bindings("other-project", app, setup, "build@example.com")
+    with pytest.raises(ValueError):
+        bindings("other-project", app, setup, "build@example.com", project_job_policy=True)
     with pytest.raises(ValueError):
         bindings(PROJECT, app, dict(setup, job="unrelated-job"), "build@example.com", hosted_job_exists=True)
 
