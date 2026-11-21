@@ -153,9 +153,12 @@ def main():
     )
     notes = Path("documentation/releases") / f"{version}.md"
     if (
-        json.loads(Path("package.json").read_text())["version"] != version
+        json.loads(Path("package.json").read_text(encoding="utf-8"))["version"]
+        != version
         or not notes.is_file()
-        or not notes.read_text().strip().startswith(f"# Version {version}\n")
+        or not notes.read_text(encoding="utf-8")
+        .strip()
+        .startswith(f"# Version {version}\n")
     ):
         parser.error(
             "The merged package version and release notes must match the PR branch."

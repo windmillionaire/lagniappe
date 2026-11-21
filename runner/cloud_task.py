@@ -21,7 +21,9 @@ def connection_file(account):
     path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     manifest = os.environ.get("OIC_MANIFEST_PATH")
     if manifest:
-        connections = json.loads(Path(manifest).read_text())["connections"]
+        connections = json.loads(Path(manifest).read_text(encoding="utf-8"))[
+            "connections"
+        ]
         alias = os.environ.get("LAGNIAPPE_OIDC_ALIAS")
         choices = [
             c
@@ -36,7 +38,7 @@ def connection_file(account):
         path = choices[0]["credentials_file"]
     if not path:
         raise RuntimeError("Attach the environment's Google OIDC connection first.")
-    credentials = json.loads(Path(path).read_text())
+    credentials = json.loads(Path(path).read_text(encoding="utf-8"))
     endpoint = urlsplit(credentials.get("service_account_impersonation_url", ""))
     target = f"/v1/projects/-/serviceAccounts/{account}:generateAccessToken"
     route = unquote(endpoint.path)
