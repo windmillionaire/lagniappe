@@ -566,28 +566,33 @@ def test_switching_session_user_requests_client_cache_invalidation(get_admin, ge
 def test_stale_preloaded_session_keys_fall_back_to_flask_login_user(get_admin, get_user):
     owner = get_admin()
     stale = get_user(Users.create_user_from_index, creator=owner)
-    owner.go(SitePages.HOME)
+    client = app.test_client()
+    client.set_cookie("session", _session_cookie(owner.page.context)["value"])
+    token = client.get("/l/token")
+    assert token.status_code == 200
 
-    serializer = _session_serializer()
-    cookie = _session_cookie(owner.page.context)
-    payload = serializer.loads(cookie["value"])
-    payload[CONFIG.LOGIN_USER_KEY] = stale.entity.urlsafe_key
-    payload[CONFIG.LOGIN_USER_PAGE_KEY] = stale.entity.page.urlsafe_key
-    payload["restrictions"] = ["stale"]
-    payload["belongs_to"] = ["stale"]
-    payload["assign"] = ["stale"]
-    payload["create_pages"] = ["stale"]
-    cookie["value"] = serializer.dumps(payload)
-    owner.page.context.add_cookies([cookie])
+    cache_keys = ("restrictions", "belongs_to", "assign", "create_pages")
+    with client.session_transaction() as session:
+        assert session["_user_id"] == owner.email
+        session[CONFIG.LOGIN_USER_KEY] = stale.entity.urlsafe_key
+        session[CONFIG.LOGIN_USER_PAGE_KEY] = stale.entity.page.urlsafe_key
+        for key in cache_keys:
+            session[key] = ["stale"]
 
-    owner.page.goto(_site_url("/"))
-    expect(owner.page).to_have_title("Home")
-
-    refreshed = serializer.loads(_session_cookie(owner.page.context)["value"])
-    assert refreshed[CONFIG.LOGIN_USER_KEY] == owner.entity.urlsafe_key
-    assert refreshed[CONFIG.LOGIN_USER_PAGE_KEY] == owner.entity.page.urlsafe_key
-    for stale_key in ("restrictions", "belongs_to", "assign", "create_pages"):
-        assert stale_key not in refreshed
+    # This authenticated request returns the actor without rebuilding permissions.
+    # Home starts other requests that can legitimately fill the cache again.
+    response = client.post(
+        "/l/update-session",
+        json={},
+        headers={"X-CSRFToken": token.get_data(as_text=True)},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["userHash"] == owner.entity.hash
+    with client.session_transaction() as session:
+        assert session[CONFIG.LOGIN_USER_KEY] == owner.entity.urlsafe_key
+        assert session[CONFIG.LOGIN_USER_PAGE_KEY] == owner.entity.page.urlsafe_key
+        for key in cache_keys:
+            assert key not in session
 
 
 # @pair login:redirect-target
