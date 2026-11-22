@@ -9,12 +9,6 @@ import os
 from pathlib import Path
 import uuid
 
-from google.api_core.exceptions import PreconditionFailed
-from google.cloud import storage
-from google.oauth2.credentials import Credentials
-
-from runner import cloud_settings as settings
-
 ACTIVE = ContextVar("hosted_checkpoint", default=None)
 OBJECT = "hosted-e2e/checkpoint.json"
 DOCUMENTS = {"setup.json": "setup", "state.json": "state"}
@@ -22,6 +16,8 @@ DOCUMENTS = {"setup.json": "setup", "state.json": "state"}
 
 # @testable infrastructure
 def _bucket(project, number, *, credentials=None):
+    from google.cloud import storage
+
     bucket = storage.Client(project=project, credentials=credentials).get_bucket(
         f"{project}-lagniappe-operator"
     )
@@ -82,6 +78,8 @@ class Checkpoint:
         self.doc = doc
 
     def save(self):
+        from google.api_core.exceptions import PreconditionFailed
+
         blob = self.bucket.blob(OBJECT)
         try:
             blob.upload_from_string(
@@ -152,6 +150,10 @@ class Checkpoint:
 # @matrix hosted-e2e setup : project-identity transactional-state
 def seed(root, project):
     """Import the existing verified installation's last completed setup and teardown once."""
+    from google.oauth2.credentials import Credentials
+
+    from runner import cloud_settings as settings
+
     receipt = settings._receipt(root)
     if receipt.get("project") != project or receipt.get("secret") != settings.SECRET:
         raise RuntimeError(
@@ -206,6 +208,9 @@ def lifecycle(hosted, args):
             )
         yield
         return
+
+    from runner import cloud_settings as settings
+
     receipt = settings._receipt(hosted.APP_DIR)
     if (
         receipt.get("project") != project

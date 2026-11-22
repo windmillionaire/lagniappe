@@ -337,7 +337,9 @@ additional server URLs.
 pull-request candidates. It resolves the exact pull-request head commit,
 then enters the protected environment, verifies that the already-preflighted
 Cloud Run job was created from that source, invokes through WIF, and waits for
-the result bucket's last-uploaded `manifest.json` completion marker.
+the result bucket's last-uploaded `manifest.json` completion marker. Once the
+bundle is downloaded, the evidence importer runs locally with PyYAML as its
+only Python dependency.
 
 The workflow validates and merges evidence, confirms that no tracked file other
 than `testing/evidence/latest.json` changed, and non-force pushes an

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -1538,11 +1539,17 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     tmp_path,
     monkeypatch,
 ):
-    source = "a" * 40
-    source_file = tmp_path / "source.py"
-    source_file.write_text("VALUE = 1\n", encoding="utf-8")
-    snapshot, paths = behavior_snapshot(tmp_path)
-    result_dir = tmp_path / "reports/result"
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    _git(checkout, "init")
+    (checkout / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(checkout, "add", "source.py")
+    _git(checkout, "config", "user.name", "Test")
+    _git(checkout, "config", "user.email", "ci@example.test")
+    _git(checkout, "commit", "-m", "Candidate")
+    source = _git(checkout, "rev-parse", "HEAD").stdout.strip()
+    snapshot, paths = behavior_snapshot(checkout)
+    result_dir = tmp_path / "result"
     result_dir.mkdir(parents=True)
     manifest = {
         "schema_version": 1,
@@ -1563,23 +1570,22 @@ def test_hosted_result_directory_import_requires_the_exact_source(
             outcome="failed",
         ),
     )
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_git",
-        lambda *_arguments, **_options: subprocess.CompletedProcess(
-            ["git"], 0, stdout=f"{source}\n", stderr=""
-        ),
-    )
-
-    imported = hosted_e2e.import_result_directory(
-        result_dir,
-        expected_execution="lagniappe-e2e-result1",
-    )
-
-    assert imported == manifest
+    # The protected workflow imports its downloaded bundle with only PyYAML installed.
+    packages = tmp_path / "packages"
+    shutil.copytree(Path(yaml.__file__).parent, packages / "yaml")
+    monkeypatch.setenv("PYTHONPATH", str(packages))
+    monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(checkout))
+    command = [
+        sys.executable, "-S", hosted_e2e.APP_DIR / "run.py",
+        "hosted-e2e", "import-results",
+        "--directory", result_dir,
+        "--execution", manifest["execution"],
+    ]
+    result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert json.loads(result.stdout) == manifest
     evidence = traceability_common.load_json(
-        tmp_path / traceability_common.LATEST_TEST_RUN
+        checkout / traceability_common.LATEST_TEST_RUN
     )
     assert (
         evidence["tests"]["tests_e2e/test_remote.py::test_remote"]["outcome"]
@@ -1588,8 +1594,10 @@ def test_hosted_result_directory_import_requires_the_exact_source(
 
     manifest["source"] = "b" * 40
     traceability_common.write_json(result_dir / "manifest.json", manifest)
-    with pytest.raises(HostedE2EError, match="does not match"):
-        hosted_e2e.import_result_directory(result_dir)
+    result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "source does not match" in result.stdout
+    assert traceability_common.load_json(checkout / traceability_common.LATEST_TEST_RUN) == evidence
 
 
 # @matrix hosted-e2e traceability : evidence merge
