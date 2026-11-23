@@ -23,7 +23,8 @@ class _AssetEntity(AssetOwner, Protocol):
 
 if TYPE_CHECKING:
     class _AssetHost:
-        hash: str
+        @property
+        def hash(self) -> str: ...
 
         @property
         def key(self) -> Key | None: ...

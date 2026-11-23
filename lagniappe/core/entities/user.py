@@ -24,6 +24,7 @@ from . import Entities
 if TYPE_CHECKING:
     from google.cloud.datastore import Key
 
+    from ..mixins.field_host import FieldUser
     from . import property_types
     from .group import UserGroup
     from .page import Page
@@ -107,7 +108,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @matrix admin : delete edit privileged-account view
     # @matrix users : group-view owner restriction-independence users-view
     # @pair owner:owner-only
-    def allowed(self, action: Action, user: User | None = None) -> bool:
+    def allowed(self, action: Action, user: FieldUser = None) -> bool:
         """Authorize user rows from their own Users/group permission scope."""
         viewer = current_context_user(user)
         if (

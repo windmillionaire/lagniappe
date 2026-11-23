@@ -1,13 +1,13 @@
 import json
 from datetime import datetime, UTC
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING, Literal, Protocol, cast, overload, runtime_checkable
 
 
 from google.cloud import datastore
 
 from .. import mixins
-from ..definitions import Action, MutationIntent, Restriction
+from ..definitions import Action, MutationIntent, MutationOutcome, Restriction
 from ..definitions.fingerprints import base_fingerprint
 from ..entities import Entities
 from ..exceptions import PropertyError
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from ..properties.user_related import UserPage
 
     from .page import Page
+    from ..mixins.field_host import FieldUser
 
 
 class RegisteredProperty(Protocol):
@@ -146,9 +147,16 @@ class Entity:
     if TYPE_CHECKING:
         # Values exposed by the common entity property registry.
         name: str
-        hash: str
+        @property
+        def hash(self) -> str: ...
+
         kind: str
-        modified: datetime | None
+        @property
+        def modified(self) -> datetime | None: ...
+
+        @modified.setter
+        def modified(self, value: datetime | None) -> None: ...
+
         created: datetime | None
         active: bool
         requires: list[str]
@@ -156,19 +164,22 @@ class Entity:
 
     entity_kind: str
     _properties: EntityProperties | None = None
-    _related_keys = None
-    _relations = None
-    _mutation_intents = None
+    _related_keys: set[datastore.Key] | None = None
+    _relations: list[mixins.RelatedEntityMixin | mixins.RelatedEntityListMixin] | None = None
+    _mutation_intents: list[MutationIntent] | None = None
     _processes: dict[str, dict[str, object]] | None = None
-    _to_cache = None
-    _details = None
-    _readonly = None
+    _to_cache: dict[str, object] | None = None
+    _details: dict[str, object] | None = None
+    _readonly: bool | None = None
     _key: datastore.Key | None = None
     _db: datastore.Entity | dict[str, object] | None = None
     _state = None
     retired_fields = frozenset()
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, *args: database_get.Identifier, temporary: bool | None = None,
+        testing: bool | None = None, parent: database_get.Identifier = None, **kwargs: object,
+    ) -> None:
         if not getattr(type(self), "entity_kind", None):
             raise NotImplementedError(f"{type(self).__name__} requires entity_kind")
         identifier = args[0] if args and args[0] is not None else None
@@ -176,14 +187,14 @@ class Entity:
 
         if identifier is not None:
             self._key = database_get.datastore_key(identifier)
-        elif not kwargs.get("temporary") and not kwargs.get("testing"):
-            self._key = database_utility.create_key(self.entity_kind, kwargs.get("parent"))
+        elif not temporary and not testing:
+            self._key = database_utility.create_key(self.entity_kind, parent)
 
-        self._temporary = kwargs.get("temporary")
-        self._testing = kwargs.get("testing")
+        self._temporary = temporary
+        self._testing = testing
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset()
 
     def _get_properties(self) -> EntityProperties:
@@ -199,18 +210,18 @@ class Entity:
         return EntityProperties(self, properties)
 
     @property
-    def sync_ids(self):
+    def sync_ids(self) -> dict[str, dict[str, str | None]]:
         return {}
 
     @property
-    def temporary(self):
+    def temporary(self) -> bool | None:
         return self._temporary
 
     # @testable true
     # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
     # @matrix cache permissions : fingerprint modified
     @property
-    def fingerprint(self):
+    def fingerprint(self) -> str:
         modified = self.modified or datetime.now(UTC)
         return base_fingerprint(modified)
 
@@ -238,12 +249,12 @@ class Entity:
         setattr(prop, "value", value)  # noqa: B010
 
     @property
-    def readonly(self):
+    def readonly(self) -> bool:
         if self._readonly is None:
             self._readonly = not self.allowed(Action.EDIT)
         return self._readonly
 
-    def column(self, field_id):
+    def column(self, field_id: str) -> RegisteredProperty | None:
         """Get a property or submission field by ID for table column display."""
         if field_id in self.properties:
             return self.properties[field_id]
@@ -260,7 +271,7 @@ class Entity:
         )
 
     @property
-    def relations(self):
+    def relations(self) -> list[mixins.RelatedEntityMixin | mixins.RelatedEntityListMixin]:
         if self._relations is not None:
             return self._relations
 
@@ -272,7 +283,7 @@ class Entity:
         return self._relations
 
     @property
-    def related_keys(self):
+    def related_keys(self) -> set[datastore.Key]:
         if self._related_keys is not None:
             return self._related_keys
 
@@ -280,13 +291,13 @@ class Entity:
         return self._related_keys
 
     @property
-    def related_entities(self):
+    def related_entities(self) -> dict[datastore.Key, Entity]:
         loaded = {}
         for relation in self.relations:
             loaded.update(relation.attached_entities)
         return loaded
 
-    def attach(self, key_map, *, resolved_keys=None):
+    def attach(self, key_map: Mapping[datastore.Key, Entity], *, resolved_keys: Iterable[datastore.Key] | None = None) -> None:
         known_keys = set(key_map)
         if resolved_keys is not None:
             known_keys.update(resolved_keys)
@@ -297,11 +308,11 @@ class Entity:
                 relation.attach(key_map)
 
     @property
-    def details(self):
+    def details(self) -> dict[str, object]:
         if self._details is not None:
             return self._details
 
-        details = {}
+        details: dict[str, object] = {}
         for p in self.properties.implementing(mixins.DetailsMixin):
             value = p.details_value
             if value and p.details_key:
@@ -319,10 +330,10 @@ class Entity:
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_reference_details_does_not_derive_requirements_from_unloaded_relations
     # @pairs entities:reference-details relations:direct
     @property
-    def reference_details(self):
+    def reference_details(self) -> dict[str, object]:
         """Return a non-recursive display projection for an entity reference."""
         relation_ids = {id(relation) for relation in self.relations}
-        details = {}
+        details: dict[str, object] = {}
         for prop in self.properties.implementing(mixins.DetailsMixin):
             if id(prop) in relation_ids or prop.id == "requires":
                 continue
@@ -345,7 +356,7 @@ class Entity:
     # @matrix cache : cache-deduplication default-fields details-key parent-key
     # @matrix permissions cache : source-clauses stable-order
     @property
-    def to_cache(self):
+    def to_cache(self) -> dict[str, object]:
         if self.reserved or not self.hash:
             self._to_cache = {}
             return self._to_cache
@@ -381,7 +392,7 @@ class Entity:
     # @matrix ai file : metadata permissions
     # @pair permissions:authenticated-user
     # @pair ai:browser-url
-    def to_ai(self, user=None):
+    def to_ai(self, user: FieldUser = None) -> dict[str | None, object]:
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
             raise PermissionError("user must be authenticated")
@@ -420,7 +431,7 @@ class Entity:
     # @tests tests_unit/test_004e_submission_behavior.py::test_unset_submission_fields_do_not_erase_entity_filter_metadata
     # @matrix filter-index permissions task : column-view entity-metadata permission-neutral related-values unset-values
     # @pairs filter-index:related-values permissions:filter-index-neutral
-    def to_filter_index(self, user=None):
+    def to_filter_index(self, user: FieldUser = None) -> dict[str, object]:
         values: dict[str, object] = {"id": self.urlsafe_key}
 
         for p in self.properties.implementing(mixins.FilterMixin):
@@ -438,8 +449,8 @@ class Entity:
         return {k: v for k, v in values.items() if v is not None}
 
     @property
-    def reserved(self):
-        return self.db.get("reserved", False)
+    def reserved(self) -> bool:
+        return cast(bool, self.db.get("reserved", False))
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
@@ -447,7 +458,7 @@ class Entity:
     # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
     # @matrix task permissions : source-clauses admin-only
     # @matrix page permissions user-groups : group-match restricted-access
-    def restricted_access(self, user):
+    def restricted_access(self, user: FieldUser) -> bool:
         if not user or not user.is_authenticated:
             return True
         elif getattr(user, "is_admin", getattr(user, "is_owner", False)):
@@ -470,7 +481,7 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_testing_entity_allowed_uses_real_permissions
     # @matrix permissions testing : entity-allowed no-testing-shortcut
-    def allowed(self, action, user=None):
+    def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user)
 
         if self.restricted_access(user):
@@ -524,7 +535,7 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
     # @matrix entity : dedupe key-validation typed-intent validation
     # @matrix editor mutations : document durable-first cleanup named-versions
-    def add_mutation_intents(self, *intents):
+    def add_mutation_intents(self, *intents: MutationIntent) -> None:
         if self._mutation_intents is None:
             self._mutation_intents = []
 
@@ -566,7 +577,7 @@ class Entity:
                 existing.add(signature)
 
     @property
-    def mutation_intents(self):
+    def mutation_intents(self) -> list[MutationIntent]:
         if self._mutation_intents is None:
             self._mutation_intents = []
         return self._mutation_intents
@@ -589,7 +600,7 @@ class Entity:
             self._processes = {}
         return self._processes
 
-    def save(self, *args):
+    def save(self, *args: Entity) -> MutationOutcome | None:
         if self._testing:
             return
 
