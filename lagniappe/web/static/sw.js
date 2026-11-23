@@ -1,74 +1,74 @@
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "bfb80774";
+const SW_VERSION = "b731cc94";
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = [
-	"/chunks/account.js?v=bfb80774",
-	"/chunks/admin-tools.js?v=bfb80774",
-	"/chunks/analytics.js?v=bfb80774",
-	"/chunks/baseList.js?v=bfb80774",
-	"/chunks/baseTable.js?v=bfb80774",
-	"/chunks/builder-controls.js?v=bfb80774",
-	"/chunks/builder.js?v=bfb80774",
-	"/chunks/category.js?v=bfb80774",
-	"/chunks/combobox.js?v=bfb80774",
-	"/chunks/connectivity.js?v=bfb80774",
-	"/chunks/core-foundation.js?v=bfb80774",
-	"/chunks/deferredOperations.js?v=bfb80774",
-	"/chunks/directUpload.js?v=bfb80774",
-	"/chunks/document.js?v=bfb80774",
-	"/chunks/documentHistory.js?v=bfb80774",
-	"/chunks/editor-dialogs.js?v=bfb80774",
-	"/chunks/editor.js?v=bfb80774",
-	"/chunks/entity-foundation.js?v=bfb80774",
-	"/chunks/fileInfo.js?v=bfb80774",
-	"/chunks/filePdfPreview.js?v=bfb80774",
-	"/chunks/filters.js?v=bfb80774",
-	"/chunks/form-complex.js?v=bfb80774",
-	"/chunks/form-sections.js?v=bfb80774",
-	"/chunks/forms.js?v=bfb80774",
-	"/chunks/foundation.js?v=bfb80774",
-	"/chunks/home-tools.js?v=bfb80774",
-	"/chunks/html.js?v=bfb80774",
-	"/chunks/index-foundation.js?v=bfb80774",
-	"/chunks/index-tools.js?v=bfb80774",
-	"/chunks/ingress.js?v=bfb80774",
-	"/chunks/location.js?v=bfb80774",
-	"/chunks/messageComposer.js?v=bfb80774",
-	"/chunks/modal.js?v=bfb80774",
-	"/chunks/notifications.js?v=bfb80774",
-	"/chunks/offline-replay.js?v=bfb80774",
-	"/chunks/offline.js?v=bfb80774",
-	"/chunks/offlineWork.js?v=bfb80774",
-	"/chunks/page-tools.js?v=bfb80774",
-	"/chunks/permissions.js?v=bfb80774",
-	"/chunks/polling.js?v=bfb80774",
-	"/chunks/project-tools.js?v=bfb80774",
-	"/chunks/submission.js?v=bfb80774",
-	"/chunks/sync.js?v=bfb80774",
-	"/chunks/task-tools.js?v=bfb80774",
-	"/chunks/ui-controls.js?v=bfb80774",
-	"/chunks/ui-resources.js?v=bfb80774",
-	"/chunks/uploads.js?v=bfb80774",
-	"/chunks/upstreamUnavailable.js?v=bfb80774",
-	"/chunks/user-tools.js?v=bfb80774",
-	"/chunks/userSettings.js?v=bfb80774",
-	"/chunks/views/admin.js?v=bfb80774",
-	"/chunks/views/analytics.js?v=bfb80774",
-	"/chunks/views/builder.js?v=bfb80774",
-	"/chunks/views/file.js?v=bfb80774",
-	"/chunks/views/help.js?v=bfb80774",
-	"/chunks/views/home.js?v=bfb80774",
-	"/chunks/views/index.js?v=bfb80774",
-	"/chunks/views/manual.js?v=bfb80774",
-	"/chunks/views/messages.js?v=bfb80774",
-	"/chunks/views/page.js?v=bfb80774",
-	"/chunks/views/project.js?v=bfb80774",
-	"/chunks/views/public.js?v=bfb80774",
-	"/chunks/views/report.js?v=bfb80774",
-	"/chunks/views/results.js?v=bfb80774",
-	"/chunks/views/user.js?v=bfb80774",
-	"/chunks/watcher.js?v=bfb80774"
+	"/chunks/account.js?v=b731cc94",
+	"/chunks/admin-tools.js?v=b731cc94",
+	"/chunks/analytics.js?v=b731cc94",
+	"/chunks/baseList.js?v=b731cc94",
+	"/chunks/baseTable.js?v=b731cc94",
+	"/chunks/builder-controls.js?v=b731cc94",
+	"/chunks/builder.js?v=b731cc94",
+	"/chunks/category.js?v=b731cc94",
+	"/chunks/combobox.js?v=b731cc94",
+	"/chunks/connectivity.js?v=b731cc94",
+	"/chunks/core-foundation.js?v=b731cc94",
+	"/chunks/deferredOperations.js?v=b731cc94",
+	"/chunks/directUpload.js?v=b731cc94",
+	"/chunks/document.js?v=b731cc94",
+	"/chunks/documentHistory.js?v=b731cc94",
+	"/chunks/editor-dialogs.js?v=b731cc94",
+	"/chunks/editor.js?v=b731cc94",
+	"/chunks/entity-foundation.js?v=b731cc94",
+	"/chunks/fileInfo.js?v=b731cc94",
+	"/chunks/filePdfPreview.js?v=b731cc94",
+	"/chunks/filters.js?v=b731cc94",
+	"/chunks/form-complex.js?v=b731cc94",
+	"/chunks/form-sections.js?v=b731cc94",
+	"/chunks/forms.js?v=b731cc94",
+	"/chunks/foundation.js?v=b731cc94",
+	"/chunks/home-tools.js?v=b731cc94",
+	"/chunks/html.js?v=b731cc94",
+	"/chunks/index-foundation.js?v=b731cc94",
+	"/chunks/index-tools.js?v=b731cc94",
+	"/chunks/ingress.js?v=b731cc94",
+	"/chunks/location.js?v=b731cc94",
+	"/chunks/messageComposer.js?v=b731cc94",
+	"/chunks/modal.js?v=b731cc94",
+	"/chunks/notifications.js?v=b731cc94",
+	"/chunks/offline-replay.js?v=b731cc94",
+	"/chunks/offline.js?v=b731cc94",
+	"/chunks/offlineWork.js?v=b731cc94",
+	"/chunks/page-tools.js?v=b731cc94",
+	"/chunks/permissions.js?v=b731cc94",
+	"/chunks/polling.js?v=b731cc94",
+	"/chunks/project-tools.js?v=b731cc94",
+	"/chunks/submission.js?v=b731cc94",
+	"/chunks/sync.js?v=b731cc94",
+	"/chunks/task-tools.js?v=b731cc94",
+	"/chunks/ui-controls.js?v=b731cc94",
+	"/chunks/ui-resources.js?v=b731cc94",
+	"/chunks/uploads.js?v=b731cc94",
+	"/chunks/upstreamUnavailable.js?v=b731cc94",
+	"/chunks/user-tools.js?v=b731cc94",
+	"/chunks/userSettings.js?v=b731cc94",
+	"/chunks/views/admin.js?v=b731cc94",
+	"/chunks/views/analytics.js?v=b731cc94",
+	"/chunks/views/builder.js?v=b731cc94",
+	"/chunks/views/file.js?v=b731cc94",
+	"/chunks/views/help.js?v=b731cc94",
+	"/chunks/views/home.js?v=b731cc94",
+	"/chunks/views/index.js?v=b731cc94",
+	"/chunks/views/manual.js?v=b731cc94",
+	"/chunks/views/messages.js?v=b731cc94",
+	"/chunks/views/page.js?v=b731cc94",
+	"/chunks/views/project.js?v=b731cc94",
+	"/chunks/views/public.js?v=b731cc94",
+	"/chunks/views/report.js?v=b731cc94",
+	"/chunks/views/results.js?v=b731cc94",
+	"/chunks/views/user.js?v=b731cc94",
+	"/chunks/watcher.js?v=b731cc94"
 ];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
 const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
@@ -109,10 +109,6 @@ const TOKEN_REQUEST = {
 	headers: { "X-Lagniappe-Request": "true" },
 };
 
-/**
- * @testable false
- * @reason service-worker error reporting is best-effort diagnostics covered through focused tooling outside source traceability collection
- */
 function captureError(error, context = {}) {
 	if (typeof self.Sentry !== "undefined" && self.Sentry) {
 		if (error instanceof Error) {
@@ -123,11 +119,6 @@ function captureError(error, context = {}) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_activation_clears_only_application_owned_caches
- * @matrix cache : activation ownership service-worker
- */
 async function updateCaches() {
 	await Promise.all([caches.delete(CACHE), caches.delete(RESPONSE_CACHE)]);
 
@@ -135,14 +126,6 @@ async function updateCaches() {
 	await cache.add("/offline");
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_precache_static_assets_warms_configured_urls_and_ignores_failures
- * @tests tests_js/test_008_service_worker.mjs::test_precache_retries_transient_failures_and_preserves_cache_policy
- * @tests tests_js/test_008_service_worker.mjs::test_precache_reuses_cached_assets_without_reusing_another_build
- * @matrix cache : precache service-worker static-assets
- * @matrix cache : retry no-store
- */
 async function precacheStaticAssets() {
 	const cache = await caches.open(CACHE);
 	await Promise.allSettled(
@@ -160,12 +143,6 @@ async function precacheStaticAssets() {
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::handleStatic
- * @covered-by src/script/sw.template.mjs::precacheStaticAssets
- * @reason bounded static GET retries are exercised through serving and cache warming
- */
 async function fetchStaticAsset(request) {
 	let currentRequest = request;
 	for (let attempt = 0; ; attempt += 1) {
@@ -203,17 +180,7 @@ async function fetchStaticAsset(request) {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::checkForCacheInvalidation
- * @reason validate-user confirmation is exercised through the cache invalidation owner
- */
 const _validateUser = async (cacheConfirmation = {}) => {
-	/**
-	 * @testable false
-	 * @covered-by src/script/sw.template.mjs::_validateUser
-	 * @reason validation failures share one safe diagnostic shape
-	 */
 	const failed = (stage, status = null) => {
 		captureError(new Error("User validation acknowledgement failed."), {
 			context: "validate_user",
@@ -282,21 +249,10 @@ let _cacheGeneration = 0;
 const _cacheInvalidations = new Map();
 const _validateUserRequests = new Map();
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::checkForCacheInvalidation
- * @covered-by src/script/sw.template.mjs::handleCacheable
- * @reason invalidation header lookup is exercised through cache invalidation and cacheable request owners
- */
 function responseInvalidatesCache(response) {
 	return response.headers.get("X-Lagniappe-Invalidate-Cache");
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::checkForCacheInvalidation
- * @reason local cache clearing is exercised through the cache invalidation owner
- */
 async function clearClientCache(cacheRevision = null) {
 	if (!_cacheInvalidations.has(cacheRevision)) {
 		const cacheGeneration = _cacheGeneration + 1;
@@ -321,11 +277,6 @@ async function clearClientCache(cacheRevision = null) {
 	return _cacheInvalidations.get(cacheRevision);
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::checkForCacheInvalidation
- * @reason validate-user request coalescing is exercised through the cache invalidation owner
- */
 function validateUserOnce(cacheConfirmation) {
 	if (!cacheConfirmation.cacheCleared) return null;
 	const revision = cacheConfirmation.cacheRevision;
@@ -340,13 +291,6 @@ function validateUserOnce(cacheConfirmation) {
 	return _validateUserRequests.get(revision);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_cache_invalidation_confirmation_posts_after_local_clear
- * @tests tests_js/test_008_service_worker.mjs::test_cache_invalidation_requires_explicit_server_acknowledgement
- * @tests tests_js/test_008_service_worker.mjs::test_cache_acknowledgements_do_not_coalesce_different_revisions
- * @matrix cache : acknowledgement concurrency failure invalidation retry service-worker
- */
 async function checkForCacheInvalidation(response, options = {}) {
 	if (!responseInvalidatesCache(response)) return { invalidated: false };
 	const cacheRevision = response.headers.get("X-Lagniappe-Cache-Revision");
@@ -363,11 +307,6 @@ async function checkForCacheInvalidation(response, options = {}) {
 	};
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes
- * @matrix cache : etag query route-class service-worker sibling-invalidation
- */
 async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
 	if (storedETag && newETag && storedETag === newETag) return;
 	const shouldClear =
@@ -388,13 +327,6 @@ async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::handleUncacheableResponse
- * @covered-by src/script/sw.template.mjs::handleStatic
- * @covered-by src/script/sw.template.mjs::precacheStaticAssets
- * @reason response storage filtering is exercised through no-store, static, redirect, and precache owners
- */
 function responsePreventsStorage(response) {
 	if (responseInvalidatesCache(response)) return true;
 	if (response.redirected || response.type === "opaqueredirect") return true;
@@ -408,22 +340,10 @@ function responsePreventsStorage(response) {
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::handleUncacheableResponse
- * @covered-by src/script/sw.template.mjs::handleCacheable
- * @reason cache entry discard behavior is exercised through no-store and redirected cacheable responses
- */
 async function discardCachedResponse(cache, request) {
 	await cache.delete(request, { ignoreVary: true });
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_no_store_304_discards_cached_response
- * @tests tests_js/test_008_service_worker.mjs::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
- * @matrix cache : acknowledgement invalidation no-store service-worker
- */
 async function handleUncacheableResponse(
 	event,
 	cache,
@@ -447,12 +367,6 @@ async function handleUncacheableResponse(
 let _lastEvictionCheck = 0;
 const EVICTION_THROTTLE_MS = 60_000;
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_quota_eviction_is_throttled_and_bounded_to_oldest_entries
- * @tests tests_js/test_008_service_worker.mjs::test_quota_eviction_tolerates_unavailable_and_failed_estimates
- * @matrix cache : batch eviction failure quota service-worker throttle unavailable
- */
 async function maybeEvictForQuota() {
 	const now = Date.now();
 	if (now - _lastEvictionCheck < EVICTION_THROTTLE_MS) return;
@@ -487,11 +401,6 @@ let _connectivity = {
 	controller: "uncontrolled",
 };
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_worker_accepts_only_versioned_valid_connectivity_messages
- * @matrix browser-protocol connectivity : controller service-worker validation version
- */
 function receiveConnectivityMessage(data) {
 	if (
 		data?.protocol !== BROWSER_PROTOCOL.id ||
@@ -512,11 +421,6 @@ function receiveConnectivityMessage(data) {
 	return true;
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_worker_classifies_only_unmarked_upstream_html_failures
- * @matrix request-errors service-worker : application-error-marker classification upstream-unavailable
- */
 function isUpstreamUnavailableResponse(response) {
 	return Boolean(
 		response &&
@@ -526,11 +430,6 @@ function isUpstreamUnavailableResponse(response) {
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::notifyUpstreamUnavailable
- * @reason route privacy is asserted through the controlled-client message
- */
 function upstreamRouteClass(pathname) {
 	if (pathname === "/") return "root";
 	const segment = pathname.split("/").filter(Boolean)[0] || "root";
@@ -557,23 +456,12 @@ function upstreamRouteClass(pathname) {
 	return allowed.has(segment) ? segment : "other";
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::notifyUpstreamUnavailable
- * @covered-by src/script/sw.template.mjs::upstreamHeaders
- * @reason server sanitization is asserted through client messages and internal headers
- */
 function boundedServer(response) {
 	return String(response.headers.get("Server") || "")
 		.replace(/[^\x20-\x7E]/g, "")
 		.slice(0, 128);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_notifies_controlled_clients_with_bounded_state
- * @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable
- */
 async function notifyUpstreamUnavailable(
 	request,
 	response,
@@ -609,12 +497,6 @@ async function notifyUpstreamUnavailable(
 	for (const client of clients) client.postMessage?.(message);
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::markedStaleResponse
- * @covered-by src/script/sw.template.mjs::brandedUpstreamResponse
- * @reason internal markers are asserted through stale and branded response owners
- */
 function upstreamHeaders(
 	response,
 	{ stale = false, originalResponse = response } = {},
@@ -633,11 +515,6 @@ function upstreamHeaders(
 	return headers;
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_uses_marked_stale_cache_without_caching_5xx
- * @matrix cache request-errors service-worker : stale-cache upstream-unavailable
- */
 function markedStaleResponse(cached, upstream) {
 	return new Response(cached.body, {
 		status: cached.status,
@@ -649,12 +526,6 @@ function markedStaleResponse(cached, upstream) {
 	});
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_upstream_failure_without_cache_returns_branded_retryable_503
- * @tests tests_js/test_008_service_worker.mjs::test_mutation_upstream_failure_returns_uncertain_json_without_replay
- * @matrix request-errors service-worker : branded-response mutation no-replay retry upstream-unavailable
- */
 function brandedUpstreamResponse(request, upstream) {
 	const headers = upstreamHeaders(upstream);
 	if (request.mode === "navigate") {
@@ -695,12 +566,6 @@ function brandedUpstreamResponse(request, upstream) {
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::handleCacheable
- * @covered-by src/script/sw.template.mjs::handleRequest
- * @reason response selection and notification are exercised through fetch strategy owners
- */
 function handleUpstreamUnavailable(event, request, response, cached = null) {
 	event.waitUntil(
 		notifyUpstreamUnavailable(request, response, { stale: Boolean(cached) }),
@@ -728,12 +593,6 @@ self.addEventListener("activate", (event) => {
 	);
 });
 
-/**
- * @testable false
- * @covered-by src/script/sw.template.mjs::handleStatic
- * @covered-by src/script/sw.template.mjs::handleCacheable
- * @reason request classification is exercised through static and cacheable fetch owners
- */
 function isStatic(pathname) {
 	return (
 		pathname.startsWith("/fonts/") ||
@@ -768,17 +627,6 @@ self.addEventListener("fetch", (event) => {
 	event.respondWith(handleRequest(event, pathname));
 });
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_no_store_static_response_is_not_cached
- * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retries_transient_failures_and_caches_recovery
- * @tests tests_js/test_008_service_worker.mjs::test_static_asset_retry_budget_preserves_failure
- * @tests tests_js/test_008_service_worker.mjs::test_static_asset_does_not_retry_permanent_errors_or_mutations
- * @tests tests_js/test_008_service_worker.mjs::test_static_asset_abort_stops_retries
- * @tests tests_js/test_008_service_worker.mjs::test_static_asset_cache_hit_avoids_network
- * @matrix cache : no-store service-worker static-assets
- * @matrix cache : retry abort cache-hit
- */
 async function handleStatic(event) {
 	const cache = await caches.open(CACHE);
 	const cached = await cache.match(event.request, { ignoreVary: true });
@@ -808,11 +656,6 @@ async function handleStatic(event) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_navigation_failure_without_cached_offline_document_returns_503
- * @matrix cache offline : cache-miss fallback navigation service-worker
- */
 async function offlineFallback() {
 	const cache = await caches.open(CACHE);
 	const fallback = await cache.match("/offline");
@@ -820,12 +663,6 @@ async function offlineFallback() {
 	return new Response("Offline", { status: 503, statusText: "Offline" });
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_application_get_failure_returns_503_instead_of_offline_html
- * @tests tests_js/test_008_service_worker.mjs::test_navigation_failure_uses_offline_document
- * @matrix cache offline : ajax navigation response-shape service-worker
- */
 async function unavailableResponse(request) {
 	if (request.mode === "navigate") return offlineFallback();
 
@@ -851,13 +688,6 @@ async function unavailableResponse(request) {
 	});
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_dynamic_fetch_preserves_browser_validators_without_stored_etag
- * @tests tests_js/test_008_service_worker.mjs::test_conditional_fetch_preserves_original_request_redirect_mode
- * @tests tests_js/test_008_service_worker.mjs::test_304_response_with_invalidation_header_fetches_fresh_response
- * @matrix cache : browser-validators etag invalidation redirect-mode service-worker
- */
 function networkRequest(request, { etag, cache } = {}) {
 	const headers = new Headers(request.headers);
 	if (cache === "reload") {
@@ -874,11 +704,6 @@ function networkRequest(request, { etag, cache } = {}) {
 	return new Request(request, options);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_cached_304_marks_response_not_updated
- * @matrix cache request : conditional-response dom-refresh service-worker
- */
 function markResponseNotUpdated(response) {
 	const headers = new Headers(response.headers);
 	headers.set(UPDATED_HEADER, "false");
@@ -889,11 +714,6 @@ function markResponseNotUpdated(response) {
 	});
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_token_request_is_network_only_without_client_cache_directives
- * @matrix cache csrf : network-only service-worker token
- */
 async function handleNetworkOnlyGet(event) {
 	const { request } = event;
 	const cache = await caches.open(RESPONSE_CACHE);
@@ -914,18 +734,6 @@ async function handleNetworkOnlyGet(event) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_no_store_304_discards_cached_response
- * @tests tests_js/test_008_service_worker.mjs::test_cached_304_marks_response_not_updated
- * @tests tests_js/test_008_service_worker.mjs::test_304_response_with_invalidation_header_fetches_fresh_response
- * @tests tests_js/test_008_service_worker.mjs::test_redirect_response_with_invalidation_header_clears_cache
- * @tests tests_js/test_008_service_worker.mjs::test_redirected_responses_are_discarded_and_not_cached
- * @tests tests_js/test_008_service_worker.mjs::test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response
- * @tests tests_js/test_008_service_worker.mjs::test_invalidation_response_waits_for_acknowledgement_and_is_not_stored
- * @tests tests_js/test_008_service_worker.mjs::test_previously_stored_invalidation_is_discarded_before_reuse
- * @matrix cache : browser-validators cached-response invalidation network-validation no-store redirected-response service-worker
- */
 async function handleCacheable(event, pathname) {
 	const { request } = event;
 	const url = request.url;
@@ -1048,11 +856,6 @@ async function handleCacheable(event, pathname) {
 	return unavailableResponse(request);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_008_service_worker.mjs::test_mutation_failure_returns_json_503
- * @matrix offline request : mutation response-shape service-worker
- */
 async function handleRequest(event, pathname) {
 	const request = event.request;
 	try {
