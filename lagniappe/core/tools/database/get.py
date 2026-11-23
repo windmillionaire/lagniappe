@@ -143,7 +143,7 @@ def user(email: str) -> Entity | None:
 
 # @testable false
 # @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def users(start_cursor: str | None = None, hashes: QueryHashes | None = Restriction.UNRESTRICTED, group: Key | None = None, limit: int = 25) -> Results[Entity]:
+def users(start_cursor: str | None = None, hashes: QueryHashes | None = Restriction.UNRESTRICTED, group: Key | None = None, limit: int | None = 25) -> Results[Entity]:
     """Fetch a paginated list of users, optionally filtered by hashes or group."""
     if Restriction.is_denied(hashes):
         return _empty_results()

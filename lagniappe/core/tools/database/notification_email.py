@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from google.cloud.datastore import Entity as DatastoreEntity
 from google.cloud.datastore import Key
@@ -38,6 +38,14 @@ DELIVERY_EXCLUDED_FIELDS = (
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason key normalization is exercised through public capture APIs
+@overload
+def encoded_key(value: Key) -> str: ...
+
+
+@overload
+def encoded_key(value: Identifier) -> str | None: ...
+
+
 def encoded_key(value: Identifier) -> str | None:
     return urlsafe_key(getattr(value, "key", value))
 
