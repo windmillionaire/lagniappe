@@ -553,7 +553,7 @@ class StandardMutation[Target: Entity = Entity]:
 
     # @testable infrastructure
     def plan_save(
-        self, entity: Target, builder, *, reason: str, depends_on: Iterable[Entity] = ()
+        self, entity: Target, builder: MutationPlanBuilder, *, reason: str, depends_on: Iterable[Entity] = ()
     ) -> None:
         builder.standard_root(entity, reason=reason, depends_on=depends_on)
         builder.consume_intents(entity)

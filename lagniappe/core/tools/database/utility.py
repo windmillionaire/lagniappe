@@ -492,7 +492,7 @@ def site_fingerprints(
 
 
 # @testable infrastructure
-def cleanup_test_data():
+def cleanup_test_data() -> None:
     """Delete all test Datastore entities and Storage objects (testing only)."""
     if not CONFIG.testing:
         return

@@ -210,7 +210,7 @@ class Filter:
 
     # --- Convenience Methods ---
 
-    def all_of(self, **kwargs) -> Filter:
+    def all_of(self, **kwargs: object) -> Filter:
         """
         Add multiple equality filters from keyword arguments.
 
