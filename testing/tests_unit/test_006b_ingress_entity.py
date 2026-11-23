@@ -749,6 +749,10 @@ def test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields(
     assert "html-instructqr" not in assign.fields
     assert assign.ignore("col-ignore") == "on"
     assert assign.guess_field("col-website")["id"] == "link-externalij"
+    # A stored field can have a missing label. Other columns must still match.
+    mapping = assign.mapping
+    mapping.fields["name"]["label"] = None
+    assert mapping.guess_field("col-website")["id"] == "link-externalij"
     assert assign.column_map == {
         "col-name": {
             **assign.fields["name"],

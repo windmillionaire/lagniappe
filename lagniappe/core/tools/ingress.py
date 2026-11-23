@@ -266,7 +266,8 @@ class IngressMapping:
             (
                 field
                 for field in self.fields.values()
-                if field["label"].lower() == column.get("label", "").lower()
+                if (label := field["label"]) is not None
+                and label.lower() == column.get("label", "").lower()
             ),
             None,
         )
@@ -411,7 +412,7 @@ class IngressMapping:
             (
                 field
                 for field in self.file_options
-                if field["id"] == "name" or field.get("label", "").lower() == "name"
+                if field["id"] == "name" or (field.get("label") or "").lower() == "name"
             ),
             None,
         )
