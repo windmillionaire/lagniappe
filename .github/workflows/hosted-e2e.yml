@@ -493,6 +493,22 @@ jobs:
             exit 1
           fi
 
+      - name: Set up the minimum installer Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-installer.txt
+
+      - name: Exercise setup imports on Python 3.12
+        run: |
+          python -m venv "$RUNNER_TEMP/bootstrap"
+          "$RUNNER_TEMP/bootstrap/bin/python" -m pip install -r requirements.txt -r requirements-installer.txt
+          "$RUNNER_TEMP/bootstrap/bin/python" -m installer --help
+          "$RUNNER_TEMP/bootstrap/bin/python" -m testing.utility.installer_bootstrap_smoke
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
