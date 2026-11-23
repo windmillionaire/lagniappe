@@ -383,7 +383,7 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     command_arguments = [list(map(str, command)) for command, _options in commands]
     assert command_arguments[0] == ["npm", "run", "check"]
     assert command_arguments[1][1:] == ["-m", "ruff", "check", "."]
-    assert command_arguments[2][1:] == ["-m", "basedpyright"]
+    assert command_arguments[2][1:] == ["-m", "basedpyright", "--warnings"]
     assert command_arguments[3][2:] == [
         "test",
         "--no-test-evidence",
@@ -1829,6 +1829,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "validate-release-evidence" in quality_text
     assert "npm run check" in quality_text
     assert "ruff check ." in quality_text
+    assert "basedpyright --warnings" in quality_text
     assert "run.py traceability" not in quality_text
     assert "release-check --base" in quality_text
     assert "gcloud" not in quality_text

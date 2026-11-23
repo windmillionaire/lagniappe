@@ -467,7 +467,7 @@ def _run_create_preflight(source, *, base_ref=None):
     gates = (
         ("authored frontend source", [NPM_CLI, "run", "check"]),
         ("Python source", [python, "-m", "ruff", "check", "."]),
-        ("Python type checking", [python, "-m", "basedpyright"]),
+        ("Python type checking", [python, "-m", "basedpyright", "--warnings"]),
         (
             "tooling tests",
             [python, run_py, "test", "--no-test-evidence", "tooling"],
