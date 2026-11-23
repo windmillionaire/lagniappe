@@ -317,7 +317,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 },
             },
         )
-        ask_get = await _call(client, "get_plan", {"plan_id": ask["id"]})
+        ask_get = await _call(
+            client, "get_plan", {"plan_id": ask["id"], "include_proposal": True}
+        )
         result["ask"] = {
             "start": ask_start,
             "search": search,
@@ -396,7 +398,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "instructions": "Prepare the revised field guide Page for browser review.",
             },
         )
-        replacement_get = await _call(client, "get_plan", {"plan_id": create["id"]})
+        replacement_get = await _call(
+            client, "get_plan", {"plan_id": create["id"], "include_proposal": True}
+        )
         result["create"] = {
             "start": create_start,
             "selected_contract": create_contract_call,
@@ -451,7 +455,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             "start": update_start,
             "contract": update_contract,
             "receipt": update_receipt,
-            "get": await _call(client, "get_plan", {"plan_id": update["id"]}),
+            "get": await _call(
+                client, "get_plan", {"plan_id": update["id"], "include_proposal": True}
+            ),
         }
 
         organize_start = await _call(
