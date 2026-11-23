@@ -21,9 +21,9 @@ GENERIC_MESSAGE = "Generation failed. Please try again. "
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @matrix ai : project validation
-def validate_project(project_data):
+def validate_project(project_data: object) -> dict[str, object]:
     """Validate that generated project data has all required fields."""
-    if "project_name" not in project_data:
+    if not isinstance(project_data, dict) or "project_name" not in project_data:
         raise AIException(
             "Project data missing required field: project_name",
         )
@@ -52,7 +52,7 @@ def validate_project(project_data):
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
 # @matrix projects : ai-create ai-generated
-def generate_project(prompt):
+def generate_project(prompt: Prompt) -> dict[str, object]:
     """Generate and validate a project specification from a Prompt."""
     try:
         return ai_model.generate_content(prompt, validator=validate_project)
@@ -63,7 +63,7 @@ def generate_project(prompt):
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
 # @matrix ai : output-format prompt-builders
-def project_creation_prompt(user_description):
+def project_creation_prompt(user_description: str) -> Prompt:
     """Build the AI prompt for creating a project from a user description."""
     intro = """You are a project creation AI. Based on the user's description, create a comprehensive project specification with appropriate model tasks and forms for data collection."""
 

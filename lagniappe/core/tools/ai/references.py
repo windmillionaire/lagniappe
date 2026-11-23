@@ -4,6 +4,9 @@ import re
 from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from ..cache.details import CachedDetail
+    from ..files.html import SafeHTML
     from lagniappe.core.entities.entity import Entity
     from lagniappe.core.entities import Identifier
 
@@ -28,7 +31,7 @@ def stored_file_identifiers(entity: Entity) -> list[Identifier]:
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
 # @pairs ai-report:answer-only markdown:html-sanitization
-def render_ai_markdown(text):
+def render_ai_markdown(text: str) -> SafeHTML:
     """Render model Markdown after resolving known AI references for browser use."""
     return render_markdown(normalize_hash_references(text))
 
@@ -45,7 +48,7 @@ def hash_reference(entity: object) -> str | None:
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
 # @pairs ai:resource-inventory permissions:personal-page
-def personal_page_reference(user):
+def personal_page_reference(user: User) -> dict[str, object]:
     """Return the authenticated user's guaranteed editable Page reference."""
     page = user.page
     return {
@@ -62,16 +65,16 @@ def personal_page_reference(user):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
 # @matrix ai : batched-cache hash-reference normalization
 @overload
-def normalize_hash_references[V](value: dict[str, V], *, resolved_details=None) -> dict[str, V]: ...
+def normalize_hash_references[V](value: dict[str, V], *, resolved_details: dict[str, CachedDetail] | None = None) -> dict[str, V]: ...
 @overload
-def normalize_hash_references(value: str, *, resolved_details=None) -> str: ...
+def normalize_hash_references(value: str, *, resolved_details: dict[str, CachedDetail] | None = None) -> str: ...
 @overload
-def normalize_hash_references[V](value: list[V], *, resolved_details=None) -> list[V]: ...
+def normalize_hash_references[V](value: list[V], *, resolved_details: dict[str, CachedDetail] | None = None) -> list[V]: ...
 @overload
-def normalize_hash_references(value: object, *, resolved_details=None) -> object: ...
+def normalize_hash_references(value: object, *, resolved_details: dict[str, CachedDetail] | None = None) -> object: ...
 
 
-def normalize_hash_references(value: object, *, resolved_details=None) -> object:
+def normalize_hash_references(value: object, *, resolved_details: dict[str, CachedDetail] | None = None) -> object:
     """Replace known ``hash:...`` tokens with executable entity ids.
 
     The payload is scanned first so all hashes are resolved in one cache lookup.

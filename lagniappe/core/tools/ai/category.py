@@ -21,7 +21,7 @@ GENERIC_MESSAGE = "Generation failed. Please try again. "
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @matrix ai : category validation
-def validate_category(category_data):
+def validate_category(category_data: object) -> dict[str, object]:
     """Validate category output and normalize an omitted default form."""
     if not isinstance(category_data, dict) or not category_data.get("category_name"):
         raise exceptions.AIException(
@@ -46,7 +46,7 @@ def validate_category(category_data):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_generate_category_default_form_is_conservative
 # @matrix categories : ai-create ai-generated default-form
-def generate_category(prompt):
+def generate_category(prompt: Prompt) -> dict[str, object]:
     """Generate category data with an optional, conservatively chosen form."""
     # @testable false
     # @covered-by lagniappe/core/tools/ai/category.py::generate_category
@@ -73,7 +73,7 @@ def generate_category(prompt):
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
 # @matrix ai : output-format prompt-builders thinking
-def category_creation_prompt(user_description):
+def category_creation_prompt(user_description: str) -> Prompt:
     """Build the AI prompt for creating a category from a user description."""
     intro = """
 Based on the user's description, create a category. Include a default page form

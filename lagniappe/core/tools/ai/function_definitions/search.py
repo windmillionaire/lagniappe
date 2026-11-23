@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ...cache.details import SearchRecord
     from lagniappe.core.entities.user import User
 
 from google.genai import types
@@ -45,7 +46,7 @@ CANDIDATE_SEARCH_DESCRIPTION = (
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
 # @pair ai:search-url
-def entity_url(result):
+def entity_url(result: SearchRecord) -> str:
     entity_ref = result["id"]
     details = result.get("details")
     parent = result.get("parent")
@@ -69,7 +70,7 @@ def entity_url(result):
 # @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
 # @matrix ai : parent-hydration result-scrubbing
 # @pair ai:search-url
-def format_search_result(result):
+def format_search_result(result: SearchRecord) -> SearchRecord:
     formatted = dict(result)
     # Build browser links before projecting canonical IDs into tool references.
     formatted["url"] = entity_url(result)

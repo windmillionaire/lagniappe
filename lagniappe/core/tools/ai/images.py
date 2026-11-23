@@ -1,10 +1,21 @@
 """AI-powered image generation for pages."""
 
+from typing import TypedDict, Unpack
+from .core import GeneratedImage
+
+
+
 from ... import exceptions
 from .core import ai_model
 from .guidelines import IMAGE_PROMPT_RULES
 from .prompt import Prompt
 from .provider_policy import provider_error_message
+
+
+class ImagePromptOptions(TypedDict, total=False):
+    user_prompt: str
+    page_details: dict[str, object]
+
 
 GENERIC_MESSAGE = "Image generation failed."
 
@@ -55,7 +66,7 @@ def _choose_aspect_ratio(prompt):
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
 # @tests tests_unit/test_015_ai_tools.py::test_generate_ai_image_returns_clean_provider_message
 # @matrix ai pages : image-generate
-def generate_ai_image(prompt):
+def generate_ai_image(prompt: Prompt) -> GeneratedImage:
     """Generate an image from a Prompt and return a BytesIO buffer."""
     try:
         aspect_ratio = _choose_aspect_ratio(prompt)
@@ -69,7 +80,7 @@ def generate_ai_image(prompt):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_image_prompting_and_aspect_ratio_selection
 # @pair ai:image-prompt
-def page_image_generation_prompt(**kwargs):
+def page_image_generation_prompt(**kwargs: Unpack[ImagePromptOptions]) -> Prompt:
     """Build the AI prompt for generating an image from page context.
 
     Args:

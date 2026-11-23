@@ -13,7 +13,7 @@ MAX_DEPTH = 4
 # @testable false
 # @covered-by lagniappe/core/tools/ai/debug.py::ai_debug
 # @reason debug flag lookup is exercised only through guarded logging callers
-def enabled():
+def enabled() -> bool:
     """Return whether AI debug logging is enabled for this process."""
     return bool(getattr(CONFIG, "AI_DEBUG", False))
 
@@ -21,7 +21,7 @@ def enabled():
 # @testable false
 # @covered-by lagniappe/core/tools/ai/debug.py::ai_debug
 # @reason debug output routing is a local observability helper
-def debug_log(message):
+def debug_log(message: str) -> None:
     """Write one AI debug line to the configured sink."""
     path = getattr(CONFIG, "AI_DEBUG_LOG", None)
     if path:
@@ -36,7 +36,7 @@ def debug_log(message):
 
 # @testable infrastructure
 # @reason debug breadcrumb logging is intentionally behavior-neutral
-def ai_debug(event, **fields):
+def ai_debug(event: str, **fields: object) -> None:
     """Print a compact AI_DEBUG line when debug logging is enabled."""
     if not enabled():
         return

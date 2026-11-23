@@ -1,5 +1,10 @@
 """AI ingress for static task-form content authored as Markdown."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..files.html import SafeHTML
+
 from copy import deepcopy
 
 from lagniappe.core import exceptions
@@ -11,7 +16,7 @@ from .references import render_ai_markdown
 # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_html_calls_set_html_field
 # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_rejects_raw_or_invalid_static_content
 # @matrix form-schema html-field : ai-value markdown validation
-def prepare_static_form_element(element, *, form_type):
+def prepare_static_form_element(element: dict[str, object], *, form_type: str) -> tuple[dict[str, object], SafeHTML | None]:
     """Return a durable field plus optional rendered static HTML sidecar."""
     field = deepcopy(element)
     if "html" in field:

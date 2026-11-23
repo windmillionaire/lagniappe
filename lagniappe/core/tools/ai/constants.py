@@ -88,7 +88,7 @@ GEMINI_MIMETYPE_ALIASES = {
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_normalizes_textual_file_mimetypes_for_gemini
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_saves_missing_summaries
 # @matrix ai files : mimetype normalization
-def gemini_mimetype(mimetype):
+def gemini_mimetype(mimetype: object) -> str | None:
     """Return the provider-supported media type for a Lagniappe MIME type."""
     mimetype = str(mimetype or "").partition(";")[0].strip().lower()
     mimetype = GEMINI_MIMETYPE_ALIASES.get(mimetype, mimetype)

@@ -1,7 +1,7 @@
 """Function declaration and handler for listing workspace model resources."""
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from lagniappe.core.entities.user import User
@@ -90,17 +90,24 @@ def execute_list_workspace_resources(args: Mapping[str, object], user: User) -> 
                     return {"error": "Requested workspace scope is unavailable"}
                 selected[collection] = [
                     item
-                    for item in inventory[collection]
+                    for item in (inventory["categories"] if collection == "categories" else inventory["projects"])
                     if item["hash"] == hash_reference(entity)
                 ]
         return selected
     return inventory
 
 
+class WorkspaceResourceInventory(TypedDict):
+    personal_page: dict[str, object]
+    categories: list[dict[str, object]]
+    projects: list[dict[str, object]]
+    standalone_forms: list[dict[str, str | None]]
+
+
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
 # @matrix ai : categories forms projects resource-inventory
-def build_workspace_resource_inventory(user):
+def build_workspace_resource_inventory(user: User) -> WorkspaceResourceInventory:
     """Build a compact inventory of viewable model resources for an AI prompt."""
     models = [
         entity

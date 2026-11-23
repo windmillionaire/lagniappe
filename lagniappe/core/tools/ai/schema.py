@@ -1,5 +1,7 @@
 """AI-powered form schema generation from natural language descriptions."""
 
+from collections.abc import Callable
+
 from ... import exceptions
 
 from .core import ai_model
@@ -21,7 +23,7 @@ GENERIC_MESSAGE = "Generation failed. Please try again. "
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @matrix ai : schema validation
-def validate_schema(schema):
+def validate_schema(schema: object) -> list[dict[str, object]]:
     validated_schema = []
     """Validate that each generated schema element has a type and id."""
     if not isinstance(schema, list):
@@ -44,7 +46,7 @@ def _valid_schema_attribute(value):
 # @covered-by lagniappe/core/tools/ai/schema.py::validate_schema
 # @covered-by lagniappe/core/tools/ai/schema.py::form_generation_prompt
 # @reason provider-call wrapper; deterministic schema validation and prompt construction are tracked separately
-def generate_schema(prompt, *, validator=validate_schema):
+def generate_schema(prompt: Prompt, *, validator: Callable[[object], list[dict[str, object]]] = validate_schema) -> list[dict[str, object]]:
     """Generate and validate a form schema from a Prompt."""
     try:
         return ai_model.generate_content(prompt, validator=validator)
@@ -55,7 +57,7 @@ def generate_schema(prompt, *, validator=validate_schema):
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
 # @matrix ai : output-format prompt-builders thinking
-def form_generation_prompt(form_type, description=None, *, draft=None):
+def form_generation_prompt(form_type: str, description: str | None = None, *, draft: dict[str, object] | None = None) -> Prompt:
     """Build the AI prompt for generating a page or task form schema.
 
     Args:

@@ -1,5 +1,9 @@
 """AI-powered parsing of natural language scheduling descriptions."""
 
+from typing import TypedDict, Unpack
+
+
+
 from ...exceptions import AIException, capture
 
 from .core import ai_model
@@ -19,6 +23,12 @@ from .guidelines import (
 from .prompt import Prompt
 
 
+class SchedulePromptOptions(TypedDict, total=False):
+    mode: str
+    user_prompt: str
+
+
+
 VALID_TYPES = [
     "specific_day",
     "ordinal_weekday",
@@ -33,7 +43,7 @@ PERIODIC_REQUIRED_FIELDS = ["unit", "interval", "text"]
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
 # @matrix ai : schedule validation
-def validate_schedule(schedule_data, mode):
+def validate_schedule(schedule_data: object, mode: str | None) -> dict[str, object]:
     """Validate generated schedule data against the expected mode schema.
 
     Args:
@@ -43,7 +53,7 @@ def validate_schedule(schedule_data, mode):
     Returns:
         schedule_data
     """
-    if all(value is None for value in schedule_data.values()):
+    if not isinstance(schedule_data, dict) or all(value is None for value in schedule_data.values()):
         raise AIException("Could not understand user request")
 
     if mode == "periodic":
@@ -96,7 +106,7 @@ def validate_schedule(schedule_data, mode):
 # @covered-by lagniappe/core/tools/ai/dates.py::validate_schedule
 # @covered-by lagniappe/core/tools/ai/dates.py::scheduling_prompt
 # @reason provider-call wrapper; natural-language model quality belongs in AI E2E/manual provider validation
-def generate_schedule(prompt):
+def generate_schedule(prompt: Prompt) -> dict[str, object]:
     """Generate and validate a schedule from a Prompt."""
     schedule_data = None
     try:
@@ -113,7 +123,7 @@ def generate_schedule(prompt):
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
 # @matrix ai : output-format prompt-builders thinking
-def scheduling_prompt(**kwargs):
+def scheduling_prompt(**kwargs: Unpack[SchedulePromptOptions]) -> Prompt:
     """Build the AI prompt for parsing natural language scheduling descriptions"""
 
     prompt = Prompt(type="scheduling")

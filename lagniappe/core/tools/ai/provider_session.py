@@ -82,7 +82,7 @@ class ProviderSession:
                     task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
 
-    def close(self):
+    def close(self) -> None:
         try:
             if self.client is not None:
                 try:
