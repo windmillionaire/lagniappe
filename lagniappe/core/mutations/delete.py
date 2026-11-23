@@ -657,7 +657,7 @@ def plan_delete(
 
             source = registry.fetch_one(entity.key, request=Fetch.root())
             if source is not None:
-                history = archive_form_generation(source)
+                history = archive_form_generation(cast("Form", source))
                 history._form_save_guard = (source.key, ExactEntityState(dict(source.db)))
                 builder.plan_standard(history, reason="deleted-form-generation")
         builder.delete(entity, reason="delete-cascade")

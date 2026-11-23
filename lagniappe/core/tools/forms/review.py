@@ -1,6 +1,6 @@
 """Snapshot, merge, and review contracts for concurrently editable autofill."""
 import json
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from copy import deepcopy
 from typing import TYPE_CHECKING, TypedDict, cast
 
@@ -77,7 +77,7 @@ def launch_snapshot(
     elif submission is not None:
         prompt["submission"] = deepcopy(submission)
     if target_context:
-        prompt["target"].update(deepcopy(target_context))
+        prompt.setdefault("target", {}).update(deepcopy(target_context))
     if review_context:
         prompt["review_context"] = deepcopy(review_context)
     snapshot = {
@@ -108,7 +108,7 @@ def snapshot_matches_form(snapshot: Mapping[str, object], target: Page | Task) -
 # @testable true
 # @pair ai:autofill
 def prepare_proposal(
-    schema: Iterable[FieldDefinition],
+    schema: Sequence[FieldDefinition],
     submission: Mapping[str, object],
     target: Page | Task,
     actor: User,
