@@ -1,9 +1,20 @@
 """Persisted public-page visibility and search-preview settings."""
 
+from typing import TypedDict
+
 from ..definitions import MutationIntent
 from ..exceptions import ValidationError
 from .base_db import DBProperty
 from .common_entity import IsPublic
+
+
+class PageSettings(TypedDict):
+    version: int
+    allow_indexing: bool
+    title: str | None
+    description: str | None
+    preview_image_asset: str | None
+    directory_category: str | None
 
 
 PUBLIC_PAGE_SETTINGS_VERSION = 2
@@ -14,7 +25,7 @@ PUBLIC_DESCRIPTION_LIMIT = 300
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_public_settings_normalize_and_invalidate_discovery
 # @matrix page public-directory sitemap : category metadata settings-validation
-def normalize_public_settings(value=None):
+def normalize_public_settings(value: object = None) -> PageSettings:
     """Return the versioned canonical per-page public settings."""
     if value is None:
         incoming = {}
@@ -30,7 +41,7 @@ def normalize_public_settings(value=None):
     # @testable false
     # @covered-by lagniappe/core/properties/page_public.py::normalize_public_settings
     # @reason bounded text normalization is exercised through the public normalizer
-    def optional_text(name, limit, label):
+    def optional_text(name: str, limit: int, label: str) -> str | None:
         raw = incoming.get(name)
         if raw is None:
             return None
@@ -73,10 +84,14 @@ def normalize_public_settings(value=None):
 class PageIsPublic(IsPublic):
     """Page visibility with public-discovery invalidation registration."""
 
-    @IsPublic.value.setter
-    def value(self, value):
-        previous = IsPublic.value.fget(self)
-        IsPublic.value.fset(self, value)
+    @property
+    def value(self) -> bool:
+        return super().value
+
+    @value.setter
+    def value(self, value: bool) -> None:
+        previous = super().value
+        self._write_public(value)
         if value != previous:
             self.entity.add_mutation_intents(
                 MutationIntent.invalidate_public_discovery(
@@ -88,21 +103,21 @@ class PageIsPublic(IsPublic):
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_public_settings_normalize_and_invalidate_discovery
 # @matrix page public-directory sitemap : category metadata settings-validation
-class PublicSettings(DBProperty):
+class PublicSettings(DBProperty[PageSettings]):
     """Versioned discovery and social metadata for one public page."""
 
     _id = "public_settings"
     json = True
 
     @property
-    def value(self):
-        return normalize_public_settings(DBProperty._read_db_value(self))
+    def value(self) -> PageSettings:
+        return normalize_public_settings(self._read_db_value())
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         previous = self.value
         normalized = normalize_public_settings(value)
-        DBProperty._write_db_value(self, normalized)
+        self._write_db_value(normalized)
         if (
             normalized["allow_indexing"] != previous["allow_indexing"]
             or normalized["directory_category"] != previous["directory_category"]

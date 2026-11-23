@@ -633,6 +633,9 @@ class IsPublic(FilterMixin, DBProperty[bool, "Entity", bool]):
 
     @value.setter
     def value(self, value: bool) -> None:
+        self._write_public(value)
+
+    def _write_public(self, value: bool) -> None:
         if not isinstance(value, bool):
             raise TypeError("public must be a boolean")
 
