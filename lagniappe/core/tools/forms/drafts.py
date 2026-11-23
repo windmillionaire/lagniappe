@@ -1,32 +1,63 @@
 """Draft validation and guarded publication of versioned Form definitions."""
-
-from copy import deepcopy
 import hashlib
 import json
-from typing import cast
 import re
+from collections.abc import Callable, Mapping
+from copy import deepcopy
+from typing import TYPE_CHECKING, TypedDict, cast
 from uuid import uuid4
 
-from google.cloud import datastore
 from bs4 import BeautifulSoup
-from config.form_schema import normalize_form_schema as canonicalize_schema
+from google.cloud import datastore
 
+from config.form_schema import normalize_form_schema as canonicalize_schema
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, MutationOperation
-from lagniappe.core.definitions.file_consumers import FileConsumer, enforce_file_consumer
+from lagniappe.core.definitions.file_consumers import (
+    FileConsumer,
+    enforce_file_consumer,
+)
 from lagniappe.core.definitions.identifiers import short_hash
 from lagniappe.core.entities import Entities
+from lagniappe.core.properties.form import requires_submission_conversion
 from lagniappe.core.tools.database import assets as storage_assets
-from lagniappe.core.tools.database.assets import cleanup_rejected_attempt, record_attempt_asset
+from lagniappe.core.tools.database.assets import (
+    cleanup_rejected_attempt,
+    record_attempt_asset,
+)
 from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.utility import ExactEntityState
 from lagniappe.core.tools.files.html import sanitize_form_content_html
-from lagniappe.core.properties.form import requires_submission_conversion
 
-from .contracts import PENDING, json_value
+from .contracts import FormPublication, pending_change, persisted_key
+
+if TYPE_CHECKING:
+    from ...definitions.asset import AssetUpload, ImageAsset
+    from ...entities.form import Form
+    from ...entities.history import FormHistory
+    from ...entities.user import User
+    from ...mutations.base import MutationPlanBuilder
+    from ...properties.base_schema import FieldDefinition
+    from ..database.assets import AttemptOwner
 
 CONTENT_VERSION = 1
 IMAGE_ID = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
+
+
+class DraftImage(TypedDict):
+    field_id: str
+    file: AssetUpload | Callable[[], AssetUpload]
+
+
+class BuilderDraft(TypedDict):
+    name: str
+    schema: list[FieldDefinition]
+    form_type: str | None
+    html_fields: dict[str, str]
+    baseline: str
+
+
+type DraftImages = Mapping[str, DraftImage]
 
 
 # @testable infrastructure
@@ -38,7 +69,7 @@ class FormDraftConflict(exceptions.ValidationError):
 # @covered-by lagniappe/core/tools/forms/drafts.py::builder_draft
 # @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @reason canonical digest helper owned by draft revision and receipt contracts
-def _digest(value):
+def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
         default=str,
@@ -54,7 +85,9 @@ def _field_records(field: dict[str, object], name: str) -> list[dict[str, object
 # @tests tests_unit/test_004f_form_drafts.py::test_draft_schema_rejects_collisions_and_broken_conditions
 # @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
 # @matrix form-schema : validation identity conditions
-def validate_draft_schema(schema, form_type):
+def validate_draft_schema(
+    schema: object, form_type: str | None
+) -> list[FieldDefinition]:
     """Validate a complete draft without dropping malformed definitions."""
     if form_type not in {"page", "task"}:
         raise exceptions.ValidationError("Unknown form type.")
@@ -97,7 +130,9 @@ def validate_draft_schema(schema, form_type):
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
 # @matrix form-schema : identity migration-required save-guard
-def validate_compatible_schema(previous, proposed, form_type=None):
+def validate_compatible_schema(
+    previous: object, proposed: object, form_type: str | None = None
+) -> list[FieldDefinition]:
     """Require the guarded form-change workflow for representation changes."""
     kind = form_type or "task"
     old = canonicalize_schema(previous or [], form_type=kind)
@@ -114,14 +149,14 @@ def validate_compatible_schema(previous, proposed, form_type=None):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/drafts.py::builder_draft
 # @reason HTML field enumeration is part of the complete builder projection
-def _html_ids(form):
-    return {field["id"] for field in form.schema if field.get("type") == "html"}
+def _html_ids(form: Form) -> set[str]:
+    return {cast(str, field["id"]) for field in form.schema if field.get("type") == "html"}
 
 
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_builder_draft_and_staged_html_are_read_only
 # @matrix forms html-field : draft baseline no-write
-def builder_draft(form):
+def builder_draft(form: Form) -> BuilderDraft:
     """Return one complete read-only builder baseline, including static content."""
     html = {
         field_id: str(sanitize_form_content_html(form.get_html_field(field_id) or "", form, field_id))
@@ -143,7 +178,9 @@ def builder_draft(form):
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
 # @matrix form-schema html-field : history generation immutable-assets
-def archive_form_generation(source, *, attempt_owner=None):
+def archive_form_generation(
+    source: Form, *, attempt_owner: AttemptOwner | None = None
+) -> FormHistory:
     """Preserve a superseded Form and its private content before replacing it."""
     history = Entities.FORM_HISTORY.create(source, source.generation)
     owner = attempt_owner if attempt_owner is not None else history
@@ -155,6 +192,8 @@ def archive_form_generation(source, *, attempt_owner=None):
             if name not in html_ids and not is_image:
                 continue
             asset = source.get_asset(name)
+            if asset is None:
+                raise exceptions.ValidationError("Could not preserve the Form's previous content.")
             destination = f"{history.hash}_{name}_{uuid4().hex}.{asset.extension}"
             blob = storage_assets.copy_file(
                 asset.path, asset.visibility.value, destination, "private",
@@ -168,9 +207,9 @@ def archive_form_generation(source, *, attempt_owner=None):
             if getattr(blob, "generation", None) is not None:
                 copied["generation"] = str(blob.generation)
             history.assets[name] = copied
-            record_attempt_asset(owner, copied)
+            record_attempt_asset(owner, dict(copied))
             if definition.get("type") == "image":
-                source_urls[name] = asset.url
+                source_urls[name] = cast("ImageAsset", asset).url
     except Exception:
         cleanup_rejected_attempt(owner)
         raise
@@ -189,9 +228,10 @@ def archive_form_generation(source, *, attempt_owner=None):
 # @matrix html-field : isolated-assets cleanup
 # @matrix permissions cache : change-detection retry new-form content-only no-queue
 # @pair mutations:rejected-save
-def prepare_form_publication(form, builder):
+def prepare_form_publication(form: Form, builder: MutationPlanBuilder) -> None:
     """Compare with the saved Form and publish staged content at the save boundary."""
-    source = builder.entities.fetch_one(form.key, request=Fetch.root())
+    assert builder.entities is not None
+    source = cast("Form | None", builder.entities.fetch_one(form.key, request=Fetch.root()))
     prior_guard = getattr(form, "_form_save_guard", None)
     if prior_guard is not None:
         expected = prior_guard[1]
@@ -203,7 +243,7 @@ def prepare_form_publication(form, builder):
             raise exceptions.MutationConflict("This Form changed before saving; reload and retry.")
         if source.form_type != form.form_type:
             raise exceptions.ValidationError("A saved Form's type cannot be changed.")
-        change = json_value(source.db, PENDING)
+        change = pending_change(source.db)
         if change and getattr(form, "_form_change_publication", None) == change["id"]:
             if form.schema != change["target"]["schema"] or not change["applied"]:
                 raise exceptions.ValidationError("The pending Form change does not match its publication.")
@@ -228,7 +268,7 @@ def prepare_form_publication(form, builder):
         form._permission_sources_changed = True
 
     previous_generation = source.generation if source else 0
-    changed_generation = bool(source) and requires_submission_conversion(source.schema, form.schema)
+    changed_generation = source is not None and requires_submission_conversion(source.schema, form.schema)
     form.generation = previous_generation + 1 if changed_generation else previous_generation
     if not getattr(form, "_form_change_publication", None):
         stage_form_content(form)
@@ -236,12 +276,14 @@ def prepare_form_publication(form, builder):
     # Ordinary saves are compatible. A generation change is published only
     # after the guarded change workflow has converted the affected values.
     if changed_generation:
+        assert source is not None
         history = archive_form_generation(source, attempt_owner=form)
         builder.plan_standard(history, reason="form-generation-history")
     if source is not None:
         for name, definition in source.assets.items():
             if definition.get("path") != (form.assets.get(name) or {}).get("path"):
                 asset = source.get_asset(name)
+                assert asset is not None
                 builder.delete_blob(asset.path, asset.visibility.value, reason="replaced-form-content")
     previous_version = form.version
     form.properties.version.update()
@@ -253,7 +295,7 @@ def prepare_form_publication(form, builder):
 # @covered-by lagniappe/core/tools/forms/drafts.py::prepare_form_publication
 # @covered-by lagniappe/core/tools/forms/changes.py::start_change
 # @reason explicit Save stages isolated content for immediate or deferred publication
-def stage_form_content(form):
+def stage_form_content(form: Form) -> None:
     for field_id, content in getattr(form, "_pending_html", {}).items():
         if field_id not in _html_ids(form):
             raise exceptions.ValidationError("Static content must belong to a draft HTML field.")
@@ -262,7 +304,7 @@ def stage_form_content(form):
             previous_path = (form.assets.get(field_id) or {}).get("path")
             asset = form.save_asset(content, field_id, "html", isolated=True)
             if asset and asset.path != previous_path:
-                record_attempt_asset(form, asset.definition)
+                record_attempt_asset(form, dict(asset.definition))
         else:
             form.assets.pop(field_id, None)
             form.db["assets"] = json.dumps(form.assets)
@@ -271,9 +313,11 @@ def stage_form_content(form):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @reason save response projection is shared by accepted requests and their receipts
-def _saved_response(form, image_urls, *, post_commit_complete=True):
-    accepted = builder_draft(form)
-    baseline = accepted.pop("baseline")
+def _saved_response(
+    form: Form, image_urls: Mapping[str, str], *, post_commit_complete: bool = True
+) -> FormPublication:
+    accepted = dict(builder_draft(form))
+    baseline = cast(str, accepted.pop("baseline"))
     return {"draft": accepted, "baseline": baseline, "image_urls": image_urls,
             "post_commit_complete": post_commit_complete}
 
@@ -282,7 +326,7 @@ def _saved_response(form, image_urls, *, post_commit_complete=True):
 # @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason exact draft image references are part of draft validation
-def _validate_content(schema, html, images):
+def _validate_content(schema: list[FieldDefinition], html: object, images: DraftImages):
     html_ids = {field["id"] for field in schema if field["type"] == "html"}
     if not isinstance(html, dict) or set(html) != html_ids or any(not isinstance(value, str) for value in html.values()):
         raise exceptions.ValidationError("The draft must include content for every HTML field.")
@@ -304,11 +348,11 @@ def _validate_content(schema, html, images):
 # @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason exact image URL replacement is owned by publication
-def _rewrite_images(content, replacements):
+def _rewrite_images(content: str, replacements: Mapping[str, str]) -> str:
     soup = BeautifulSoup(content, "html.parser")
     for image in soup.find_all("img"):
         source = image.get("src")
-        if source in replacements:
+        if isinstance(source, str) and source in replacements:
             image["src"] = replacements[source]
     return str(soup)
 
@@ -317,7 +361,9 @@ def _rewrite_images(content, replacements):
 # @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason private attempt assets are prepared only after full draft validation
-def _stage_content(form, html, images):
+def _stage_content(
+    form: Form, html: dict[str, str], images: DraftImages
+) -> dict[str, str]:
     image_urls = {}
     for image_id, image in images.items():
         source = image["file"]() if callable(image["file"]) else image["file"]
@@ -326,7 +372,7 @@ def _stage_content(form, html, images):
         asset = form.save_asset(source, asset_name, "image")
         if asset is None:
             raise exceptions.ValidationError("A draft image could not be stored.")
-        record_attempt_asset(form, asset.definition)
+        record_attempt_asset(form, dict(asset.definition))
         image_urls[f"draft-image:{image_id}"] = asset.url
     for field_id, content in html.items():
         form.set_html_field(field_id, _rewrite_images(content, image_urls))
@@ -336,12 +382,16 @@ def _stage_content(form, html, images):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason copying source images is part of independent draft publication
-def _stage_copy_content(copied, source, html, images):
+def _stage_copy_content(
+    copied: Form, source: Form, html: dict[str, str], images: DraftImages
+) -> dict[str, str]:
     replacements = {}
     for asset_name, definition in source.assets.items():
         if definition.get("type") != "image" or not any(asset_name.startswith(f"image_{field_id}_") for field_id in html):
             continue
         asset = source.get_asset(asset_name)
+        if asset is None:
+            raise exceptions.ValidationError("The Form's images could not be copied.")
         destination = f"{copied.hash}_{uuid4().hex}_{asset_name}.{asset.extension}"
         blob = storage_assets.copy_file(asset.path, asset.visibility.value, destination, "private",
             **({"source_generation": asset.generation} if asset.generation else {}))
@@ -353,8 +403,11 @@ def _stage_copy_content(copied, source, html, images):
         if getattr(blob, "generation", None) is not None:
             stored["generation"] = str(blob.generation)
         copied.assets[asset_name] = stored
-        record_attempt_asset(copied, stored)
-        replacements[asset.url] = copied.get_asset(asset_name).url
+        record_attempt_asset(copied, dict(stored))
+        destination_asset = cast("ImageAsset | None", copied.get_asset(asset_name))
+        if destination_asset is None:
+            raise exceptions.ValidationError("The Form's images could not be copied.")
+        replacements[cast("ImageAsset", asset).url] = destination_asset.url
     copied.db["assets"] = json.dumps(copied.assets)
     html = {field_id: _rewrite_images(content, replacements) for field_id, content in html.items()}
     return _stage_content(copied, html, images)
@@ -367,7 +420,16 @@ def _stage_copy_content(copied, source, html, images):
 # @matrix forms : draft save-receipt conflict publication
 # @matrix html-field : upload publication
 # @matrix mutations : conflict rejected-save ambiguous-commit
-def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retry=True):
+def save_form_draft(
+    form: Form,
+    draft: Mapping[str, object],
+    baseline: str,
+    save_id: str,
+    actor: User,
+    *,
+    images: DraftImages | None = None,
+    _retry: bool = True,
+) -> FormPublication:
     """Publish one accepted draft; retries are recognized before consuming uploads."""
     # Keep the persistence entry point out of mutation-registry initialization.
     from lagniappe.core.mutations import execute_mutation, plan_mutation
@@ -377,18 +439,19 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     if not isinstance(draft, dict):
         raise exceptions.ValidationError("A complete Form draft is required.")
     payload_digest = _digest(draft)
-    current = Entities.fetch_one(form.key, request=Fetch.direct())
+    current = cast("Form | None", Entities.fetch_one(form.key, request=Fetch.direct()))
     if current is None or not current.allowed(Action.EDIT, user=actor):
         raise exceptions.ValidationError("This Form is unavailable or no longer editable.")
     receipt = current.db.get("form_draft_receipt") or {}
     if isinstance(receipt, str):
         receipt = json.loads(receipt)
+    receipt = cast(dict[str, object], receipt)
     if receipt.get("id") == save_id:
         if receipt.get("digest") != payload_digest:
             raise FormDraftConflict("This Save identity was already used for another draft.")
         if receipt.get("baseline") != builder_draft(current)["baseline"]:
             raise FormDraftConflict("The Form changed after this Save. Reload before reconciling your draft.")
-        return _saved_response(current, receipt.get("image_urls") or {})
+        return _saved_response(current, cast(dict[str, str], receipt.get("image_urls") or {}))
     if not isinstance(baseline, str) or builder_draft(current)["baseline"] != baseline:
         raise FormDraftConflict("This Form changed in another session. Your draft is preserved; reload to reconcile it.")
     if draft.get("form_type", current.form_type) != current.form_type:
@@ -397,7 +460,7 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     if not isinstance(name, str) or not name.strip():
         raise exceptions.ValidationError("Please enter a Form name.")
     from .changes import start_change, change_response
-    pending = json_value(current.db, PENDING)
+    pending = pending_change(current.db)
     if pending:
         if pending["id"] == save_id and pending["digest"] == payload_digest:
             return change_response(current, actor)
@@ -408,6 +471,7 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
     html = draft.get("html_fields")
     images = images or {}
     _validate_content(schema, html, images)
+    html = cast(dict[str, str], html)
 
     current._form_save_guard = (current.key, ExactEntityState(dict(current.db)))
     current.name = name.strip()
@@ -440,21 +504,31 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_copy_draft_owns_content_and_is_idempotent_without_saving_source
 # @matrix forms html-field : copy draft immutable-assets save-receipt
-def copy_form_draft(source, draft, baseline, save_id, actor, *, images=None):
+def copy_form_draft(
+    source: Form,
+    draft: Mapping[str, object],
+    baseline: str,
+    save_id: str,
+    actor: User,
+    *,
+    images: DraftImages | None = None,
+) -> FormPublication:
     """Copy the complete draft into an independent Form without saving its source."""
     # Keep the persistence entry point out of mutation-registry initialization.
     from lagniappe.core.mutations import execute_mutation, plan_mutation
 
     if not isinstance(save_id, str) or not IMAGE_ID.fullmatch(save_id) or not isinstance(draft, dict):
         raise exceptions.ValidationError("A complete draft and valid Copy request identity are required.")
-    source = Entities.fetch_one(source.key, request=Fetch.direct())
-    if source is None or not source.allowed(Action.VIEW, user=actor):
+    loaded = cast("Form | None", Entities.fetch_one(source.key, request=Fetch.direct()))
+    if loaded is None or not loaded.allowed(Action.VIEW, user=actor):
         raise exceptions.ValidationError("The source Form is unavailable.")
+    source = loaded
+    source_key = persisted_key(source)
     identity = _digest({"source": source.urlsafe_key, "actor": str(getattr(actor, "key", None)), "id": save_id})
     key = datastore.Key(KINDS.models.value, "form-copy-" + identity,
-                        project=source.key.project, namespace=source.key.namespace)
+                        project=source_key.project, namespace=source_key.namespace)
     digest = _digest(draft)
-    existing = Entities.fetch_one(key, request=Fetch.direct())
+    existing = cast("Form | None", Entities.fetch_one(key, request=Fetch.direct()))
     if existing is not None:
         encoded = existing.db.get("form_draft_receipt") or "{}"
         if not isinstance(encoded, str):
@@ -474,6 +548,7 @@ def copy_form_draft(source, draft, baseline, save_id, actor, *, images=None):
     html = deepcopy(draft.get("html_fields"))
     images = images or {}
     _validate_content(schema, html, images)
+    html = cast(dict[str, str], html)
 
     row = datastore.Entity(key=key)
     row.update({"type": "form", "form_type": source.form_type,
@@ -494,7 +569,7 @@ def copy_form_draft(source, draft, baseline, save_id, actor, *, images=None):
         outcome = execute_mutation(plan)
     except exceptions.MutationConflict as error:
         cleanup_rejected_attempt(copied)
-        existing = Entities.fetch_one(key, request=Fetch.direct())
+        existing = cast("Form | None", Entities.fetch_one(key, request=Fetch.direct()))
         if existing is not None:
             return copy_form_draft(source, draft, baseline, save_id, actor, images=images)
         raise FormDraftConflict("The source Form changed while copying. Your draft is preserved.") from error

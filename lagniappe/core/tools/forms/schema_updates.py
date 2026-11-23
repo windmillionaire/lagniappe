@@ -1,8 +1,9 @@
 """Read-only schema operations and complete, permission-checked migration impact."""
-
-from copy import deepcopy
 import hashlib
 import json
+from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities
@@ -10,6 +11,45 @@ from ...exceptions import ValidationError
 from ...properties.schema import SchemaValidationError
 from . import conversions, drafts, population
 from .contracts import json_value, needs_ai_value
+
+if TYPE_CHECKING:
+    from ...entities.form import Form
+    from ...entities.page import Page
+    from ...entities.task import Task
+    from ...entities.user import User
+    from ...properties.base_schema import FieldDefinition
+
+
+class AffectedField(TypedDict):
+    schema_id: str
+    title: str
+    rule: conversions.Rule
+    reason: str
+    source_fingerprint: str
+    value: NotRequired[object]
+    before: NotRequired[object]
+    after: NotRequired[object]
+    clears: NotRequired[bool]
+
+
+class AffectedInstance(TypedDict):
+    id: str
+    kind: str
+    fields: list[AffectedField]
+
+
+class MigrationScope(TypedDict):
+    scope_fingerprint: str
+    instances: list[AffectedInstance]
+    total: int
+
+
+class PreparedCandidate(TypedDict):
+    entity: str
+    schema_id: str
+    source_fingerprint: str
+    value: NotRequired[object]
+    unresolved_reason: NotRequired[str]
 
 
 RESTRICTED_MESSAGE = (
@@ -51,7 +91,9 @@ class RestrictedFormChange(ValidationError):
 # @testable true
 # @tests tests_unit/test_004l_form_schema_updates.py::test_operations_preserve_identity_and_validate_final_schema
 # @matrix form-migration : schema-operations stable-identity validation
-def apply_operations(schema, operations, form_type):
+def apply_operations(
+    schema: list[FieldDefinition], operations: object, form_type: str | None
+) -> list[FieldDefinition]:
     """Apply exact-ID edits on a detached schema, then validate the whole result."""
     if not isinstance(operations, list) or not operations:
         raise ValidationError("Schema updates require at least one operation.")
@@ -111,7 +153,7 @@ def apply_operations(schema, operations, form_type):
                 raise ValidationError(
                     "An added option requires a selection field and value/label object."
                 )
-            field.setdefault("options", []).append(deepcopy(option))
+            cast(list[dict[str, object]], field.setdefault("options", [])).append(deepcopy(option))
         elif op == "update_field":
             patch = operation.get("patch")
             if not isinstance(patch, dict) or not patch or set(patch) - PATCH_KEYS:
@@ -147,7 +189,7 @@ def apply_operations(schema, operations, form_type):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason canonical fingerprints are shared by preview, approval and worker preflight
-def fingerprint(value):
+def fingerprint(value: object) -> str:
     return hashlib.sha256(
         json.dumps(
             value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -159,7 +201,9 @@ def fingerprint(value):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason value preconditions bind an exact entity, generation and schema pair
-def value_fingerprint(entity, change, values):
+def value_fingerprint(
+    entity: Page | Task, change: conversions.FieldChange, values: Mapping[str, object]
+) -> str:
     return fingerprint(
         {
             "entity": entity.urlsafe_key,
@@ -176,28 +220,36 @@ def value_fingerprint(entity, change, values):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason scope checks materialize the relations needed by normal permission rules
-def require_visible(entity, actor):
-    entity = Entities.fetch_one(
+def require_visible(entity: Page | Task, actor: User) -> Page | Task:
+    loaded = Entities.fetch_one(
         entity,
         request=Fetch.nested(
             because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION
         ),
     )
-    if not entity or not entity.allowed(Action.VIEW, user=actor):
+    if not loaded or not loaded.allowed(Action.VIEW, user=actor):
         raise RestrictedFormChange(RESTRICTED_MESSAGE)
-    return entity
+    return loaded
 
 
 # @testable true
 # @tests tests_unit/test_004l_form_schema_updates.py::test_scope_is_exhaustive_permission_checked_and_projects_only_affected_values
 # @matrix form-migration : complete-scope permissions affected-values pagination
-def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=None):
+def inspect_scope(
+    form: Form,
+    changes: Sequence[conversions.FieldChange],
+    actor: User,
+    *,
+    include_values: bool = False,
+    ensure_active: Callable[[], object] | None = None,
+) -> MigrationScope:
     """Check every attached live row; never mistake a filtered page for full scope."""
     from .. import dates
 
     if not form.allowed(Action.EDIT, user=actor) or form.reserved:
         raise ValidationError("You do not have permission to update this Form.")
-    impact, members = [], []
+    impact: list[AffectedInstance] = []
+    members = []
     if not changes:
         return {"scope_fingerprint": fingerprint([]), "instances": [], "total": 0}
     cursor = None
@@ -211,7 +263,8 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
                 continue
             entity = require_visible(entity, actor)
             values = json_value(entity.db, "submission")
-            fields, hashes = [], []
+            fields: list[AffectedField] = []
+            hashes = []
             for change in changes:
                 source_hash = value_fingerprint(entity, change, values)
                 hashes.append(source_hash)
@@ -236,9 +289,9 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
                     reason = "ai" if ai else "unset"
                     if not ai:
                         continue
-                item = {
+                item: AffectedField = {
                     "schema_id": change["id"],
-                    "title": change["source"].get("title", change["id"]),
+                    "title": cast(str, change["source"].get("title", change["id"])),
                     "rule": change["rule"],
                     "reason": reason,
                     "source_fingerprint": source_hash,
@@ -255,7 +308,7 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
             if fields:
                 impact.append(
                     {
-                        "id": entity.urlsafe_key,
+                        "id": cast(str, entity.urlsafe_key),
                         "kind": entity.entity_kind,
                         "fields": fields,
                     }
@@ -273,7 +326,11 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
 # @testable true
 # @tests tests_unit/test_004l_form_schema_updates.py::test_external_candidates_require_exact_coverage_and_source_fingerprints
 # @matrix form-migration : candidate-validation stale-value complete-scope
-def validate_candidates(candidates, scope, changes):
+def validate_candidates(
+    candidates: object,
+    scope: MigrationScope,
+    changes: Sequence[conversions.FieldChange],
+) -> list[PreparedCandidate]:
     """Require one strict result for every populated AI conversion and no others."""
     if not isinstance(candidates, list):
         raise ValidationError("Prepared conversions must be an array.")
@@ -307,6 +364,7 @@ def validate_candidates(candidates, scope, changes):
             raise ValidationError(
                 "Prepared conversions contain duplicate or unexpected entity/field targets."
             )
+        key = cast(tuple[str, str], key)
         if candidate.get("source_fingerprint") != required[key]:
             raise ValidationError(STALE_MESSAGE)
         conversions.validate_ai_candidate(candidate, by_field[key[1]]["target"])
@@ -315,4 +373,4 @@ def validate_candidates(candidates, scope, changes):
         raise ValidationError(
             "AI conversions are missing. Call preview_form_schema_update with include_values=true, follow every next_cursor, and prepare every required entity/field conversion."
         )
-    return deepcopy(candidates)
+    return cast(list[PreparedCandidate], deepcopy(candidates))

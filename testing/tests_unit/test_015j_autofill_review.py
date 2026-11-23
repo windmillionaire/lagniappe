@@ -106,6 +106,9 @@ def test_answer_revision_guard_is_tied_to_loaded_baseline():
     assert not stage_submission_guard(target, {})
     assert not stage_submission_guard(target, {"form-revision": "old"})
     assert not hasattr(target, "_form_additional_guards")
+    unsaved = SimpleNamespace(key=None, db={}, autofill_revision="r1")
+    assert not stage_submission_guard(unsaved, {"form-revision": "r1"})
+    assert not hasattr(unsaved, "_form_additional_guards")
     assert stage_submission_guard(target, {"form-revision": "r1"})
     target.db["submission"] = '{"a":2}'
     assert target._form_additional_guards[0][1]["submission"] == '{"a":1}'

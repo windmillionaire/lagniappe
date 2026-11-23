@@ -35,6 +35,7 @@ from ..tools.auth.restrictions import permission_relation
 
 
 if TYPE_CHECKING:
+    from ..tools.forms.definitions import FormIdentity, SubmissionDefinition
     from . import property_types
     from .form import Form
     from .file import File
@@ -51,6 +52,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         @property
         def restricted_to(self) -> dict[str, list[str]]: ...
 
+        _submission_definition: tuple[FormIdentity, SubmissionDefinition] | None
         form: Form | None
         @property
         def due_date(self) -> datetime | None: ...
