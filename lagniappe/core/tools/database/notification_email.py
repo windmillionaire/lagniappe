@@ -66,7 +66,7 @@ def new_delivery(
     user: User,
     *,
     record_type: str,
-    mode: NotificationEmailMode | str,
+    mode: NotificationEmailMode,
     due_at: datetime,
     preference_epoch: int,
     now: datetime,

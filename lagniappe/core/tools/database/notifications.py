@@ -41,10 +41,13 @@ def aggregate_key(user: User) -> Key:
 def new_aggregate(
     key: Key, *, ordinary_count: int = 0, unread_message_count: int = 0
 ) -> DatastoreEntity:
+    parent = key.parent
+    if parent is None:
+        raise ValueError("A notification aggregate must have a parent user key.")
     row = DatastoreEntity(key=key)
     row.update(
         notification_aggregate.initial_values(
-            key.parent,
+            parent,
             ordinary_count=ordinary_count,
             unread_message_count=unread_message_count,
         )
