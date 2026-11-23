@@ -19,6 +19,7 @@ from ..tools.auth.restrictions import restriction_fields
 
 
 if TYPE_CHECKING:
+    from ..properties.base_process import ProcessProperty
     from ..properties.form_submission import FormSubmission
     from ..properties.user_related import UserPage
 
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     from ..mixins.field_host import FieldUser
 
 
-class RegisteredProperty(Protocol):
+class _ReadableProperty(Protocol):
     """Common portion of fields with different owner and value types."""
 
     @property
@@ -34,6 +35,9 @@ class RegisteredProperty(Protocol):
 
     @property
     def value(self) -> object: ...
+
+
+type RegisteredProperty = _ReadableProperty | ProcessProperty
 
 
 class _FieldFactory(Protocol):
