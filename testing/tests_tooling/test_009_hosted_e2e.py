@@ -1893,7 +1893,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "statuses/$EVIDENCE_SHA" in workflow_text
     assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
 
-    quality_text = yaml.dump(quality, sort_keys=False)
+    quality_text = "\n".join(step.get("run", "") for step in quality["steps"])
     assert "gh api" in quality_text
     assert "validate-release-evidence" in quality_text
     assert "npm run check" in quality_text
