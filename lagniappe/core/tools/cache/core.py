@@ -1,8 +1,9 @@
 """Redis cache clients for hash-based (search) and JSON-based (filter) entity storage."""
 
+from collections.abc import Collection, Iterable, Mapping
 from contextlib import suppress
 from datetime import timedelta
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import redis
 from redis import Redis, ResponseError
@@ -12,12 +13,16 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.commands.search.result import Result
 
-from config.redis import redis_client_kwargs
+from config.redis import redis_connection_kwargs
 from lagniappe import CONFIG, Config
 from lagniappe.core.exceptions import capture
 from ..auth.restrictions import RESTRICTION_SOURCES
 
 from .keys import HELP_PREFIX, SEARCH_SCORE_FIELD, Keys, Search
+
+
+if TYPE_CHECKING:
+    from redis.commands.json._util import JsonType
 
 
 # @testable true
@@ -26,7 +31,7 @@ from .keys import HELP_PREFIX, SEARCH_SCORE_FIELD, Keys, Search
 def _create_redis_client(settings: Config = CONFIG) -> Redis:
     """Create the shared runtime Redis client from application settings."""
     client = redis.Redis(
-        **redis_client_kwargs(
+        **redis_connection_kwargs(
             settings,
             decode_responses=False,
         )
@@ -134,7 +139,7 @@ class Cache:
 
     # @testable false
     # @reason api-wrapper; callers own key selection and deletion workflow
-    def delete(self, *keys):
+    def delete(self, *keys: str | bytes) -> None:
         """Delete one or more keys in a pipeline."""
         with self.redis.pipeline() as pipe:
             pipe.delete(*keys)
@@ -142,7 +147,7 @@ class Cache:
 
     # @testable false
     # @reason decoded Redis get wrapper used by provider-specific cache consumers
-    def get(self, key):
+    def get(self, key: str | bytes) -> str | None:
         """Return the decoded string value for a key, or None."""
         # This client is constructed with decode_responses=False.
         value = cast(bytes | None, self.redis.get(key))
@@ -151,7 +156,7 @@ class Cache:
     # @testable false
     # @covered-by lagniappe/core/tools/cache/utility.py::check_hash
     # @reason decoded Redis hash-field wrapper
-    def hget(self, key, field, expires=None):
+    def hget(self, key: str, field: str, expires: int | timedelta | None = None) -> str | None:
         """Return a decoded hash field value, optionally refreshing expiry."""
         with self.pipeline() as pipe:
             pipe.hget(key, field)
@@ -164,7 +169,7 @@ class Cache:
 
     # @testable false
     # @reason decoded Redis hash-map wrapper retained for direct cache clients
-    def hgetall(self, key, expires=None):
+    def hgetall(self, key: str, expires: int | timedelta | None = None) -> dict[str, str]:
         """Return all hash fields as a decoded dict, optionally refreshing expiry."""
         with self.pipeline() as pipe:
             pipe.hgetall(key)
@@ -176,15 +181,15 @@ class Cache:
     # @testable false
     # @covered-by lagniappe/core/tools/cache/utility.py::cleanup_test_data
     # @reason api-wrapper used by test-data cleanup
-    def keys(self, pattern):
+    def keys(self, pattern: str) -> list[bytes]:
         """Return all keys matching the given pattern."""
-        return self.redis.keys(pattern)
+        return cast(list[bytes], self.redis.keys(pattern))  # Response decoding is disabled.
 
     # @testable false
     # @covered-by lagniappe/core/tools/cache/utility.py::cleanup_test_data
     # @covered-by lagniappe/core/tools/cache/utility.py::delete_cache
     # @reason maintenance api-wrapper owned by cleanup/reset workflows
-    def drop_index(self, index):
+    def drop_index(self, index: str) -> None:
         """Drop a RediSearch index."""
         self.redis.ft(index).dropindex()
 
@@ -212,10 +217,10 @@ class Cache:
     # @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
     # @covered-by lagniappe/core/tools/cache/documents.py::poll_document
     # @reason Redis hash api-wrapper used by detail and document-presence workflows
-    def hmget(self, key, fields):
+    def hmget(self, key: str, fields: Iterable[str]) -> list[bytes | None]:
         """Return values for multiple hash fields."""
         try:
-            return self.redis.hmget(key, fields)
+            return cast(list[bytes | None], self.redis.hmget(key, fields))  # Response decoding is disabled.
         except ResponseError as e:
             capture(
                 e,
@@ -283,20 +288,20 @@ class CacheJSON:
 
     # @testable false
     # @reason api-wrapper; currently reserved for direct JSON key deletion
-    def delete(self, key):
+    def delete(self, key: str) -> None:
         """Delete a JSON key."""
         self.redis.json().delete(key)
 
     # @testable false
     # @reason api-wrapper; currently used only for debugging/inspection
-    def get(self, key):
+    def get(self, key: str) -> JsonType:
         """Return the JSON value for a key."""
         return self.redis.json().get(key)
 
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @reason JSON cache existence check owned by filter-cache workflow
-    def exists(self, key):
+    def exists(self, key: str) -> int:
         """Check whether a key exists."""
         return self.redis.exists(key)
 
@@ -322,7 +327,7 @@ class CacheJSON:
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @reason JSON document creation is owned by filter-cache population
-    def create(self, key, mapping):
+    def create(self, key: str, mapping: dict[str, JsonType]) -> None:
         """Store a JSON document with an access hash and one-day expiry."""
         parent_hash = key.split(":")[1]
         mapping["access"] = {"hash": parent_hash}
@@ -336,7 +341,7 @@ class CacheJSON:
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.query
     # @reason JSONPath api-wrapper owned by filter query workflow
-    def query(self, key, json_path):
+    def query(self, key: str, json_path: str) -> JsonType:
         """Return a JSON value at a specific path within a key."""
         try:
             return self.redis.json().get(key, f"{json_path}")
@@ -347,9 +352,9 @@ class CacheJSON:
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @reason JSON field update is owned by filter-cache refresh workflow
-    def set(self, key, mapping):
+    def set(self, key: str, mapping: Mapping[str, JsonType]) -> None:
         """Update multiple JSON fields on a key and refresh expiry."""
-        triplets = [(key, f"$.{k}", v) for k, v in mapping.items()]
+        triplets: list[tuple[str, str, JsonType]] = [(key, f"$.{k}", v) for k, v in mapping.items()]
         if triplets:
             try:
                 self.redis.json().mset(triplets)
@@ -361,18 +366,19 @@ class CacheJSON:
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @reason refresh marker query is owned by filter-cache refresh workflow
-    def refresh_needed(self, cache_key):
+    def refresh_needed(self, cache_key: str) -> list[str]:
         """Get member IDs within a specific JSON object that have refresh stubs"""
         # Use JSON path to get all members where refresh=1, then extract their ids
         refresh_members = self.redis.json().get(cache_key, "$..[?(@refresh == 1)].id")
-        return refresh_members if refresh_members else []
+        # This JSONPath selects only identifiers from persisted refresh markers.
+        return cast(list[str], refresh_members) if refresh_members else []
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_existing_filter_parents_execute_before_pipeline_closes
     # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
     # @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
     # @matrix cache : parent-index redis-protocol pipeline
-    def get_existing_parents(self, hashes):
+    def get_existing_parents(self, hashes: Collection[str]) -> dict[str, list[str]]:
         """Return a mapping of hashes to their parent JSON key IDs."""
         with self.redis.pipeline() as pipe:
             for h in hashes:
@@ -391,7 +397,7 @@ class CacheJSON:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_json_parent_lookup_skips_empty_parent_query
     # @matrix cache : empty-parent-lookup parent-index redis-cloud tag-syntax
-    def get_new_parents(self, parent_hashes):
+    def get_new_parents(self, parent_hashes: Iterable[str]) -> list[str]:
         """Return JSON key IDs for parents matching the given hashes."""
         parent_hashes = list(parent_hashes)
         if not parent_hashes:
