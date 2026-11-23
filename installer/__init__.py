@@ -22,6 +22,17 @@ from runner.context import (
 )
 
 
+def verify_python_version() -> None:
+    """Require the Python minor used by the installer and deployed application."""
+    if sys.version_info[:2] != (3, 14):
+        from installer.errors import SetupError
+
+        raise SetupError(
+            f"Python 3.14 is required (you are running {sys.version}).",
+            repair_action=virtualenv_instructions(),
+        )
+
+
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
 # @matrix setup : portability prerequisites python-version virtualenv
@@ -29,13 +40,7 @@ def verify_setup_runtime() -> None:
     """Require supported Python from this checkout's project virtualenv."""
     from installer.errors import SetupError
 
-    if sys.version_info[:2] != (3, 14):
-        print(
-            f"Python 3.14 is required (you are running {sys.version})."
-        )
-        print(virtualenv_instructions())
-        raise SetupError("Python 3.14 is required.")
-
+    verify_python_version()
     if not project_virtualenv_active():
         print("Setup must run from this checkout's project virtualenv.")
         print(virtualenv_instructions())

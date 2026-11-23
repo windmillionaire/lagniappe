@@ -366,6 +366,9 @@ def _dispatch(args):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
 # @matrix setup : cli-routing operation-journal prerequisites
 def main(argv: list[str] | None = None) -> int:
+    from installer import verify_python_version
+
+    verify_python_version()
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = _parser()
     args = parser.parse_args(arguments)

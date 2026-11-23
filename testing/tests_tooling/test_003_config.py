@@ -730,7 +730,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
     (app_dir / "main.py").write_text("")
     (app_dir / "package.json").write_text("{}")
     (app_dir / "index.yaml").write_text("indexes: []\n")
-    (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
+    (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     (config_files_dir / "lagniappe_settings.yaml").write_text(
         yaml.safe_dump(
             {
@@ -1699,7 +1699,7 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     (app_dir / "main.py").write_text("")
     (app_dir / "package.json").write_text(json.dumps({"version": "1.23"}))
     (app_dir / "index.yaml").write_text("indexes: []\n")
-    (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
+    (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     (config_files_dir / "lagniappe_settings.yaml").write_text("{}\n")
     (config_files_dir / "lagniappe_dev.yaml").write_text("{}\n")
 

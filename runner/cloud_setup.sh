@@ -22,6 +22,9 @@ if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node')" != "$
 fi
 if [[ ! -x venv/bin/python ]]; then
     python3.14 -m venv venv
+elif ! venv/bin/python -c 'import sys; sys.exit(sys.version_info[:2] != (3, 14))'; then
+    echo 'Cloud setup requires Python 3.14. Move the existing venv aside and run setup again.' >&2
+    exit 1
 fi
 venv/bin/python -m pip install -r requirements-dev.txt
 npm ci

@@ -2156,7 +2156,7 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
 
     from installer import config_file_status
 
-    (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
+    (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     config_dir = app_dir / "config" / "files"
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "lagniappe_dev.yaml").write_text("gcloud_config: {}\n")

@@ -74,7 +74,7 @@ def make_demo_app(tmp_path: Path) -> Path:
         '{"id": "demo", "version": 1}'
     )
     (app_dir / "index.yaml").write_text("indexes: []\n")
-    (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
+    (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     (config_files_dir / "lagniappe_settings.yaml").write_text(
         yaml.safe_dump(
             {
