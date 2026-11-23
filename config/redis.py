@@ -4,6 +4,7 @@ import ssl
 from collections.abc import Mapping
 from os import PathLike
 from pathlib import Path
+from typing import NotRequired, TypedDict, Unpack, cast
 
 
 # @testable false
@@ -111,3 +112,46 @@ def redis_client_kwargs(
         )
 
     return options
+
+
+class RedisConnectionOptions(TypedDict, total=False):
+    """redis-py overrides used by Lagniappe's connection constructors."""
+
+    socket_timeout: float | None
+    socket_connect_timeout: float | None
+    retry_on_timeout: bool
+    decode_responses: bool
+
+
+class RedisConnectionKwargs(RedisConnectionOptions):
+    host: str
+    port: int
+    password: str | None
+    ssl: NotRequired[bool]
+    ssl_ca_certs: NotRequired[str]
+    ssl_cert_reqs: NotRequired[str]
+    ssl_check_hostname: NotRequired[bool]
+
+
+def redis_connection_kwargs(
+    settings: object,
+    *,
+    app_dir: str | Path | None = None,
+    **connection_options: Unpack[RedisConnectionOptions],
+) -> RedisConnectionKwargs:
+    """Return redis-py constructor arguments for a configured endpoint."""
+    options = redis_client_kwargs(settings, app_dir=app_dir, **connection_options)
+    host = options["host"]
+    port = options["port"]
+    password = options["password"]
+    if not isinstance(host, str) or not host:
+        raise ValueError("REDIS_HOST is required when connecting to Redis.")
+    if not isinstance(port, (str, int)):
+        raise ValueError("REDIS_PORT must be an integer when connecting to Redis.")
+    if password is not None and not isinstance(password, str):
+        raise ValueError("REDIS_PASSWORD must be text when connecting to Redis.")
+    options["port"] = int(port)
+    # The remaining keys are the typed overrides above and the verified TLS
+    # settings added by redis_client_kwargs; that helper also serves setup
+    # preflight, where the endpoint can still be incomplete.
+    return cast(RedisConnectionKwargs, options)

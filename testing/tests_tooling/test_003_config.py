@@ -1644,6 +1644,23 @@ def test_redis_client_kwargs_support_verified_tls(monkeypatch, tmp_path):
     assert validated == [{"cafile": str(ca_bundle)}]
 
 
+def test_redis_connection_options_require_complete_endpoint():
+    from config.redis import redis_client_kwargs, redis_connection_kwargs
+
+    assert redis_client_kwargs({}) == {"host": None, "port": None, "password": None}
+    with pytest.raises(ValueError, match="REDIS_HOST"):
+        redis_connection_kwargs({})
+    with pytest.raises(ValueError, match="REDIS_PORT"):
+        redis_connection_kwargs({"REDIS_HOST": "cache.example"})
+    assert redis_connection_kwargs(
+        {"REDIS_HOST": "cache.example", "REDIS_PORT": "6379"},
+        socket_connect_timeout=5,
+    ) == {
+        "host": "cache.example", "port": 6379, "password": None,
+        "socket_connect_timeout": 5,
+    }
+
+
 # @matrix config : certificate-validation failure redis-tls
 def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
     from config import redis as redis_config
