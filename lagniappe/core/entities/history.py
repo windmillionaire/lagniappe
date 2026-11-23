@@ -206,6 +206,8 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 # @matrix form-schema html-field : history generation immutable-assets
 class FormHistory(Entity, AssetMixin):
     if TYPE_CHECKING:
+        schema: list[dict[str, object]]
+
         @property
         def properties(self) -> property_types.FormHistoryProperties: ...
 

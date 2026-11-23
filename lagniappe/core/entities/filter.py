@@ -16,12 +16,19 @@ from .entity import Entity
 
 if TYPE_CHECKING:
     from . import property_types
+    from .category import Category
+    from .project import Project
 
 
 # @testable false
 # @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class Filter(Entity):
     if TYPE_CHECKING:
+        parent: Category | Project | None
+
+        @property
+        def table(self) -> filter.FilterTable: ...
+
         @property
         def properties(self) -> property_types.FilterProperties: ...
 

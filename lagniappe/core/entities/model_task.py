@@ -8,6 +8,7 @@ from .entity import Entity
 
 if TYPE_CHECKING:
     from . import property_types
+    from .project import Project
 
 
 # @testable true
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
 # @matrix model-task permissions project : attached-form create ordering relation-save restricted-access update
 class ModelTask(Entity):
     if TYPE_CHECKING:
+        project: Project | None
+
         @property
         def properties(self) -> property_types.ModelTaskProperties: ...
 

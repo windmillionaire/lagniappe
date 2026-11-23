@@ -136,6 +136,8 @@ class Entity:
         modified: datetime | None
         created: datetime | None
         active: bool
+        requires: list[str]
+        _form_attempt_assets: list[dict[str, object]] | None
 
     entity_kind: str
     _properties: EntityProperties | None = None

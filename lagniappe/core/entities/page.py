@@ -23,6 +23,7 @@ from .entity import Entity
 
 if TYPE_CHECKING:
     from . import property_types
+    from .category import Category
     from .form import Form
     from .file import File
     from .user import User
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 # @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
+        categories: list[Category]
         form: Form | None
 
         files: list[File]

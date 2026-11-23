@@ -6,11 +6,17 @@ For most fields id == filter_key; EntityForm is the exception (id="form-{hash}"
 but filter_key="form").
 """
 
+from typing import TYPE_CHECKING
+
 from flask_login import current_user
 from ..definitions import Comparator, Fetch, FieldType, FilterDefinition
 from ..entities import Entities
 from ..properties.form_select import CategoricalElement
 from ..tools import cache
+
+
+if TYPE_CHECKING:
+    from .entity import Entity
 
 
 # @testable true
@@ -24,6 +30,8 @@ class Condition:
     determines the available comparators, value transformation, and
     whether values are entity hashes requiring lookup.
     """
+
+    _contract_parent: Entity | None
 
     def __init__(self, definition=None):
         self._entity = None
