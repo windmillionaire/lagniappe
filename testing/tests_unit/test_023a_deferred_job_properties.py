@@ -672,6 +672,27 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     assert released == [("lock:terminal", "job-terminal")]
 
 
+@pytest.mark.parametrize("job_id", ["job-key", None])
+def test_form_change_lock_survives_a_missing_job_row(monkeypatch, job_id):
+    target = SimpleNamespace(urlsafe_key="target-key", entity_kind="page", db={"form": "form-key"})
+    pending = {"id": "change-id", "job": job_id} if job_id else {"id": "change-id"}
+    form = SimpleNamespace(key="form-key", db={"pending_form_change": json.dumps(pending)})
+    monkeypatch.setattr(deferred_locks, "deferred_job_lock_key", lambda *args: "lock-key")
+    monkeypatch.setattr(
+        deferred_locks.Entities, "fetch",
+        lambda *keys, request: [form] if keys == (form.key,) else [],
+    )
+
+    if job_id is None:
+        with pytest.raises(exceptions.ValidationError, match="needs repair"):
+            deferred_job_lock_descriptor(target)
+    else:
+        descriptor = deferred_job_lock_descriptor(target)
+        assert descriptor["scope"] == "form-change"
+        assert descriptor["operation"] == job_id
+        assert descriptor["blocks_edit"] is True
+
+
 # @matrix deferred-jobs : browser-projection form-lock
 def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
     lock = SimpleNamespace(scope="form-autofill")

@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.properties.deferred_job_lifecycle import ACTIVE_STATUSES
 from lagniappe.core.properties.deferred_job_lock import Operation, Scope
 from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
@@ -97,17 +98,31 @@ def deferred_job_lock_descriptors(targets: Iterable[Entity | str | None] | None,
         elif lock:
             database_deferred_jobs.release_deferred_job_lock(lock.key, lock.operation)
     if scope == AUTOFILL_FORM_LOCK_SCOPE:
-        from ..forms.contracts import json_value, PENDING
-        form_keys = {getattr(target, "db", {}).get("form") for target in targets
-                     if getattr(target, "entity_kind", None) in {"page", "task"}} - {None}
-        forms = {form.key: form for form in Entities.fetch(*form_keys, request=Fetch.root())} if form_keys else {}
-        pending = {key: json_value(form.db, PENDING) for key, form in forms.items() if form.db.get(PENDING)}
-        pending_jobs = {job.urlsafe_key: job for job in Entities.fetch(
-            *(change["job"] for change in pending.values()), request=Fetch.direct())} if pending else {}
+        from ..forms.contracts import PENDING, pending_change
+
+        form_keys = {
+            getattr(target, "db", {}).get("form")
+            for target in targets
+            if getattr(target, "entity_kind", None) in {"page", "task"}
+        } - {None}
+        forms = Entities.fetch(*form_keys, request=Fetch.root()) if form_keys else []
+        pending: dict[Key, str] = {}
+        for form in forms:
+            if form.key is None or not form.db.get(PENDING):
+                continue
+            change = pending_change(form.db)
+            job_id = change.get("job") if change else None
+            if not job_id:
+                raise ValidationError("Saved form change data needs repair.")
+            pending[form.key] = job_id
+        pending_jobs = {
+            job.urlsafe_key: job
+            for job in Entities.fetch(*pending.values(), request=Fetch.direct())
+        } if pending else {}
         for target in targets:
-            change = pending.get(getattr(target, "db", {}).get("form"))
-            if change:
-                job = pending_jobs.get(change["job"]) or _PendingJob(urlsafe_key=change["job"])
+            form_key = getattr(target, "db", {}).get("form")
+            if form_key is not None and (job_id := pending.get(form_key)):
+                job = pending_jobs.get(job_id) or _PendingJob(urlsafe_key=job_id)
                 active[_target_key(target)] = (_PendingLock(Scope.FORM_CHANGE), cast(LockJobView, job))
     return active
 
