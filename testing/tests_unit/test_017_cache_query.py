@@ -26,7 +26,7 @@ def test_runtime_redis_client_uses_shared_tls_options(monkeypatch):
         calls.append((received_settings, kwargs))
         return {"ssl": True, "ssl_cert_reqs": "required"}
 
-    monkeypatch.setattr(cache_core, "redis_client_kwargs", fake_options)
+    monkeypatch.setattr(cache_core, "redis_connection_kwargs", fake_options)
     monkeypatch.setattr(
         cache_core.redis,
         "Redis",
