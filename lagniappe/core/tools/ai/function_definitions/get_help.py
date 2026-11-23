@@ -18,13 +18,13 @@ GET_HELP = types.FunctionDeclaration(
         "guidance does not establish access to a particular workspace record. "
         "No Plan, provider call or workspace change is needed."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "Short help search keywords."},
             "topic_id": {"type": "string", "description": "Exact canonical help topic ID."},
         },
-    },
+    }),
 )
 
 

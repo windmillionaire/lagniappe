@@ -21,7 +21,7 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
         "Reuse sufficient search/list evidence; a duplicate check does not require both. "
         "Omit compact for the existing full task details."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": ["default", "edit"]},
@@ -40,7 +40,7 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

@@ -2,6 +2,7 @@
 
 from contextlib import suppress
 from copy import deepcopy
+from typing import Never
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -97,7 +98,9 @@ def delete_plan_if_idle(report, expected_report, *entities):
 class ExternalPlanError(Exception):
     """A safe domain failure translated to HTTP only at the REST boundary."""
 
-    def __init__(self, reason, message, *, details=None):
+    checkpoint_disposition: str
+
+    def __init__(self, reason: str, message: str, *, details: object = None) -> None:
         super().__init__(message)
         self.reason = reason
         self.details = details
@@ -107,7 +110,7 @@ class ExternalPlanError(Exception):
 # @covered-by lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
 # @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
 # @reason claim outcomes are exercised through both public upload routes
-def raise_plan_operation_error(outcome):
+def raise_plan_operation_error(outcome: str) -> Never:
     """Map a transactional Plan-operation outcome to a bounded API conflict."""
     if outcome == agent_api_store.PLAN_OPERATION_PENDING:
         raise ExternalPlanError(
@@ -170,7 +173,7 @@ def claimed_plan_save(report, *, phase, operation_id, claim_token, user, request
             plan = plan_mutation(MutationOperation.SAVE, *entities)
             writes = prepare_durable_writes(plan)
         except BaseException as error:
-            error.checkpoint_disposition = CHECKPOINT_NOT_COMMITTED
+            vars(error)["checkpoint_disposition"] = CHECKPOINT_NOT_COMMITTED
             raise
         try:
             outcome = agent_api_store.commit_plan_operation(
@@ -183,7 +186,7 @@ def claimed_plan_save(report, *, phase, operation_id, claim_token, user, request
                 notification_user=user if phase == "submit" else None,
             )
         except BaseException as error:
-            error.checkpoint_disposition = CHECKPOINT_AMBIGUOUS
+            vars(error)["checkpoint_disposition"] = CHECKPOINT_AMBIGUOUS
             raise
         if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
             if outcome == agent_api_store.PLAN_OPERATION_LOST:

@@ -24,7 +24,7 @@ PREVIEW_FORM_SCHEMA_UPDATE = types.FunctionDeclaration(
         "Follow every next_cursor; include_values=true returns original affected AI values and scalar before/after values (clears=true omits after). "
         "Return baseline and scope_fingerprint unchanged in update_form_schema."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "required": ["id", "operations"],
         "properties": {
@@ -54,7 +54,7 @@ PREVIEW_FORM_SCHEMA_UPDATE = types.FunctionDeclaration(
             },
             "cursor": {"type": "string"},
         },
-    },
+    }),
 )
 
 

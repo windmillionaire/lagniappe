@@ -22,7 +22,7 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
         "describes counts, continuation and partial errors. Use get_page_tasks "
         "with compact=true when discovery also needs completed tasks."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": ["default", "edit"]},
@@ -55,7 +55,7 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

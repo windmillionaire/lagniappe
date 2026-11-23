@@ -23,7 +23,7 @@ def render_ai_markdown(text):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
 # @matrix ai : batched-cache hash-reference normalization
-def hash_reference(entity):
+def hash_reference(entity: object) -> str | None:
     """Return the explicit AI reference token for an entity hash."""
     entity_hash = getattr(entity, "hash", None)
     return f"hash:{entity_hash}" if entity_hash else None

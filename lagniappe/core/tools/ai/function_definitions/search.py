@@ -100,7 +100,7 @@ def _format_detail_hashes(details):
 SEARCH_ENTITIES = types.FunctionDeclaration(
     name="search_entities",
     description=CANDIDATE_SEARCH_DESCRIPTION,
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "query": {
@@ -144,7 +144,7 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
             },
         },
         "required": ["query"],
-    },
+    }),
 )
 
 

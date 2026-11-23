@@ -24,7 +24,7 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
         "specific type. Call get_category_forms first to discover available "
         "form types, then pass a form hash token here to get focused examples."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -67,7 +67,7 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

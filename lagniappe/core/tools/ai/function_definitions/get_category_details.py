@@ -14,7 +14,7 @@ GET_CATEGORY_DETAILS = types.FunctionDeclaration(
         "category — for example, when generating content that should match the "
         "category's theme, conventions, or descriptive context."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -23,7 +23,7 @@ GET_CATEGORY_DETAILS = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

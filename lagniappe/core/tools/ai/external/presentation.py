@@ -67,7 +67,7 @@ def _replace_internal_references(value, replacements):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_public_execution_receipt_rechecks_entity_visibility
 # @pair agent-api:execution-receipt
-def public_execution_receipt(report, user):
+def public_execution_receipt(report, user) -> dict[str, object] | None:
     """Expose bounded outcomes, never the recovery ledger or stale entity data."""
     result = getattr(report, "result", None)
     if not isinstance(result, dict):
@@ -102,7 +102,7 @@ def public_execution_receipt(report, user):
     )
     actions = []
     for record in selected:
-        action = {
+        action: dict[str, object] = {
             key: str(record[key])[:200]
             for key in ("id", "type", "status")
             if record.get(key) is not None
@@ -195,9 +195,10 @@ def public_plan_proposal(report, user=None):
     )
     replacements.update(
         {
-            entity.urlsafe_key: hash_reference(entity)
+            key: reference
             for entity in entities
-            if entity and hash_reference(entity)
+            if entity and isinstance(key := entity.urlsafe_key, str)
+            and (reference := hash_reference(entity))
         }
     )
     public = _replace_internal_references(public, replacements)

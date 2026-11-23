@@ -27,7 +27,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
         "answers. Set include_original=true for its original completed answers "
         "and recorded schema; this requires edit access, as on the website."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -50,7 +50,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

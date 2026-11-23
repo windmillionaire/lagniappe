@@ -33,7 +33,7 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
         "Supply category_id and/or project_id when their references are already known "
         "to omit unrelated resources; without a scope, return the full inventory."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "category_id": {
@@ -45,7 +45,7 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
                 "description": "Known Project hash reference to include.",
             },
         },
-    },
+    }),
 )
 
 

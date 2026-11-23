@@ -1,8 +1,26 @@
 """Structured-output schemas for AI report proposals."""
 
+from collections.abc import Iterable
+from typing import NotRequired, TypedDict, cast
+
 from ...autofill import submission_response_schema
 from ..schedules import task_schedule_response_schema
 from .actions import ACTION_ORDER, REPORT_ACTION_DATA_CONTRACTS
+
+
+# Both transports return an object with property schemas. The external transport
+# also publishes named action definitions referenced by its discriminators.
+ProposalSchema = TypedDict(
+    "ProposalSchema",
+    {
+        "type": str,
+        "properties": dict[str, dict[str, object]],
+        "required": list[str],
+        "additionalProperties": bool,
+        "propertyOrdering": NotRequired[list[str]],
+        "$defs": NotRequired[dict[str, object]],
+    },
+)
 
 
 # @testable false
@@ -411,12 +429,12 @@ def _report_action_response_schema(action_type, include_submission_fields):
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_conversion_schema_rejects_flattened_items
 # @matrix ai-report : allowed-actions provider-validation schema structured-output
 def report_proposal_response_schema(
-    allowed_actions=None,
+    allowed_actions: Iterable[str] | None = None,
     *,
-    allow_answer_html=False,
-    require_issues=False,
-    include_submission_fields=True,
-):
+    allow_answer_html: bool = False,
+    require_issues: bool = False,
+    include_submission_fields: bool = True,
+) -> ProposalSchema:
     """Return typed provider JSON variants for report proposal responses."""
     action_types = tuple(ACTION_ORDER if allowed_actions is None else allowed_actions)
     unknown_actions = [
@@ -428,7 +446,7 @@ def report_proposal_response_schema(
             f"{', '.join(unknown_actions)}"
         )
 
-    properties = {
+    properties: dict[str, dict[str, object]] = {
         "summary": {"type": "string"},
         "answer_markdown": {"type": "string"},
         "confidence": {"type": "number"},
@@ -485,9 +503,9 @@ def _external_required_group_schema(fields):
 # @testable true
 # @tests tests_unit/test_032d_external_guidance.py::test_external_schedule_schema_matches_repeating_schedule_requirements
 # @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
-def external_task_schedule_response_schema():
+def external_task_schedule_response_schema() -> dict[str, object]:
     """Add conditional public requirements without changing the Gemini schema."""
-    schema = _standard_json_schema(task_schedule_response_schema())
+    schema = _standard_schema_object(task_schedule_response_schema())
     schema["description"] = (
         "Repeating work only. A one-time reminder uses due_date without schedule. "
         "The kind selects the required interval or calendar fields below."
@@ -653,17 +671,21 @@ def _external_report_action_response_schema(
 # @covered-by lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 # @covered-by lagniappe/core/tools/ai/external/contracts.py::plan_contract
 # @reason provider-only ordering hints are removed through the public external serializer
-def _standard_json_schema(value):
+def _standard_schema_object(value: dict[str, object]) -> dict[str, object]:
+    result = {
+        key: _standard_json_schema(child)
+        for key, child in value.items()
+        if key not in {"propertyOrdering", "nullable"}
+    }
+    if value.get("nullable") is True:
+        return {"anyOf": [result, {"type": "null"}]}
+    return result
+
+
+def _standard_json_schema(value: object) -> object:
     """Translate provider annotations into standard JSON Schema semantics."""
     if isinstance(value, dict):
-        result = {
-            key: _standard_json_schema(child)
-            for key, child in value.items()
-            if key not in {"propertyOrdering", "nullable"}
-        }
-        if value.get("nullable") is True:
-            return {"anyOf": [result, {"type": "null"}]}
-        return result
+        return _standard_schema_object(value)
     if isinstance(value, list):
         return [_standard_json_schema(child) for child in value]
     return value
@@ -674,12 +696,12 @@ def _standard_json_schema(value):
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_conversion_schema_rejects_flattened_items
 # @matrix agent-api ai-report : external-schema proposal-contract structured-output
 def external_report_proposal_response_schema(
-    allowed_actions=None,
+    allowed_actions: Iterable[str] | None = None,
     *,
-    require_issues=False,
-    include_submission_fields=True,
-    require_file_summary_terms=False,
-):
+    require_issues: bool = False,
+    include_submission_fields: bool = True,
+    require_file_summary_terms: bool = False,
+) -> ProposalSchema:
     """Return a named, machine-readable proposal schema for external clients.
 
     The internal Gemini schema intentionally keeps its provider-compatible
@@ -693,7 +715,8 @@ def external_report_proposal_response_schema(
         require_issues=require_issues,
         include_submission_fields=include_submission_fields,
     )
-    schema = _standard_json_schema(provider_schema)
+    # The non-nullable proposal root keeps its object and property shapes.
+    schema = cast(ProposalSchema, _standard_json_schema(provider_schema))
     if not action_types:
         schema["properties"]["actions"] = {"type": "array", "maxItems": 0}
         return schema

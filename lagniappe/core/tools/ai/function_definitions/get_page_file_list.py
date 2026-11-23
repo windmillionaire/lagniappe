@@ -16,7 +16,7 @@ GET_PAGE_FILE_LIST = types.FunctionDeclaration(
         "extracted text, and small original files. Large originals require an "
         "explicit get_file include_original request."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -25,7 +25,7 @@ GET_PAGE_FILE_LIST = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

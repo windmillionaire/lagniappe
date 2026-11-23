@@ -19,7 +19,7 @@ GET_ENTITY = types.FunctionDeclaration(
         "form-bearing pages, tasks, or model tasks, the result includes the "
         "schema needed to create valid submission objects."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": ["default", "edit"]},
@@ -29,7 +29,7 @@ GET_ENTITY = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

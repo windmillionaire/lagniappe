@@ -1,9 +1,15 @@
 """Entity, page, and file reference resolution for report actions."""
 
+from typing import TYPE_CHECKING, Literal, overload
+
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason, Restriction
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+
 
 from .common import (
     _first_data_reference,
@@ -325,7 +331,17 @@ def _page_name_matches(page, page_name=None):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason reference resolution is exercised through ordered runner tests
-def _resolve_entity(reference, created, expected=None, optional=False):
+@overload
+def _resolve_entity[T: Entity](reference, created, expected: type[T], optional: Literal[False] = False) -> T: ...
+@overload
+def _resolve_entity[T: Entity](reference, created, expected: type[T], optional: bool) -> T | None: ...
+@overload
+def _resolve_entity(reference, created, expected: None = None, optional: Literal[False] = False) -> Entity: ...
+@overload
+def _resolve_entity(reference, created, expected: None = None, *, optional: bool) -> Entity | None: ...
+
+
+def _resolve_entity(reference, created, expected: type[Entity] | None = None, optional: bool = False) -> Entity | None:
     if not reference:
         if optional:
             return None
@@ -382,7 +398,7 @@ def _resolve_report_file(reference, report, created=None):
             candidate in {file.urlsafe_key, file.key, file.name, file.filename}
             for candidate in references
         ):
-            if hasattr(created, "copy_input"):
+            if created is not None and hasattr(created, "copy_input"):
                 # Report inputs outlive a rejected batch. Mutate only the
                 # workspace's copy, reusing any already-staged File edits.
                 return created.copy_input(file)

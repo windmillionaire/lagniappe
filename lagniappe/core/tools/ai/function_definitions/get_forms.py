@@ -19,7 +19,7 @@ GET_CATEGORY_FORMS = types.FunctionDeclaration(
         "model can create valid submission objects with exact field ids and "
         "value shapes."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -28,7 +28,7 @@ GET_CATEGORY_FORMS = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

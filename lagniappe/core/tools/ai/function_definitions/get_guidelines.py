@@ -213,7 +213,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
         "summaries, or action data. Request one bundle per call. Independent bundles "
         "may be requested in parallel when the client supports it."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "task": {
@@ -244,7 +244,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
             },
         },
         "required": ["task"],
-    },
+    }),
 )
 
 
@@ -326,17 +326,17 @@ def _guidelines_result(args, *, external):
             section = _schema_type_guidance(field_types)
         sections.append(section)
     if task == "report_actions":
+        assert actions
         sections.extend((
             _selected_action_guidance(actions),
             "### Output Boundary\n\nUse the action fields and final JSON "
             "shape defined by the current report response schema.",
         ))
 
-    if task == "report_actions" and "create_task" in actions:
-        sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
-
-    if task == "report_actions" and "summarize_file" in actions:
-        sections.append(SUMMARY_GENERATION_GUIDELINES)
+        if "create_task" in actions:
+            sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
+        if "summarize_file" in actions:
+            sections.append(SUMMARY_GENERATION_GUIDELINES)
 
     guidelines = "\n\n".join(section.strip() for section in sections)
     ai_debug(
@@ -358,7 +358,7 @@ def _guidelines_result(args, *, external):
             "the proposal. Read tools never execute the proposal."
         )
     content = f"{instructions}\n\n{guidelines}"
-    result = {
+    result: dict[str, object] = {
         "task": task,
         "description": bundle["description"],
         "guidelines": content,
@@ -376,7 +376,9 @@ def _guidelines_result(args, *, external):
             external_report_proposal_response_schema(allowed_actions=actions, include_submission_fields=True, require_file_summary_terms=True)
             if external else report_proposal_response_schema(actions, include_submission_fields=True)
         )
-        result["action_schema"] = {**schema["properties"]["actions"]["items"], **({"$defs": schema["$defs"]} if "$defs" in schema else {})}
+        items = schema["properties"]["actions"]["items"]
+        assert isinstance(items, dict)
+        result["action_schema"] = {**items, **({"$defs": schema["$defs"]} if "$defs" in schema else {})}
     return result
 
 

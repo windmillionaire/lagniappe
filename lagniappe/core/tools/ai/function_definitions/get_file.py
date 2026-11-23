@@ -13,7 +13,7 @@ GET_FILE = types.FunctionDeclaration(
         "direct analysis. Transport adapters may return direct media or a "
         "short-lived download URL; extracted text is returned by default."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -33,7 +33,7 @@ GET_FILE = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

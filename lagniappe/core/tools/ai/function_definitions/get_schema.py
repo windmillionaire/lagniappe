@@ -21,7 +21,7 @@ GET_SCHEMA = types.FunctionDeclaration(
         "by those same field ids. Tables use rows keyed by column id; Todo lists "
         "use items. Numbers and booleans retain their JSON types."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -34,7 +34,7 @@ GET_SCHEMA = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

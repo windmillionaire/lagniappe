@@ -32,7 +32,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
         "current submission data keyed by schema field id. Use this before "
         "proposing reviewed batch submission updates for a form."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -61,7 +61,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 

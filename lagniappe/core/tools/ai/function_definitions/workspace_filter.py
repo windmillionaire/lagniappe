@@ -40,7 +40,7 @@ GET_FILTER_SCHEMA = types.FunctionDeclaration(
         "values. Call this before query_workspace_filter when the needed fields "
         "or comparators are not already known."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -52,7 +52,7 @@ GET_FILTER_SCHEMA = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
@@ -66,7 +66,7 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
         "values. All conditions are combined with AND. Values are strings even "
         "for numbers and dates; use ISO YYYY-MM-DD dates."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -125,7 +125,7 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
             },
         },
         "required": ["id", "conditions"],
-    },
+    }),
 )
 
 
