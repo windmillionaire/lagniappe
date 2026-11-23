@@ -1,9 +1,10 @@
 """Gemini AI client wrapper for content and image generation."""
 
+from collections.abc import Callable
 from io import BytesIO
 import json
 import re
-from typing import TYPE_CHECKING, Never, Unpack
+from typing import TYPE_CHECKING, Never, Unpack, overload
 
 if TYPE_CHECKING:
     from .prompt import Prompt
@@ -37,6 +38,9 @@ from .observability import (
     current_observer,
     mark_outcome,
 )
+
+type ModelValue = str | int | float | bool | None | list[ModelValue] | dict[str, ModelValue]
+
 
 MINIMUM_SAFETY_SETTINGS = [
     types.SafetySetting(
@@ -88,7 +92,7 @@ DEFERRED_AI_RETRY_ATTEMPTS = 2
 def _raise_provider_error(error: Exception) -> Never:
     if is_provider_quota_error(error):
         details = provider_error_details(error)
-        context = {
+        context: dict[str, object] = {
             "ai_provider": {
                 "quota_exhausted": True,
                 "code": details.get("code"),
@@ -383,6 +387,12 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
     # @matrix ai : output-format provider-errors quota search tool-loop
     # @matrix ai : empty-response-retry model-routing site-policy provider-boundary
+    @overload
+    def generate_content[T](self, prompt: Prompt, *, validator: Callable[[object], T], validation_retries: int = 0) -> T: ...
+    @overload
+    def generate_content(self, prompt: Prompt, *, validator: None = None, validation_retries: int = 0) -> ModelValue: ...
+
+
     def generate_content(self, prompt: Prompt, *, validator=None, validation_retries: int = 0):
         """Generate and optionally validate text under one observable call boundary."""
         if not CONFIG.AI_ENABLED:
@@ -691,7 +701,7 @@ class GenAI:
                             response.function_calls,
                             iteration_trace["calls"],
                         )
-                    context = {
+                    context: dict[str, object] = {
                         "ai_tool_loop": {
                             "prompt_type": prompt.prompt_type,
                             "search_enabled": prompt.search,
@@ -752,7 +762,7 @@ class GenAI:
             except Exception as e:
                 if execution_control is not None:
                     execution_control.ensure_active()
-                context = {
+                context: dict[str, object] = {
                     "ai_tool_loop": {
                         "prompt_type": prompt.prompt_type,
                         "search_enabled": prompt.search,
@@ -782,7 +792,7 @@ class GenAI:
             self._log_response(response, "tool-loop")
 
         if response.function_calls:
-            context = {
+            context: dict[str, object] = {
                 "ai_tool_loop": {
                     "prompt_type": prompt.prompt_type,
                     "search_enabled": prompt.search,
