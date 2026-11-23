@@ -81,7 +81,7 @@ class EntityRegistry:
         if hasattr(entity, "db"):
             return cast("Entity", entity)
 
-        entity_type = entity.get("type", None)
+        entity_type = cast("DatastoreEntity", entity).get("type", None)
         if not entity_type:
             capture(
                 ValueError(f"Entity type not found for entity: {entity}"),
@@ -134,7 +134,7 @@ class EntityRegistry:
             for key in entity.related_keys:
                 pending.setdefault(key, None)
 
-        secondary_keys = [key for key, value in pending.items() if value is None]
+        secondary_keys = [key for key, value in pending.items() if key is not None and value is None]
         secondary_entities = {
             entity.key: self._typed_entity(entity)
             for entity in database_get.entities(secondary_keys)

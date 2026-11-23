@@ -11,7 +11,16 @@
     "lagniappe/core/entities/__init__.py",
     "lagniappe/core/tools/ai/auto_execute.py",
     "lagniappe/core/tools/ai/settings.py",
-    "lagniappe/core/tools/ai/reporting/execution/request.py"
+    "lagniappe/core/tools/ai/reporting/execution/request.py",
+    "installer",
+    "runner",
+    "main.py",
+    "run.py",
+    "lagniappe/reference",
+    "lagniappe/core/tools/cache",
+    "lagniappe/core/tools/database",
+    "lagniappe/core/entities/user.py",
+    "lagniappe/core/properties/common_assets.py"
   ],
   "exclude": [
     "**/__pycache__",
