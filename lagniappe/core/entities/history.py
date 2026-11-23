@@ -24,6 +24,7 @@ from ..tools.database import get as database_get
 
 if TYPE_CHECKING:
     from . import property_types
+    from .task import Task
 
 
 # @testable true
@@ -43,6 +44,8 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     edit-revision signal.
     """
     if TYPE_CHECKING:
+        task: Task | None
+
         @property
         def properties(self) -> property_types.TaskHistoryProperties: ...
 

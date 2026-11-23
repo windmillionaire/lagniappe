@@ -23,6 +23,8 @@ from .entity import Entity
 
 if TYPE_CHECKING:
     from . import property_types
+    from .file import File
+    from .user import User
     from .task import Task
 
 
@@ -31,6 +33,10 @@ if TYPE_CHECKING:
 # @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
+        files: list[File]
+        user: User | None
+        deferred_job: dict[str, object] | None
+
         @property
         def properties(self) -> property_types.PageProperties: ...
 

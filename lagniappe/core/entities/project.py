@@ -11,6 +11,7 @@ from .index import TaskIndex
 
 if TYPE_CHECKING:
     from . import property_types
+    from .model_task import ModelTask
 
 
 # @testable true
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
 # @pair project:update
 class Project(Entity, AssetMixin):
     if TYPE_CHECKING:
+        model_tasks: list[ModelTask]
+
         @property
         def properties(self) -> property_types.ProjectProperties: ...
 

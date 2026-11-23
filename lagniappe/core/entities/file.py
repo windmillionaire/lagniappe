@@ -13,6 +13,8 @@ from ..tools.auth.restrictions import permission_relation
 
 if TYPE_CHECKING:
     from . import property_types
+    from .page import Page
+    from .task import Task
 
 
 # @testable true
@@ -22,6 +24,9 @@ if TYPE_CHECKING:
 # @matrix file : asset-lifecycle attached-pages attached-tasks badges permissions references reverse-links task-history upload
 class File(AssetMixin, Entity):
     if TYPE_CHECKING:
+        page: Page | None
+        task: Task | None
+
         @property
         def properties(self) -> property_types.FileProperties: ...
 
@@ -49,7 +54,7 @@ class File(AssetMixin, Entity):
         return list(dict.fromkeys(h for h in [self.hash, "models", *requirements] if h))
 
     @property
-    def owner(self):
+    def owner(self) -> Entity | None:
         if self.properties.task.key:
             return permission_relation(self, "task", required=True)
         return permission_relation(self, "page")

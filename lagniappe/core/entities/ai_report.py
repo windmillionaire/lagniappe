@@ -25,6 +25,12 @@ UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
     if TYPE_CHECKING:
+        agent_manifest: dict[str, object] | None
+        deferred_job: dict[str, object] | None
+        proposal: dict[str, object] | None
+        result: dict[str, object] | None
+        status: str | None
+
         @property
         def properties(self) -> property_types.AIReportProperties: ...
 

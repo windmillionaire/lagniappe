@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 # @reason focused methods/properties own the durable Form behavior
 class Form(Entity, AssetMixin):
     if TYPE_CHECKING:
+        schema: list[dict[str, object]]
+
         @property
         def properties(self) -> property_types.FormProperties: ...
 

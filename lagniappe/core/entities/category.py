@@ -9,6 +9,7 @@ from .index import PageIndex
 
 if TYPE_CHECKING:
     from . import property_types
+    from .form import Form
 
 UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 
@@ -19,6 +20,8 @@ UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 # @matrix category permissions : attached-form cache restricted-access
 class Category(Entity):
     if TYPE_CHECKING:
+        forms: list[Form]
+
         @property
         def properties(self) -> property_types.CategoryProperties: ...
 

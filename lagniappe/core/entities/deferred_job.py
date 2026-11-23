@@ -22,6 +22,18 @@ if TYPE_CHECKING:
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
     if TYPE_CHECKING:
+        job_type: str | None
+        status: str | None
+        authorization: dict[str, object] | None
+        parameters: dict[str, object] | None
+        inputs: dict[str, dict[str, str] | None] | None
+        client: dict[str, object] | None
+        checkpoint: dict[str, object] | None
+        progress: dict[str, object] | None
+        result: dict[str, object] | None
+        delivery: dict[str, object] | None
+        error: dict[str, object] | None
+
         @property
         def properties(self) -> property_types.DeferredJobProperties: ...
 

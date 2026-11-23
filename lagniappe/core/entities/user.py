@@ -23,6 +23,7 @@ from . import Entities
 
 if TYPE_CHECKING:
     from . import property_types
+    from .page import Page
 
 
 # @testable true
@@ -30,6 +31,8 @@ if TYPE_CHECKING:
 # @pair user:entity-lifecycle
 class User(AssetMixin, UserMixin, Entity):
     if TYPE_CHECKING:
+        page: Page
+
         @property
         def properties(self) -> property_types.UserProperties: ...
 
