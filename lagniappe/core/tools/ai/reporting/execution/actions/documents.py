@@ -2,9 +2,7 @@
 
 from datetime import datetime, UTC
 from html import escape
-from typing import cast
 
-from pycrdt import Map
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import MutationIntent
@@ -14,6 +12,7 @@ from lagniappe.core.tools.document_crdt import (
     append_fragment,
     replace_fragment,
     load_document,
+    report_receipts,
 )
 from lagniappe.core.tools.document_updates import (
     checkpointed_document,
@@ -69,12 +68,13 @@ def _append_page_document(action, report, user, created, context):
         raise exceptions.ValidationError("Document is unavailable or no longer editable.")
     with document_write_lock(page.properties.document.sync_id):
         document = page.properties.document
-        receipt = cast(Map, load_document(document.ydoc)["lagniappeReports"]).get(
+        receipt = report_receipts(load_document(document.ydoc)).get(
             record["idempotency_key"]
         )
         if receipt:
             # This operation already committed. Later user edits are authoritative;
             # retry must not restore or duplicate the originally appended content.
+            assert "signature" in receipt
             return page, [], {"document_after": receipt["signature"]}
         batch = context["batch"]
         first_append = page.key not in batch.documents
@@ -111,6 +111,7 @@ def _append_page_document(action, report, user, created, context):
                 document.ydoc, addition, record["idempotency_key"], html_after=html
             )
         document.save(html=html, ydoc=snapshot)
+        assert "signature" in receipt
         return page, [], {"document_after": receipt["signature"]}
 
 
@@ -125,7 +126,7 @@ def inspect_document_append(record, user):
         page = fresh_document(page, user)
     except exceptions.ValidationError:
         return "drifted"
-    receipt = cast(Map, load_document(page.properties.document.ydoc)["lagniappeReports"]).get(
+    receipt = report_receipts(load_document(page.properties.document.ydoc)).get(
         record["idempotency_key"]
     )
     if not receipt:
@@ -135,5 +136,6 @@ def inspect_document_append(record, user):
     record["entity"] = _entity_result(page)
     # The applied receipt is historical proof, not a guard on current content.
     # Reconcile a lost Report checkpoint without treating later user edits as drift.
+    assert "signature" in receipt
     record.setdefault("document_after", receipt["signature"])
     return "applied"
