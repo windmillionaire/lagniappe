@@ -941,6 +941,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         create_get = _assert_safe_plan(
             workflow["create"]["get"], tool="create", status="ready"
         )
+        assert "proposal" not in create_get
         replacement_receipt = _assert_safe_receipt(
             workflow["create"]["replacement_receipt"], status="ready"
         )
@@ -1094,6 +1095,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         organize_get = _assert_safe_plan(
             workflow["organize"]["get"], tool="organize", status="ready"
         )
+        assert "proposal" not in organize_get
         assert organize_get["id"] == organize_start["id"] == organize_receipt["id"]
         assert organize_get["files"] == upload["upload_inventory"]
 
