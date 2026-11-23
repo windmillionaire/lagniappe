@@ -38,6 +38,8 @@ jobs:
           }
           if ((Get-Content venv/fixture.txt) -ne 'preserved') { throw "Setup replaced the fixture" }
           Move-Item venv "$env:RUNNER_TEMP\old-lagniappe-venv"
+          # The expected setup failure remains the last native command's exit code.
+          exit 0
       - name: Select the supported runtime
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
