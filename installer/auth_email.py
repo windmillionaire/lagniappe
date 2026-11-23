@@ -1,6 +1,12 @@
 """Configure SMTP delivery for authentication action links."""
 
+from __future__ import annotations
+from collections.abc import Callable, Mapping
+from typing import TypedDict
+
+
 from contextlib import suppress
+from typing import SupportsIndex, SupportsInt
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -24,6 +30,18 @@ from installer.errors import (
 )
 from runner.context import setup_command
 
+class SMTPConfig(TypedDict):
+    provider: str
+    service: str
+    host: str
+    port: int
+    security: str
+    username: str
+    password: str
+    senderEmail: str
+    senderName: str
+
+
 GMAIL_APP_PASSWORDS_URL = (
     "https://accounts.google.com/AccountChooser"
     "?continue=https%3A%2F%2Fmyaccount.google.com%2Fapppasswords"
@@ -43,7 +61,7 @@ EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_auth_email_config_requires_canonical_smtp
 # @matrix setup : app-password authentication-email validation
-def normalize_app_password(value):
+def normalize_app_password(value: object) -> str | None:
     """Normalize and validate Google's displayed 16-character app password."""
     password = "".join(str(value or "").split())
     return password if re.fullmatch(r"[A-Za-z0-9]{16}", password) else None
@@ -52,10 +70,9 @@ def normalize_app_password(value):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_auth_email_config_requires_canonical_smtp
 # @matrix setup : authentication-email smtp validation
-def normalize_auth_email_config(config):
+def normalize_auth_email_config(config: object) -> SMTPConfig | None:
     """Return one validated generic SMTP configuration or ``None``."""
-    config = config or {}
-    if config.get("provider") != "smtp":
+    if not isinstance(config, Mapping) or config.get("provider") != "smtp":
         return None
     service = str(config.get("service") or "SMTP").strip()
     host = str(config.get("host") or "").strip()
@@ -65,7 +82,10 @@ def normalize_auth_email_config(config):
     sender_email = str(config.get("senderEmail") or "").strip()
     sender_name = str(config.get("senderName") or "").strip()
     try:
-        port = int(config.get("port"))
+        raw_port = config.get("port")
+        if not isinstance(raw_port, (str, bytes, bytearray, SupportsIndex, SupportsInt)):
+            return None
+        port = int(raw_port)
     except (TypeError, ValueError):
         return None
     if not (
@@ -95,7 +115,7 @@ def normalize_auth_email_config(config):
 # @testable false
 # @covered-by installer/auth_email.py::normalize_auth_email_config
 # @reason validation predicate delegates to the canonical normalizer
-def auth_email_config_matches(config):
+def auth_email_config_matches(config: object) -> bool:
     """Return whether saved authentication-email settings are complete."""
     return normalize_auth_email_config(config) is not None
 
@@ -114,15 +134,15 @@ def _create_smtp_tls_context():
 # @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_tls_and_reports_transport_failures
 # @matrix setup : authentication-email error-reporting smtp tls transient-retry
 def test_smtp_delivery(
-    config,
-    recipient=None,
+    config: object,
+    recipient: str | None = None,
     *,
-    smtp_factory=smtplib.SMTP,
-    smtp_ssl_factory=smtplib.SMTP_SSL,
-    tls_context=None,
-    smtp_attempts=2,
-    retry_sleep=None,
-):
+    smtp_factory: type[smtplib.SMTP] = smtplib.SMTP,
+    smtp_ssl_factory: type[smtplib.SMTP_SSL] = smtplib.SMTP_SSL,
+    tls_context: ssl.SSLContext | None = None,
+    smtp_attempts: int = 2,
+    retry_sleep: Callable[[float], None] | None = None,
+) -> bool:
     """Send a test message through the candidate SMTP configuration."""
     normalized = normalize_auth_email_config(config)
     if not normalized:
@@ -146,7 +166,7 @@ def test_smtp_delivery(
     # @testable false
     # @covered-by installer/auth_email.py::test_smtp_delivery
     # @reason nested response sanitizer is exercised through SMTP failure handling
-    def response_detail(response):
+    def response_detail(response: object) -> str:
         if isinstance(response, bytes):
             response = response.decode("utf-8", errors="replace")
         return " ".join(str(response or "").split())[:500]
@@ -154,7 +174,7 @@ def test_smtp_delivery(
     # @testable false
     # @covered-by installer/auth_email.py::test_smtp_delivery
     # @reason one-attempt transport helper is exercised through bounded delivery retry
-    def send_test_message():
+    def send_test_message() -> bool:
         stage = "connect to the email service"
         try:
             if normalized["security"] == "ssl":
@@ -250,14 +270,12 @@ def test_smtp_delivery(
             ) from error
         return True
 
-    retry_options = {
-        "description": f"Test {normalized['service']} email delivery",
-        "attempts": smtp_attempts,
-        "delays": (1,),
-    }
-    if retry_sleep is not None:
-        retry_options["sleep"] = retry_sleep
-    return retry_provider_call(send_test_message, **retry_options)
+    return retry_provider_call(
+        send_test_message,
+        description=f"Test {normalized['service']} email delivery",
+        attempts=smtp_attempts, delays=(1,),
+        **({"sleep": retry_sleep} if retry_sleep is not None else {}),
+    )
 
 
 # @testable false
@@ -350,7 +368,7 @@ def _prompt(label, default=None):
 # @tests tests_tooling/test_001b_setup_providers.py::test_setup_auth_email_replaces_existing_gmail_sender
 # @tests tests_tooling/test_001b_setup_providers.py::test_setup_auth_email_uses_custom_domain_provider_path
 # @matrix setup : authentication-email custom-domain failure-isolation interactive-input replacement settings-save smtp
-def setup_auth_email(*, replace=False):
+def setup_auth_email(*, replace: bool = False) -> bool:
     """Select a custom-domain SMTP service or the zero-domain Gmail bootstrap."""
     from config import SETTINGS
 
@@ -931,7 +949,7 @@ def _setup_provider_auth_email():
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_email_cli_replaces_gmail_without_custom_domain
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_email_cli_configures_and_optionally_deploys
 # @matrix setup : authentication-email cli custom-domain deploy gmail replacement smtp
-def configure_auth_email():
+def configure_auth_email() -> int:
     """Replace authentication-email delivery on an existing installation."""
     from .verify import prepare_existing_installation
 

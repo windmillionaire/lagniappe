@@ -9,7 +9,7 @@ from installer import FORMATTER
 
 # @testable false
 # @reason console-only custom-domain Google OAuth instructions
-def update_oauth_redirect_uris(domain):
+def update_oauth_redirect_uris(domain: str) -> None:
     """Provide instructions for updating OAuth redirect URIs."""
     f = FORMATTER.initialize()
     print(wrap_text(f"\n{ui.heading('Update authentication settings')}"))

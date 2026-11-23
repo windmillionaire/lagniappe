@@ -32,14 +32,14 @@ _REQUIRED_INSTALLATION_FILES = (
 # @testable false
 # @covered-by installer/development.py::setup_development
 # @reason platform branch is exercised through the development setup entrypoint
-def _native_windows():
+def _native_windows() -> bool:
     return os.name == "nt"
 
 
 # @testable false
 # @covered-by installer/development.py::setup_development
 # @reason virtualenv enforcement is exercised through the development setup entrypoint
-def _in_virtualenv():
+def _in_virtualenv() -> bool:
     return bool(
         getattr(sys, "real_prefix", None)
         or sys.prefix != getattr(sys, "base_prefix", sys.prefix)
@@ -49,7 +49,7 @@ def _in_virtualenv():
 # @testable false
 # @covered-by installer/development.py::setup_development
 # @reason installation prerequisite reporting is exercised through the development setup entrypoint
-def _missing_installation_files():
+def _missing_installation_files() -> list[str]:
     status = config_file_status()
     return [name for name in _REQUIRED_INSTALLATION_FILES if not status.get(name)]
 
@@ -57,7 +57,9 @@ def _missing_installation_files():
 # @testable false
 # @covered-by installer/development.py::setup_development
 # @reason Node discovery is exercised through the development setup entrypoint
-def _installed_node_version():
+def _installed_node_version() -> str | None:
+    if NODE_CLI is None:
+        return None
     result = subprocess.run(
         [NODE_CLI, "--version"],
         cwd=APP_ROOT,
@@ -73,7 +75,7 @@ def _installed_node_version():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_validates_node_range
 # @matrix setup : development node-version
-def node_version_supported(version):
+def node_version_supported(version: str | None) -> bool:
     """Return whether a Node version satisfies the project's engine floor."""
     match = _NODE_VERSION_PATTERN.match(str(version).strip())
     if not match:
@@ -114,7 +116,7 @@ def _run_command(label, command, timeout=None):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_is_additive_and_idempotent
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_directs_native_windows_to_wsl
 # @matrix setup : development frontend-build idempotence package-install portability prerequisites windows
-def setup_development():
+def setup_development() -> int:
     """Install local development dependencies after ordinary installer."""
     print(ui.heading("Lagniappe development setup"))
 

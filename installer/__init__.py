@@ -1,3 +1,5 @@
+from typing import Self
+
 import sys
 
 from runner.console import (
@@ -23,7 +25,7 @@ from runner.context import (
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
 # @matrix setup : portability prerequisites python-version virtualenv
-def verify_setup_runtime():
+def verify_setup_runtime() -> None:
     """Require supported Python from this checkout's project virtualenv."""
     from installer.errors import SetupError
 
@@ -43,7 +45,7 @@ def verify_setup_runtime():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
 # @pair setup:config-files
-def config_file_status():
+def config_file_status() -> dict[str, bool]:
     from config import File
 
     """Return expected config files and whether each one exists."""
@@ -66,7 +68,7 @@ class Formatter:
     success = staticmethod(success)
     info = staticmethod(info)
 
-    def initialize(self):
+    def initialize(self) -> Self:
         if not self._initialized:
             from installer.package_install import install_if_missing
 

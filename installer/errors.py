@@ -1,8 +1,10 @@
 """Typed setup failures and bounded provider retry helpers."""
 
+from collections.abc import Callable, Sequence
 import re
 import subprocess
 import time
+from typing import SupportsIndex, SupportsInt
 
 GCLOUD_TIMEOUT = 600
 GIT_TIMEOUT = 300
@@ -20,7 +22,9 @@ class SetupError(RuntimeError):
     exit_code = 1
     category = "setup"
 
-    def __init__(self, message="Setup failed.", *, repair_action=None):
+    def __init__(
+        self, message: str = "Setup failed.", *, repair_action: str | None = None
+    ) -> None:
         super().__init__(message)
         self.repair_action = repair_action
 
@@ -46,12 +50,12 @@ class ProviderTermsNotAccepted(ProviderError):
 
     def __init__(
         self,
-        message="Google service terms have not been accepted.",
+        message: str = "Google service terms have not been accepted.",
         *,
-        terms_id=None,
-        terms_url=None,
-        repair_action=None,
-    ):
+        terms_id: str | None = None,
+        terms_url: str | None = None,
+        repair_action: str | None = None,
+    ) -> None:
         super().__init__(message, repair_action=repair_action)
         self.terms_id = terms_id
         self.terms_url = terms_url
@@ -92,7 +96,9 @@ _GOOGLE_SERVICE_TERMS_NAMES = {
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
 # @matrix setup : error-guidance google-service-terms identity provider-errors
-def google_service_terms_error(detail, *, account=None):
+def google_service_terms_error(
+    detail: object, *, account: str | None = None
+) -> ProviderTermsNotAccepted | None:
     """Return a concise actionable error for Google's per-service agreements."""
     detail = str(detail or "")
     normalized = detail.casefold()
@@ -131,7 +137,7 @@ def google_service_terms_error(detail, *, account=None):
 # @testable false
 # @covered-by installer/errors.py::classify_provider_error
 # @reason provider status adapter exercised through public classification
-def _status_code(error):
+def _status_code(error: object) -> int | None:
     status = getattr(error, "status_code", None)
     if status is None:
         status = getattr(error, "code", None)
@@ -141,7 +147,7 @@ def _status_code(error):
         except Exception:
             status = None
     try:
-        return int(status)
+        return int(status) if isinstance(status, (str, bytes, bytearray, SupportsIndex, SupportsInt)) else None
     except (TypeError, ValueError):
         return None
 
@@ -149,7 +155,12 @@ def _status_code(error):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
 # @matrix setup : classification provider-errors
-def classify_provider_error(error, *, message=None, status_code=None):
+def classify_provider_error(
+    error: object,
+    *,
+    message: str | None = None,
+    status_code: int | None = None,
+) -> SetupError:
     """Return one typed provider failure without confusing access with absence."""
     if isinstance(error, SetupError):
         return error
@@ -211,14 +222,14 @@ def classify_provider_error(error, *, message=None, status_code=None):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
 # @matrix setup : provider-errors retry timeout
-def retry_provider_call(
-    operation,
+def retry_provider_call[T](
+    operation: Callable[[], T],
     *,
-    description,
-    attempts=4,
-    delays=(1, 2, 4),
-    sleep=time.sleep,
-):
+    description: str,
+    attempts: int = 4,
+    delays: Sequence[float] = (1, 2, 4),
+    sleep: Callable[[float], None] = time.sleep,
+) -> T:
     """Retry only typed transient provider failures with a bounded backoff."""
     for attempt in range(attempts):
         try:

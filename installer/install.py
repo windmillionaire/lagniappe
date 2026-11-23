@@ -32,7 +32,7 @@ def _recovery_file_present(app_dir=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_only_prints_manual_deployment_steps_when_declined
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
 # @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
-def install(*, experiments=False):
+def install(*, experiments: bool = False) -> int:
     print(ui.heading(wrap_text("Welcome to Lagniappe setup")))
     if _recovery_file_present():
         print(
@@ -160,7 +160,7 @@ def install(*, experiments=False):
 
         if not _configure_deferred_job_recovery(f, gcloud):
             return 1
-        if ai_email_config:
+        if isinstance(ai_email_config, dict) and ai_email_config:
             record_step("activate AI email submissions")
             ai_email.activate_ai_email(ai_email_config)
         deployed = True
@@ -243,7 +243,7 @@ def install(*, experiments=False):
                     action=True,
                 )
             )
-        if ai_email_config:
+        if isinstance(ai_email_config, dict) and ai_email_config:
             print(
                 ui.value(
                     "Then activate the saved AI email configuration",

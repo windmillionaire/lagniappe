@@ -20,7 +20,7 @@ class _SetupArgumentParser(argparse.ArgumentParser):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
 # @matrix setup : argument-validation cli-routing
-def _parser():
+def _parser() -> argparse.ArgumentParser:
     parser = _SetupArgumentParser(description="Lagniappe setup")
     parser.add_argument("--experiments", action="store_true", help="Create a dedicated experiments installation with an Administrator agent")
     commands = parser.add_subparsers(
@@ -153,7 +153,7 @@ def _read_only(args):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
 # @matrix setup : cli-status failure-propagation
-def _status(result):
+def _status(result: object) -> int:
     """Normalize every setup entry point to an honest process status."""
     if result is True:
         return 0
@@ -365,7 +365,7 @@ def _dispatch(args):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
 # @matrix setup : cli-routing operation-journal prerequisites
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = _parser()
     args = parser.parse_args(arguments)
@@ -402,7 +402,7 @@ def main(argv=None):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
 # @matrix setup : cli-status failure-propagation unexpected-errors
-def cli(argv=None):
+def cli(argv: list[str] | None = None) -> int:
     from installer.errors import SetupCancelled, SetupError, SetupInterrupted
 
     try:

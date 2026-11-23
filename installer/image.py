@@ -1,5 +1,9 @@
 """Best-effort restoration of site images with transactional local updates."""
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -12,6 +16,11 @@ import uuid
 from installer import FORMATTER
 from installer.utils import ensure_storage_dependency
 
+
+if TYPE_CHECKING:
+    from google.cloud import datastore, storage
+    from runner.presentation import Progress
+
 DATASTORE_TIMEOUT = 30
 IMAGE_DOWNLOAD_TIMEOUT = 60
 SITE_IMAGE_SUFFIXES = (".png", ".ico", ".jpg", ".jpeg", ".webp")
@@ -21,7 +30,7 @@ SITE_IMAGE_METADATA_KEYS = frozenset({"version", "asset_generations"})
 # @testable false
 # @covered-by installer/image.py::get_images
 # @reason thin Datastore client adapter owned by image metadata discovery
-def get_datastore_client():
+def get_datastore_client() -> datastore.Client:
     from google.cloud import datastore
     from config import SETTINGS
 
@@ -31,7 +40,7 @@ def get_datastore_client():
 # @testable false
 # @covered-by installer/image.py::save_images
 # @reason thin managed-public-bucket adapter owned by transactional image restore
-def get_storage_bucket():
+def get_storage_bucket() -> storage.Bucket:
     ensure_storage_dependency()
 
     from google.cloud import storage
@@ -45,7 +54,7 @@ def get_storage_bucket():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_uses_loaded_metadata_and_timeouts
 # @pair setup:image-restore
-def get_images():
+def get_images() -> datastore.Entity | None:
     f = FORMATTER.initialize()
 
     try:
@@ -139,7 +148,7 @@ def _swap_image_tree(staging, images_dir):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_uses_loaded_metadata_and_timeouts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_skips_invalid_entries_and_keeps_successful_downloads
 # @matrix setup : image-restore path-validation transactional-state partial-failure
-def save_images(sp, images_dict=None):
+def save_images(sp: Progress, images_dict: dict[str, object] | None = None) -> bool:
     """Restore each available remote image without replacing good live files."""
     from installer import FORMATTER
     from config import Directory

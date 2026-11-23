@@ -1,5 +1,10 @@
 """App Engine custom-domain mapping discovery and reconciliation."""
 
+from collections.abc import Callable, Iterable
+from typing import TypedDict
+from runner.presentation import Progress
+
+
 from runner.presentation import output as print
 from runner import presentation as ui
 
@@ -22,6 +27,11 @@ from installer.state import record_mutation
 
 DOMAIN_MAPPING_POLL_DELAYS = (0, 1, 2, 4, 8)
 MANAGED_CERTIFICATE_POLL_DELAYS = (0, 30, 30) + (60,) * 9
+
+
+# @testable infrastructure
+class _DomainMapping(TypedDict):
+    resourceRecords: list[dict[str, object]]
 
 
 # @testable false
@@ -214,12 +224,12 @@ def _listed_domain_mapping(mappings, project_id, domain):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_missing_domain_mapping
 # @matrix setup : account-project deploy gcp-domain https incomplete-deployment managed-certificate missing-resource operator-guidance provider-failure provider-status retry success timeout
 def wait_for_managed_certificate(
-    domain,
+    domain: str,
     *,
-    announce_ready=False,
-    sleep=time.sleep,
-    poll_delays=MANAGED_CERTIFICATE_POLL_DELAYS,
-):
+    announce_ready: bool = False,
+    sleep: Callable[[float], None] = time.sleep,
+    poll_delays: Iterable[float] = MANAGED_CERTIFICATE_POLL_DELAYS,
+) -> bool:
     """Wait for Google to attach an active managed certificate."""
     from config import SETTINGS
 
@@ -384,7 +394,9 @@ def _validated_mapping(mapping, project_id, domain):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_domain_mapping_enables_managed_tls
 # @tests tests_tooling/test_001d_setup_drift.py::test_app_engine_discovery_has_domain_mapping_create
 # @matrix setup : api-drift gcp-domain idempotence managed-certificate missing-resource provider-records reconciliation
-def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
+def create_gcp_domain_mapping(
+    domain: str, sp: Progress, *, sleep: Callable[[float], None] = time.sleep
+) -> _DomainMapping:
     """Discover or create a mapping and return Google's exact DNS records."""
     from config import SETTINGS
 

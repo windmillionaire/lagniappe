@@ -51,7 +51,7 @@ _SETUP_DEPENDENCIES = (
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
 # @pair setup:package-install
-def ensure_pip_is_available():
+def ensure_pip_is_available() -> None:
     """Checks if pip is available, tries to install it if not, and provides guidance."""
     try:
         # Try to run pip --version
@@ -244,7 +244,7 @@ def _run_pip_check():
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_repairs_transitive_conflicts
 # @matrix setup : dependency-pins package-install
-def ensure_setup_dependencies():
+def ensure_setup_dependencies() -> bool:
     """Validate/install the default setup dependency set in one pip transaction."""
     pending = []
     for import_name, package_name, explanation in _SETUP_DEPENDENCIES:
@@ -366,7 +366,9 @@ def _install(package_name, import_name):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
 # @pair setup:package-install
-def install_if_missing(import_name, explanation=None, package_name=None):
+def install_if_missing(
+    import_name: str, explanation: str | None = None, package_name: str | None = None
+) -> None:
     """Test import and install if missing.
 
     Uses stderr for all output and pauses active setup spinners so prompts

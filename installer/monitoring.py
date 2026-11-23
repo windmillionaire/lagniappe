@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, TypedDict
+
+
 from runner import presentation as ui
 
 from runner.presentation import output as print
@@ -11,6 +15,29 @@ from urllib.parse import quote
 
 from runner.console import wrap_text
 from runner.context import setup_command
+
+
+if TYPE_CHECKING:
+    from requests import Session
+
+# @testable infrastructure
+class MemoryPolicy(TypedDict):
+    displayName: str
+    documentation: dict[str, str]
+    userLabels: dict[str, str]
+    conditions: list[dict[str, object]]
+    combiner: str
+    enabled: bool
+    severity: str
+    notificationChannels: list[str]
+    alertStrategy: dict[str, object]
+
+# @testable infrastructure
+class MemoryThreshold(TypedDict):
+    instance_class: str
+    envelope_mib: int
+    threshold_mib: float
+    threshold_bytes: float
 
 
 MONITORING_API = "monitoring.googleapis.com"
@@ -65,7 +92,7 @@ def _instance_class(settings):
 # @testable true
 # @tests tests_tooling/test_001i_setup_monitoring.py::test_memory_threshold_is_derived_from_each_supported_instance_class
 # @matrix monitoring setup : instance-class threshold
-def memory_threshold(settings):
+def memory_threshold(settings: Mapping[str, object]) -> MemoryThreshold:
     """Return the configured memory envelope and its 80% warning threshold."""
     instance_class = _instance_class(settings)
     envelope_mib = INSTANCE_CLASS_MEMORY_MIB[instance_class]
@@ -147,7 +174,9 @@ def _documentation(settings, project):
 # @testable true
 # @tests tests_tooling/test_001i_setup_monitoring.py::test_memory_policy_payload_uses_per_instance_query_and_actionable_documentation
 # @matrix monitoring setup : alert-policy documentation memory-pressure payload
-def memory_policy_payload(settings, project, notification_channels):
+def memory_policy_payload(
+    settings: Mapping[str, object], project: str, notification_channels: Sequence[str]
+) -> MemoryPolicy:
     """Build the exact owned alert-policy fields."""
     return {
         "displayName": POLICY_DISPLAY_NAME,
@@ -352,7 +381,12 @@ def _resources(session, project, headers):
 # @tests tests_tooling/test_001i_setup_monitoring.py::test_reconcile_reuses_owner_channel_preserves_operator_channels_and_is_idempotent
 # @tests tests_tooling/test_001i_setup_monitoring.py::test_reconcile_creates_owner_channel_and_detaches_obsolete_managed_channels
 # @matrix monitoring setup : alert-policy creation idempotence notification-channel operator-preservation owner-reconciliation
-def reconcile_memory_alert(*, settings=None, project=None, session=None):
+def reconcile_memory_alert(
+    *,
+    settings: Mapping[str, object] | None = None,
+    project: str | None = None,
+    session: Session | None = None,
+) -> dict[str, object]:
     """Enable Monitoring and reconcile one managed policy and owner channel."""
     from config import SETTINGS
     from installer.google_provider import _api_request
@@ -440,7 +474,7 @@ def reconcile_memory_alert(*, settings=None, project=None, session=None):
 # @testable true
 # @tests tests_tooling/test_001i_setup_monitoring.py::test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command
 # @matrix monitoring setup : failure-isolation post-deploy retry-command
-def reconcile_memory_alert_after_deploy():
+def reconcile_memory_alert_after_deploy() -> bool:
     """Run automatic reconciliation without invalidating a completed deploy."""
     from config import SETTINGS
     from installer import FORMATTER
@@ -477,7 +511,9 @@ def reconcile_memory_alert_after_deploy():
 # @testable true
 # @tests tests_tooling/test_001i_setup_monitoring.py::test_inspection_reports_missing_and_drifted_managed_policy
 # @matrix doctor monitoring setup : drift read-only
-def inspect_memory_alert(settings, project, *, session=None):
+def inspect_memory_alert(
+    settings: Mapping[str, object], project: str, *, session: Session | None = None
+) -> dict[str, object]:
     """Return a doctor-compatible read-only policy observation."""
     try:
         session, headers = _provider_context(project, session=session)

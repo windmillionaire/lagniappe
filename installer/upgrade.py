@@ -26,7 +26,7 @@ from .verify import activate_installation
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
 # @matrix setup : config-files deferred-jobs post-deploy public-page-settings storage-buckets
-def update(*, announce=True):
+def update(*, announce: bool = True) -> int:
     """Apply app-saved configuration without replacing repository code."""
     activate_installation(announce=announce)
     return _apply_update(upgrade=False)
@@ -36,7 +36,7 @@ def update(*, announce=True):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
 # @matrix setup : branch config-files git-upgrade post-deploy
 # @pairs migrations:major-version setup:major-version
-def upgrade(branch=None, *, announce=True):
+def upgrade(branch: str | None = None, *, announce: bool = True) -> int:
     """Replace tracked source from a remote branch, then apply and deploy it."""
     activate_installation(announce=announce)
 

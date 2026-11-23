@@ -10,6 +10,7 @@ import webbrowser
 import requests
 
 from config.ai_email import (
+    AIEmailConfig,
     ai_email_public_config,
     normalize_ai_email_config,
     normalize_email_address,
@@ -50,7 +51,15 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason shared HTTP implementation exercised through the public adapter
-    def _request(self, method, path, *, json_data=None, api_key=None, headers=None):
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_data: dict[str, str | dict[str, str] | list[str]] | None = None,
+        api_key: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, object]:
         request_headers = {
             "Authorization": f"Bearer {api_key or self.api_key}",
             "Content-Type": "application/json",
@@ -97,7 +106,7 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through the public setup client
-    def list_domains(self):
+    def list_domains(self) -> list[dict[str, object]]:
         payload = self._request("GET", "/domains")
         data = payload.get("data")
         if not isinstance(data, list):
@@ -107,7 +116,7 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through domain reconciliation
-    def create_receiving_domain(self, domain):
+    def create_receiving_domain(self, domain: str) -> dict[str, object]:
         return self._request(
             "POST",
             "/domains",
@@ -120,13 +129,13 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through domain reconciliation
-    def get_domain(self, domain_id):
+    def get_domain(self, domain_id: str) -> dict[str, object]:
         return self._request("GET", f"/domains/{domain_id}")
 
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through domain reconciliation
-    def enable_domain_receiving(self, domain_id):
+    def enable_domain_receiving(self, domain_id: str) -> dict[str, object]:
         return self._request(
             "PATCH",
             f"/domains/{domain_id}",
@@ -136,13 +145,13 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through the setup workflow
-    def verify_domain(self, domain_id):
+    def verify_domain(self, domain_id: str) -> dict[str, object]:
         return self._request("POST", f"/domains/{domain_id}/verify")
 
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through webhook reconciliation
-    def list_webhooks(self):
+    def list_webhooks(self) -> list[dict[str, object]]:
         payload = self._request("GET", "/webhooks")
         data = payload.get("data")
         if not isinstance(data, list):
@@ -152,13 +161,13 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through webhook reconciliation
-    def get_webhook(self, webhook_id):
+    def get_webhook(self, webhook_id: str) -> dict[str, object]:
         return self._request("GET", f"/webhooks/{webhook_id}")
 
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through webhook reconciliation
-    def create_webhook(self, endpoint):
+    def create_webhook(self, endpoint: str) -> dict[str, object]:
         return self._request(
             "POST",
             "/webhooks",
@@ -168,7 +177,9 @@ class ResendSetupClient:
     # @testable false
     # @covered-by installer/ai_email.py::ResendSetupClient
     # @reason endpoint adapter exercised through webhook reconciliation
-    def update_webhook(self, webhook_id, *, endpoint, status):
+    def update_webhook(
+        self, webhook_id: str, *, endpoint: str, status: str
+    ) -> dict[str, object]:
         return self._request(
             "PATCH",
             f"/webhooks/{webhook_id}",
@@ -217,7 +228,7 @@ def _open_resend_page(label, url):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_guides_full_receiving_key_creation
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
 # @matrix ai-email resend setup : authorization browser instructions resend secrets setup
-def guide_resend_receiving_key(*, existing=False):
+def guide_resend_receiving_key(*, existing: bool = False) -> None:
     """Explain the exact dashboard steps for the receiving administration key."""
     print(wrap_text(ui.heading("\nConfigure the Resend receiving administration key:")))
     if existing:
@@ -260,7 +271,9 @@ def guide_resend_receiving_key(*, existing=False):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_explains_when_authentication_email_can_be_reused
 # @matrix ai-email resend setup : authentication-email authorization instructions resend reuse secrets sending-domain setup
-def guide_resend_sending_identity(sending_domain, *, reusable_sender=None):
+def guide_resend_sending_identity(
+    sending_domain: str, *, reusable_sender: str | None = None
+) -> None:
     """Confirm reuse of the Resend identity established by authentication email."""
     print(wrap_text(ui.heading("\nConfigure the Resend feedback-sending identity:")))
     if not reusable_sender:
@@ -294,7 +307,9 @@ def _domain_id(domain):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_reconcile_receiving_domain_creates_or_reuses_one_exact_domain
 # @matrix ai-email setup : domain idempotence receiving-only resend resend-domain setup
-def reconcile_receiving_domain(client, domain):
+def reconcile_receiving_domain(
+    client: ResendSetupClient, domain: str
+) -> dict[str, object]:
     """Find/create one exact receiving domain without touching unrelated domains."""
     matches = [
         item
@@ -306,7 +321,7 @@ def reconcile_receiving_domain(client, domain):
     if matches:
         domain_id = _domain_id(matches[0])
         capabilities = matches[0].get("capabilities") or {}
-        if capabilities.get("receiving") != "enabled":
+        if not isinstance(capabilities, dict) or capabilities.get("receiving") != "enabled":
             client.enable_domain_receiving(domain_id)
             record_mutation(
                 "ai-email-domain",
@@ -327,7 +342,7 @@ def reconcile_receiving_domain(client, domain):
     if str(current.get("name") or "").rstrip(".").casefold() != domain.casefold():
         raise ProviderError("Resend returned a different domain than requested.")
     capabilities = current.get("capabilities") or {}
-    if capabilities.get("receiving") != "enabled":
+    if not isinstance(capabilities, dict) or capabilities.get("receiving") != "enabled":
         raise ProviderError("Resend receiving capability is not enabled.")
     return current
 
@@ -360,7 +375,9 @@ def _print_domain_records(domain):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_receiving_dns_guidance_prefers_cloudflare_and_keeps_manual_fallback
 # @matrix ai-email setup : browser cloudflare-dns instructions manual-dns receiving-domain setup
-def guide_resend_receiving_dns(domain, *, cloudflare_default=False):
+def guide_resend_receiving_dns(
+    domain: dict[str, object], *, cloudflare_default: bool = False
+) -> None:
     """Guide assisted or manual DNS without dumping records unnecessarily."""
     domain_name = str(domain.get("name") or "").strip()
     if not domain_name:
@@ -458,7 +475,7 @@ def _wait_for_domain(client, domain_id, *, attempts=12, sleep=time.sleep):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy
 # @matrix ai-email setup : disabled-first idempotence resend resend-webhook secret-retrieval setup webhook
-def reconcile_webhook(client, endpoint):
+def reconcile_webhook(client: ResendSetupClient, endpoint: str) -> dict[str, object]:
     """Return one exact webhook and leave it disabled for safe deployment."""
     matches = [
         item
@@ -533,7 +550,9 @@ def _setup_config(
 # @matrix ai-email setup : custom-domain prerequisites setup supporting-services
 def _prerequisites(settings):
     custom_domain = str(settings.get("CUSTOM_DOMAIN") or "").strip()
-    auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
+    auth_email = settings.get("AUTH_EMAIL_CONFIG")
+    if not isinstance(auth_email, dict):
+        auth_email = {}
     missing = []
     if not custom_domain:
         missing.append("a custom application domain")
@@ -605,14 +624,16 @@ def _disable(existing):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_main_install_ai_email_offer_requires_custom_domain_and_resend
 # @matrix ai-email setup : deferred-activation main-install optional prerequisites
-def setup_ai_email():
+def setup_ai_email() -> int | AIEmailConfig | None:
     """Offer AI email during a fresh install and defer activation to its deploy."""
     from config import SETTINGS
 
     f = FORMATTER.initialize()
     settings = SETTINGS.APP
     custom_domain = str(settings.get("CUSTOM_DOMAIN") or "").strip()
-    auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
+    auth_email = settings.get("AUTH_EMAIL_CONFIG")
+    if not isinstance(auth_email, dict):
+        auth_email = {}
     resend_ready = (
         str(auth_email.get("provider") or "").casefold() == "smtp"
         and str(auth_email.get("service") or "").casefold() == "resend"
@@ -678,7 +699,7 @@ def setup_ai_email():
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
 # @matrix ai-email : activation provider-verification
 # @pair setup:main-install
-def activate_ai_email(candidate=None):
+def activate_ai_email(candidate: AIEmailConfig | None = None) -> bool:
     """Enable and verify a configured webhook after its application deploy."""
     from config import SETTINGS
 
@@ -740,7 +761,9 @@ def activate_ai_email(candidate=None):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
 # @matrix ai-email : deploy deployment-guidance disabled-first manual-smoke-test prerequisites provider-verification setup
-def configure_ai_email(*, prepare_installation=True, deploy=True):
+def configure_ai_email(
+    *, prepare_installation: bool = True, deploy: bool = True
+) -> int | AIEmailConfig | None:
     """Configure production Resend receiving and optionally deploy it."""
     if prepare_installation:
         from installer.verify import prepare_existing_installation
@@ -828,7 +851,9 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
         domain_state = _wait_for_domain(client, domain_id)
     print(f.success(f"Resend receiving domain {domain} is verified."))
 
-    auth_email = SETTINGS.APP.get("AUTH_EMAIL_CONFIG") or {}
+    auth_email = SETTINGS.APP.get("AUTH_EMAIL_CONFIG")
+    if not isinstance(auth_email, dict):
+        auth_email = {}
     try:
         sender_email = normalize_email_address(
             auth_email.get("senderEmail"),

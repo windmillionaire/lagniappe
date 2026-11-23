@@ -1,5 +1,10 @@
 """Read-only local and provider diagnostics for an existing installation."""
 
+from collections.abc import Callable, Mapping
+from subprocess import CalledProcessError, CompletedProcess
+from typing import Protocol
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -14,6 +19,13 @@ import yaml
 from config import decode_app_settings
 from runner.context import REPOSITORY_ROOT, setup_command
 from installer.summary import expected_resource_lines
+
+
+# @testable infrastructure
+class _GcloudRunner(Protocol):
+    def __call__(
+        self, command: list[str], *, check: bool
+    ) -> CompletedProcess[str] | CalledProcessError: ...
 
 
 GENERATED_FILES = (
@@ -337,11 +349,14 @@ def _keyless_identity_issues(settings, deploy):
 # @matrix setup : adc doctor drift independent-provider-check parsing provider-identity read-only
 def run_doctor(
     *,
-    root=REPOSITORY_ROOT,
-    gcloud_runner=None,
-    adc_checker=None,
-    provider_checker=None,
-):
+    root: str | Path = REPOSITORY_ROOT,
+    gcloud_runner: _GcloudRunner | None = None,
+    adc_checker: Callable[[], Mapping[str, str | None]] | None = None,
+    provider_checker: Callable[
+        [Mapping[str, object], str], Mapping[str, Mapping[str, object]]
+    ]
+    | None = None,
+) -> int:
     """Inspect setup state and expected providers without repairing anything."""
     root = Path(root)
     documents, local_issues = _local_state(root)
@@ -377,7 +392,7 @@ def run_doctor(
                 identity_issues.append("ADC principal is unavailable")
             elif (
                 saved_gcloud.get("ACCOUNT")
-                and adc["principal"].casefold() != saved_gcloud["ACCOUNT"].casefold()
+                and str(adc["principal"]).casefold() != saved_gcloud["ACCOUNT"].casefold()
             ):
                 identity_issues.append("ADC principal differs from the saved deployer")
             if saved_gcloud.get("PROJECT") and (

@@ -82,7 +82,7 @@ def _api_request(session, method, url, headers, json_data=None, allow_codes=None
 # @testable false
 # @covered-by installer/ai.py::_configure_ai_cache
 # @reason manual fallback instructions for the AI cache setup flow
-def print_ai_cache_instructions(project_id):
+def print_ai_cache_instructions(project_id: object) -> None:
     """Print a portable Python retry command for AI caching."""
     FORMATTER.initialize()
     print(
@@ -157,7 +157,7 @@ def _configure_ai_cache(sp):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_setup_mode_configures_observability
 # @matrix ai-observability setup : ai-cache privacy-consent settings-save
-def configure_ai():
+def configure_ai() -> int:
     """Entry point for AI configuration.
 
     Verify the installation, configure caching, and expose observability.

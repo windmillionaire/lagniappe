@@ -1,5 +1,11 @@
 """Standalone Google Identity Platform provisioning."""
 
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+
 import time
 from urllib.parse import quote, urlsplit
 
@@ -20,6 +26,10 @@ from .google_provider import (
 from .package_install import install_if_missing
 from .state import record_mutation
 
+
+if TYPE_CHECKING:
+    from requests import Session
+
 IDENTITY_PLATFORM_SUBTYPE = "IDENTITY_PLATFORM"
 IDENTITY_PLATFORM_CORE_UPDATE_MASK = (
     "authorizedDomains",
@@ -34,7 +44,9 @@ IDENTITY_INITIALIZATION_DELAYS = (2, 4, 8, 15, 20, 30, 30)
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @matrix setup : identity-platform provider-state
-def get_identity_platform_config(session, project_id, headers):
+def get_identity_platform_config(
+    session: Session, project_id: str, headers: Mapping[str, str]
+) -> dict[str, object] | None:
     """Read the live project-level Identity Platform configuration."""
     url = (
         f"https://identitytoolkit.googleapis.com/admin/v2/projects/{project_id}/config"
@@ -52,7 +64,7 @@ def get_identity_platform_config(session, project_id, headers):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @matrix setup : authorized-domain identity-platform
-def identity_platform_target(app_url):
+def identity_platform_target(app_url: str) -> tuple[str, str]:
     """Return the application domain and local email action-handler URL."""
     app_url = str(app_url or "").strip().rstrip("/")
     parsed = urlsplit(app_url)
@@ -91,7 +103,9 @@ def _core_matches(config, app_url):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @matrix setup : authorized-domain identity-platform provider-state
-def identity_platform_config_matches(config, app_url):
+def identity_platform_config_matches(
+    config: Mapping[str, object] | None, app_url: str
+) -> bool:
     """Return whether the live standalone provider matches Lagniappe's contract."""
     return _core_matches(config, app_url)
 
@@ -135,7 +149,9 @@ def _ensure_standalone_subtype(config, project_id):
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_existing_provider
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_already_enabled_http_400
 # @matrix setup : authorized-domain diagnostics idempotency identity-platform provider-convergence provider-state retry
-def reconcile_identity_platform(session, project_id, headers, app_url):
+def reconcile_identity_platform(
+    session: Session, project_id: str, headers: Mapping[str, str], app_url: str
+) -> dict[str, object]:
     """Initialize standalone Identity Platform and reconcile email authentication."""
     config = get_identity_platform_config(session, project_id, headers)
     initialize = config is None
@@ -185,7 +201,10 @@ def reconcile_identity_platform(session, project_id, headers, app_url):
         domain, _ = identity_platform_target(app_url)
         authorized_domains = []
         seen_domains = set()
-        for value in [*(config.get("authorizedDomains") or ()), domain]:
+        current_domains = config.get("authorizedDomains") or []
+        if not isinstance(current_domains, (list, tuple)):
+            raise ProviderError("Identity Platform returned invalid authorized domains.")
+        for value in [*current_domains, domain]:
             value = str(value).strip()
             normalized = value.casefold()
             if value and normalized not in seen_domains:
@@ -256,7 +275,7 @@ def _public_client_config(config, project_id):
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_finishes_spinner_before_reporting_error
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @matrix setup : authorized-domain diagnostics error-reporting identity-platform provider-state settings-save spinner
-def setup_identity_platform(app_url=None):
+def setup_identity_platform(app_url: str | None = None) -> bool:
     """Set up standalone Identity Platform email/password authentication."""
     from config import SETTINGS
 
@@ -264,11 +283,11 @@ def setup_identity_platform(app_url=None):
     install_if_missing("requests", "HTTP library for Python")
     import requests
 
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     app_url = app_url or (
         f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}"
         if SETTINGS.APP.get("CUSTOM_DOMAIN")
-        else SETTINGS.APP["APP_URL"]
+        else str(SETTINGS.APP["APP_URL"])
     )
     with f.progress(
         text="Configure Identity Platform",
@@ -306,7 +325,9 @@ def setup_identity_platform(app_url=None):
 # @testable false
 # @covered-by installer/identity.py::setup_google_provider
 # @reason provider lookup is exercised through Google-provider reconciliation
-def get_google_provider_config(session, project_id, headers):
+def get_google_provider_config(
+    session: Session, project_id: str, headers: Mapping[str, str]
+) -> dict[str, object] | None:
     """Return the live Google provider config, or None when it is absent."""
     url = (
         "https://identitytoolkit.googleapis.com/admin/v2/"
@@ -325,7 +346,9 @@ def get_google_provider_config(session, project_id, headers):
 # @testable false
 # @covered-by installer/identity.py::setup_google_provider
 # @reason provider-state predicate is exercised through reconciliation
-def google_provider_matches(config, client_id):
+def google_provider_matches(
+    config: Mapping[str, object] | None, client_id: str
+) -> bool:
     return bool(
         config
         and config.get("enabled") is True
@@ -336,14 +359,14 @@ def google_provider_matches(config, client_id):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_google_provider_reconciliation
 # @matrix setup : google-oauth identity-platform provider-state secrets
-def setup_google_provider(client_id, client_secret=None):
+def setup_google_provider(client_id: str, client_secret: str | None = None) -> bool:
     """Configure the Google provider without persisting its OAuth secret."""
     from config import SETTINGS
 
     install_if_missing("requests", "HTTP library for Python")
     import requests
 
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     access_token = _get_access_token()
     headers = _google_request_headers(
         access_token,

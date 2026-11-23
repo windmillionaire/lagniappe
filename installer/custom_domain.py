@@ -12,7 +12,7 @@ from .verify import prepare_existing_installation
 # @testable false
 # @covered-by installer/custom_domain.py::_setup_custom_domain
 # @reason entrypoint verification/deploy wrapper around custom-domain setup
-def add_custom_domain():
+def add_custom_domain() -> int:
     """Configure a custom domain for an existing installation."""
     prepare_existing_installation()
 
@@ -135,7 +135,8 @@ def _setup_custom_domain(*, configure_auth=True):
             )
             spinner.ok(f"Reconciled {len(record_ids)} DNS-only Cloudflare records")
         SETTINGS.APP["CLOUDFLARE_ZONE_ID"] = zone["id"]
-        account_id = (zone.get("account") or {}).get("id")
+        account = zone.get("account")
+        account_id = account.get("id") if isinstance(account, dict) else None
         if account_id:
             SETTINGS.APP["CLOUDFLARE_ACCOUNT_ID"] = account_id
     else:

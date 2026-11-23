@@ -1,5 +1,8 @@
 """Secret-safe setup summaries shared by install and diagnostics."""
 
+from collections.abc import Mapping
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -73,11 +76,11 @@ def _bucket_names(settings):
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_expected_resource_summary_is_allowlisted
 # @matrix doctor setup : operator-summary provider-resources secret-redaction
 def expected_resource_lines(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deploy=None,
-    gcloud_config=None,
-):
+    deploy: Mapping[str, object] | None = None,
+    gcloud_config: Mapping[str, object] | None = None,
+) -> list[str]:
     """Return the detailed allowlisted provider inventory used by doctor."""
     settings = settings or {}
     deploy = deploy or {}
@@ -143,14 +146,14 @@ def expected_resource_lines(
 # @tests tests_tooling/test_001k_setup_console.py::test_install_summary_is_responsive
 # @matrix setup : operator-summary secret-redaction
 def install_summary_lines(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deploy=None,
-    node=None,
-    gcloud_config=None,
-    deployed=False,
-    width=None,
-):
+    deploy: Mapping[str, object] | None = None,
+    node: Mapping[str, object] | None = None,
+    gcloud_config: Mapping[str, object] | None = None,
+    deployed: bool = False,
+    width: int | None = None,
+) -> list[str]:
     """Return a compact, decision-focused successful-install handoff."""
     settings = settings or {}
     node = node or {}
@@ -366,14 +369,14 @@ def install_summary_lines(
 # @covered-by installer/summary.py::install_summary_lines
 # @reason console adapter delegates all output selection to the tested allowlist
 def print_install_summary(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deploy=None,
-    node=None,
-    gcloud_config=None,
-    deployed=False,
-    width=None,
-):
+    deploy: Mapping[str, object] | None = None,
+    node: Mapping[str, object] | None = None,
+    gcloud_config: Mapping[str, object] | None = None,
+    deployed: bool = False,
+    width: int | None = None,
+) -> None:
     """Print the allowlisted final install summary."""
     print()
     for line in install_summary_lines(

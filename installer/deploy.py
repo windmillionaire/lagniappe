@@ -8,7 +8,7 @@ from runner.console import wrap_text
 # @testable false
 # @covered-by installer/deploy.py::deploy_to_app_engine
 # @reason console-only installation summary
-def print_summary():
+def print_summary() -> None:
     from config import SETTINGS
     from installer.summary import print_install_summary
 
@@ -28,10 +28,10 @@ def print_summary():
 # @pairs migrations:deploy setup:legacy-upgrade setup:major-version
 def deploy_to_app_engine(
     *,
-    print_final_summary=True,
-    upgrade_notice_handled=False,
-    first_install=False,
-):
+    print_final_summary: bool = True,
+    upgrade_notice_handled: bool = False,
+    first_install: bool = False,
+) -> None:
     from config import SETTINGS
     from installer import FORMATTER
     from installer.upgrade_notice import (
@@ -62,7 +62,7 @@ def deploy_to_app_engine(
     ) as spinner:
         try:
             deploy(
-                build_assets=SETTINGS.APP.get("EXPERIMENTS_ENABLED", False),
+                build_assets=bool(SETTINGS.APP.get("EXPERIMENTS_ENABLED", False)),
                 deploy_indexes=True,
                 quiet=True,
                 capture_output=True,

@@ -1,5 +1,11 @@
 """Process locking and secret-free setup operation journaling."""
 
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Self
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -130,7 +136,7 @@ class SetupProcessLock:
         self.path = Path(path or (_state_dir() / ".lagniappe_setup.lock"))
         self.acquired = False
 
-    def acquire(self):
+    def acquire(self) -> Self:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         for _attempt in range(2):
             try:
@@ -175,12 +181,12 @@ class SetupProcessLock:
             return self
         raise SetupError("Could not acquire the Lagniappe setup process lock.")
 
-    def release(self):
+    def release(self) -> None:
         if self.acquired:
             self.path.unlink(missing_ok=True)
             self.acquired = False
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self.acquire()
 
     def __exit__(self, exc_type, exc, tb):
@@ -206,16 +212,24 @@ class OperationJournal:
             "mutations": [],
         }
 
-    def save(self):
+    def save(self) -> None:
         _write_json(self.path, self.payload)
 
-    def step(self, name):
+    def step(self, name: str) -> None:
         self.payload["last_step"] = str(name)
         self.save()
 
-    def mutation(self, step, *, action, resource, identifier, details=None):
+    def mutation(
+        self,
+        step: str,
+        *,
+        action: str,
+        resource: str,
+        identifier: str,
+        details: Mapping[str, object] | None = None,
+    ) -> None:
         self.payload["last_step"] = str(step)
-        mutation = {
+        mutation: dict[str, object] = {
             "step": str(step),
             "action": str(action),
             "resource": str(resource),
@@ -226,7 +240,7 @@ class OperationJournal:
         self.payload["mutations"].append(mutation)
         self.save()
 
-    def finish(self, status, error=None):
+    def finish(self, status: str, error: BaseException | None = None) -> None:
         self.payload["status"] = status
         if error is not None:
             self.payload["error_category"] = getattr(error, "category", "setup")
@@ -236,7 +250,7 @@ class OperationJournal:
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
 # @pair setup:operation-journal
-def record_step(name):
+def record_step(name: str) -> None:
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.step(name)
 
@@ -244,7 +258,14 @@ def record_step(name):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
 # @matrix setup : operation-journal recovery
-def record_mutation(step, *, action, resource, identifier, details=None):
+def record_mutation(
+    step: str,
+    *,
+    action: str,
+    resource: str,
+    identifier: str,
+    details: Mapping[str, object] | None = None,
+) -> None:
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.mutation(
             step,
@@ -313,7 +334,13 @@ def _print_recovery(journal, prefix):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
 # @matrix setup : operation-journal process-lock recovery
 @contextmanager
-def setup_operation(mode, argv, *, lock_path=None, journal_path=None):
+def setup_operation(
+    mode: str,
+    argv: Sequence[str],
+    *,
+    lock_path: str | Path | None = None,
+    journal_path: str | Path | None = None,
+) -> Iterator[OperationJournal]:
     """Lock setup and report a secret-free exact resume command on failure."""
     global _ACTIVE_JOURNAL
 

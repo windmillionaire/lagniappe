@@ -1,5 +1,8 @@
 """Optional Cloudflare DNS-only reconciliation for custom domains."""
 
+from collections.abc import Iterable, Mapping
+
+
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -101,7 +104,7 @@ def _cloudflare_request(method, path, api_token, *, params=None, json_data=None)
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_cloudflare_token_prompt_explains_dashboard_steps_and_scope
 # @matrix setup : cloudflare-api interactive-input least-privilege
-def get_cloudflare_api_token():
+def get_cloudflare_api_token() -> str:
     """Prompt for a scoped token without echoing or persisting it."""
     print(
         "\n"
@@ -170,7 +173,7 @@ def get_cloudflare_api_token():
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dns_only_reconciliation
 # @matrix setup : cloudflare-api zone-resolution
-def get_cloudflare_zone(domain, api_token):
+def get_cloudflare_zone(domain: str, api_token: str) -> dict[str, object]:
     """Resolve the longest provider-owned zone suffix for a hostname."""
     zones = []
     page = 1
@@ -230,7 +233,9 @@ def _valid_dmarc_policy(content):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dmarc_reconciliation_creates_or_reuses_valid_policy
 # @matrix setup : authentication-email cloudflare-dns dmarc idempotence
-def ensure_cloudflare_dmarc_record(domain, zone, api_token):
+def ensure_cloudflare_dmarc_record(
+    domain: str, zone: Mapping[str, object], api_token: str
+) -> dict[str, object]:
     """Create a monitoring DMARC policy unless one already exists."""
     zone_id = str(zone.get("id") or "")
     zone_name = str(zone.get("name") or "").rstrip(".").casefold()
@@ -393,11 +398,11 @@ def _record_snapshot(record):
 # @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dns_only_reconciliation
 # @matrix setup : cloudflare-dns dns-only idempotence partial-failure provider-records
 def reconcile_cloudflare_dns_records(
-    domain,
-    zone,
-    api_token,
-    resource_records,
-):
+    domain: str,
+    zone: Mapping[str, object],
+    api_token: str,
+    resource_records: Iterable[Mapping[str, object]],
+) -> list[str]:
     """Reconcile only App Engine DNS records, always with proxying disabled."""
     zone_id = str(zone.get("id") or "")
     zone_name = str(zone.get("name") or "")

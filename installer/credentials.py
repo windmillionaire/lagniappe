@@ -63,22 +63,22 @@ class _AdcCredentialTransaction:
         self.committed = False
         self.refresh_required = False
 
-    def capture(self):
+    def capture(self) -> None:
         if self.captured:
             return
         self.captured = True
         self.previous = self.path.read_bytes() if self.path.is_file() else None
 
-    def reject_current(self):
+    def reject_current(self) -> None:
         if not self.captured:
             self.captured = True
             self.previous = None
 
-    def commit(self):
+    def commit(self) -> None:
         self.committed = True
         self.previous = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         if self.committed or not self.captured:
             return
         if self.previous is None:
@@ -163,6 +163,7 @@ def _get_current_account_email(credentials=None):
     """Resolve the ADC principal email from the credential's access token."""
     import google.auth
     from google.auth.transport.requests import Request
+    from google.auth.exceptions import RefreshError
     from installer.utils import install_if_missing
 
     scopes = ["https://googleapis.com/auth/userinfo.email", "openid"]
@@ -180,7 +181,7 @@ def _get_current_account_email(credentials=None):
     auth_request = Request()
     try:
         credentials.refresh(auth_request)
-    except google.auth.exceptions.RefreshError:
+    except RefreshError:
         return None
 
     if credentials.token:

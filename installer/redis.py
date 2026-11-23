@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
@@ -23,10 +25,12 @@ REDIS_CLOUD_CONSOLE_URL = "https://cloud.redis.io/"
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_connection_uses_shared_tls_settings_and_exits_on_failure
 # @matrix setup : redis-connection redis-tls
-def test_redis_connection(settings=None, *, exit_on_failure=True):
+def test_redis_connection(
+    settings: Mapping[str, object] | None = None, *, exit_on_failure: bool = True
+) -> bool:
     """Test Redis connection."""
     from config import SETTINGS
-    from config.redis import redis_client_kwargs, redis_tls_enabled
+    from config.redis import redis_connection_kwargs, redis_tls_enabled
 
     f = FORMATTER.initialize()
     settings = settings or SETTINGS.APP
@@ -45,7 +49,7 @@ def test_redis_connection(settings=None, *, exit_on_failure=True):
 
         try:
             client = redis.Redis(
-                **redis_client_kwargs(settings, socket_timeout=5)
+                **redis_connection_kwargs(settings, socket_timeout=5)
             )
             client.ping()
             sp.ok()
@@ -84,7 +88,7 @@ def test_redis_connection(settings=None, *, exit_on_failure=True):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_eviction_policy_instructions_require_confirmation
 # @matrix setup : interactive-input operator-guidance redis
-def eviction_policy_instructions():
+def eviction_policy_instructions() -> None:
     """Print eviction policy instructions."""
     from installer import FORMATTER
 
@@ -152,7 +156,7 @@ def eviction_policy_instructions():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cloud_instructions_open_console_and_locate_credentials
 # @matrix setup : browser operator-guidance plan-selection provider-region redis redis-tls
-def redis_cloud_instructions():
+def redis_cloud_instructions() -> None:
     """Open Redis Cloud and guide database placement and credential copying."""
     from config import SETTINGS, constants
 
@@ -635,7 +639,7 @@ def _offer_redis_tls_for_fresh_install():
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_redis_clears_failed_credentials_and_retries
 # @matrix setup : failure-isolation redis retry rollback settings-save
-def setup_redis():
+def setup_redis() -> bool:
     """Configure Redis connection details."""
     from config import SETTINGS
 

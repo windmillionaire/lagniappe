@@ -1,6 +1,8 @@
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
+from collections.abc import Callable
 from functools import wraps
+from typing import Concatenate
 
 from runner.console import format_prompt, wrap_text
 from .errors import SetupCancelled
@@ -12,7 +14,7 @@ from .package_install import install_if_missing
 # @covered-by installer/upgrade.py::_update_custom_images
 # @covered-by installer/upgrade.py::_update_deployment_settings
 # @reason shared dependency guard exercised through image/deployment restore flows
-def ensure_datastore_dependency():
+def ensure_datastore_dependency() -> None:
     install_if_missing(
         "google.cloud.datastore",
         "Google Cloud Datastore client",
@@ -24,7 +26,7 @@ def ensure_datastore_dependency():
 # @covered-by installer/image.py::save_images
 # @covered-by installer/upgrade.py::_update_custom_images
 # @reason shared dependency guard exercised through image restore flows
-def ensure_storage_dependency():
+def ensure_storage_dependency() -> None:
     install_if_missing(
         "google.cloud.storage",
         "Google Cloud Storage client",
@@ -35,24 +37,24 @@ def ensure_storage_dependency():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_input_retries_allows_empty_and_exits
 # @pair setup:interactive-input
-def validate_input(
-    prompt,
-    validation_fn=None,
-    error_msg=None,
-    allow_empty=False,
-    default=None,
-):
+def validate_input[**P, T](
+    prompt: str,
+    validation_fn: Callable[[str], object] | None = None,
+    error_msg: str | None = None,
+    allow_empty: bool = False,
+    default: object = None,
+) -> Callable[[Callable[Concatenate[str, P], T]], Callable[P, T]]:
     """Decorator factory for validated input with an optional Enter default."""
 
     # @testable false
     # @covered-by installer/utils.py::validate_input
     # @reason closure returned by the validate_input decorator factory
-    def decorator(func):
+    def decorator(func: Callable[Concatenate[str, P], T]) -> Callable[P, T]:
         # @testable false
         # @covered-by installer/utils.py::validate_input
         # @reason interactive retry loop exercised through validate_input
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             from installer import FORMATTER
 
             f = FORMATTER.initialize()
@@ -88,10 +90,10 @@ def validate_input(
 # @reason older upgrade processes reload utils after replacing source but retain their old caller
 def deploy_to_app_engine(
     *,
-    print_final_summary=True,
-    upgrade_notice_handled=False,
-    first_install=False,
-):
+    print_final_summary: bool = True,
+    upgrade_notice_handled: bool = False,
+    first_install: bool = False,
+) -> None:
     """Forward deployment from an upgrade process started on an older checkout."""
     from installer.deploy import deploy_to_app_engine as deploy
 

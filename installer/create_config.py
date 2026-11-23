@@ -147,7 +147,7 @@ def _set_default_config():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_update_config_sets_application_version_from_package
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_update_config_refreshes_preloaded_builders_and_current_settings
 # @matrix setup : config-files config-version git-upgrade
-def update_config():
+def update_config() -> str:
     """Refresh generated config defaults and return the active package version."""
     from importlib import reload
     from installer import config_builders
@@ -178,7 +178,7 @@ def update_config():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_prepares_bootstrap_apis_before_adc
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write
 # @matrix setup : adc config-files existing-project gcloud-config interactive-input preconfirmation provider-apis recovery
-def set_application_defaults():
+def set_application_defaults() -> bool:
     with credentials._adc_auth_transaction() as transaction:
         return _set_application_defaults(transaction)
 
@@ -257,7 +257,7 @@ def _set_application_defaults(transaction):
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     target = setup_target.SetupTarget(
         app_name=app_name,
-        configuration_name=SETTINGS.GCLOUD_CONFIG["NAME"],
+        configuration_name=str(SETTINGS.GCLOUD_CONFIG["NAME"]),
         account=account,
         project_id=project_id,
     )
@@ -428,7 +428,7 @@ def _set_application_defaults(transaction):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_upgrade_collects_missing_ai_choices
 # @matrix setup : config-files google-oauth keyless-config optional project-identity redis-tls validation
 # @matrix setup : ai-policy git-upgrade interactive-input
-def verify_application_config(upgrade=False):
+def verify_application_config(upgrade: bool = False) -> bool:
     """Validate settings and collect the new AI policy during source upgrades."""
     from installer import FORMATTER
 
@@ -537,5 +537,5 @@ def verify_application_config(upgrade=False):
 # @testable false
 # @covered-by installer/setup_target.py::validate_project_id
 # @reason public compatibility entrypoint for target syntax validation
-def validate_project_id(project_id):
+def validate_project_id(project_id: str) -> bool:
     return setup_target.validate_project_id(project_id)

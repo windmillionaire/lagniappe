@@ -550,7 +550,7 @@ def _gcloud_configuration_name(name):
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
 # @pair setup:project-id
-def validate_project_id(project_id):
+def validate_project_id(project_id: str) -> bool:
     """Validate the provider's project-ID syntax without mutating state."""
     if not PROJECT_ID_PATTERN.fullmatch(str(project_id or "")):
         print(

@@ -1,9 +1,16 @@
 """Optional MCP service lifecycle shared by setup and ordinary app deployments."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Literal, overload
 import hashlib
 import json
 import os
@@ -11,7 +18,7 @@ from pathlib import Path
 import re
 import tempfile
 import time
-from types import SimpleNamespace
+
 
 from config import SETTINGS
 from config.ai_settings import normalize_ai_features
@@ -23,6 +30,10 @@ from installer.errors import ProviderTransientError, SetupError, retry_provider_
 from installer.state import record_mutation, record_step
 from installer.commands import run_gcloud_command
 from runner.context import REPOSITORY_ROOT, setup_command
+
+
+if TYPE_CHECKING:
+    from google.cloud.resourcemanager_v3 import ProjectsClient
 
 SERVICE = "lagniappe-mcp"
 BUILD_ACCOUNT = "lagniappe-mcp-build"
@@ -56,6 +67,19 @@ AUTH_LOG_EXCLUSION = "remote-mcp-oauth-query"
 
 
 # @testable infrastructure
+@dataclass
+class _Bindings:
+    bindings: list[dict[str, object]]
+
+    @classmethod
+    def from_policy(cls, policy: Mapping[str, object]) -> _Bindings:
+        bindings = policy.get("bindings", [])
+        if not isinstance(bindings, list) or any(not isinstance(row, dict) for row in bindings):
+            raise SetupError("MCP IAM returned malformed policy bindings.")
+        return cls(bindings)
+
+
+# @testable infrastructure
 @dataclass(frozen=True)
 class Deployment:
     project: str
@@ -71,7 +95,7 @@ class Deployment:
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_version_tracks_only_build_inputs_and_rejects_symlinks
 # @matrix mcp-install : source-version upload-boundary
-def source_version(root=REPOSITORY_ROOT):
+def source_version(root: str | Path = REPOSITORY_ROOT) -> str:
     """Identify the exact service build without coupling it to app releases."""
     root = Path(root)
     directory = root / "mcp"
@@ -98,10 +122,10 @@ def source_version(root=REPOSITORY_ROOT):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service
 # @matrix mcp-install : configuration opt-in legacy-settings
-def requested(settings):
+def requested(settings: Mapping[str, object]) -> bool:
     """Legacy REST access alone does not opt an installation into Cloud Run."""
     policy = normalize_ai_features(settings)
-    return policy["EXTERNAL_AI_ENABLED"] and settings.get(
+    return bool(policy["EXTERNAL_AI_ENABLED"]) and settings.get(
         "EXTERNAL_AI_ENABLED", bool(settings.get("MCP_RESOURCE"))
     ) is True
 
@@ -161,7 +185,20 @@ def _run(target, arguments, *, timeout=600, check=True):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_discovery_distinguishes_absence_from_unavailable_state
 # @matrix mcp-install : fail-closed provider-discovery
-def describe(target, arguments, *, optional=False):
+@overload
+def describe(target: Deployment, arguments: Sequence[str], *, optional: Literal[False] = False) -> dict[str, object]: ...
+
+
+@overload
+def describe(target: Deployment, arguments: Sequence[str], *, optional: bool) -> dict[str, object] | None: ...
+
+
+def describe(
+    target: Deployment,
+    arguments: Sequence[str],
+    *,
+    optional: bool = False,
+) -> dict[str, object] | None:
     result = _run(target, [*arguments, "--format=json"], check=False)
     if result.returncode:
         error = (result.stderr or "").casefold()
@@ -200,7 +237,9 @@ def describe(target, arguments, *, optional=False):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_permissions_are_checked_before_resource_mutation
 # @matrix mcp-install : iam preflight
-def require_permissions(target, *, client=None):
+def require_permissions(
+    target: Deployment, *, client: ProjectsClient | None = None
+) -> None:
     if client is None:
         from google.cloud import resourcemanager_v3
         client = resourcemanager_v3.ProjectsClient()
@@ -218,10 +257,18 @@ def require_permissions(target, *, client=None):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_iam_preserves_conditions_etags_and_skips_noop_writes
 # @matrix mcp-install : iam idempotence handoff
-def reconcile_access(target, command, resource, grants=(), *, flags=(), remove_member=None):
+def reconcile_access(
+    target: Deployment,
+    command: Sequence[str],
+    resource: str,
+    grants: Sequence[tuple[str, Sequence[str]]] = (),
+    *,
+    flags: Sequence[str] = (),
+    remove_member: str | None = None,
+) -> None:
     """Apply scoped bindings using the existing IAM reconciler and provider etag."""
     policy = describe(target, [*command, "get-iam-policy", resource, *flags])
-    view = SimpleNamespace(bindings=policy.get("bindings", []))
+    view = _Bindings.from_policy(policy)
     changed = False
     for member, roles in grants:
         changed |= iam.reconcile_member_roles(
@@ -238,7 +285,7 @@ def reconcile_access(target, command, resource, grants=(), *, flags=(), remove_m
         path.write_text(json.dumps(policy), encoding="utf-8")
         _run(target, [*command, "set-iam-policy", resource, str(path), *flags])
     verified = describe(target, [*command, "get-iam-policy", resource, *flags])
-    checked = SimpleNamespace(bindings=verified.get("bindings", []))
+    checked = _Bindings.from_policy(verified)
     for member, roles in grants:
         if not set(roles).issubset(iam.policy_member_roles(checked, member, include_conditions=False)):
             raise SetupError(f"MCP IAM did not converge on {resource}.")
@@ -302,7 +349,7 @@ def _ensure_account(target, email):
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_account_readback_failure_stops_before_more_resources
 # @matrix mcp-install : iam resources keyless privacy idempotence
 # @matrix mcp-install : provider-convergence fail-closed
-def reconcile_resources(target, deployer):
+def reconcile_resources(target: Deployment, deployer: str) -> None:
     require_permissions(target)
     _run(target, ["services", "enable", *SERVICES])
     for email in (target.runtime, target.build_account):
@@ -373,7 +420,10 @@ def _reconcile_oauth_resources(target, *, verify_only=False):
             raise SetupError("The MCP token TTL needs installer repair before remote deployment.")
         _run(target, ["firestore", "fields", "ttls", "update", "expires_at", *flags, "--enable-ttl", "--async"])
     sink = describe(target, ["logging", "sinks", "describe", "_Default"])
-    exclusion = next((row for row in sink.get("exclusions", []) if row.get("name") == AUTH_LOG_EXCLUSION), None)
+    exclusions = sink.get("exclusions", [])
+    if not isinstance(exclusions, list):
+        raise SetupError("MCP log sink returned invalid exclusions.")
+    exclusion = next((row for row in exclusions if row.get("name") == AUTH_LOG_EXCLUSION), None)
     if exclusion is None or exclusion.get("filter") != AUTH_LOG_FILTER or exclusion.get("disabled"):
         if verify_only:
             raise SetupError("The MCP OAuth log exclusion needs installer repair before remote deployment.")
@@ -381,16 +431,26 @@ def _reconcile_oauth_resources(target, *, verify_only=False):
         _run(target, ["logging", "sinks", "update", "_Default",
                       f"--{action}-exclusion=name={AUTH_LOG_EXCLUSION},filter={AUTH_LOG_FILTER},disabled="])
         sink = describe(target, ["logging", "sinks", "describe", "_Default"])
-        if not any(row.get("name") == AUTH_LOG_EXCLUSION and row.get("filter") == AUTH_LOG_FILTER
-                   and not row.get("disabled") for row in sink.get("exclusions", [])):
+        exclusions = sink.get("exclusions", [])
+        if not isinstance(exclusions, list) or not any(row.get("name") == AUTH_LOG_EXCLUSION and row.get("filter") == AUTH_LOG_FILTER
+                   and not row.get("disabled") for row in exclusions):
             raise SetupError("MCP OAuth request-log exclusion did not converge.")
+
+
+def _resource_field(resource: Mapping[str, object], *path: str) -> object:
+    value: object = resource
+    for name in path:
+        if not isinstance(value, Mapping):
+            return None
+        value = value.get(name)
+    return value
 
 
 # @testable false
 # @covered-by installer/mcp.py::prepare_deployment
 # @covered-by installer/mcp.py::finish_deployment
 # @reason canonical provider state is checked at both deployment boundaries
-def _service(target):
+def _service(target: Deployment) -> dict[str, object] | None:
     return describe(target, ["run", "services", "describe", SERVICE,
                              f"--region={target.region}"], optional=True)
 
@@ -486,7 +546,9 @@ def _deploy_service(target, resource, *, enabled):
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_cloud_operator_requires_preprovisioned_mcp_and_oauth_controls
 # @matrix mcp-install : bootstrap configuration source-version update-order
-def prepare_deployment(settings=None, *, announce_progress=True):
+def prepare_deployment(
+    settings: dict[str, object] | None = None, *, announce_progress: bool = True
+) -> Deployment | None:
     """Prepare the optional service and configuration before publishing App Engine."""
     settings = SETTINGS.APP if settings is None else settings
     if not requested(settings):
@@ -494,7 +556,7 @@ def prepare_deployment(settings=None, *, announce_progress=True):
     target = _deployment(settings)
     record_step("prepare MCP service")
     deployer = settings.get("DEPLOYER_EMAIL") or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
-    if not deployer:
+    if not isinstance(deployer, str) or not deployer:
         raise SetupError("MCP requires the saved installer/deployer identity.")
     if announce_progress:
         print(ui.activity("Preparing MCP service before App Engine deployment"), flush=True)
@@ -506,8 +568,8 @@ def prepare_deployment(settings=None, *, announce_progress=True):
             raise SetupError("The Cloud operator can deploy only its configured experiments installation.")
         service = _service(target)
         if (not service or not saved_resource or _resource(service) != saved_resource
-                or service.get("metadata", {}).get("labels", {}).get("managed-by") != "lagniappe"
-                or service.get("spec", {}).get("template", {}).get("spec", {}).get("serviceAccountName") != target.runtime):
+                or _resource_field(service, "metadata", "labels", "managed-by") != "lagniappe"
+                or _resource_field(service, "spec", "template", "spec", "serviceAccountName") != target.runtime):
             raise SetupError("The existing MCP service, resource and runtime must match before remote deployment.")
         _reconcile_oauth_resources(target, verify_only=True)
         bucket = describe(target, ["storage", "buckets", "describe", f"gs://{target.bucket}", "--raw"])
@@ -522,7 +584,7 @@ def prepare_deployment(settings=None, *, announce_progress=True):
         resource = _resource(service)
         if saved_resource and saved_resource != resource:
             raise SetupError("The saved MCP resource differs from this Cloud Run service.")
-        if not saved_resource and service.get("metadata", {}).get("labels", {}).get("managed-by") != "lagniappe":
+        if not saved_resource and _resource_field(service, "metadata", "labels", "managed-by") != "lagniappe":
             raise SetupError("An unmanaged Cloud Run service already uses the MCP service name.")
         if not _matches(service, target, resource):
             _build(target, announce_progress=announce_progress)
@@ -551,7 +613,12 @@ def prepare_deployment(settings=None, *, announce_progress=True):
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_disable_and_failed_activation_do_not_claim_success
 # @matrix mcp-install : disable failure-recovery update-order verification
-def finish_deployment(target=None, settings=None, *, announce_progress=True):
+def finish_deployment(
+    target: Deployment | None = None,
+    settings: Mapping[str, object] | None = None,
+    *,
+    announce_progress: bool = True,
+) -> None:
     """Activate only after the main app accepts the matching OAuth configuration."""
     settings = SETTINGS.APP if settings is None else settings
     if not requested(settings):
@@ -607,7 +674,7 @@ def _enabled(service):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_inspection_is_read_only_and_detects_version_drift
 # @matrix mcp-install : doctor recovery source-version
-def inspect_deployment(settings):
+def inspect_deployment(settings: Mapping[str, object]) -> dict[str, object]:
     if not requested(settings):
         if settings.get("MCP_RESOURCE"):
             target = _deployment(settings, version=settings.get("MCP_VERSION") or "disabled")
@@ -626,7 +693,12 @@ def inspect_deployment(settings):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_handoff_uses_selected_accounts_and_scoped_resources
 # @matrix mcp-install : handoff iam
-def handoff_access(settings, *, owner=None, remove_installer=None):
+def handoff_access(
+    settings: Mapping[str, object],
+    *,
+    owner: str | None = None,
+    remove_installer: str | None = None,
+) -> None:
     """Transfer exact MCP resource access before removing the installer's project role."""
     if not settings.get("MCP_RESOURCE"):
         return
@@ -652,7 +724,7 @@ def handoff_access(settings, *, owner=None, remove_installer=None):
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_focused_mcp_command_uses_normal_deployment_path
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_deployment_decline_preserves_configuration
 # @matrix mcp-install : cli-routing retry confirmation default-no no-mutation
-def configure_mcp():
+def configure_mcp() -> int:
     from installer.verify import prepare_existing_installation
     from installer.deploy import deploy_to_app_engine
     prepare_existing_installation()
