@@ -154,8 +154,8 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     from lagniappe import CONFIG
     from lagniappe.core.entities import Entities
     from runner.test_session import capture_process_identity, load_session_state
-    from testing.utility.traceability_common import behavior_snapshot
-    from testing.utility.traceability_results import _write_manifest
+    from testing.utility.test_evidence import behavior_snapshot
+    from testing.utility.evidence_results import _write_manifest
 
     authority.assert_active()
     Entities.initialize()
@@ -256,7 +256,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
             path.chmod(0o600)
             output = stack.enter_context((artifacts / "pytest.log").open("w", encoding="utf-8"))
             child_command = [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini",
-                             "-p", "testing.utility.traceability_results", "-p", "runner.pytest_routing",
+                             "-p", "testing.utility.evidence_results", "-p", "runner.pytest_routing",
                              "-p", "runner.e2e_claims",
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
                              f"--junitxml={artifacts / 'junit.xml'}", "-m", "not unfinished", *batch.nodeids]

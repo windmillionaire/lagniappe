@@ -12,7 +12,7 @@ import sys
 
 
 PYTEST_CONFIG = "testing/pytest.ini"
-TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
+TEST_RESULTS_PLUGIN = "testing.utility.evidence_results"
 PYTEST_ROUTING_PLUGIN = "runner.pytest_routing"
 MCP_ADAPTER_TEST = "testing/tests_unit/test_033_mcp_adapter.py"
 MCP_TEST_FILES = (
@@ -280,7 +280,7 @@ def normalize_pytest_invocation(
         "--noconftest",
         *indexed_args,
     ]
-    traceability_plugin = importlib.import_module(TRACEABILITY_RESULTS_PLUGIN)
+    results_plugin = importlib.import_module(TEST_RESULTS_PLUGIN)
 
     previous_cwd = Path.cwd()
     config = None
@@ -289,7 +289,7 @@ def normalize_pytest_invocation(
         try:
             config = _prepareconfig(
                 parser_args,
-                plugins=[sys.modules[__name__], traceability_plugin],
+                plugins=[sys.modules[__name__], results_plugin],
                 prog="run.py test",
             )
         except UsageError as error:
@@ -303,11 +303,11 @@ def normalize_pytest_invocation(
         }
         reserved_plugins = {
             PYTEST_ROUTING_PLUGIN,
-            TRACEABILITY_RESULTS_PLUGIN,
+            TEST_RESULTS_PLUGIN,
         }
         if disabled_plugins.intersection(reserved_plugins):
             raise PytestRoutingError(
-                "run.py's routing and traceability pytest plugins cannot be disabled"
+                "run.py's routing and results pytest plugins cannot be disabled"
             )
         if bool(getattr(namespace, "pyargs", False)):
             raise PytestRoutingError(

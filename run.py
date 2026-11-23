@@ -23,7 +23,7 @@ from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.pytest_routing import (
     PYTEST_CONFIG,
     PYTEST_ROUTING_PLUGIN,
-    TRACEABILITY_RESULTS_PLUGIN,
+    TEST_RESULTS_PLUGIN,
     PytestRoutingError,
     normalize_pytest_invocation,
     MCP_TEST_FILES,
@@ -87,7 +87,7 @@ def pytest_command(pytest_args: list[str]) -> list[str]:
         "-c",
         PYTEST_CONFIG,
         "-p",
-        TRACEABILITY_RESULTS_PLUGIN,
+        TEST_RESULTS_PLUGIN,
         "-p",
         PYTEST_ROUTING_PLUGIN,
         *pytest_args,
@@ -176,7 +176,7 @@ def _merge_mcp_test_evidence(
             )
         normalized_outcomes[canonical_nodeid] = row
 
-    from testing.utility.traceability_results import _write_manifest
+    from testing.utility.evidence_results import _write_manifest
 
     _write_manifest(
         REPOSITORY_ROOT,
@@ -1138,10 +1138,6 @@ if __name__ == "__main__":
         from testing.utility import browser_review
 
         sys.exit(browser_review.main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "traceability":
-        from testing.utility import traceability
-
-        sys.exit(traceability.main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "template-contracts":
         from testing.utility import template_contracts
 
@@ -1185,7 +1181,6 @@ if __name__ == "__main__":
             "release-check",
             "test",
             "test-server",
-            "traceability",
             "template-contracts",
             "style-contracts",
             "upgrade-dependencies",

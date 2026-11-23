@@ -68,7 +68,7 @@ result_path = Path(sys.argv[2]).resolve()
 del sys.argv[1:3]
 
 sys.path.insert(0, str(repository_root))
-from testing.utility import traceability_results
+from testing.utility import evidence_results
 sys.path.pop(0)
 
 def capture_results(_repo_root, _command, outcomes, exitstatus):
@@ -84,10 +84,10 @@ def capture_results(_repo_root, _command, outcomes, exitstatus):
         stream.write("\\n")
     os.replace(temporary, result_path)
 
-traceability_results._write_manifest = capture_results
+evidence_results._write_manifest = capture_results
 
 import pytest
-raise SystemExit(pytest.main(sys.argv[1:], plugins=[traceability_results]))
+raise SystemExit(pytest.main(sys.argv[1:], plugins=[evidence_results]))
 """.strip()
 
 

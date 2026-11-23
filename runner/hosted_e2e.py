@@ -1673,7 +1673,7 @@ def create(*, base_ref=None, environment="standard", experiments_workers=DEFAULT
     source = require_clean_source()
     build_id = _require_committed_production_build(source)
     _run_create_preflight(source, base_ref=base_ref)
-    from testing.utility.traceability_common import behavior_snapshot
+    from testing.utility.test_evidence import behavior_snapshot
 
     source_snapshot, _source_paths = behavior_snapshot(APP_DIR)
     _activate(adc=True)
@@ -2285,7 +2285,7 @@ def _latest_execution(infrastructure, *, environment="standard"):
 # @matrix hosted-e2e traceability : evidence merge provenance
 def merge_remote_evidence(local, remote):
     """Merge a hosted pytest manifest into the normal latest evidence file."""
-    from testing.utility.traceability_common import (
+    from testing.utility.test_evidence import (
         TEST_RUN_SCHEMA_VERSION,
         decode_test_run_snapshots,
         encode_test_run_snapshots,
@@ -2339,12 +2339,12 @@ def merge_remote_evidence(local, remote):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_result_directory_import_requires_the_exact_source
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_import_replaces_retired_parameter_results
-# @tests tests_tooling/test_009_hosted_e2e.py::test_traceability_common_import_does_not_require_playwright
+# @tests tests_tooling/test_009_hosted_e2e.py::test_test_evidence_import_does_not_require_playwright
 # @matrix hosted-e2e traceability : ci-import evidence merge provenance source-integrity
 # @matrix hosted-e2e : suite-scope failure-retention
 def import_result_directory(directory, *, expected_execution=None):
     """Validate and merge an already-downloaded hosted result directory."""
-    from testing.utility.traceability_common import (
+    from testing.utility.test_evidence import (
         LATEST_TEST_RUN,
         behavior_snapshot,
         load_json,
@@ -2407,7 +2407,7 @@ def validate_release_evidence(
     repo_root=APP_DIR,
 ):
     """Validate passing hosted evidence for an exact release commit chain."""
-    from testing.utility.traceability_common import (
+    from testing.utility.test_evidence import (
         LATEST_TEST_RUN,
         TEST_RUN_SCHEMA_VERSION,
         behavior_snapshot,
