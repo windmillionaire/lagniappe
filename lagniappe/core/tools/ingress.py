@@ -52,9 +52,9 @@ if TYPE_CHECKING:
     from werkzeug.datastructures import FileStorage
     from ..definitions import MutationOutcome
     from ..entities.entity import Entity
-    from ..entities.category import Category
-    from ..entities.project import Project
-    from ..entities.model_task import ModelTask
+    from ..entities.category import Category, CategoryData
+    from ..entities.project import Project, ProjectData
+    from ..entities.model_task import ModelTask, ModelTaskData
     from ..entities.form import Form
     from ..entities.ingress import Ingress
     from ..properties.base_process import ProcessProperty
@@ -64,8 +64,18 @@ if TYPE_CHECKING:
 
 type CsvColumns = dict[str, file_validation.CSVColumn]
 type CsvRow = dict[str, str]
-# Form widgets and the CSV type inference code attach field-specific formatting metadata.
-type ImportField = dict[str, Any]
+class ImportField(TypedDict):
+    id: str
+    label: str | None
+    kind: str
+    icon: str | None
+    type: NotRequired[str | None]
+    choices: NotRequired[bool]
+    fuzzy_import: NotRequired[bool]
+    description: NotRequired[str | None]
+    index: NotRequired[int]
+
+
 type FieldsById = dict[str, ImportField]
 
 
@@ -129,7 +139,7 @@ class IngressParser:
 
     @staticmethod
     # @testable infrastructure
-    def parse_entity(entity: Ingress) -> tuple[dict[str, Any], list[CsvRow]]:
+    def parse_entity(entity: Ingress) -> tuple[file_validation.CSVMetadata, list[CsvRow]]:
         if entity.mimetype != "text/csv":
             raise ValidationError("File must be a CSV file.")
         text = entity.properties.text.asset
@@ -137,7 +147,8 @@ class IngressParser:
             raise ValidationError("The CSV file has no text to parse.")
         parsed = dict(file_validation.process_csv(text))
         rows = cast(list[CsvRow], parsed.pop("rows", []))
-        return parsed, rows
+        # ParsedCSV extends CSVMetadata with only the rows field.
+        return cast(file_validation.CSVMetadata, parsed), rows
 
 
 # @testable true
@@ -177,7 +188,7 @@ class IngressMapping:
 
     @staticmethod
     # @testable infrastructure
-    def _field_details(field):
+    def _field_details(field: SchemaField) -> ImportField:
         return {
             "label": field.label,
             "id": field.id,
@@ -187,12 +198,12 @@ class IngressMapping:
             "fuzzy_import": bool(
                 field.choices or isinstance(field, Link) and field.is_entity_valued
             ),
-            "type": field.get("type"),
+            "type": cast(str | None, field.get("type")),
         }
 
     # @testable infrastructure
-    def _default_fields(self):
-        fields = {}
+    def _default_fields(self) -> FieldsById:
+        fields: FieldsById = {}
         if not _form_fields(self.form).get("name"):
             fields["name"] = {
                 "label": "Page Name",
@@ -278,7 +289,7 @@ class IngressMapping:
         if self._column_map is not None:
             return self._column_map
         section = self.entity.properties.assign_columns.section
-        mapped = {}
+        mapped: FieldsById = {}
         for index, column_id in enumerate(self.columns):
             if self.ignore(column_id):
                 continue
@@ -325,7 +336,7 @@ class IngressMapping:
             }
         if not details:
             return None
-        details = dict(details)
+        details = details.copy()
         details["description"] = (
             " ".join(
                 f"{{ {self.columns[column_id].get('label', '')} }}"
@@ -353,18 +364,21 @@ class IngressMapping:
     def file_options(self) -> list[ImportField]:
         if self._file_options is not None:
             return self._file_options
-        options = []
+        options: list[ImportField] = []
         for column_id, column in self.columns.items():
             if column.get("type") != "string":
                 continue
-            field_id = self.column_map.get(column_id, {}).get("id")
+            mapped = self.column_map.get(column_id)
+            field_id = mapped["id"] if mapped else None
+            icon: str | None = "csv"
+            if field_id:
+                field = self.fields.get(field_id)
+                icon = field["icon"] if field else None
             options.append(
                 {
                     "id": field_id or column_id,
                     "label": column.get("label"),
-                    "icon": self.fields.get(field_id, {}).get("icon")
-                    if field_id
-                    else "csv",
+                    "icon": icon,
                     "kind": "file",
                 }
             )
@@ -1159,25 +1173,25 @@ class IngressService:
                 raise ValidationError("The selected parent no longer exists.")
             self.entity.parent = cast("Category | ModelTask | Project", parent)
         elif entity_type == "task":
-            data = {"name": status.parent_name or self.entity.name}
+            project_data: ProjectData = {"name": status.parent_name or self.entity.name}
             if getattr(self.entity, "_testing", False):
-                project = Entities.PROJECT.create(data)
+                project = Entities.PROJECT.create(project_data)
             else:
                 key = self.entity_key("project", "setup:project")
                 project = Entities.PROJECT(key)
                 project.kind = project.entity_kind
-                project.update(data)
+                project.update(project_data)
             self.entity.project = project
             created.append(project)
         else:
-            data = {"name": status.parent_name or self.entity.name}
+            category_data: CategoryData = {"name": status.parent_name or self.entity.name}
             if getattr(self.entity, "_testing", False):
-                category = Entities.CATEGORY.create(data)
+                category = Entities.CATEGORY.create(category_data)
             else:
                 key = self.entity_key("category", "setup:category")
                 category = Entities.CATEGORY(key)
                 category.kind = category.entity_kind
-                category.update(data)
+                category.update(category_data)
             self.entity.category = category
             created.append(category)
 
@@ -1185,16 +1199,16 @@ class IngressService:
             project = self.entity.project
             if project is None:
                 raise ValidationError("Choose a project before creating its model.")
-            data = {"name": status.model_name or self.entity.name}
+            model_data: ModelTaskData = {"name": status.model_name or self.entity.name}
             if getattr(self.entity, "_testing", False):
-                model = Entities.MODEL_TASK.create(project, data)
+                model = Entities.MODEL_TASK.create(project, model_data)
             else:
                 key = self.entity_key("model", "setup:model", parent=project)
                 model = Entities.MODEL_TASK(key)
                 model.kind = model.entity_kind
                 model.project = project
                 project.properties.model_tasks.add(model)
-                model.update(data)
+                model.update(model_data)
             self.entity.model = model
             created.extend([project, model])
         return created

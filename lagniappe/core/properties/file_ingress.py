@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 from collections.abc import Mapping
 
 if TYPE_CHECKING:
+    from ..tools.files.validate import CSVMetadata
     from ..entities.ingress import Ingress
     from ..entities.entity import Entity
     from ..entities.form import Form
@@ -121,10 +122,10 @@ class ProcessCSV(ProcessProperty["Ingress"]):
     attributes = ("delimiter", "column_count", "row_count", "columns")
 
     # @testable infrastructure
-    def process(self) -> dict[str, Any]:
+    def process(self) -> CSVMetadata:
         metadata, rows = IngressParser.parse_entity(self.entity)
         self.entity.properties.rows.value = rows
-        self.section = metadata
+        self.section = dict(metadata)
         return metadata
 
 

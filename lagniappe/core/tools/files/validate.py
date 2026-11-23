@@ -19,12 +19,15 @@ class CSVColumn(TypedDict):
     type: NotRequired[str]
 
 
-class ParsedCSV(TypedDict):
+class CSVMetadata(TypedDict):
     delimiter: str
-    rows: list[dict[str, str]]
     columns: dict[str, CSVColumn]
     row_count: int
     column_count: int
+
+
+class ParsedCSV(CSVMetadata):
+    rows: list[dict[str, str]]
 
 
 # @testable true
