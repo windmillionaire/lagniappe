@@ -96,6 +96,7 @@ def _patch_star(user, key):
 
 
 # @matrix starred : category title-menu
+# @scaffolding testing/elements/containers.py::List.find_item
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_category(get_admin, get_user):
@@ -118,7 +119,7 @@ def test_star_category(get_admin, get_user):
 
     # Open category list and find the category
     category_list = home.category_list
-    category_item = category_list.get_item(category)
+    category_item = category_list.find_item(category)
 
     # Star from home page
     star_button = StarButton(category_item)
@@ -148,6 +149,7 @@ def test_star_category(get_admin, get_user):
 
 
 # @matrix starred : project title-menu
+# @scaffolding testing/elements/containers.py::List.find_item
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_project(get_admin, get_user):
@@ -170,7 +172,7 @@ def test_star_project(get_admin, get_user):
 
     # Open project list and find the project
     project_list = home.project_list
-    project_item = project_list.get_item(project)
+    project_item = project_list.find_item(project)
 
     # Star from home page
     star_button = StarButton(project_item)
@@ -197,7 +199,7 @@ def test_star_project(get_admin, get_user):
     home = user.go(SitePages.HOME)
     starred_project = home.starred_list.get_item(project)
     expect(starred_project).to_be_visible()
-    project_item = home.project_list.get_item(project)
+    project_item = home.project_list.find_item(project)
     star_button = StarButton(project_item)
     assert star_button.is_starred is True
 

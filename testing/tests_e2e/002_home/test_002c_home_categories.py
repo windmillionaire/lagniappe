@@ -214,6 +214,7 @@ def test_create_category_ai_mode(get_admin, get_user, results, browser_failures)
 
 
 # @pair categories:navigate
+# @scaffolding testing/elements/containers.py::List.find_item
 @pytest.mark.e2e
 def test_navigate_to_category(get_admin, get_user):
     """
@@ -227,7 +228,7 @@ def test_navigate_to_category(get_admin, get_user):
     category = Categories.test_navigate_to_category.get(user)
     home = user.go(SitePages.HOME)
 
-    category_element = home.category_list.get_item(category)
+    category_element = home.category_list.find_item(category)
     Link(category_element).click()
     expect(user.page).to_have_title(re.compile(category.definition.name))
 

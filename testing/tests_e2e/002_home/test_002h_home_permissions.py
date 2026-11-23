@@ -8,8 +8,6 @@ from lagniappe.web import auth as web_auth
 from testing.definitions import Categories, Projects, SitePages, Tasks, Users
 from testing.elements import HeaderSearch, List
 from testing.resources import Task
-from testing.utility.network import expect_successful_response
-from urllib.parse import urlsplit
 
 pytestmark = pytest.mark.e2e
 
@@ -131,6 +129,7 @@ def test_one_category_permissions(get_user):
 
 
 # @matrix permissions : global-resources owner
+# @scaffolding testing/elements/containers.py::List.find_item
 def test_admin_permissions(get_user):
     """
     Verify that an admin can access the home page and see model lists and tools.
@@ -141,26 +140,10 @@ def test_admin_permissions(get_user):
     project_one = Projects.test_create_project_manual_mode.get(user)
     home = user.go(SitePages.HOME)
 
-    for listing, expected in (
-        (home.category_list, [cat_one, cat_two]),
-        (home.project_list, [project_one]),
-    ):
-        remaining = list(expected)
-        while remaining:
-            for item in remaining[:]:
-                row = listing.get_item(item)
-                if row.count():
-                    expect(row).to_be_visible()
-                    remaining.remove(item)
-            if not remaining:
-                break
-            next_page = listing.list.locator("button[lp-control='next']")
-            expect(next_page).to_be_visible()
-            route = next_page.get_attribute("data-route")
-            first_key = listing.list.locator("li[lp-entity]").first.get_attribute("data-key")
-            with expect_successful_response(user.page, method="GET", path=urlsplit(route).path):
-                next_page.click()
-            expect(listing.list.locator(f"li[data-key='{first_key}']")).not_to_be_attached()
+    categories = home.category_list
+    expect(categories.find_item(cat_one)).to_be_visible()
+    expect(categories.find_item(cat_two)).to_be_visible()
+    expect(home.project_list.find_item(project_one)).to_be_visible()
 
     directory_list = home.directory
     expect(directory_list.list.locator("li")).to_have_count(4)

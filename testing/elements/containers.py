@@ -1,4 +1,8 @@
+from urllib.parse import parse_qsl, urlsplit
+
 from playwright.sync_api import expect
+
+from testing.utility.network import expect_successful_response
 
 
 class List:
@@ -36,6 +40,32 @@ class List:
         assert entity.key, "Entity must have a key"
 
         return self.list.locator(f"li[lp-entity][data-key='{entity.key}']")
+
+    def find_item(self, entity):
+        """Find a named row in a loaded Home list, following its pagination controls."""
+        row = self.get_item(entity)
+        first_page = self.list.locator("button[lp-control='previous']")
+        next_page = self.list.locator("button[lp-control='next']")
+        control = first_page if first_page.count() else next_page
+        visited = set()
+        while not row.count():
+            assert control.count(), f"{entity.name!r} was missing from the Home list"
+            route = control.get_attribute("data-route")
+            assert route and route not in visited, "Home pagination did not advance"
+            visited.add(route)
+            target = urlsplit(route)
+            with expect_successful_response(
+                self.list.page,
+                method="GET",
+                path=target.path,
+                query=dict(parse_qsl(target.query)),
+            ):
+                control.click()
+            # The response arrives before the widget replaces the outgoing controls.
+            outgoing = self.list.locator(f'button[lp-control][data-route="{route}"]')
+            expect(outgoing).not_to_be_attached()
+            control = next_page
+        return row
 
     def count(self):
         return self.list.count()
