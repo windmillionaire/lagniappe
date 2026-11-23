@@ -36,6 +36,7 @@ from ..tools.auth.restrictions import permission_relation
 
 if TYPE_CHECKING:
     from . import property_types
+    from .form import Form
 
 
 # @testable true
@@ -44,6 +45,8 @@ if TYPE_CHECKING:
 # @matrix task-completion mutations : hydration no-extra-read
 class Task(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
+        form: Form | None
+
         @property
         def properties(self) -> property_types.TaskProperties: ...
 

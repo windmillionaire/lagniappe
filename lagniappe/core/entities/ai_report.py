@@ -12,6 +12,7 @@ from ..tools.auth.context import current_context_user
 
 if TYPE_CHECKING:
     from . import property_types
+    from .file import File
 
 REPORT_FORMAT_VERSION = 2
 UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
@@ -25,6 +26,8 @@ UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
     if TYPE_CHECKING:
+        input_files: list[File]
+
         agent_manifest: dict[str, object] | None
         deferred_job: dict[str, object] | None
         proposal: dict[str, object] | None

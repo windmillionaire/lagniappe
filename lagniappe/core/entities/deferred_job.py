@@ -14,6 +14,7 @@ from ..properties import (
 
 if TYPE_CHECKING:
     from . import property_types
+    from .user import User
 
 
 # @testable true
@@ -22,6 +23,10 @@ if TYPE_CHECKING:
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
     if TYPE_CHECKING:
+        attempt: int | None
+        status_revision: int | None
+        actor: User | None
+
         job_type: str | None
         status: str | None
         authorization: dict[str, object] | None

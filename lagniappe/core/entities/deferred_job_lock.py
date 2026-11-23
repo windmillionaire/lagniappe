@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 class DeferredJobLock(Entity):
     """Small deterministic record coupling a target form to one active job."""
     if TYPE_CHECKING:
+        operation: str | None
+
         @property
         def properties(self) -> property_types.DeferredJobLockProperties: ...
 
