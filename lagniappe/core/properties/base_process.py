@@ -57,7 +57,8 @@ class ProcessProperty[Owner: Entity = "Entity"]:
         if isinstance(value, dict):
             self._value.update({k.replace("_", "-"): v for k, v in value.items()})
 
-    def update(self, form_data: Mapping[str, object]) -> dict[str, object] | None:
+    def update(self, form_data: Mapping[str, object]) -> dict[str, object] | bool | None:
+        """Apply stage inputs. Subclasses can report the saved section or a change flag."""
         self.section = {**form_data}
 
     # @testable true
