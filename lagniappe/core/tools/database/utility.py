@@ -21,6 +21,7 @@ from .transactions import retry_aborted
 
 if TYPE_CHECKING:
     from lagniappe.core.entities.entity import Entity as DomainEntity
+    from lagniappe.core.entities.site import Site
 
     from .get import Identifier
 
@@ -153,7 +154,7 @@ class Fingerprint(Enum, metaclass=DefaultEnum):
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_persists_user_and_users_fingerprint_record
 # @matrix caching users : save site-fingerprint
-def save(*entities: DomainEntity) -> None:
+def save(*entities: DomainEntity | Site) -> None:
     """Persist entities to Datastore and update their site fingerprints."""
     to_save = {e.key: e.db for e in entities if getattr(e, "key", None)}
     to_update = update_site_fingerprints(*to_save.values())

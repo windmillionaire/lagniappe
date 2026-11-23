@@ -217,6 +217,20 @@ def group_view_access(hashes: list[str] | str) -> list[Entity]:
 
 # @testable false
 # @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
+@overload
+def models(
+    model_type: str, start_cursor: str | None = None, limit: Literal[10] = 10,
+    hashes: QueryHashes = Restriction.UNRESTRICTED,
+) -> Results[Entity]: ...
+
+
+@overload
+def models(
+    model_type: str, start_cursor: str | None = None, limit: int | None = 10,
+    hashes: QueryHashes = Restriction.UNRESTRICTED,
+) -> Results[Entity] | list[Entity]: ...
+
+
 def models(
     model_type: str, start_cursor: str | None = None, limit: int | None = 10,
     hashes: QueryHashes = Restriction.UNRESTRICTED,
