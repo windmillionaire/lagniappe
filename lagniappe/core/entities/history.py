@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self, overload
 
 from datetime import datetime, UTC
 from copy import deepcopy
@@ -23,7 +23,11 @@ from ..tools.database import get as database_get
 
 
 if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
     from . import property_types
+    from .page import Page
+    from .project import Project
     from .task import Task
 
 
@@ -378,8 +382,19 @@ class DocumentHistory(AssetMixin, Entity):
         }
         return EntityProperties(self, properties)
 
+    @overload
     @classmethod
-    def create(cls, entity, *, name=None, html=None, key=None, allow_empty=False):
+    def create(cls, entity: Page | Project, *, name: str, html: str, key: Key | None = None, allow_empty: bool = False) -> Self: ...
+
+    @overload
+    @classmethod
+    def create(cls, entity: Page | Project, *, name: str | None = None, html: str | None = None, key: Key | None = None, allow_empty: bool = False) -> Self | None: ...
+
+    @classmethod
+    def create(
+        cls, entity: Page | Project, *, name: str | None = None, html: str | None = None,
+        key: Key | None = None, allow_empty: bool = False,
+    ) -> Self | None:
         named = name is not None or html is not None
         if named:
             name = cls.validate_name(name)
@@ -394,6 +409,8 @@ class DocumentHistory(AssetMixin, Entity):
         new_history.hash = key_identity
 
         if named:
+            # Named snapshots pass validate_name above.
+            assert name is not None
             new_history.name = name
             new_history.save_asset(html or "<p></p>", cls.DOCUMENT_ASSET, "html")
             return new_history
@@ -407,7 +424,7 @@ class DocumentHistory(AssetMixin, Entity):
         return new_history
 
     @classmethod
-    def validate_name(cls, value):
+    def validate_name(cls, value: object) -> str:
         if not isinstance(value, str):
             raise ValidationError("Version name is required")
 
@@ -421,7 +438,7 @@ class DocumentHistory(AssetMixin, Entity):
         return name
 
     @staticmethod
-    def validate_html(value):
+    def validate_html(value: object) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValidationError("Document content is required")
 

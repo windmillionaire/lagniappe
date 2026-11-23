@@ -19,12 +19,22 @@ from ..tools.auth.restrictions import restriction_fields
 
 
 if TYPE_CHECKING:
-    from ..properties.base_property import Property
-    from ..properties.base_process import ProcessProperty
     from ..properties.form_submission import FormSubmission
+    from ..properties.user_related import UserPage
 
-    type RegisteredProperty = Property | ProcessProperty
     from .page import Page
+
+
+class RegisteredProperty(Protocol):
+    """Common portion of fields with different owner and value types."""
+
+    def __init__(self, *, entity: Entity) -> None: ...
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def value(self) -> object: ...
 
 
 # @testable infrastructure
@@ -208,18 +218,19 @@ class Entity:
         super().__setattr__("_properties", properties)
         return properties
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> object:
         prop = self.properties.get(name)
         if prop is None:
             raise AttributeError(f"Property {name} not found")
         return prop.value
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: object) -> None:
         prop = self.properties.get(name)
         if prop is None:
             super().__setattr__(name, value)
             return
-        prop.value = value
+        # Registered fields have heterogeneous writers, including read-only descriptors.
+        setattr(prop, "value", value)  # noqa: B010
 
     @property
     def readonly(self):
@@ -315,7 +326,8 @@ class Entity:
                 details[prop.details_key] = value
 
         if getattr(self, "entity_kind", None) == "user":
-            page = self.properties.get("page")
+            # The user registry installs UserPage under this name.
+            page = cast("UserPage | None", self.properties.get("page"))
             details["id"] = database_get.urlsafe_key(page.key) if page else None
         else:
             details["id"] = self.urlsafe_key

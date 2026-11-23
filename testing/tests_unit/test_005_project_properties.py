@@ -132,6 +132,16 @@ def test_document_html_assignment_reads_back_text_and_clears():
         save.assert_called_with(None, "document", "html")
 
 
+@pytest.mark.unit
+def test_document_computed_value_and_kind_reject_writes():
+    document = Project(testing=True).properties.document
+    for field in ("value", "kind"):
+        with pytest.raises(AttributeError):
+            setattr(document, field, "override")
+    assert document.value is document
+    assert document.kind == "project"
+
+
 # @matrix project : filter-value public
 @pytest.mark.unit
 def test_project_is_public(get_test_entities):
