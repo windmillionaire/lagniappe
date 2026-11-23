@@ -164,7 +164,7 @@ def upsert_message_candidate(
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_message
 # @reason scheduled-sequence compare-and-set is exercised through message capture
 def mark_message_scheduled(
-    row: DatastoreEntity, sequence: int, task_name: str, now: datetime
+    row: DatastoreEntity, sequence: int, task_name: str | None, now: datetime
 ) -> bool:
     if not task_name:
         return False

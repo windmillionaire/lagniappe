@@ -19,7 +19,6 @@ from .transactions import retry_aborted
 from .utility import create_named_key, stored_key, stored_row
 
 if TYPE_CHECKING:
-    from lagniappe.core.entities.entity import Entity as DomainEntity
     from lagniappe.core.entities.user import User
 
     from .get import Identifier
@@ -231,7 +230,7 @@ def conversations_page(
 # @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
 # @reason indexed query plumbing is exercised through bounded history
 def messages_page(
-    conversation: DomainEntity, cursor: str | None = None, limit: int = 50
+    conversation: Row, cursor: str | None = None, limit: int = 50
 ) -> Results[Row]:
     return (
         Query(KINDS.messages, ancestor=conversation.key)
