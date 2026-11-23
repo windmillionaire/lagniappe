@@ -430,6 +430,10 @@ def _require_committed_production_build(
         raise HostedE2EError(
             "Hosted E2E create requires a configured frontend build version."
         )
+    return _committed_build_id(source, repo_root, expected_version=expected_version)
+
+
+def _committed_build_id(source: str, repo_root: Path, *, expected_version: str | None = None) -> str:
     validation, issues = inspect_frontend_build(
         GitFrontendBuildReader(repo_root, revision=source),
         expected_mode="production",
@@ -438,7 +442,7 @@ def _require_committed_production_build(
     if issues or validation is None:
         detail = "; ".join(issues)
         raise HostedE2EError(
-            "Hosted E2E create requires a coherent committed production frontend "
+            "Hosted E2E requires a coherent committed production frontend "
             f"build. Run `npm run build`, commit every generated artifact, and "
             f"retry. {detail}"
         )
@@ -2411,9 +2415,10 @@ def import_result_directory(
     if (
         not isinstance(hosted, dict)
         or not isinstance(manifest.get("suite"), str)
+        or not re.fullmatch(r"b[0-9a-f]{7}", str(manifest.get("build_id") or ""))
         or any(
             hosted.get(key) != manifest[key]
-            for key in ("execution", "source", "source_snapshot", "suite")
+            for key in ("execution", "source", "source_snapshot", "suite", "build_id")
         )
         or any(
             (key in manifest) != (key in hosted) or manifest.get(key) != hosted.get(key)
@@ -2421,6 +2426,8 @@ def import_result_directory(
         )
     ):
         raise HostedE2EError("Hosted result manifest and evidence provenance disagree.")
+    if hosted["build_id"] != _committed_build_id(source, APP_DIR):
+        raise HostedE2EError("Hosted result build ID does not match the committed frontend build.")
     evidence_path = APP_DIR / LATEST_TEST_RUN
     local = load_json(evidence_path)
     if (
@@ -2536,6 +2543,8 @@ def validate_release_evidence(
         raise HostedE2EError(
             "Release evidence does not match the current semantic source tree."
         )
+    if hosted.get("build_id") != _committed_build_id(candidate, repo_root):
+        raise HostedE2EError("Release evidence does not match the candidate frontend build ID.")
     if hosted.get("suite") != "all" or "targets" in hosted:
         raise HostedE2EError(
             "Release evidence must come from the complete hosted all suite."

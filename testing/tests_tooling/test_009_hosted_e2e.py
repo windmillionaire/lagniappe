@@ -512,6 +512,77 @@ def _evidence(snapshot, paths, test_name, outcome="passed"):
     }
 
 
+def _write_release_build(tmp_path):
+    files = {
+        "build/publication.json": f"{
+            json.dumps(
+                {
+                    'schema': 1,
+                    'source_roots': ['src/script'],
+                    'source_files': ['build/publication.json', 'package.json'],
+                    'exclusive_artifact_roots': ['lagniappe/web/static/chunks'],
+                    'required_artifacts': [
+                        'lagniappe/web/static/chunks/views/home.js',
+                        'lagniappe/web/static/script.js',
+                        'lagniappe/web/static/sw.js',
+                    ],
+                    'required_artifact_prefixes': [
+                        'lagniappe/web/static/chunks/',
+                        'lagniappe/web/static/chunks/views/',
+                    ],
+                },
+                sort_keys=True,
+            )
+        }\n",
+        "config/constants.py": 'BUILD_ID = "b1234567"\n',
+        "lagniappe/web/static/chunks/views/home.js": "export const home = true;\n",
+        "lagniappe/web/static/script.js": "export const main = true;\n",
+        "lagniappe/web/static/sw.js": 'const BUILD_ID = "b1234567";\n',
+        "package.json": '{"version": "1.2.3"}\n',
+        "src/script/main.mjs": "export const main = true;\n",
+    }
+    for relative, content in files.items():
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    source_paths = [
+        "build/publication.json",
+        "package.json",
+        "src/script/main.mjs",
+    ]
+    source_digest = hashlib.sha256(b"frontend-source-v1\0")
+    for relative in source_paths:
+        source_digest.update(relative.encode())
+        source_digest.update(b"\0")
+        source_digest.update((tmp_path / relative).read_bytes())
+        source_digest.update(b"\0")
+    artifact_paths = [
+        "lagniappe/web/static/chunks/views/home.js",
+        "lagniappe/web/static/script.js",
+        "lagniappe/web/static/sw.js",
+    ]
+    metadata = {
+        "schema": 1,
+        "build_id": "b1234567",
+        "mode": "production",
+        "version": "1.2.3",
+        "source": {"sha256": source_digest.hexdigest()},
+        "artifacts": [],
+    }
+    for relative in artifact_paths:
+        content = (tmp_path / relative).read_bytes()
+        metadata["artifacts"].append(
+            {
+                "path": relative,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        )
+    metadata_path = tmp_path / "lagniappe/web/static/build.json"
+    metadata_path.write_text(f"{json.dumps(metadata, indent=2)}\n", encoding="utf-8")
+    return metadata_path
+
+
 def _release_evidence_repository(
     repo,
     *,
@@ -524,6 +595,7 @@ def _release_evidence_repository(
     _git(repo, "init")
     _git(repo, "config", "user.name", "Hosted Release Test")
     _git(repo, "config", "user.email", "hosted-release@example.test")
+    _write_release_build(repo)
     source = repo / "source.py"
     source.write_text("VALUE = 1\n", encoding="utf-8")
     evidence_path = repo / test_evidence.LATEST_TEST_RUN
@@ -681,6 +753,8 @@ def test_release_evidence_validation_rejects_failed_or_focused_results(tmp_path)
         ({"source": "a" * 40}, "exact candidate source"),
         ({"source_snapshot": "b" * 64}, "current semantic source tree"),
         ({"targets": []}, "complete hosted all suite"),
+        ({"build_id": "b7654321"}, "candidate frontend build ID"),
+        ({"build_id": None}, "candidate frontend build ID"),
     ],
 )
 def test_release_rejects_passing_evidence_for_another_source_or_selection(
@@ -1577,7 +1651,8 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     checkout.mkdir()
     _git(checkout, "init")
     (checkout / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
-    _git(checkout, "add", "source.py")
+    _write_release_build(checkout)
+    _git(checkout, "add", ".")
     _git(checkout, "config", "user.name", "Test")
     _git(checkout, "config", "user.email", "ci@example.test")
     _git(checkout, "commit", "-m", "Candidate")
@@ -1592,12 +1667,13 @@ def test_hosted_result_directory_import_requires_the_exact_source(
         "exit_status": 1,
         "source": source,
         "source_snapshot": snapshot,
+        "build_id": "b1234567",
         "suite": "all",
     }
     test_evidence.write_json(result_dir / "manifest.json", manifest)
     remote = _evidence(snapshot, paths, "tests_e2e/test_remote.py::test_remote", outcome="failed")
     remote["provenance"]["hosted_e2e"] = {
-        key: manifest[key] for key in ("execution", "source", "source_snapshot", "suite")
+        key: manifest[key] for key in ("execution", "source", "source_snapshot", "suite", "build_id")
     }
     test_evidence.write_json(result_dir / "evidence.json", remote)
     # The protected workflow imports its downloaded bundle with only PyYAML installed.
@@ -1621,6 +1697,15 @@ def test_hosted_result_directory_import_requires_the_exact_source(
         evidence["tests"]["tests_e2e/test_remote.py::test_remote"]["outcome"]
         == "failed"
     )
+
+    manifest["build_id"] = "b7654321"
+    remote["provenance"]["hosted_e2e"]["build_id"] = manifest["build_id"]
+    test_evidence.write_json(result_dir / "manifest.json", manifest)
+    test_evidence.write_json(result_dir / "evidence.json", remote)
+    result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "does not match the committed frontend build" in result.stderr + result.stdout
+    assert test_evidence.load_json(checkout / test_evidence.LATEST_TEST_RUN) == evidence
 
     manifest["source"] = "b" * 40
     test_evidence.write_json(result_dir / "manifest.json", manifest)
@@ -1657,13 +1742,13 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
     manifest = {
         "schema_version": 1, "kind": "hosted-e2e-result",
         "execution": "lagniappe-e2e-result1", "source": source,
-        "source_snapshot": snapshot, "suite": suite, "exit_status": status,
+        "source_snapshot": snapshot, "build_id": "b1234567", "suite": suite, "exit_status": status,
     }
     if targets:
         manifest["targets"] = [bare]
     remote["provenance"]["hosted_e2e"] = {
         key: manifest[key]
-        for key in ("execution", "source", "source_snapshot", "suite", "targets")
+        for key in ("execution", "source", "source_snapshot", "suite", "build_id", "targets")
         if key in manifest
     }
     result_dir = tmp_path / "reports/result"
@@ -1675,6 +1760,7 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
         lambda *_args, **_kwargs: subprocess.CompletedProcess(["git"], 0, stdout=source, stderr=""),
     )
 
+    monkeypatch.setattr(hosted_e2e, "_committed_build_id", lambda *_: "b1234567")
     hosted_e2e.import_result_directory(result_dir)
 
     merged = test_evidence.load_json(evidence_path)
@@ -1691,7 +1777,7 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
 @pytest.mark.parametrize(("field", "value"), [
     ("exit_status", None), ("exit_status", False), ("exit_status", "0"), ("exit_status", 1),
     ("source", "b" * 40), ("source_snapshot", "other"), ("execution", "lagniappe-e2e-other"),
-    ("suite", "focused"), ("targets", []),
+    ("suite", "focused"), ("targets", []), ("build_id", "b7654321"), ("build_id", None),
 ])
 def test_hosted_import_rejects_inconsistent_evidence_without_overwriting(
     tmp_path, monkeypatch, field, value,
@@ -1702,6 +1788,7 @@ def test_hosted_import_rejects_inconsistent_evidence_without_overwriting(
         "execution": "lagniappe-e2e-result1",
         "source": source,
         "source_snapshot": snapshot,
+        "build_id": "b1234567",
         "suite": "all",
     }
     directory = tmp_path / "reports" / "result"
@@ -2020,73 +2107,7 @@ def test_hosted_e2e_requires_a_committed_production_build(tmp_path):
     _git(tmp_path, "init")
     _git(tmp_path, "config", "user.name", "Hosted E2E Test")
     _git(tmp_path, "config", "user.email", "hosted-e2e@example.test")
-    files = {
-        "build/publication.json": f"{
-            json.dumps(
-                {
-                    'schema': 1,
-                    'source_roots': ['src/script'],
-                    'source_files': ['build/publication.json', 'package.json'],
-                    'exclusive_artifact_roots': ['lagniappe/web/static/chunks'],
-                    'required_artifacts': [
-                        'lagniappe/web/static/chunks/views/home.js',
-                        'lagniappe/web/static/script.js',
-                        'lagniappe/web/static/sw.js',
-                    ],
-                    'required_artifact_prefixes': [
-                        'lagniappe/web/static/chunks/',
-                        'lagniappe/web/static/chunks/views/',
-                    ],
-                },
-                sort_keys=True,
-            )
-        }\n",
-        "config/constants.py": 'BUILD_ID = "b1234567"\n',
-        "lagniappe/web/static/chunks/views/home.js": "export const home = true;\n",
-        "lagniappe/web/static/script.js": "export const main = true;\n",
-        "lagniappe/web/static/sw.js": 'const BUILD_ID = "b1234567";\n',
-        "package.json": '{"version": "1.2.3"}\n',
-        "src/script/main.mjs": "export const main = true;\n",
-    }
-    for relative, content in files.items():
-        path = tmp_path / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-    source_paths = [
-        "build/publication.json",
-        "package.json",
-        "src/script/main.mjs",
-    ]
-    source_digest = hashlib.sha256(b"frontend-source-v1\0")
-    for relative in source_paths:
-        source_digest.update(relative.encode())
-        source_digest.update(b"\0")
-        source_digest.update((tmp_path / relative).read_bytes())
-        source_digest.update(b"\0")
-    artifact_paths = [
-        "lagniappe/web/static/chunks/views/home.js",
-        "lagniappe/web/static/script.js",
-        "lagniappe/web/static/sw.js",
-    ]
-    metadata = {
-        "schema": 1,
-        "build_id": "b1234567",
-        "mode": "production",
-        "version": "1.2.3",
-        "source": {"sha256": source_digest.hexdigest()},
-        "artifacts": [],
-    }
-    for relative in artifact_paths:
-        content = (tmp_path / relative).read_bytes()
-        metadata["artifacts"].append(
-            {
-                "path": relative,
-                "sha256": hashlib.sha256(content).hexdigest(),
-                "size": len(content),
-            }
-        )
-    metadata_path = tmp_path / "lagniappe/web/static/build.json"
-    metadata_path.write_text(f"{json.dumps(metadata, indent=2)}\n", encoding="utf-8")
+    metadata_path = _write_release_build(tmp_path)
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-m", "production build")
     source = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
