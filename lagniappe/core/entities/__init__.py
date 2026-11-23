@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Self, TypeGuard, cast, overload
 
-from ..definitions import Fetch, FetchDepth, MutationOperation, MutationOutcome
+from ..definitions import Fetch, FetchDepth, MutationOperation, MutationOutcome, MutationPhase
 from ..exceptions import capture, record_entity_load_trace
 from ..mutations import (
     execute_mutation,
@@ -312,14 +312,14 @@ class EntityRegistry:
         expected_state: Mapping[str, object] | None = None,
     ) -> MutationOutcome:
         """Persist a document checkpoint without rewriting sibling state."""
-        return execute_mutation(
-            plan_document_checkpoint(
-                entity,
-                advance_parent=advance_parent,
-                registry=self,
-            ),
-            **({"guards": [(entity.key, expected_state)]} if expected_state is not None else {}),
-        )
+        plan = plan_document_checkpoint(entity, advance_parent=advance_parent, registry=self)
+        if expected_state is not None:
+            key = entity.key
+            if key is not None:
+                return execute_mutation(plan, guards=[(key, expected_state)])
+            if any(effect.phase is MutationPhase.DURABLE for effect in plan.effects):
+                raise ValueError("A guarded document checkpoint needs a persisted key.")
+        return execute_mutation(plan)
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints

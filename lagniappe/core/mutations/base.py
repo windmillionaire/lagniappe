@@ -1,6 +1,7 @@
 """Mutation plan construction primitives shared by every entity kind."""
-
 from collections import OrderedDict
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING
 
 from ..definitions import (
     MutationEffect,
@@ -10,6 +11,13 @@ from ..definitions import (
     MutationPhase,
     MutationPlan,
 )
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ..definitions import MutationIntent
+    from ..entities import EntityRegistry
+    from ..entities.entity import Entity
 
 
 STANDARD_PROPERTY_UPDATES = (
@@ -23,12 +31,12 @@ STANDARD_PROPERTY_UPDATES = (
 
 
 # @testable infrastructure
-def _entity_key(entity):
+def _entity_key(entity: Entity | None) -> Key | None:
     return getattr(entity, "key", None)
 
 
 # @testable infrastructure
-def _unique(values):
+def _unique[T](values: Iterable[T | None]) -> tuple[T, ...]:
     return tuple(dict.fromkeys(value for value in values if value is not None))
 
 
@@ -37,18 +45,37 @@ class MutationPlanBuilder:
     """Merge kind-planner output into one authoritative effect inventory."""
 
     # @testable infrastructure
-    def __init__(self, operation, entities, *, registry=None, planner_for=None):
+    def __init__(
+        self,
+        operation: MutationOperation,
+        entities: Iterable[Entity],
+        *,
+        registry: EntityRegistry | None = None,
+        planner_for: Callable[[Entity], StandardMutation[Entity]] | None = None,
+    ) -> None:
         self.operation = operation
         self.roots = tuple(entities)
         self.entities = registry
         self._planner_for = planner_for
-        self._effects = OrderedDict()
+        self._effects: OrderedDict[tuple[object, ...], MutationEffect] = OrderedDict()
         self._standard_planned = set()
         self._standard_planning = set()
-        self._consumed = OrderedDict()
+        self._consumed: OrderedDict[Key | None, tuple[Entity, tuple[MutationIntent, ...]]] = OrderedDict()
+
+    @property
+    def registry(self) -> EntityRegistry:
+        if self.entities is None:
+            raise RuntimeError("This mutation requires an entity registry")
+        return self.entities
 
     # @testable infrastructure
-    def _effect_key(self, effect, entity=None, cache_key=None, cache_kind=None):
+    def _effect_key(
+        self,
+        effect: MutationEffectType,
+        entity: Entity | None = None,
+        cache_key: str | None = None,
+        cache_kind: str | None = None,
+    ) -> tuple[object, ...]:
         if entity is not None:
             return effect, _entity_key(entity)
         if effect is MutationEffectType.CACHE_STATE_DELETE:
@@ -60,7 +87,9 @@ class MutationPlanBuilder:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_full_page_save_wins_over_file_owner_touch_in_either_order
     # @matrix mutations : full-root masked-touch instance-precedence
-    def _merge_write(self, existing, incoming):
+    def _merge_write(
+        self, existing: MutationEffect, incoming: MutationEffect
+    ) -> MutationEffect:
         if existing.property_mask is None or incoming.property_mask is None:
             property_mask = None
         else:
@@ -89,15 +118,15 @@ class MutationPlanBuilder:
     # @testable infrastructure
     def add_write(
         self,
-        entity,
+        entity: Entity | None,
         *,
-        effect=MutationEffectType.UPSERT,
-        property_mask=None,
-        property_updates=(),
-        serialize_processes=False,
-        reason,
-        depends_on=(),
-    ):
+        effect: MutationEffectType = MutationEffectType.UPSERT,
+        property_mask: Iterable[str] | None = None,
+        property_updates: Iterable[str] = (),
+        serialize_processes: bool = False,
+        reason: str,
+        depends_on: Iterable[Entity] = (),
+    ) -> None:
         if not getattr(entity, "key", None):
             return
         key = self._effect_key(effect, entity=entity)
@@ -119,7 +148,9 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def standard_root(self, entity, *, reason, depends_on=()):
+    def standard_root(
+        self, entity: Entity | None, *, reason: str, depends_on: Iterable[Entity] = ()
+    ) -> None:
         self.add_write(
             entity,
             property_updates=STANDARD_PROPERTY_UPDATES,
@@ -130,7 +161,14 @@ class MutationPlanBuilder:
         self.cache_refresh(entity, reason=reason)
 
     # @testable infrastructure
-    def root(self, entity, *, property_mask=None, property_updates=(), reason):
+    def root(
+        self,
+        entity: Entity | None,
+        *,
+        property_mask: Iterable[str] | None = None,
+        property_updates: Iterable[str] = (),
+        reason: str,
+    ) -> None:
         mask = None if property_mask is None else tuple(property_mask)
         self.add_write(
             entity,
@@ -142,14 +180,14 @@ class MutationPlanBuilder:
     # @testable infrastructure
     def patch(
         self,
-        entity,
-        *properties,
-        property_updates=("modified",),
-        refresh_cache=True,
-        reason,
-        depends_on=(),
-        effect=MutationEffectType.UPSERT,
-    ):
+        entity: Entity | None,
+        *properties: str,
+        property_updates: Iterable[str] = ("modified",),
+        refresh_cache: bool = True,
+        reason: str,
+        depends_on: Iterable[Entity] = (),
+        effect: MutationEffectType = MutationEffectType.UPSERT,
+    ) -> None:
         mask = _unique((*properties, *property_updates))
         if not mask:
             raise ValueError("Masked mutation writes require at least one property")
@@ -165,7 +203,14 @@ class MutationPlanBuilder:
             self.cache_refresh(entity, reason=reason)
 
     # @testable infrastructure
-    def touch(self, entity, *, refresh_cache=True, reason, depends_on=()):
+    def touch(
+        self,
+        entity: Entity | None,
+        *,
+        refresh_cache: bool = True,
+        reason: str,
+        depends_on: Iterable[Entity] = (),
+    ) -> None:
         self.patch(
             entity,
             property_updates=("modified",),
@@ -175,7 +220,7 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def delete(self, entity, *, reason):
+    def delete(self, entity: Entity | None, *, reason: str) -> None:
         if not getattr(entity, "key", None):
             return
         key = self._effect_key(MutationEffectType.DELETE, entity=entity)
@@ -190,7 +235,9 @@ class MutationPlanBuilder:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_full_page_save_wins_over_file_owner_touch_in_either_order
     # @matrix mutations : full-root masked-touch instance-precedence cache
-    def _add_entity_cache_effect(self, effect, entity, reason):
+    def _add_entity_cache_effect(
+        self, effect: MutationEffectType, entity: Entity | None, reason: str
+    ) -> None:
         if not getattr(entity, "key", None):
             return
         key = self._effect_key(effect, entity=entity)
@@ -209,19 +256,19 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def cache_refresh(self, entity, *, reason):
+    def cache_refresh(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(MutationEffectType.CACHE_REFRESH, entity, reason)
 
     # @testable infrastructure
-    def cache_invalidate(self, entity, *, reason):
+    def cache_invalidate(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(MutationEffectType.CACHE_INVALIDATE, entity, reason)
 
     # @testable infrastructure
-    def cache_delete(self, entity, *, reason):
+    def cache_delete(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(MutationEffectType.CACHE_DELETE, entity, reason)
 
     # @testable infrastructure
-    def notification_upsert(self, entity, *, reason):
+    def notification_upsert(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(
             MutationEffectType.NOTIFICATION_UPSERT,
             entity,
@@ -229,7 +276,7 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def notification_delete(self, entity, *, reason):
+    def notification_delete(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(
             MutationEffectType.NOTIFICATION_DELETE,
             entity,
@@ -237,7 +284,7 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def operation_upsert(self, entity, *, reason):
+    def operation_upsert(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(
             MutationEffectType.OPERATION_UPSERT,
             entity,
@@ -245,7 +292,7 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def operation_delete(self, entity, *, reason):
+    def operation_delete(self, entity: Entity | None, *, reason: str) -> None:
         self._add_entity_cache_effect(
             MutationEffectType.OPERATION_DELETE,
             entity,
@@ -255,7 +302,9 @@ class MutationPlanBuilder:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
     # @matrix mutations task-scheduling : durable-first post-commit
-    def dispatch_scheduled_uncomplete(self, entity, *, reason):
+    def dispatch_scheduled_uncomplete(
+        self, entity: Entity | None, *, reason: str
+    ) -> None:
         self._add_entity_cache_effect(
             MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH,
             entity,
@@ -263,7 +312,7 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def invalidate_public_discovery(self, *, reason):
+    def invalidate_public_discovery(self, *, reason: str) -> None:
         key = (MutationEffectType.PUBLIC_DISCOVERY_INVALIDATE,)
         existing = self._effects.get(key)
         reasons = _unique((*(existing.reasons if existing else ()), reason))
@@ -274,7 +323,7 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def clear_cache_state(self, cache_key, *, reason):
+    def clear_cache_state(self, cache_key: str | None, *, reason: str) -> None:
         if not cache_key:
             return
         key = self._effect_key(
@@ -290,7 +339,9 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def delete_from_search(self, kind, entity, *, reason):
+    def delete_from_search(
+        self, kind: str | None, entity: Entity | None, *, reason: str
+    ) -> None:
         if not kind or not getattr(entity, "key", None):
             return
         key = (
@@ -309,7 +360,9 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def delete_blob(self, path, visibility, *, reason):
+    def delete_blob(
+        self, path: str | None, visibility: str | None, *, reason: str
+    ) -> None:
         if not path:
             return
         key = MutationEffectType.BLOB_DELETE, visibility, path
@@ -324,9 +377,15 @@ class MutationPlanBuilder:
         )
 
     # @testable infrastructure
-    def plan_standard(self, entity, *, reason="explicit-root", depends_on=()):
+    def plan_standard(
+        self,
+        entity: Entity | None,
+        *,
+        reason: str = "explicit-root",
+        depends_on: Iterable[Entity] = (),
+    ) -> None:
         key = _entity_key(entity)
-        if key is None:
+        if entity is None or key is None:
             return
         if key in self._standard_planning:
             self.standard_root(entity, reason=reason, depends_on=depends_on)
@@ -350,8 +409,8 @@ class MutationPlanBuilder:
 
     # @testable true
     # @matrix editor mutations : document durable-first cleanup named-versions
-    def consume_intents(self, owner):
-        intents = tuple(getattr(owner, "mutation_intents", ()))
+    def consume_intents(self, owner: Entity) -> None:
+        intents: tuple[MutationIntent, ...] = tuple(getattr(owner, "mutation_intents", ()))
         if not intents:
             return
         owner_key = _entity_key(owner)
@@ -394,7 +453,9 @@ class MutationPlanBuilder:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_write_order_preserves_distinct_roots_and_dependencies
     # @matrix mutations : write-identity dependency-order
-    def _ordered_writes(self, effects):
+    def _ordered_writes(
+        self, effects: Iterable[MutationEffect]
+    ) -> list[MutationEffect]:
         writes = [
             effect
             for effect in effects
@@ -426,7 +487,7 @@ class MutationPlanBuilder:
         return ordered
 
     # @testable infrastructure
-    def build(self):
+    def build(self) -> MutationPlan:
         effects = list(self._effects.values())
         delete_keys = {
             _entity_key(effect.entity)
@@ -469,7 +530,12 @@ class RootMutation:
 
     @classmethod
     # @testable infrastructure
-    def plan(cls, *entities, property_mask=None, property_updates=()):
+    def plan(
+        cls,
+        *entities: Entity,
+        property_mask: Iterable[str] | None = None,
+        property_updates: Iterable[str] = (),
+    ) -> MutationPlan:
         builder = MutationPlanBuilder(MutationOperation.SAVE, entities)
         for entity in entities:
             builder.root(
@@ -482,10 +548,12 @@ class RootMutation:
 
 
 # @testable infrastructure
-class StandardMutation:
+class StandardMutation[Target: Entity = Entity]:
     """Normal full-document root mutation shared by simple entity kinds."""
 
     # @testable infrastructure
-    def plan_save(self, entity, builder, *, reason, depends_on=()):
+    def plan_save(
+        self, entity: Target, builder, *, reason: str, depends_on: Iterable[Entity] = ()
+    ) -> None:
         builder.standard_root(entity, reason=reason, depends_on=depends_on)
         builder.consume_intents(entity)

@@ -1,4 +1,5 @@
 """Explicit kind-to-planner routing for entity mutations."""
+from typing import TYPE_CHECKING, cast
 
 from .base import StandardMutation
 from .save import (
@@ -16,6 +17,9 @@ from .save import (
     TaskMutation,
     UserMutation,
 )
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
 
 
 STANDARD = StandardMutation()
@@ -51,10 +55,10 @@ SAVE_PLANNERS = {
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
 # @matrix mutations : completeness contract planner-registry
-def planner_for(entity):
+def planner_for(entity: Entity) -> StandardMutation[Entity]:
     kind = getattr(entity, "entity_kind", None) or getattr(entity, "kind", None)
     try:
-        return SAVE_PLANNERS[kind]
+        return cast("StandardMutation[Entity]", SAVE_PLANNERS[cast(str, kind)])
     except KeyError as error:
         raise ValueError(f"No mutation planner registered for kind: {kind}") from error
 
@@ -62,5 +66,5 @@ def planner_for(entity):
 # @testable false
 # @covered-by lagniappe/core/mutations/registry.py::planner_for
 # @reason registry keys are exposed through the package completeness check
-def registered_kinds():
+def registered_kinds() -> frozenset[str]:
     return frozenset(SAVE_PLANNERS)

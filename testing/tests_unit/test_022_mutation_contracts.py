@@ -31,7 +31,7 @@ from lagniappe.core.mutations import (
 )
 from lagniappe.core.mutations import executor as mutation_executor
 from lagniappe.core import mutations as mutation_planning
-from lagniappe.core.mutations.delete import Survivor, _merge_survivors
+from lagniappe.core.mutations.delete import DeleteCollector, Survivor, _merge_survivors
 from testing.utility import mutation_contracts
 from testing.utility.test_entities import TestEntities
 
@@ -934,3 +934,30 @@ def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
     assert writes[task.key].property_mask == ("files", "modified")
     assert writes[history.key].property_mask == ("files",)
     assert writes[page.key].property_mask == ("modified",)
+
+def test_unsaved_category_delete_does_not_query_all_pages(monkeypatch):
+    category = TestEntities.get("CATEGORY", {"name": "Unsaved category"})
+    monkeypatch.setattr(type(category), "key", property(lambda self: None))
+    monkeypatch.setattr(
+        "lagniappe.core.mutations.delete.database_get.pages",
+        lambda *args, **kwargs: pytest.fail("Unsaved categories have no persisted pages"),
+    )
+    collector = DeleteCollector(Entities)
+    collector.category_pages(category)
+    assert collector.to_delete == []
+
+
+def test_unsaved_document_checkpoint_keeps_noop_and_guards_dependents(monkeypatch):
+    from types import SimpleNamespace
+
+    document = SimpleNamespace(key=None, mutation_intents=())
+    assert Entities.save_document_checkpoint(document, expected_state={}).complete
+
+    owner = TestEntities.get("CATEGORY", {"name": "Saved history", "hash": "saved-owner"})
+    document.mutation_intents = (MutationIntent.standard(owner, reason="history"),)
+    monkeypatch.setattr(
+        mutation_executor.database_utility, "save_mutations",
+        lambda *args, **kwargs: pytest.fail("An unresolved guard cannot commit a dependent"),
+    )
+    with pytest.raises(ValueError, match="persisted key"):
+        Entities.save_document_checkpoint(document, expected_state={})

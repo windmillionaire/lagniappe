@@ -1,15 +1,12 @@
 """Machine-readable contracts and executable plans for entity mutations."""
 
 from collections.abc import Iterable
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import TYPE_CHECKING, Literal, Self
 
 if TYPE_CHECKING:
     from ..entities.entity import Entity
-
-
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
 
 
 class MutationOperation(Enum):
@@ -144,7 +141,7 @@ class EntityMutationContract:
 # @testable false
 # @covered-by lagniappe/core/definitions/mutations.py::MutationEffect
 # @reason compact entity identifiers are exercised through plan serialization
-def _entity_key(entity):
+def _entity_key(entity: Entity) -> str | None:
     try:
         return entity.urlsafe_key
     except (AttributeError, RuntimeError, ValueError):
@@ -155,7 +152,7 @@ def _entity_key(entity):
 # @testable false
 # @covered-by lagniappe/core/definitions/mutations.py::MutationEffect
 # @reason compact entity kinds are exercised through plan serialization
-def _entity_kind(entity):
+def _entity_kind(entity: Entity) -> str | None:
     return getattr(entity, "entity_kind", None) or getattr(entity, "kind", None)
 
 
@@ -168,14 +165,14 @@ class MutationEffect:
 
     effect: MutationEffectType
     phase: MutationPhase
-    entity: Any = field(default=None, repr=False, compare=False)
+    entity: Entity | None = field(default=None, repr=False, compare=False)
     relation: str | None = None
-    targets: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    targets: tuple[Entity, ...] = field(default=(), repr=False, compare=False)
     property_mask: tuple[str, ...] | None = None
     property_updates: tuple[str, ...] = ()
     serialize_processes: bool = False
     reasons: tuple[str, ...] = ()
-    depends_on: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    depends_on: tuple[Entity, ...] = field(default=(), repr=False, compare=False)
     path: str | None = None
     visibility: str | None = None
     cache_key: str | None = None
@@ -235,7 +232,7 @@ class MutationIntent:
     """Typed related or post-commit work awaiting a root mutation."""
 
     intent: MutationIntentType
-    entity: Any = field(default=None, repr=False, compare=False)
+    entity: Entity | None = field(default=None, repr=False, compare=False)
     property_mask: tuple[str, ...] = ()
     property_updates: tuple[str, ...] = ()
     refresh_cache: bool = True
@@ -244,7 +241,7 @@ class MutationIntent:
     cache_kind: str | None = None
     path: str | None = None
     visibility: str | None = None
-    depends_on: tuple[Any, ...] | None = field(default=None, repr=False, compare=False)
+    depends_on: tuple[Entity, ...] | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     # @testable false
@@ -373,7 +370,7 @@ class MutationPlan:
 
     operation: MutationOperation
     effects: list[MutationEffect]
-    consumed_intents: tuple[Any, ...] = field(default=(), repr=False)
+    consumed_intents: tuple[tuple[Entity, tuple[MutationIntent, ...]], ...] = field(default=(), repr=False)
 
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::MutationPlan
