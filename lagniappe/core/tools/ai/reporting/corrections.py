@@ -1,5 +1,7 @@
 """Linked corrective reports and guarded supersession of executed plans."""
 
+from typing import cast
+
 from copy import deepcopy
 import json
 
@@ -60,7 +62,7 @@ def _check_source(source, user):
     from .schema_updates import migration_pending
     if migration_pending(source):
         raise ValidationError("Finish or recover the active Form migration before correcting this plan.")
-    if any(record.get("status") == "applying" or (record.get("status") == "failed" and record.get("expected")) for record in source.result.get("actions", [])):
+    if any(record.get("status") == "applying" or (record.get("status") == "failed" and record.get("expected")) for record in cast(list[dict[str, object]], source.result.get("actions", []))):
         raise ValidationError("Reconcile the interrupted execution with Retry before creating a correction.")
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_corrections_share_evidence_across_origins_and_fence_source_retries

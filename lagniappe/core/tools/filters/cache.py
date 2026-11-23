@@ -9,7 +9,12 @@ from lagniappe.core.tools.database import get as database_get
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
 from ...tools.auth.context import current_context_user
-from typing import TypeGuard
+from typing import TYPE_CHECKING, TypeGuard
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.category import Category
+    from lagniappe.core.entities.project import Project
+    from lagniappe.core.entities.user import User
 
 from ..cache import Keys, filter_cache
 from ..services.task_queue import create_task
@@ -65,7 +70,7 @@ def escape_for_filter(to_filter):
 class FilterCache:
     """Manages a cached filter index for an entity."""
 
-    def __init__(self, entity, user=None):
+    def __init__(self, entity: Category | Project, user: User | None = None) -> None:
         self.entity = entity
         self.user = current_context_user(user)
         self.cache_key = Keys.FILTER.value.format(self.entity.hash, FILTER_CACHE_SCOPE)
@@ -165,9 +170,11 @@ class FilterCache:
         if self.entity.kind != "category":
             return
 
+        category_key = self.entity.key
+        assert category_key is not None
         while True:
             index = database_get.pages(
-                self.entity.key,
+                category_key,
                 start_cursor=cursor,
                 limit=100,
                 hashes=Restriction.UNRESTRICTED,

@@ -100,7 +100,9 @@ def execute_get_form_instances(args, user):
         }
 
     limit = _limit(args.get("limit"))
-    loaded = Entities.fetch(*database_get.form_instance_users(form.key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    form_key = form.key
+    assert form_key is not None
+    loaded = Entities.fetch(*database_get.form_instance_users(form_key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     instances = [entity for entity in loaded if _include_instance(entity, user, kinds, task_completed)]
     instances.sort(key=lambda entity: (entity.kind, (entity.name or "").lower()))
     returned = instances[:limit]

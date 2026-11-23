@@ -95,7 +95,7 @@ def _attach_file(action, report, user, created):
     if file.has_references:
         _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to attach this file.")
         owner = target.task if isinstance(target, Entities.TASK_HISTORY) else target
-        if file.owner.key != owner.key:
+        if owner is None or file.owner.key != owner.key:
             raise exceptions.ValidationError(
                 "This File already belongs to another Page or Task. "
                 "A File has one owner; attach_file cannot move it. "

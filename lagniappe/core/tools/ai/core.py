@@ -606,6 +606,7 @@ class GenAI:
         validator=None,
         validation_retries=0,
     ):
+        context: dict[str, object]
         max_iterations = prompt.max_tool_iterations or MAX_TOOL_ITERATIONS
         model = model or GenAI._model_for_prompt(prompt)
         tool_cache = {}
@@ -701,7 +702,7 @@ class GenAI:
                             response.function_calls,
                             iteration_trace["calls"],
                         )
-                    context: dict[str, object] = {
+                    context = {
                         "ai_tool_loop": {
                             "prompt_type": prompt.prompt_type,
                             "search_enabled": prompt.search,
@@ -762,7 +763,7 @@ class GenAI:
             except Exception as e:
                 if execution_control is not None:
                     execution_control.ensure_active()
-                context: dict[str, object] = {
+                context = {
                     "ai_tool_loop": {
                         "prompt_type": prompt.prompt_type,
                         "search_enabled": prompt.search,
@@ -792,7 +793,7 @@ class GenAI:
             self._log_response(response, "tool-loop")
 
         if response.function_calls:
-            context: dict[str, object] = {
+            context = {
                 "ai_tool_loop": {
                     "prompt_type": prompt.prompt_type,
                     "search_enabled": prompt.search,

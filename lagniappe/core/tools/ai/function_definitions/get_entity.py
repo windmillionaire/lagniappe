@@ -4,6 +4,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from ..references import stored_file_identifiers
 
 
 GET_ENTITY = types.FunctionDeclaration(
@@ -69,7 +70,7 @@ def _load_entity(identifier):
         Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     elif isinstance(entity, Entities.TASK_HISTORY):
         Entities.fetch(
-            entity, entity.properties.task.key, *entity.db.get("files", []),
+            entity, entity.properties.task.key, *stored_file_identifiers(entity),
             request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
         )
     elif entity is not None:

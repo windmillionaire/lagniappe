@@ -1,7 +1,11 @@
 """AI-facing short reference helpers."""
 
 import re
-from typing import overload
+from typing import TYPE_CHECKING, overload
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities import Identifier
 
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools import cache
@@ -11,6 +15,14 @@ from lagniappe.core.tools.files.html import render_markdown
 HASH_REFERENCE_REGEX = re.compile(r"\bhash:([0-9a-z]{12})\b")
 HASH_PREFIXED_ID_REGEX = re.compile(r"\bhash:(ah[A-Za-z0-9_-]{30,})\b")
 HASH_TOKEN_REGEX = re.compile(r"\bhash:([A-Za-z0-9_-]+)\b")
+
+
+def stored_file_identifiers(entity: Entity) -> list[Identifier]:
+    """Return attachment IDs from a raw Task or TaskHistory record."""
+    identifiers = entity.db.get("files") or []
+    if not isinstance(identifiers, list):
+        raise TypeError("Stored file references must be an array")
+    return identifiers
 
 
 # @testable true

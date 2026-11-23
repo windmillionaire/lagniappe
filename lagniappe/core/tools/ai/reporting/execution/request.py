@@ -1,7 +1,7 @@
 """Shared browser, auto-execute, and external-API/MCP request to execute a saved proposal."""
 
 import hashlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
     from lagniappe.core.entities.ai_report import AIReport
@@ -20,6 +20,11 @@ from lagniappe.core.tools.ai.auto_execute import (
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from . import ledger
+
+
+class _MigrationCheckpoint(TypedDict, total=False):
+    migration_id: str
+    migration_form: str
 
 
 def request_execution(
@@ -142,7 +147,7 @@ def request_execution(
         if not retryable:
             prepare_schema_updates(report.proposal, actor, verify=True)
         else:
-            for record in result.get("actions", []):
+            for record in cast(list[_MigrationCheckpoint], result.get("actions", [])):
                 if record.get("migration_id"):
                     form = Entities.fetch_one(
                         record.get("migration_form"), request=Fetch.direct()

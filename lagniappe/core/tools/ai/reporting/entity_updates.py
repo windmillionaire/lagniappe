@@ -6,6 +6,10 @@ the returned entities and its execution receipt.
 """
 
 from copy import deepcopy
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.project import Project
 import hashlib
 import json
 
@@ -193,10 +197,10 @@ def prepare_entity_updates(proposal, user):
                 entity.properties.model_tasks._value = []
             else:
                 reference = data.get("project") or "$" + data.get("project_action", "")
-                project = _resolve(reference, "project", outputs)
+                project = cast("Project", _resolve(reference, "project", outputs))
                 if project.urlsafe_key not in outputs:
                     original = project
-                    project = _copy_entity(project)
+                    project = cast("Project", _copy_entity(project))
                     project.properties.model_tasks._value = list(original.model_tasks)
                     outputs[project.urlsafe_key] = project
                 entity.project = project

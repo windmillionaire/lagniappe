@@ -109,7 +109,8 @@ def public_execution_receipt(report, user) -> dict[str, object] | None:
         }
         source = record.get("entity")
         if isinstance(source, dict):
-            entity = entities.get(source.get("id"))
+            identifier = source.get("id")
+            entity = entities.get(identifier) if isinstance(identifier, str) else None
             action["entity"] = (
                 {
                     "hash": hash_reference(entity),

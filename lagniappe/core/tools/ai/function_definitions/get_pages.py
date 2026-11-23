@@ -112,8 +112,10 @@ def execute_get_category_pages(args, user):
         return {"error": "cursor must be a string"}
     cursor = cursor.strip() if cursor else None
     restrictions = user.properties.restrictions.unrestricted_pages(category)
+    category_key = category.key
+    assert category_key is not None
     db = database_get.pages(
-        category.key,
+        category_key,
         form=form,
         start_cursor=cursor,
         limit=effective_limit,

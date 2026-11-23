@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal, overload
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason, Restriction
 from lagniappe.core.entities import Entities
+from ....references import stored_file_identifiers
 from lagniappe.core.tools import cache
 
 if TYPE_CHECKING:
@@ -144,9 +145,7 @@ def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return not file.db.get("task") and endpoint.key == file.db.get("page")
     if isinstance(endpoint, (Entities.TASK, Entities.TASK_HISTORY)):
-        return endpoint.key == file.db.get("task") or file.key in list(
-            endpoint.db.get("files") or []
-        )
+        return endpoint.key == file.db.get("task") or file.key in stored_file_identifiers(endpoint)
     return False
 
 
@@ -179,10 +178,13 @@ def _add_file_to_endpoint(file, endpoint):
         return file.move_to(endpoint)
     if isinstance(endpoint, Entities.TASK_HISTORY):
         # An older completion can reference a File, but its live Task owns it.
-        was_current = file.key in endpoint.task.properties.files.keys
-        file.move_to(endpoint.task)
+        owner = endpoint.task
+        if owner is None:
+            raise exceptions.ValidationError("Task history has no owning task.")
+        was_current = file.key in owner.properties.files.keys
+        file.move_to(owner)
         if not was_current:
-            endpoint.task.properties.files.remove(file)
+            owner.properties.files.remove(file)
         return endpoint.properties.files.add(file)
     return False
 
@@ -446,7 +448,7 @@ def _fetch_report_entity(identifier, *, derived_page=False):
 
     if isinstance(entity, Entities.TASK_HISTORY):
         Entities.fetch(
-            entity, entity.properties.task.key, *entity.db.get("files", []),
+            entity, entity.properties.task.key, *stored_file_identifiers(entity),
             request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
         )
         return entity
