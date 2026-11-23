@@ -1,5 +1,6 @@
 """Deferred-job adapters for the email domain."""
 
+from ..context import required_input
 import hashlib
 
 from config.ai_email import AI_EMAIL_LIMITS
@@ -65,7 +66,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         )
         from ..service import DeferredJobs
 
-        report = context.input("report")
+        report = required_input(context, "report")
         actor = context.actor
         parameters = context.parameters
         parameters["_diagnostic_code"] = "email_ingest_failed"
@@ -178,7 +179,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
 
     def apply(self, context):
         return {
-            "report_key": context.input("report").urlsafe_key,
+            "report_key": required_input(context, "report").urlsafe_key,
             "report_job": context.checkpoint.get("report_job"),
         }
 

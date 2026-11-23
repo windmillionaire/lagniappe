@@ -1,5 +1,6 @@
 """Deferred-job adapters for the files domain."""
 
+from ..context import required_input
 from copy import deepcopy
 import hashlib
 import json
@@ -35,7 +36,7 @@ class FileAdapter(DeferredJobAdapter):
         authorization = super().authorization(spec)
         file = spec.inputs.get("file")
         try:
-            asset_fingerprint = file.get_asset("file").fingerprint
+            asset_fingerprint = file.get_asset("file").fingerprint if file is not None else None
         except AttributeError:
             asset_fingerprint = None
         if asset_fingerprint:
@@ -52,7 +53,7 @@ class FileAdapter(DeferredJobAdapter):
             return super().validate_apply(context)
         file = context.input("file")
         try:
-            current = file.get_asset("file").fingerprint
+            current = file.get_asset("file").fingerprint if file is not None else None
         except AttributeError:
             current = None
         if current != expected:
@@ -93,7 +94,7 @@ class FileExtractAdapter(FileAdapter):
     # @pair deferred-jobs:checkpoint
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
-        file = context.input("file")
+        file = required_input(context, "file")
         extract = files.ocr_file(file, raise_errors=True)
         if not extract.complete:
             raise exceptions.ValidationError(
@@ -113,7 +114,7 @@ class FileExtractAdapter(FileAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_job_inspection_uses_loaded_input_without_fetch
     # @matrix deferred-jobs files : inspection loaded-input no-database-read
     def inspect(self, context):
-        file = context.input("file")
+        file = required_input(context, "file")
         if file is None:
             raise exceptions.ValidationError("Deferred file is missing.")
         return (
@@ -128,7 +129,7 @@ class FileExtractAdapter(FileAdapter):
     # @pair deferred-jobs:checkpoint
     def apply(self, context):
         context.ensure_active()
-        file = context.input("file")
+        file = required_input(context, "file")
         text_asset = context.checkpoint.get("text_asset")
         if not isinstance(text_asset, dict):
             raise exceptions.ValidationError(
@@ -167,7 +168,7 @@ class FileSummarizeAdapter(FileAdapter):
     # @matrix deferred-jobs file : expected-failure no-duplicate-capture summary
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.SUMMARIZING)
-        file = context.input("file")
+        file = required_input(context, "file")
         summarize = ai_summarize.generate_summary(file, raise_quota=True, raise_errors=True)
         if not summarize.complete:
             raise DeferredJobDependencyFailedError(
@@ -182,7 +183,7 @@ class FileSummarizeAdapter(FileAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_job_inspection_uses_loaded_input_without_fetch
     # @matrix deferred-jobs files : inspection loaded-input no-database-read
     def inspect(self, context):
-        file = context.input("file")
+        file = required_input(context, "file")
         if file is None:
             raise exceptions.ValidationError("Deferred file is missing.")
         if (
@@ -195,7 +196,7 @@ class FileSummarizeAdapter(FileAdapter):
     # @testable infrastructure
     def apply(self, context):
         context.ensure_active()
-        file = context.input("file")
+        file = required_input(context, "file")
         file.summary = context.checkpoint.get("summary")
         file.properties.summarize.section = context.checkpoint["process"]
         file.save()

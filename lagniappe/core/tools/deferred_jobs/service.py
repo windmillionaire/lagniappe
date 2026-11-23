@@ -69,10 +69,9 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     def _sync_reconciler(self, *, required=False, force=False, control=None):
         """Converge recovery scheduling, optionally requiring success to start."""
         try:
-            options = {"force": force}
             if control is not None:
-                options["initial_control"] = control
-            return scheduler.synchronize_deferred_job_reconciler(**options)
+                return scheduler.synchronize_deferred_job_reconciler(force=force, initial_control=control)
+            return scheduler.synchronize_deferred_job_reconciler(force=force)
         except Exception as error:
             exceptions.capture(
                 error,

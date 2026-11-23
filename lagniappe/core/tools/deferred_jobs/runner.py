@@ -1,5 +1,11 @@
 """Claim-through-terminal deferred-job execution."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    # Dispatch, recovery, and execution are composed by the same service.
+    from .service import DeferredJobService
+
 from datetime import timedelta
 import uuid
 
@@ -61,6 +67,7 @@ class DeferredJobRunner:
     # @matrix deferred-jobs : cancellation checkpoint reauthorization recovery retry
     # @pair deferred-jobs:preparation-context
     def run(self, job_key, *, now=None):
+        service = cast("DeferredJobService", self)
         now = _utc(now)
         lease_token = uuid.uuid4().hex
         claim = database_deferred_jobs.claim_deferred_job(
@@ -80,7 +87,7 @@ class DeferredJobRunner:
         job = Entities.fetch_one(job, request=Fetch.direct()) or job
         from lagniappe.core.tools.measurements import link_job
         link_job(job)
-        adapter = self.adapter(job.job_type)
+        adapter = service.adapter(job.job_type)
         if not claim.get("claimed"):
             if claim.get("reason") == "terminal":
                 if job.status in {
@@ -478,7 +485,8 @@ class DeferredJobRunner:
     # @tests tests_unit/test_023b_deferred_job_service.py::test_terminal_release_reuses_committed_scheduler_control
     # @pairs cloud-scheduler:datastore-read-isolation deferred-jobs:terminal-delivery
     def _release(self, job, lease_token):
-        values = {
+        service = cast("DeferredJobService", self)
+        values: dict[str, object] = {
             "lease_token": None,
             "lease_expires": None,
             "next_attempt_at": None,
@@ -488,7 +496,7 @@ class DeferredJobRunner:
             values.update({"dispatch_state": "complete", "deadline_at": None})
         scheduler_control = self._persist_claimed(job, lease_token, **values)
         if terminal:
-            self._sync_reconciler(control=scheduler_control)
+            service._sync_reconciler(control=scheduler_control)
 
 
     # @testable infrastructure
@@ -505,6 +513,7 @@ class DeferredJobRunner:
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_increases_later_quota_backoff_without_adding_attempts
     # @pair deferred-jobs:retry
     def _schedule_retry(self, job, adapter, context, lease_token, error, now):
+        service = cast("DeferredJobService", self)
         attempt = int(job.attempt or 0)
         delay = _retry_delay(error, _provider_retry_attempt(job))
         scheduled_at = max(_utc(), now)
@@ -526,7 +535,7 @@ class DeferredJobRunner:
             status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
         )
         try:
-            task_identity = self.dispatch(
+            task_identity = service.dispatch(
                 job,
                 attempt=attempt + 1,
                 delay_seconds=delay,
@@ -574,6 +583,7 @@ class DeferredJobRunner:
         error,
         now,
     ):
+        service = cast("DeferredJobService", self)
         attempt = int(job.attempt or 0)
         scheduled_at = max(_utc(), now)
         parameters = dict(job.parameters or {})
@@ -599,7 +609,7 @@ class DeferredJobRunner:
             status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
         )
         try:
-            task_identity = self.dispatch(
+            task_identity = service.dispatch(
                 job,
                 attempt=attempt + 1,
                 delay_seconds=delay,

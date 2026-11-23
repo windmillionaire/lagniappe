@@ -16,7 +16,7 @@ from .base import DeferredJobAdapter
 # @matrix deferred-jobs : adapter-registry domain-strategy
 class DeferredJobAdapterRegistry:
     def __init__(self):
-        self._adapters = {}
+        self._adapters: dict[DeferredJobType, DeferredJobAdapter] = {}
         self._defaults_loaded = False
         self._lock = RLock()
 
@@ -24,7 +24,7 @@ class DeferredJobAdapterRegistry:
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rejects_duplicate_job_types
     # @pair deferred-jobs:adapter-registration
-    def register(self, adapter):
+    def register[T: DeferredJobAdapter](self, adapter: T) -> T:
         if not isinstance(adapter, DeferredJobAdapter) or adapter.job_type is None:
             raise TypeError("Deferred job adapters require a job_type")
         with self._lock:
@@ -38,7 +38,7 @@ class DeferredJobAdapterRegistry:
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
     # @pair deferred-jobs:adapter-lookup
-    def adapter(self, job_type):
+    def adapter(self, job_type: DeferredJobType | str) -> DeferredJobAdapter:
         self._load_default_adapters()
         if not isinstance(job_type, DeferredJobType):
             job_type = DeferredJobType(job_type)

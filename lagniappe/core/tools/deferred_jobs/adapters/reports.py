@@ -1,5 +1,6 @@
 """Deferred-job adapters for the reports domain."""
 
+from ..context import required_input
 from copy import deepcopy
 import hashlib
 
@@ -43,7 +44,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
     # @pairs ai-report:active-operation deferred-jobs:superseded
     def started(self, context):
-        report = context.input("report")
+        report = required_input(context, "report")
         current = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
         if isinstance(current, Entities.REPORT):
             report = current
@@ -83,7 +84,7 @@ class ReportAdapter(DeferredJobAdapter):
 
     def validate_apply(self, context):
         """Only the operation recorded on the report may publish its proposal."""
-        report = context.input("report")
+        report = required_input(context, "report")
         active_job = report.deferred_job or {}
         if active_job.get("key") != context.job.urlsafe_key:
             raise exceptions.ValidationError(
@@ -93,7 +94,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @testable infrastructure
     def inspect(self, context):
         report = Entities.fetch_one(
-            context.input("report").urlsafe_key,
+            required_input(context, "report").urlsafe_key,
             request=Fetch.direct(),
         )
         if report is None:
@@ -117,7 +118,7 @@ class ReportAdapter(DeferredJobAdapter):
     def apply(self, context):
         context.ensure_active()
         self.validate_apply(context)
-        report = context.input("report")
+        report = required_input(context, "report")
         proposal = deepcopy(context.checkpoint["proposal"])
         if proposal.get("actions") and not context.actor.access(AI.CREATE):
             raise exceptions.ValidationError(
@@ -269,7 +270,7 @@ class AIReportAdapter(ReportAdapter):
         )
 
     def prepare(self, context):
-        report, actor = context.input("report"), context.actor
+        report, actor = required_input(context, "report"), context.actor
         stage = (context.checkpoint or {}).get("stage")
         stage_index = {
             None: 0,
@@ -352,13 +353,14 @@ class ReportExecutionAdapter(DeferredJobAdapter):
     active_message = "Still saving report changes..."
     notification_policy = "none"
 
-    def checkpoint_ready(self, _context):
+    def checkpoint_ready(self, context):
         """The report's action ledger is the execution checkpoint."""
         return True
 
     def authorization(self, spec):
         authorization = super().authorization(spec)
         report = spec.inputs.get("report")
+        assert report is not None
         # The MCP request gate checks this submitted identity before new work.
         # Replays must also match the receipt after legacy execution normalized
         # its saved proposal; the shared service still compares the entire job.
@@ -370,7 +372,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         return authorization
 
     def started(self, context):
-        report = context.input("report")
+        report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         external_snapshot = (
@@ -450,7 +452,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             )
 
     def validate_apply(self, context):
-        report = context.input("report")
+        report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         active_job = report.deferred_job or {}
@@ -466,7 +468,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def inspect(self, context):
         report = Entities.fetch_one(
-            context.input("report").urlsafe_key,
+            required_input(context, "report").urlsafe_key,
             request=Fetch.direct(),
         )
         if report is None:
@@ -485,7 +487,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
     def apply(self, context):
         context.ensure_active()
         self.validate_apply(context)
-        report = context.input("report")
+        report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         result = report_runner.run_report(

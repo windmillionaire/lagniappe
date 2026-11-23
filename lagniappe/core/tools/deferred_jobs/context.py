@@ -2,6 +2,21 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal, overload
+
+from lagniappe.core import exceptions
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.ai_report import AIReport
+    from lagniappe.core.entities.file import File
+    from lagniappe.core.entities.form import Form
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.deferred_job import DeferredJob
+    from lagniappe.core.entities.notification import Notification
+    from lagniappe.core.entities.user import User
+    from .control import DeferredExecutionControl
 
 from .common import _json_copy
 from .errors import DeferredJobClaimLostError
@@ -10,14 +25,14 @@ from .errors import DeferredJobClaimLostError
 # @testable infrastructure
 @dataclass
 class DeferredJobContext:
-    job: object
-    actor: object
-    notification: object | None
+    job: DeferredJob
+    actor: User
+    notification: Notification | None
     inputs: dict
     parameters: dict
     checkpoint: dict
     active_check: Callable[[], bool] | None = None
-    execution_control: object | None = None
+    execution_control: DeferredExecutionControl | None = None
     checkpoint_callback: Callable[..., None] | None = None
 
     # @testable infrastructure
@@ -54,3 +69,21 @@ class DeferredJobContext:
             self.checkpoint_callback(checkpoint, progress=progress)
         self.checkpoint = checkpoint
         return checkpoint
+
+
+@overload
+def required_input(context: DeferredJobContext, name: Literal["file"]) -> File: ...
+@overload
+def required_input(context: DeferredJobContext, name: Literal["report"]) -> AIReport: ...
+@overload
+def required_input(context: DeferredJobContext, name: Literal["form"]) -> Form: ...
+@overload
+def required_input(context: DeferredJobContext, name: Literal["target"]) -> Page | Task: ...
+
+
+def required_input(context: DeferredJobContext, name: str) -> Entity:
+    """Read a mandatory loaded input after its adapter has authorized its kind."""
+    entity = context.input(name)
+    if entity is None:
+        raise exceptions.ValidationError(f"Missing required deferred job input: {name}")
+    return entity

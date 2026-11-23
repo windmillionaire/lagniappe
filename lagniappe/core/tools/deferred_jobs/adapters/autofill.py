@@ -1,5 +1,6 @@
 """Deferred-job adapters for the autofill domain."""
 
+from ..context import required_input
 from copy import deepcopy
 import hashlib
 import json
@@ -149,6 +150,8 @@ class AutofillAdapter(DeferredJobAdapter):
     def can_view_status(self, job, actor):
         try:
             target = (job.inputs or {}).get("target")
+            if target is None:
+                return False
             target = Entities.fetch_one(
                 target.get("id"),
                 request=Fetch.nested(
@@ -295,12 +298,12 @@ class AutofillAdapter(DeferredJobAdapter):
         prompt = ai_autofill.form_autofill_prompt(**prompt_data)
         context.set_phase(DeferredJobPhase.GENERATING)
         submission = ai_autofill.generate_autofilled_submission(
-            prompt, entity=context.input("target"), user=context.actor,
+            prompt, entity=required_input(context, "target"), user=context.actor,
             schema=prompt_data["schema"],
         )
         context.set_phase(DeferredJobPhase.VALIDATING)
         proposal = form_review.prepare_proposal(
-            prompt_data["schema"], submission, context.input("target"), context.actor,
+            prompt_data["schema"], submission, required_input(context, "target"), context.actor,
         )
         return {"submission": submission, "proposal": proposal}
 
@@ -311,7 +314,7 @@ class AutofillAdapter(DeferredJobAdapter):
         if context.parameters.get("snapshot"):
             return (DeferredJobInspection.APPLIED if context.job.db.get(form_review.RECEIPT)
                     else DeferredJobInspection.NOT_APPLIED)
-        target = context.input("target")
+        target = required_input(context, "target")
         current = target.properties.submission.value
         if current != context.checkpoint.get("submission"):
             return DeferredJobInspection.NOT_APPLIED
@@ -343,7 +346,7 @@ class AutofillAdapter(DeferredJobAdapter):
         context.ensure_active()
         if context.parameters.get("snapshot"):
             return self.apply_proposal(context)
-        target = context.input("target")
+        target = required_input(context, "target")
         attachment = context.checkpoint.get("attachment")
         attached_file = None
         if attachment:
@@ -412,7 +415,7 @@ class AutofillAdapter(DeferredJobAdapter):
         private = context.parameters.get("mode") == "revise"
         for attempt in range(3):
             context.ensure_active()
-            target = Entities.fetch_one(context.input("target").key, request=Fetch.nested(
+            target = Entities.fetch_one(required_input(context, "target").key, request=Fetch.nested(
                 because=FetchReason.TASK_SAVE_REQUIREMENTS,
             ))
             if not target or not target.allowed(Action.EDIT, user=context.actor):

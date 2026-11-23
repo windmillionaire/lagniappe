@@ -1,5 +1,6 @@
 """One resumable form change with deterministic or prepared AI conversion batches."""
 
+from ..context import required_input
 from copy import deepcopy
 import json
 
@@ -57,7 +58,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         if self.inspect(context) == DeferredJobInspection.APPLIED:
             from lagniappe.core.definitions import Action
 
-            form = Entities.fetch_one(context.input("form").key, request=Fetch.direct())
+            form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.direct())
             if not form.allowed(Action.EDIT, user=context.actor):
                 raise ValidationError(
                     "You no longer have permission to update this Form."
@@ -76,7 +77,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         from lagniappe.core.definitions import Action
 
         form = Entities.fetch_one(
-            (job.inputs.get("form") or {}).get("id"), request=Fetch.direct()
+            ((job.inputs or {}).get("form") or {}).get("id"), request=Fetch.direct()
         )
         return bool(form and form.allowed(Action.EDIT, user=actor))
 
@@ -160,11 +161,11 @@ class FormChangeAdapter(DeferredJobAdapter):
                 )
 
     def inspect(self, context):
-        form = Entities.fetch_one(context.input("form").key, request=Fetch.root())
+        form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.root())
         receipt = contracts.json_value(form.db, "form_draft_receipt") if form else {}
         return (
             DeferredJobInspection.APPLIED
-            if receipt.get("id") == context.parameters["change_id"]
+            if form is not None and receipt.get("id") == context.parameters["change_id"]
             and not form.db.get(contracts.PENDING)
             else DeferredJobInspection.NOT_APPLIED
         )
@@ -368,7 +369,7 @@ class FormChangeAdapter(DeferredJobAdapter):
 
     def before_cancel(self, job):
         form = Entities.fetch_one(
-            (job.inputs.get("form") or {}).get("id"), request=Fetch.root()
+            ((job.inputs or {}).get("form") or {}).get("id"), request=Fetch.root()
         )
         pending = contracts.json_value(form.db, contracts.PENDING) if form else {}
         if pending.get("job") == job.urlsafe_key and pending.get("applied"):
@@ -390,7 +391,7 @@ class FormChangeAdapter(DeferredJobAdapter):
 
         if str(error) not in {RESTRICTED_MESSAGE, STALE_MESSAGE}:
             return
-        form = Entities.fetch_one(context.input("form").key, request=Fetch.root())
+        form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.root())
         pending = contracts.json_value(form.db, contracts.PENDING) if form else {}
         if pending.get("job") != context.job.urlsafe_key or pending.get("applied"):
             return
@@ -418,7 +419,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         # A failed/expired job does not release ownership of partially converted values.
         from lagniappe.core.tools.database import deferred_jobs
 
-        form = Entities.fetch_one(context.input("form").key, request=Fetch.root())
+        form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.root())
         if form and not form.db.get(contracts.PENDING):
             from lagniappe.core.tools import cache
 

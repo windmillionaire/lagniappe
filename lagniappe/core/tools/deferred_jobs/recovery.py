@@ -1,5 +1,11 @@
 """Collection recovery and terminal-delivery reconciliation."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    # Dispatch, recovery, and execution are composed by the same service.
+    from .service import DeferredJobService
+
 import json
 from datetime import timedelta
 
@@ -61,9 +67,10 @@ class DeferredJobRecovery:
     # @pair notifications:terminal-delivery
     def reconcile(self, *, now=None, limit=250):
         """Redispatch stranded work and bound the age of every operation."""
+        service = cast("DeferredJobService", self)
         now = _utc(now)
         jobs = self._repair_reconciler_control(now)
-        self._sync_reconciler(force=True)
+        service._sync_reconciler(force=True)
         jobs = jobs[: max(int(limit), 0)]
         result = {
             "examined": len(jobs),
@@ -100,7 +107,7 @@ class DeferredJobRecovery:
                     now,
                     grace_seconds=DEFERRED_JOB_RECONCILE_GRACE_SECONDS,
                     max_age_seconds=(
-                        self.adapter(job.job_type).max_lifetime_seconds
+                        service.adapter(job.job_type).max_lifetime_seconds
                         or DEFERRED_JOB_MAX_AGE_SECONDS
                     ),
                     stale_updates={
@@ -145,7 +152,7 @@ class DeferredJobRecovery:
                 revision = int(getattr(job, "status_revision", 0) or 0)
                 attempt = max(int(getattr(job, "attempt", 0) or 0) + 1, 1)
                 try:
-                    identity = self.dispatch(
+                    identity = service.dispatch(
                         job,
                         attempt=attempt,
                         task_suffix=f"reconcile-{revision}",
@@ -180,7 +187,7 @@ class DeferredJobRecovery:
                     },
                     level="warning",
                 )
-        self._sync_reconciler()
+        service._sync_reconciler()
         return result
 
     # @testable infrastructure
@@ -193,12 +200,13 @@ class DeferredJobRecovery:
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/recovery.py::DeferredJobRecovery.reconcile
     def _finish_stale_delivery(self, job, *, error=None):
+        service = cast("DeferredJobService", self)
         error = error or exceptions.AIException(
             (job.error or {}).get("message")
             or "This operation could not finish after automatic recovery. Try again."
         )
-        adapter = self.adapter(job.job_type)
-        context = self._context(job)
+        adapter = service.adapter(job.job_type)
+        context = service._context(job)
         inputs_available = True
         try:
             context = adapter.load(context)
@@ -215,12 +223,12 @@ class DeferredJobRecovery:
             delivery["failure"] = True
             delivery_changed = True
         if delivery_changed:
-            self._save_terminal_fields(job, delivery=delivery)
-        self._finish_terminal_delivery(
+            service._save_terminal_fields(job, delivery=delivery)
+        service._finish_terminal_delivery(
             job,
             adapter,
             context=context,
             error=error,
             inputs_available=inputs_available,
         )
-        self._release(job, getattr(job, "lease_token", None))
+        service._release(job, getattr(job, "lease_token", None))

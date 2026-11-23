@@ -1,5 +1,7 @@
 """Attempt deadlines, progress boundaries, and background lease renewal."""
 
+from collections.abc import Callable
+from datetime import datetime
 import threading
 
 from lagniappe.core.definitions import DEFERRED_JOB_HEARTBEAT_SECONDS, DeferredJobPhase
@@ -30,32 +32,36 @@ class DeferredExecutionControl:
         "structured_final": DeferredJobPhase.FINALIZING,
     }
 
-    def __init__(self, *, deadline_at, active_check, progress_callback):
+    def __init__(
+        self, *, deadline_at: datetime, active_check: Callable[[], bool],
+        progress_callback: Callable[[dict[str, str | int]], object],
+    ) -> None:
         self.deadline_at = deadline_at
         self._active_check = active_check
         self._progress_callback = progress_callback
-        self._phase = None
-        self._details = {}
+        self._phase: str | None = None
+        self._details: dict[str, str | int] = {}
         self._lost = False
-        self._background_error = None
+        self._background_error: BaseException | None = None
         self.report_planning = False
-        self.provider_retry_callback = None
+        self.provider_retry_callback: Callable[[], bool] | None = None
+        self.cancellable_provider = False
 
     @property
-    def remaining_seconds(self):
+    def remaining_seconds(self) -> float:
         return max((self.deadline_at - _utc()).total_seconds(), 0)
 
-    def mark_lost(self):
+    def mark_lost(self) -> None:
         self._lost = True
 
-    def mark_background_error(self, error):
+    def mark_background_error(self, error: BaseException) -> None:
         self._background_error = error
 
-    def claim_provider_retry(self):
+    def claim_provider_retry(self) -> bool:
         self.ensure_active()
         return bool(self.provider_retry_callback and self.provider_retry_callback())
 
-    def ensure_active(self):
+    def ensure_active(self) -> None:
         """Check local stop conditions and fresh durable ownership, without renewal."""
         self._check_local_state()
         if not self._active_check():
@@ -67,7 +73,7 @@ class DeferredExecutionControl:
     # @testable false
     # @covered-by lagniappe/core/tools/deferred_jobs/control.py::DeferredExecutionControl
     # @reason local stop conditions are checked through ensure_active
-    def _check_local_state(self):
+    def _check_local_state(self) -> None:
         if self._background_error is not None:
             raise DeferredJobInfrastructureError(
                 "Deferred job heartbeat failed."
@@ -79,7 +85,7 @@ class DeferredExecutionControl:
                 "Deferred AI attempt reached its execution deadline."
             )
 
-    def set_phase(self, phase, **details):
+    def set_phase(self, phase: DeferredJobPhase | str, **details: object) -> None:
         phase = str(getattr(phase, "value", phase))
         bounded = {
             key: value
@@ -101,19 +107,19 @@ class DeferredExecutionControl:
         self._phase = phase
         self._details = bounded
 
-    def before_provider(self, stage):
+    def before_provider(self, stage: str) -> None:
         self.set_phase(
             self._PROVIDER_PHASES.get(stage, DeferredJobPhase.GENERATING),
             provider_stage=stage,
         )
 
-    def after_provider(self, _stage):
+    def after_provider(self, _stage: str) -> None:
         self.ensure_active()
 
-    def before_tool(self, _name):
+    def before_tool(self, _name: str) -> None:
         self.set_phase(DeferredJobPhase.USING_TOOLS)
 
-    def after_tool(self, _name):
+    def after_tool(self, _name: str) -> None:
         self.ensure_active()
 
 
