@@ -344,7 +344,7 @@ The workflow validates and merges evidence, confirms that no tracked file other
 than `testing/evidence/latest.json` changed, and non-force pushes an
 evidence-only child if the branch head is unchanged. It then dispatches a
 current-head continuation that verifies the parent source, semantic snapshot and production build ID and runs
-source lint and release-tree checks without rerunning suites. A scoped final job
+Ruff, Biome, both Python type checks, the template, style and mutation contracts, and release-tree checks without rerunning suites. A scoped final job
 publishes the required **Source quality and traceability** status on the exact
 evidence head.
 

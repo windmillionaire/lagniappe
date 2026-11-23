@@ -150,6 +150,7 @@ changes that must remain attributable in blame.
 npm run check
 venv/bin/python -m ruff check .
 venv/bin/python -m basedpyright --warnings
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
 venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
 venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
 venv/bin/python run.py template-contracts --check --no-report
@@ -179,14 +180,14 @@ gh pr merge --auto --squash
 gh pr checks --watch
 ```
 
-The required **Source quality and traceability** workflow first reruns the
-type, lint, contract, hosted evidence and release checks in an unprivileged job. Only
-a passing exact candidate can enter the protected environment and run hosted
-`all`. A manual diagnostic dispatch may bypass that preflight, but cannot
-publish release attestation. The automatic workflow may push one evidence-only
-child commit and then validate that child without rerunning the suites. Do not
-manually merge downloaded evidence into the release branch. Any later source
-change requires a new exact hosted lifecycle.
+Candidate creation runs the offline preflight before deployment. For a release
+PR, the protected job executes the complete hosted suite on that candidate
+and imports its results. The workflow can push one evidence-only child commit.
+The unprivileged quality job verifies the evidence, runs both type checks,
+Ruff, Biome and all three contract checks, and checks the release tree. The
+attestation job then posts **Source quality and traceability** on the exact
+release head. Manual diagnostic runs cannot publish this status. Leave evidence
+import to the workflow.
 
 The hosted result and the recorded test evidence must agree on the build ID.
 The importer and the final validation each verify it against the production

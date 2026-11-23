@@ -165,6 +165,7 @@ the standard-mode policy and resolves dependencies against its locked `mcp/.venv
 
 ```bash
 venv/bin/python -m basedpyright --warnings
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
 venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
 venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
 venv/bin/python -m ruff check .
