@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, cast
 
 import hashlib
 
@@ -22,8 +22,23 @@ from . import Entities
 
 
 if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
     from . import property_types
+    from .group import UserGroup
     from .page import Page
+
+
+class UserCreationData(TypedDict, total=False):
+    name: str | None
+    email: str | None
+    page: Page | None
+    groups: list[UserGroup]
+    picture: str | None
+    ai_access: str | None
+    admin: bool
+    is_public: bool
+    test_user: bool
 
 
 # @testable true
@@ -31,7 +46,26 @@ if TYPE_CHECKING:
 # @pair user:entity-lifecycle
 class User(AssetMixin, UserMixin, Entity):
     if TYPE_CHECKING:
-        page: Page
+        email: str | None
+        groups: list[UserGroup]
+        permissions: dict[str, str]
+        @property
+        def ai_access(self) -> str: ...
+
+        @ai_access.setter
+        def ai_access(self, value: str | None) -> None: ...
+
+        is_public: bool
+        is_owner: bool
+        is_admin: bool
+        allow_auto_execute: bool
+        invalidate_cache: bool
+
+        @property
+        def page(self) -> Page: ...
+
+        @page.setter
+        def page(self, page: Page | None) -> None: ...
 
         @property
         def properties(self) -> property_types.UserProperties: ...
@@ -39,7 +73,7 @@ class User(AssetMixin, UserMixin, Entity):
     entity_kind = "user"
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
                 "ai_access",
@@ -59,11 +93,11 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
     # @matrix user : page-canonical search-cache
     @property
-    def to_cache(self):
+    def to_cache(self) -> dict[str, object]:
         return {}
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         return ["users", *[g.hash for g in self.groups]]
 
     # @testable true
@@ -72,7 +106,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @matrix admin : delete edit privileged-account view
     # @matrix users : group-view owner restriction-independence users-view
     # @pair owner:owner-only
-    def allowed(self, action, user=None):
+    def allowed(self, action: Action, user: User | None = None) -> bool:
         """Authorize user rows from their own Users/group permission scope."""
         viewer = current_context_user(user)
         if (
@@ -124,11 +158,11 @@ class User(AssetMixin, UserMixin, Entity):
         return properties
 
     @property
-    def is_authenticated(self):
+    def is_authenticated(self) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- Flask-Login infers a constant for its default.
         return bool(self._db)
 
     @property
-    def is_anonymous(self):
+    def is_anonymous(self) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- A missing user row represents an anonymous session.
         return not self.is_authenticated
 
     # @testable true
@@ -136,14 +170,15 @@ class User(AssetMixin, UserMixin, Entity):
     # @matrix permissions : empty-permissions fingerprint stored-permissions
     # @pair cache:role
     @property
-    def permissions_fingerprint(self):
+    def permissions_fingerprint(self) -> str:
         permissions = "" if self.is_admin else self.db.get("permissions", "{}")
-        return hashlib.md5(permissions.encode("utf-8")).hexdigest()
+        # Permission maps are persisted as JSON strings by Permissions.value.
+        return hashlib.md5(cast(str, permissions).encode("utf-8")).hexdigest()
 
     # @testable true
     # @tests tests_unit/test_009f_user_ai_access.py::test_user_access_is_independent_hierarchical_and_fail_closed
     # @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent site-policy
-    def access(self, required):
+    def access(self, required: AI) -> bool:
         """Check this user's independent AI entitlement."""
         if (
             not getattr(CONFIG, "AI_ENABLED", True)
@@ -160,7 +195,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @matrix permissions cache : authorization-fingerprint group-membership
     # @matrix ai-access cache : authorization-fingerprint entitlement permissions site-policy
     @property
-    def authorization_fingerprint(self):
+    def authorization_fingerprint(self) -> str:
         role = "owner" if self.is_owner else "admin" if self.is_admin else "user"
         groups = ",".join(sorted(set(self.requires) - {"users"}))
         value = (
@@ -172,11 +207,11 @@ class User(AssetMixin, UserMixin, Entity):
         return hashlib.md5(value.encode("utf-8")).hexdigest()
 
     @property
-    def is_test_user(self):
-        return self.db.get("test_user", False)
+    def is_test_user(self) -> bool:
+        return cast(bool, self.db.get("test_user", False))
 
     @is_test_user.setter
-    def is_test_user(self, value):
+    def is_test_user(self, value: bool) -> None:
         self.db["test_user"] = value
 
     # @testable true
@@ -185,19 +220,22 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_category_home_rows_only_offer_star_controls
     # @matrix permissions : entity-resources global-resources owner requires resource-gates
-    def has_permission(self, resource, action=Action.ALL):
+    def has_permission(self, resource: Entity | Resource, action: Action = Action.ALL) -> bool:
         if isinstance(resource, Entity):
             required, permissions = resource.requires, self.permissions
             return self.is_admin or any(
                 Action[a].implies(action)
-                for a in (permissions.get(r) for r in required)
+                for a in (permissions.get(r, Action.NONE.name) for r in required)
             )
         elif isinstance(resource, Resource):
             return resource.allowed(action, user=self)
 
         return False
 
-    def get_id(self):
+    def get_id(self) -> str:
+        # Entity.__init__ initializes even a temporary user with a mapping.
+        if self._db is None:
+            raise KeyError("email")
         return str(self._db["email"])
 
     # @testable true
@@ -209,33 +247,38 @@ class User(AssetMixin, UserMixin, Entity):
     # @matrix public-users : create personal-page public-group public-user
     # @matrix user : cache-invalidation create groups new-user-default owner page page-reassign personal-page public-adoption public-group public-user submitted-create-data
     @classmethod
-    def create(cls, data, *, adopt_public=False, key=None):
-        if not data.get("name"):
+    def create(
+        cls, data: UserCreationData, *, adopt_public: bool = False, key: Key | None = None
+    ) -> User:
+        name = data.get("name")
+        email = data.get("email")
+        if not name:
             raise ValueError("name is required")
-        if not data.get("email"):
+        if not email:
             raise ValueError("email is required")
 
-        exists = database_get.user(data.get("email"))
+        exists = database_get.user(email)
         adopting_public = bool(exists and adopt_public and exists.get("public", False))
         if exists and not adopting_public:
             return cls(exists)
 
         previous_page = None
         if adopting_public:
-            new_user = Entities.fetch_one(
+            # The user-kind query supplied a loaded record.
+            new_user = cast("User", Entities.fetch_one(
                 exists,
                 request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
-            )
+            ))
             previous_page = new_user.page
         else:
             new_user = cls(key) if key is not None else cls()
 
         new_user.kind = cls.entity_kind
-        new_user.name = data.get("name")
+        new_user.name = name
         new_user.is_public = data.get("is_public", False)
         new_user.page = data.get("page")
 
-        new_user.email = data.get("email")
+        new_user.email = email
         new_user.db["photo"] = data.get("picture")
         new_user.is_test_user = data.get("test_user", False)
 
@@ -259,7 +302,8 @@ class User(AssetMixin, UserMixin, Entity):
         )
         new_user.properties.permissions.create()
 
-        if previous_page and previous_page.key != new_user.page.key:
+        # Setting page to None created a personal page in UserPage.value.
+        if previous_page and previous_page.key != cast("Page", new_user.page).key:
             users_model = Entities.USERS.get()
             previous_page.user = None
             previous_page.properties.categories.remove(users_model)
@@ -288,7 +332,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
     # @matrix user : page save
-    def save(self):
+    def save(self) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- User.save refreshes only this user.
         if self.db.get("photo") and not self.get_asset("photo"):
             self.properties.photo.save_google_photo()
         super().save()
@@ -297,8 +341,9 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
     # @pair user:load
     @classmethod
-    def load(cls, email):
+    def load(cls, email: str) -> User | None:
         user = database_get.user(email)
         if user:
-            return Entities.fetch_one(user, request=Fetch.direct())
+            # The email lookup queries only user records.
+            return cast("User | None", Entities.fetch_one(user, request=Fetch.direct()))
         return None
