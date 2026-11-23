@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from google.cloud.datastore import Key
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -15,14 +14,14 @@ import hashlib
 from .base_db import DBProperty
 
 
-class Target(DBProperty[Key]):
+class Target(DBProperty[str]):
     _id = "target"
 
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_properties_own_identity_and_projection
 # @pair deferred-jobs:browser-projection
-class Operation(DBProperty[Key]):
+class Operation(DBProperty[str]):
     _id = "operation"
 
     @staticmethod
