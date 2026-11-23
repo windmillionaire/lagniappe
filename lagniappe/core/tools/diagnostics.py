@@ -1,5 +1,8 @@
 """Optional timing and profiling diagnostics."""
 
+from collections.abc import Callable, Mapping
+from typing import Protocol, cast, overload
+
 import cProfile
 from functools import wraps
 from pathlib import Path
@@ -7,6 +10,10 @@ import pstats
 import time
 from flask import has_request_context, request
 from lagniappe import CONFIG
+
+class _ProfileStats(Protocol):
+    stats: Mapping[tuple[str, int, str], tuple[int, int, float, float, object]]
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PROFILE_SOURCE_ROOTS = {
@@ -30,16 +37,22 @@ PROFILE_SOURCE_FILES = {"main.py", "run.py"}
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_prints_when_wrapped_function_raises
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_prints_request_label_without_entity_trace
 # @pair utility:timing
-def timed(
-    func=None,
+@overload
+def timed[**P, T](func: Callable[P, T], *, profile: bool = False, limit: int = 12, min_ms: float = 0.0, project_only: bool = True, enabled: bool | None = None, label: str | None = None) -> Callable[P, T]: ...
+
+@overload
+def timed[**P, T](func: None = None, *, profile: bool = False, limit: int = 12, min_ms: float = 0.0, project_only: bool = True, enabled: bool | None = None, label: str | None = None) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+def timed[**P, T](
+    func: Callable[P, T] | None = None,
     *,
-    profile=False,
-    limit=12,
-    min_ms=0.0,
-    project_only=True,
-    enabled=None,
-    label=None,
-):
+    profile: bool = False,
+    limit: int = 12,
+    min_ms: float = 0.0,
+    project_only: bool = True,
+    enabled: bool | None = None,
+    label: str | None = None,
+) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
     """Print elapsed time for a function, optionally with top profile rows.
 
     By default, output is controlled by ``CONFIG.DEBUG_TRACING``. Use
@@ -53,12 +66,12 @@ def timed(
     # @testable false
     # @covered-by lagniappe/core/tools/diagnostics.py::timed
     # @reason nested decorator factory is exercised through timed
-    def decorator(wrapped_func):
+    def decorator(wrapped_func: Callable[P, T]) -> Callable[P, T]:
         # @testable false
         # @covered-by lagniappe/core/tools/diagnostics.py::timed
         # @reason wrapper behavior is exercised through timed
         @wraps(wrapped_func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             if not _timing_enabled(enabled):
                 return wrapped_func(*args, **kwargs)
 
@@ -166,7 +179,8 @@ def _print_profile_rows(title, rows, limit):
 # @covered-by lagniappe/core/tools/diagnostics.py::timed
 # @reason cProfile row shaping is part of timed decorator output
 def _profile_rows(profiler, *, limit, min_ms, project_only):
-    stats = pstats.Stats(profiler)
+    # CPython publishes the per-location counters on Stats.stats (omitted from typeshed).
+    stats = cast(_ProfileStats, pstats.Stats(profiler))
     rows = []
     for (filename, line, function), stat in stats.stats.items():
         _primitive_calls, total_calls, total_time, cumulative_time, _callers = stat

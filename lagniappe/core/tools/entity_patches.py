@@ -1,5 +1,18 @@
 """Prepare cohesive entity edits without clearing omitted fields or writing data."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.user import User
+    from ..entities.page import Page
+    from ..entities.project import Project
+    from ..entities.model_task import ModelTask
+    from ..entities.task import Task
+    from ..entities.form import Form
+
+from typing import Any, cast
+
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, time, UTC
@@ -33,7 +46,9 @@ PATCH_FIELDS = {
 # @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_preserves_unloaded_category_forms
 # @tests tests_unit/test_032g_entity_patches.py::test_patch_schedule_and_form_type_and_permission_validation
 # @matrix entity-patch : preservation validation preparation permissions
-def prepare_patch(entity, changes, actor):
+def prepare_patch(
+    entity: Entity, changes: dict[str, Any], actor: User
+) -> PreparedPatch:
     """Return detached writes and before/after values for one reviewed edit.
 
     Relationship values are resolved entities, never names. Callers resolve exact
@@ -55,13 +70,14 @@ def prepare_patch(entity, changes, actor):
     sources = {entity.key: entity}
     related_sources = []
     if kind == "task":
-        related_sources = [entity.page, entity.project, entity.model]
+        task = cast("Task", entity)
+        related_sources = [task.page, task.project, task.model]
     elif kind == "model":
-        related_sources = [entity.project]
+        related_sources = [cast("ModelTask", entity).project]
     elif kind == "page":
-        related_sources = list(entity.categories)
+        related_sources = list(cast("Page", entity).categories)
     for related in related_sources:
-        if getattr(related, "key", None):
+        if related is not None and getattr(related, "key", None):
             sources[related.key] = related
     candidate = _copy_entity(entity)
     writes = [candidate]
@@ -69,7 +85,7 @@ def prepare_patch(entity, changes, actor):
     removed = {}
 
     if "form" in PATCH_FIELDS[kind]:
-        old_form = entity.form
+        old_form = cast("Form | None", entity.form)
         if old_form:
             _unlocked(old_form)
             sources[old_form.key] = old_form
@@ -87,7 +103,7 @@ def prepare_patch(entity, changes, actor):
             if changed_form and kind in {"task", "page"}:
                 if "submission" not in changes:
                     raise ValidationError("Form reassignment requires a complete target submission.")
-                removed = deepcopy(entity.submission or {})
+                removed = deepcopy(cast(dict[str, object], entity.submission or {}))
                 candidate.properties.submission.value = {}
                 candidate._submission_definition = None
                 candidate.properties.submission._fields = None
@@ -131,7 +147,7 @@ def prepare_patch(entity, changes, actor):
         if "assigned_to" in changes and getattr(assignee, "key", None) != getattr(entity.assigned_to, "key", None):
             candidate.assigned_to = assignee
             candidate.assigned_by = actor.page
-            candidate.db["assignment_revision"] = int(entity.db.get("assignment_revision") or 0) + 1
+            candidate.db["assignment_revision"] = int(cast(int, entity.db.get("assignment_revision") or 0)) + 1
             candidate._add_assignment_notice(actor, assignee)
 
     if kind == "project" and "model_tasks" in changes:
@@ -143,7 +159,7 @@ def prepare_patch(entity, changes, actor):
             if model.project.key != entity.key:
                 raise ValidationError("Model ordering contains another Project's model task.")
         keys = [model.key for model in ordered]
-        if len(keys) != len(set(keys)) or set(keys) != {model.key for model in entity.model_tasks}:
+        if len(keys) != len(set(keys)) or set(keys) != {model.key for model in cast("Project", entity).model_tasks}:
             raise ValidationError("Model ordering must include every model task exactly once.")
         for order, model in enumerate(ordered, 1):
             sources[model.key] = model
@@ -162,7 +178,7 @@ def prepare_patch(entity, changes, actor):
         if len({category.key for category in categories}) != len(categories):
             raise ValidationError("Page categories cannot repeat.")
         candidate.model, candidate.categories = categories[0], categories[1:]
-        for owner in entity.page_list_owners:
+        for owner in cast("Page", entity).page_list_owners:
             candidate.add_mutation_intents(MutationIntent.touch(owner, reason="page-patch-previous-owner"))
 
     if kind == "page" and candidate.form and {"categories", "form"} & changes.keys():
@@ -211,13 +227,13 @@ def prepare_patch(entity, changes, actor):
 # @reason typed preparation result carries review values and transaction inputs
 @dataclass(frozen=True)
 class PreparedPatch:
-    entity: object
-    writes: tuple
-    guards: tuple
-    before: dict
-    after: dict
-    removed_values: dict
-    forms: tuple
+    entity: Entity
+    writes: tuple[Entity, ...]
+    guards: tuple[tuple[object, object], ...]
+    before: dict[str, object]
+    after: dict[str, object]
+    removed_values: dict[str, object]
+    forms: tuple[Entity, ...]
 
 
 # @testable false
@@ -295,7 +311,7 @@ def _projection(entity):
         value = entity.summary if entity.entity_kind == "file" and field == "description" else getattr(entity, field, None)
         if field == "schedule":
             value = entity.properties.schedule.value
-        if hasattr(value, "urlsafe_key"):
+        if value is not None and hasattr(value, "urlsafe_key"):
             value = {"id": value.urlsafe_key, "name": value.name}
         elif field == "categories":
             value = [{"id": item.urlsafe_key, "name": item.name} for item in value or []]

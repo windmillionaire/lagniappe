@@ -1,5 +1,13 @@
 """Bounded experiments measurements; never retain provider arguments or content."""
 
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Client as DatastoreClient
+    from google.cloud.storage import Client as StorageClient
+    from redis import Redis
+
 from contextlib import contextmanager
 from contextvars import ContextVar
 from collections.abc import Mapping
@@ -10,7 +18,10 @@ import time
 import uuid
 
 
-CURRENT = ContextVar("experiments_measurement", default=None)
+P = ParamSpec("P")
+T = TypeVar("T")
+
+CURRENT: ContextVar[Measurement | None] = ContextVar("experiments_measurement", default=None)
 TRACE_LIMIT = 128
 
 
@@ -18,19 +29,28 @@ TRACE_LIMIT = 128
 # @tests tests_unit/test_034_experiments.py::test_measurements_are_bounded_private_and_context_local
 # @matrix experiments : request-measurements
 class Measurement:
-    def __init__(self, mode):
+    def __init__(self, mode: str) -> None:
         self.request_id = uuid.uuid4().hex
         self.started = time.perf_counter()
         self.mode = mode
-        self.operations = {}
+        self.operations: dict[str, dict[str, float]] = {}
         self.trace = []
         self.dropped = 0
-        self.jobs = []
+        self.jobs: list[str] = []
 
     # @testable false
     # @covered-by lagniappe/core/tools/measurements.py::Measurement
     # @reason aggregate and trace storage belong to the request measurement contract
-    def record(self, component, operation, started, *, failed=False, count=1, **counts):
+    def record(
+        self,
+        component: str,
+        operation: str,
+        started: float,
+        *,
+        failed: bool = False,
+        count: int = 1,
+        **counts: int,
+    ) -> None:
         duration = (time.perf_counter() - started) * 1000
         label = f"{component}.{operation}"
         item = self.operations.setdefault(
@@ -58,7 +78,7 @@ class Measurement:
     # @testable false
     # @covered-by lagniappe/core/tools/measurements.py::Measurement
     # @reason serialization belongs to the request measurement contract
-    def summary(self):
+    def summary(self) -> dict[str, object]:
         return {
             "event": "lagniappe.experiments.request",
             "schema": 1,
@@ -82,7 +102,7 @@ class Measurement:
 # @tests tests_unit/test_034_experiments.py::test_measurements_are_bounded_private_and_context_local
 # @matrix experiments : request-measurements
 @contextmanager
-def span(component, operation, *, count=1):
+def span(component: str, operation: str, *, count: int = 1) -> Iterator[dict[str, int]]:
     measurement = CURRENT.get()
     if measurement is None:
         yield {}
@@ -102,7 +122,7 @@ def span(component, operation, *, count=1):
 # @testable false
 # @covered-by lagniappe/core/tools/measurements.py::span
 # @reason decorator only enters the shared timing context
-def timed(component, operation):
+def timed(component: str, operation: str) -> Callable[[Callable[P, T]], Callable[P, T]]:
     # @testable false
     # @covered-by lagniappe/core/tools/measurements.py::span
     # @reason decorator factory for the shared timing context
@@ -123,7 +143,7 @@ def timed(component, operation):
 # @testable true
 # @tests tests_unit/test_034_experiments.py::test_measurements_count_provider_calls_without_arguments
 # @matrix experiments : provider-measurements
-def instrument_datastore(client):
+def instrument_datastore(client: DatastoreClient) -> None:
     """Count SDK RPC invocations, including each query page, not internal retries."""
     api = client._datastore_api
     for name in (
@@ -198,7 +218,7 @@ def _field(value, name, default):
 # @testable true
 # @tests tests_unit/test_034_experiments.py::test_measurements_count_provider_calls_without_arguments
 # @matrix experiments : provider-measurements
-def instrument_storage(client):
+def instrument_storage(client: StorageClient) -> None:
     """Count Storage HTTP calls without materializing streaming response bodies."""
     original = client._http.request
 
@@ -241,7 +261,7 @@ def _redis_command(args):
 # @testable true
 # @tests tests_unit/test_034_experiments.py::test_measurements_count_provider_calls_without_arguments
 # @matrix experiments : provider-measurements
-def instrument_redis(client):
+def instrument_redis(client: Redis) -> None:
     """Measure executed commands and pipeline batches, never pipeline enqueueing."""
     original = client.execute_command
     original_pipeline = client.pipeline
@@ -312,7 +332,7 @@ def instrument_redis(client):
 # @testable false
 # @covered-by lagniappe/core/tools/measurements.py::Measurement
 # @reason links existing opaque job telemetry IDs without retaining job parameters
-def link_job(job):
+def link_job(job: object) -> None:
     measurement = CURRENT.get()
     telemetry = getattr(job, "telemetry_id", None)
     if (
@@ -327,5 +347,5 @@ def link_job(job):
 # @testable false
 # @covered-by lagniappe/core/tools/measurements.py::Measurement
 # @reason one JSON line is collected by the existing cloud stdout logging pipeline
-def emit(payload):
+def emit(payload: Mapping[str, object]) -> None:
     print(json.dumps(payload, separators=(",", ":")), flush=True)

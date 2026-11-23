@@ -13,7 +13,7 @@ from lagniappe.core.tools.database.core import DATA, KINDS
 # @testable true
 # @tests tests_unit/test_034_experiments.py::test_execution_requires_designated_admin_and_current_policy
 # @matrix experiments : execution-policy
-def can_execute(user, *, remote_mcp=False):
+def can_execute(user: object, *, remote_mcp: bool = False) -> bool:
     """Additional capability never substitutes for ordinary record permissions."""
     from lagniappe.core.tools.ai.auto_execute import experiments_execution_allowed
 
@@ -23,7 +23,7 @@ def can_execute(user, *, remote_mcp=False):
 # @testable true
 # @tests tests_unit/test_034_experiments.py::test_bootstrap_is_guarded_idempotent_and_preserves_roles
 # @matrix experiments : bootstrap
-def bootstrap():
+def bootstrap() -> None:
     """Create both normal accounts once, preserving subsequent Owner decisions."""
     if not getattr(CONFIG, "EXPERIMENTS_ENABLED", False) or not CONFIG.production:
         return
@@ -53,6 +53,8 @@ def bootstrap():
             user = Entities.USER.create(
                 {"email": email, "name": name, "admin": role == "agent"}, key=key
             )
+            if user is None or user.key is None:
+                raise RuntimeError("Experiments bootstrap could not resolve the saved account.")
             # A login that already created this identity is reused, not promoted.
             if user.key == key:
                 try:

@@ -92,7 +92,11 @@ def document_structure(snapshot: str | bytes | None) -> str:
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_append_requires_a_checkpointed_collaborative_baseline
 # @matrix editor sync : document append checkpoint conflict
-def document_state(snapshot):
+def document_state(
+    snapshot: str | bytes | None,
+) -> tuple[
+    list[tuple[int, int]], str, dict[str, DocumentReceipt], dict[str, dict[str, str]]
+]:
     """Compare IDs/clocks and content, not nondeterministic binary map ordering."""
     doc = load_document(snapshot)
     values = iter(doc.get_state())
@@ -262,7 +266,9 @@ def _append_nodes(parent, nodes, marks=None):
 # @tests tests_unit/test_010b_document_append.py::test_append_converts_supported_markdown_blocks
 # @matrix editor sync : document append idempotency offline-replay browser-interop
 # @matrix editor markdown : document append formatting
-def append_fragment(snapshot, html, operation_id, *, html_after=None):
+def append_fragment(
+    snapshot: str | None, html: str, operation_id: str, *, html_after: str | None = None
+) -> tuple[str | None, DocumentReceipt]:
     """Return a new snapshot and a durable retry receipt; never reset old IDs."""
     doc = load_document(snapshot)
     receipts = report_receipts(doc)
@@ -287,7 +293,14 @@ def append_fragment(snapshot, html, operation_id, *, html_after=None):
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_replacement_preserves_crdt_lineage_and_retry_receipts
 # @matrix editor sync : document replacement idempotency offline-replay
-def replace_fragment(snapshot, html, operation_id, *, previous_version, name):
+def replace_fragment(
+    snapshot: str | None,
+    html: str,
+    operation_id: str,
+    *,
+    previous_version: str,
+    name: str,
+) -> tuple[str | None, DocumentReceipt]:
     """Replace visible nodes as one edit, retaining tombstones and all receipts."""
     doc = load_document(snapshot)
     if operation_id in report_receipts(doc):
