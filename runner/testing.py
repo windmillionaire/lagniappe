@@ -247,6 +247,8 @@ def prepare_test_artifacts(authority: TestAuthority) -> None:
 def update_test_indexes() -> None:
     index_data = File.INDEX_YAML.load()
     indexes = index_data["indexes"]
+    if not isinstance(indexes, list):
+        raise ValueError("The datastore index document must contain an index list.")
 
     try:
         test_indexes = []

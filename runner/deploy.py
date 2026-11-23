@@ -2,6 +2,8 @@ from runner import presentation as ui
 from runner.presentation import output as print
 
 import ast
+from collections.abc import Mapping
+from typing import cast
 import fnmatch
 import json
 import os
@@ -348,7 +350,7 @@ def increment_version() -> str:
     """Increment version in package.json, package-lock.json, and settings YAML."""
     # Read and update package.json
 
-    current_version = float(SETTINGS.NODE["version"])
+    current_version = float(cast(str, SETTINGS.NODE["version"]))  # npm versions are stored as strings.
     new_version = str(round(current_version + 0.01, 2))
     SETTINGS.NODE["version"] = new_version
     update_package_lock_version(new_version)
@@ -364,7 +366,7 @@ def increment_version() -> str:
 # @reason manifest naming and icon versioning shared by setup generation and deployment
 def update_manifest(
     *,
-    app_settings: dict[str, object] | None = None,
+    app_settings: Mapping[str, object] | None = None,
     manifest: dict[str, object] | None = None,
 ) -> None:
     """Update the supplied manifest, or the current settings for deployment."""
@@ -372,7 +374,7 @@ def update_manifest(
         app_settings = SETTINGS.APP
     if manifest is None:
         manifest = SETTINGS.MANIFEST
-    if not isinstance(app_settings, dict) or not isinstance(manifest, dict):
+    if not isinstance(app_settings, Mapping) or not isinstance(manifest, dict):
         raise RuntimeError("Deployment requires app settings and a web manifest.")
     app_name = app_settings["APP_NAME"]
 

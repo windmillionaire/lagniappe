@@ -58,7 +58,7 @@ def project_virtualenv_active(
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
 # @matrix setup : generated-command portability
 def format_command(
-    command: Sequence[str | Path], *, windows: bool | None = None
+    command: Sequence[object], *, windows: bool | None = None
 ) -> str:
     """Render an argument-list command for the operator's supported shell."""
     command = [str(part) for part in command]
