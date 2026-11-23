@@ -42,6 +42,9 @@ def test_todo_list_submission_projections():
         ]
     }
     assert field.value == expected
+    assert field.items == expected["items"]
+    with pytest.raises(AttributeError):
+        field.items = []
     assert field.form_value == expected
     assert field.db_value == expected
     assert field.ai_value == expected
