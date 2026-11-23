@@ -1,8 +1,12 @@
 """Root-depth collection discovery and cached-fingerprint refresh deltas."""
 
+from collections.abc import Mapping
+
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.user import User
     from lagniappe.core.entities.page import Page
 
 from dataclasses import dataclass
@@ -36,7 +40,7 @@ class RefreshFallback(ValueError):
 class RefreshView:
     """Loaded refresh identity and its cheap collection-level revision."""
 
-    entity: object
+    entity: Entity | None
     fingerprint: str | None
     reauthorize: bool = False
     authorization: str | None = None
@@ -45,7 +49,7 @@ class RefreshView:
     # @testable false
     # @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_collection
     # @reason the parent revision gate is exercised through collection loading
-    def matches(self, view):
+    def matches(self, view: Mapping[str, object]) -> bool:
         return (
             bool(view.get("fingerprint"))
             and view.get("fingerprint") == self.fingerprint
@@ -59,17 +63,17 @@ class RefreshCollection:
     """Renderer context and roots; unchanged membership reuses the client rows."""
 
     kind: str
-    parent: object
-    roots: tuple | None
+    parent: Entity | index.Index
+    roots: tuple[Entity, ...] | None
 
 
 @dataclass(frozen=True)
 class RefreshDelta:
     """Authorized changed entities and structural operations for one widget."""
 
-    upsert: tuple
-    remove: tuple
-    order: tuple
+    upsert: tuple[Entity, ...]
+    remove: tuple[str, ...]
+    order: tuple[str, ...]
 
 
 # @testable false
@@ -87,7 +91,7 @@ def _view_entity(view):
 # @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
 # @matrix filters polling : saved-filter permissions revision
 # @matrix reconnect-refresh : entity-view root-fingerprint site-index
-def load_refresh_view(view, user=None):
+def load_refresh_view(view: object, user: User | None = None) -> RefreshView:
     """Resolve a refresh view once, before any collection membership queries."""
     if not isinstance(view, dict):
         raise RefreshFallback("Unsupported refresh view")
@@ -169,7 +173,7 @@ def _filtered_roots(filter_entity, user, *, unchanged=False):
 # @matrix reconnect-refresh : authenticated-access cache-refresh component-identity root-depth target-validation
 # @matrix reconnect-refresh : root-fingerprint membership no-extra-read
 # @pairs filters:cache-refresh permissions:own-page-only
-def load_refresh_collection(view, target, user, refresh_view=None):
+def load_refresh_collection(view: object, target: object, user: User, refresh_view: RefreshView | None = None) -> RefreshCollection:
     """Load one allowlisted collection without expanding its row relationships."""
     if not isinstance(view, dict) or not isinstance(target, dict):
         raise RefreshFallback("Unsupported refresh target")
@@ -321,7 +325,7 @@ def _cached_fingerprint(key, kind, details, root=None, *, form_version=None):
 # @matrix reconnect-refresh user-index : page-canonical authorization
 # @matrix notes cache : masked-touch authorized-refresh
 # @matrix user-index : page-canonical user-fields no-extra-read
-def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
+def resolve_refresh_delta(collection: RefreshCollection, rows: object, user: User, *, reauthorize: bool = False) -> RefreshDelta:
     """Compare cached fingerprints and expand only rows needing authorization."""
     client = _client_fingerprints(rows)
     if collection.roots is None:
@@ -329,7 +333,7 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
         hashes = {key: row[0] for key, row in client.items()}
     else:
         roots = {root.urlsafe_key: root for root in collection.roots}
-        hashes = {key: root.db.get("hash") for key, root in roots.items()}
+        hashes = {key: value if isinstance(value := root.db.get("hash"), str) else None for key, root in roots.items()}
     kind = (
         "page"
         if collection.kind in {"page-index", "filtered-page-index", "user-index"}
@@ -353,7 +357,7 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
         or key not in client
         or client[key] != (
             hashes[key], _cached_fingerprint(
-                key, kind, details.get(hashes[key], {}), root,
+                key, kind, details.get(hashes[key] or "", {}), root,
                 form_version=form_versions.get(key),
             )
         )
