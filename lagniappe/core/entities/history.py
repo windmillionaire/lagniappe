@@ -29,6 +29,9 @@ if TYPE_CHECKING:
     from .page import Page
     from .project import Project
     from .task import Task
+    from .file import File
+    from .user import User
+    from .form import Form
 
 
 # @testable true
@@ -48,7 +51,24 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     edit-revision signal.
     """
     if TYPE_CHECKING:
+        form: Form | None
         task: Task | None
+        page: Page | None
+        linked_pages: list[Page]
+        files: list[File]
+
+        @property
+        def completed_on(self) -> datetime | None: ...
+
+        @completed_on.setter
+        def completed_on(self, value: datetime | str | float | None) -> None: ...
+
+        @property
+        def completed_by(self) -> Page | None: ...
+
+        @completed_by.setter
+        def completed_by(self, value: Page | User | None) -> None: ...
+
 
         @property
         def properties(self) -> property_types.TaskHistoryProperties: ...

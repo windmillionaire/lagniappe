@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from datetime import datetime, UTC
 from uuid import uuid4
@@ -37,6 +37,9 @@ from ..tools.auth.restrictions import permission_relation
 if TYPE_CHECKING:
     from . import property_types
     from .form import Form
+    from .file import File
+    from .user import User
+    from .page import Page
 
 
 # @testable true
@@ -46,6 +49,28 @@ if TYPE_CHECKING:
 class Task(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
         form: Form | None
+        @property
+        def due_date(self) -> datetime | None: ...
+
+        @due_date.setter
+        def due_date(self, value: datetime | str | float | None) -> None: ...
+
+        page: Page | None
+        linked_pages: list[Page]
+        files: list[File]
+
+        @property
+        def completed_on(self) -> datetime | None: ...
+
+        @completed_on.setter
+        def completed_on(self, value: datetime | str | float | None) -> None: ...
+
+        @property
+        def completed_by(self) -> Page | None: ...
+
+        @completed_by.setter
+        def completed_by(self, value: Page | User | None) -> None: ...
+
 
         @property
         def properties(self) -> property_types.TaskProperties: ...
@@ -73,12 +98,12 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         )
 
     @property
-    def scheduled_uncomplete_token(self):
+    def scheduled_uncomplete_token(self) -> str:
         return str(self.db.get("scheduled_uncomplete_token") or "")
 
     @property
-    def scheduled_uncomplete_at(self):
-        value = self.db.get("scheduled_uncomplete_at")
+    def scheduled_uncomplete_at(self) -> datetime | None:
+        value = cast("datetime | None", self.db.get("scheduled_uncomplete_at"))
         if value is not None and value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value
@@ -277,8 +302,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self.due_date = new_date
 
     @property
-    def postponed_from(self):
-        return self.db.get("postponed_from")
+    def postponed_from(self) -> datetime | None:
+        return cast("datetime | None", self.db.get("postponed_from"))
 
     # @testable true
     # @matrix submission task-completion : required-fields validation
