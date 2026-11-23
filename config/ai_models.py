@@ -1,5 +1,7 @@
 """Gemini model catalog, discovery, and retry defaults."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, TypedDict
 

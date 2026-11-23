@@ -1,5 +1,7 @@
 """Shared Cloud Storage naming and metadata contract."""
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import time
