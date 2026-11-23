@@ -33,7 +33,7 @@ from testing.utility.artifacts import (
     slugify,
     write_markdown_report,
 )
-from testing.utility import traceability
+from testing.utility import contract_common, native_js
 from testing.utility.traceability_common import (
     TRACEABILITY_SCHEMA_VERSION,
     git_changed_paths,
@@ -49,7 +49,6 @@ TEMPLATE_ROOT = Path("lagniappe/web/templates")
 TEXT_SECTION_LIMIT = 12
 MAX_MACRO_DEPTH = 3
 
-TAG_RE = re.compile(r"^\s*@(?P<tag>[\w-]+)(?:\s*[:=]\s*|\s+)?(?P<value>.*)$")
 MACRO_START_RE = re.compile(
     r"{%-?\s*macro\s+(?P<name>\w+)\((?P<params>[^)]*)\)\s*-?%}"
 )
@@ -294,40 +293,10 @@ def limited(values: list[object], limit: int = TEXT_SECTION_LIMIT) -> tuple[list
     return limited_items(values, limit)
 
 
-def parse_tag_values(text: str, tag_names: set[str], *, preserve: bool = False) -> list[str]:
-    values: list[str] = []
-    for raw_line in text.splitlines():
-        line = traceability.clean_metadata_line(raw_line)
-        match = TAG_RE.match(line)
-        if not match:
-            continue
-        tag = match.group("tag").lower().replace("_", "-")
-        if tag not in tag_names:
-            continue
-        value = match.group("value").strip()
-        if preserve:
-            if value:
-                values.append(value)
-        else:
-            values.extend(traceability.split_values(value, preserve_brackets=True))
-    return unique(values)
-
-
-def parse_template_tags(text: str) -> list[str]:
-    return parse_tag_values(
-        text,
-        {"template", "templates", "template-partial", "template-partials"},
-    )
-
-
-def parse_todo_tags(text: str) -> list[str]:
-    return parse_tag_values(text, {"todo", "todos"}, preserve=True)
-
-
 def normalize_target(target: str | None) -> str | None:
     if not target:
         return None
-    normalized = traceability.base_nodeid(target).replace("\\", "/")
+    normalized = contract_common.base_nodeid(target).replace("\\", "/")
     if normalized.startswith("./"):
         normalized = normalized[2:]
     if normalized.startswith("testing/"):
@@ -429,29 +398,26 @@ def target_matches_template(
 
 
 def collect_template_references(
-    repo_root: Path, target: str | None = None
+    repo_root: Path, target: str | None = None,
+    *, tests: dict[str, contract_common.ContractTest] | None = None,
 ) -> list[TemplateReference]:
-    references: list[TemplateReference] = []
-    tests_root = repo_root / "testing"
     normalized_target = normalize_target(target)
     template_target = normalize_template_target(target, repo_root)
-
-    paths = sorted([*tests_root.rglob("test_*.py"), *tests_root.rglob("test_*.mjs")])
-    for path in paths:
-        test_path = relpath(path, tests_root)
-        for qualname, info in traceability.collect_file_test_symbol_info(path).items():
-            if not template_target and not target_matches_test(normalized_target, test_path, qualname):
-                continue
-            for template_ref in info.metadata.templates:
-                template_path, macro = split_template_ref(template_ref)
-                if target_matches_template(template_target, template_path, macro):
-                    references.append(TemplateReference(
-                        nodeid=f"{test_path}::{qualname}", test_path=test_path,
-                        qualname=qualname, template_ref=template_ref,
-                        template_path=template_path, macro=macro,
-                        lineno=info.lineno, todos=info.metadata.todos,
-                    ))
-
+    if tests is None:
+        tests = contract_common.collect_contract_tests(repo_root)
+    references = []
+    for test in tests.values():
+        if not template_target and not target_matches_test(normalized_target, test.path, test.qualname):
+            continue
+        for template_ref in test.templates:
+            template_path, macro = split_template_ref(template_ref)
+            if target_matches_template(template_target, template_path, macro):
+                references.append(TemplateReference(
+                    nodeid=test.nodeid, test_path=test.path,
+                    qualname=test.qualname, template_ref=template_ref,
+                    template_path=template_path, macro=macro,
+                    lineno=test.lineno, todos=test.todos,
+                ))
     return references
 
 
@@ -1335,7 +1301,7 @@ def helper_method_selectors(
 
 def find_test_node(path: Path, qualname: str) -> ast.AST | None:
     if path.suffix == ".mjs":
-        rows = traceability.native_js.inventory(path)["cases"]
+        rows = native_js.inventory(path)["cases"]
         row = next((row for row in rows if row["name"] == qualname), None)
         if row is None:
             return None
@@ -1961,8 +1927,9 @@ def build_report(
     target: str | None = None,
     *,
     changed_paths: Iterable[str] | None = None,
+    tests: dict[str, contract_common.ContractTest] | None = None,
 ) -> Report:
-    references = collect_template_references(repo_root, target)
+    references = collect_template_references(repo_root, target, tests=tests)
     changed_path_list = sorted(set(changed_paths or []))
     js_index = collect_js_index(repo_root)
     template_index = collect_template_index(repo_root)

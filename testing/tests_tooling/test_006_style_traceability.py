@@ -10,7 +10,6 @@ from testing.utility import (
     style_candidates,
     style_registry,
     style_traceability,
-    traceability,
     traceability_common,
 )
 
@@ -558,13 +557,6 @@ def test_dropdown_panel():
     assert True
 """,
     )
-    write_file(
-        tmp_path / "testing/utility/traceability.yaml",
-        """
-source_roots: []
-test_roots: [tests_js]
-""",
-    )
     (tmp_path / "lagniappe/web/templates").mkdir(parents=True)
 
     manifest = style_traceability.build_manifest(tmp_path)
@@ -576,8 +568,27 @@ test_roots: [tests_js]
     assert manifest.styles["dropdown.panel"].evidence[0].current is False
     assert manifest.styles["dropdown.panel"].fingerprint
 
+    nodeid = "tests_js/test_dropdown.py::test_dropdown_panel"
+    paths = traceability_common.behavior_path_fingerprints(tmp_path)
+    traceability_common.write_json(
+        tmp_path / traceability_common.LATEST_TEST_RUN,
+        {
+            "schema_version": 2,
+            "tests": {nodeid: {"snapshot": "run", "outcome": "passed"}},
+            "snapshots": {"run": {"paths": paths}},
+        },
+    )
+    passing = style_traceability.build_manifest(tmp_path)
+    assert passing.styles["dropdown.panel"].evidence[0].current is True
 
-def test_traceability_styles_mode_emits_manifest_json(capsys, tmp_path):
+    styles_path = tmp_path / "src/style/styles.yaml"
+    styles_path.write_text(styles_path.read_text().replace("absolute hidden", "relative hidden"))
+    stale = style_traceability.build_manifest(tmp_path)
+    assert stale.styles["dropdown.panel"].evidence[0].outcome == "passed"
+    assert stale.styles["dropdown.panel"].evidence[0].current is False
+
+
+def test_style_contracts_emits_manifest_json(capsys, tmp_path):
     write_file(
         tmp_path / "src/style/styles.yaml",
         """
@@ -592,11 +603,10 @@ button:
     )
     (tmp_path / "src/script").mkdir(parents=True)
 
-    result = traceability.main(
+    result = style_traceability.main(
         [
             "--repo-root",
             str(tmp_path),
-            "--styles",
             "--json",
             "--no-manifest",
             "--no-report",
