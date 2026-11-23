@@ -1,5 +1,6 @@
 """Safe mechanical repairs shared by report planning."""
 
+from typing import cast
 import copy
 import re
 
@@ -152,9 +153,10 @@ def _complete_form_schema_fields(proposal):
 # @testable true
 # @tests tests_unit/test_020b_ai_planner.py::test_generate_report_validates_answers_actions_and_file_usage
 # @matrix ai-report : validation generate
-def complete_proposal_structure(proposal):
+def complete_proposal_structure[T](proposal: T) -> T:
     """Fill unambiguous schema IDs and references without another model call."""
     repaired = _complete_form_schema_fields(proposal)
     if repaired != proposal:
         mark_outcome("local_repair")
-    return repaired
+    # Repairs copy and update only dictionaries; every other input is returned unchanged.
+    return cast("T", repaired)

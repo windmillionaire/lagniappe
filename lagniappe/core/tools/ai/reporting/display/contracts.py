@@ -1,5 +1,14 @@
 """Composable contracts for AI-report proposal display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..contracts.actions import ActionData, ReportAction
+    from .details import ProposalDetailCollector
+
+
 from dataclasses import dataclass
 from enum import Enum
 from collections.abc import Callable
@@ -35,7 +44,7 @@ class ProposalActionDisplay:
 
     action_type: str
     prefix: str
-    details: Callable | None = None
+    details: Callable[[ProposalDetailCollector, ActionData, ReportAction], None] | None = None
     grouping: ProposalActionGrouping = ProposalActionGrouping.REFERENCE
     label_detail: str | None = None
     inherited_details: tuple[InheritedProposalDetail, ...] = ()

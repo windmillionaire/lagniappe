@@ -1,28 +1,47 @@
 """Reference and label resolution for AI-report proposal display."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.properties.ai_report_proposal import Proposal
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ActionReferences, ReportAction
+    from typing import TypeGuard
+
+
 import re
+from lagniappe.core.entities import Entities
 
 
 # @testable infrastructure
 class ProposalReferenceResolver:
     """Resolve stored action, file, and entity references for display."""
 
-    def __init__(self, proposal):
+    def __init__(self, proposal: Proposal) -> None:
         self.proposal = proposal
         self._entity_details_cache = None
 
-    def reset(self):
+    def reset(self) -> None:
         self._entity_details_cache = None
 
     @property
-    def value(self):
+    def value(self) -> object:
         return self.proposal.value
 
     @property
-    def entity(self):
-        return self.proposal.entity
+    def entity(self) -> models.AIReport:
+        report = self.proposal.entity
+        if not isinstance(report, Entities.REPORT):
+            raise TypeError("Report proposal requires an AI report owner.")
+        return report
 
-    def existing_entity_reference(self, action, root):
+    def existing_entity_reference(
+        self, action: ActionReferences, root: str
+    ) -> str | None:
         data = action.get("data") or {}
         for key in [root, f"{root}_id", f"{root}_ref"]:
             value = data.get(key)
@@ -33,7 +52,7 @@ class ProposalReferenceResolver:
                 return reference
         return None
 
-    def reference_identity(self, value):
+    def reference_identity(self, value: object) -> str | None:
         if isinstance(value, str):
             return value
         if isinstance(value, dict):
@@ -42,26 +61,28 @@ class ProposalReferenceResolver:
                     return value[key]
         return None
 
-    def reference_is_opaque(self, value):
+    def reference_is_opaque(self, value: object) -> TypeGuard[str]:
         if not isinstance(value, str):
             return False
         return value.startswith("hash:") or (len(value) > 32 and value.startswith("ah"))
 
-    def reference_display_label(self, action, root):
+    def reference_display_label(self, action: ReportAction, root: str) -> str | None:
         data = action.get("data") or {}
         value = data.get(root)
         for key in (f"{root}_name", f"{root}_display", f"{root}_label"):
-            if data.get(key):
-                return data[key]
-        if root != "page" and data.get("page_name"):
-            return data["page_name"]
+            label = data.get(key)
+            if isinstance(label, str) and label:
+                return label
+        page_name = data.get("page_name")
+        if root != "page" and isinstance(page_name, str) and page_name:
+            return page_name
         if isinstance(value, dict):
             for key in ("name", "title", "display_name", "label"):
                 if value.get(key):
                     return value[key]
         return None
 
-    def reference_action_id(self, action, *roots):
+    def reference_action_id(self, action: ActionReferences, *roots: str) -> str | None:
         data = action.get("data") or {}
         for root in roots:
             for key in [f"{root}_action", root, f"{root}_ref", f"{root}_id"]:
@@ -71,14 +92,16 @@ class ProposalReferenceResolver:
                     return action_id
         return None
 
-    def referenced_action_ids(self, action):
+    def referenced_action_ids(self, action: ReportAction) -> set[str]:
         references = set()
         for action_id in action.get("depends_on") or []:
             references.add(self.strip_action_reference(action_id))
         references.update(self.referenced_action_ids_from_value(action.get("data")))
         return {reference for reference in references if reference}
 
-    def referenced_action_ids_from_value(self, value, key=None):
+    def referenced_action_ids_from_value(
+        self, value: object, key: str | None = None
+    ) -> set[str]:
         references = set()
         if isinstance(value, dict):
             if value.get("action"):
@@ -99,7 +122,7 @@ class ProposalReferenceResolver:
                 references.add(action_id)
         return references
 
-    def action_reference(self, value, key=None):
+    def action_reference(self, value: object, key: str | None = None) -> str | None:
         if isinstance(value, dict):
             value = value.get("action")
         if not isinstance(value, str) or not value:
@@ -110,7 +133,7 @@ class ProposalReferenceResolver:
             return self.strip_action_reference(value)
         return None
 
-    def strip_action_reference(self, value):
+    def strip_action_reference(self, value: str) -> str:
         if not isinstance(value, str):
             return value
         if value.startswith("$"):
@@ -119,7 +142,7 @@ class ProposalReferenceResolver:
             return value.split(":", 1)[1]
         return value
 
-    def action_labels(self, actions):
+    def action_labels(self, actions: Iterable[ReportAction]) -> dict[str, str]:
         labels = {}
         for action in actions:
             action_id = action.get("id")
@@ -138,7 +161,7 @@ class ProposalReferenceResolver:
             labels[action_id] = label
         return labels
 
-    def file_labels(self):
+    def file_labels(self) -> dict[object, str]:
         labels = {}
         for file in self.entity.input_files or []:
             label = file.name or file.filename
@@ -147,10 +170,10 @@ class ProposalReferenceResolver:
                     labels[key] = label
         return labels
 
-    def action_label(self, action):
+    def action_label(self, action: ReportAction) -> str:
         data = action.get("data") or {}
         if (action.get("type") or "").startswith("create_"):
-            return (
+            return str(
                 data.get("name")
                 or action.get("display_label")
                 or self.action_id_label(action)
@@ -159,7 +182,7 @@ class ProposalReferenceResolver:
                 or "Action"
             )
         if action.get("type") == "move_file":
-            return (
+            return str(
                 data.get("display_name")
                 or data.get("file_name")
                 or data.get("file_label")
@@ -171,7 +194,7 @@ class ProposalReferenceResolver:
                 or action.get("type")
                 or "Action"
             )
-        return (
+        return str(
             action.get("display_label")
             or data.get("name")
             or action.get("id")
@@ -182,7 +205,7 @@ class ProposalReferenceResolver:
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_humanize_generated_action_ids
     # @matrix ai-report files : details fallback-labels proposal
-    def action_id_label(self, action):
+    def action_id_label(self, action: ReportAction) -> str | None:
         action_id = action.get("id")
         if not isinstance(action_id, str) or not action_id.strip():
             return None
@@ -204,15 +227,21 @@ class ProposalReferenceResolver:
             return None
         return label.title()
 
-    def move_file_display_label(self, action, fallback):
+    def move_file_display_label(self, action: ReportAction, fallback: str) -> str:
         data = action.get("data") or {}
         for key in ("display_name", "file_name", "file_label", "file_display"):
             value = data.get(key)
-            if value:
+            if isinstance(value, str) and value:
                 return value
         return self.action_id_label(action) or fallback
 
-    def resolve_detail(self, value, action_labels, file_labels, label=None):
+    def resolve_detail(
+        self,
+        value: object,
+        action_labels: Mapping[str, str],
+        file_labels: Mapping[object, str],
+        label: str | None = None,
+    ) -> object:
         if isinstance(value, dict):
             if "_proposal_display_value" in value:
                 return value["_proposal_display_value"]
@@ -230,7 +259,7 @@ class ProposalReferenceResolver:
             value = value[1:]
         elif isinstance(value, str) and value.startswith("action:") or isinstance(value, str) and value.startswith("file:"):
             value = value.split(":", 1)[1]
-        resolved = action_labels.get(value) or file_labels.get(value)
+        resolved = (action_labels.get(value) if isinstance(value, str) else None) or file_labels.get(value)
         if resolved:
             return resolved
         if label in {
@@ -250,17 +279,18 @@ class ProposalReferenceResolver:
             return self.entity_label(value) or value
         return None
 
-    def entity_label(self, value):
+    def entity_label(self, value: object) -> str | None:
         details = self.entity_details(value)
         if details:
-            return details.get("label")
+            label = details.get("label")
+            return label if isinstance(label, str) else None
         return None
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_resolve_normalized_entity_refs
     # @matrix ai-report : existing-page-category normalized-references
-    def entity_details(self, value):
+    def entity_details(self, value: object) -> dict[str, object] | None:
         if not isinstance(value, str):
             return None
 
@@ -293,7 +323,7 @@ class ProposalReferenceResolver:
     # @testable false
     # @covered-by lagniappe/core/tools/ai/reporting/display/references.py::ProposalReferenceResolver.entity_details
     # @reason entity_details owns recursive discovery of normalized submission references
-    def opaque_submission_references(self, value):
+    def opaque_submission_references(self, value: object) -> list[str]:
         """Collect possible normalized entity ids for schema-aware projection."""
         if isinstance(value, dict):
             references = []
@@ -312,7 +342,7 @@ class ProposalReferenceResolver:
     # @testable false
     # @covered-by lagniappe/core/tools/ai/reporting/display/references.py::ProposalReferenceResolver.entity_details
     # @reason entity_details owns persisted reference projection and its tests
-    def entity_detail(self, entity):
+    def entity_detail(self, entity: Entity) -> dict[str, object]:
         detail = {
             "label": entity.name,
             "kind": getattr(entity, "kind", None),
@@ -327,7 +357,7 @@ class ProposalReferenceResolver:
             detail["schema"] = schema
         return detail
 
-    def entity_category_label(self, entity):
+    def entity_category_label(self, entity: Entity) -> str | None:
         if getattr(entity, "kind", None) != "page":
             return None
 
@@ -340,7 +370,7 @@ class ProposalReferenceResolver:
             return category.name
         return None
 
-    def entity_reference_values(self, data):
+    def entity_reference_values(self, data: ActionData) -> list[str]:
         references = []
         for root in (
             "entity",
@@ -364,7 +394,7 @@ class ProposalReferenceResolver:
                 references.extend(self.reference_strings(data.get(key)))
         return references
 
-    def reference_strings(self, value):
+    def reference_strings(self, value: object) -> list[str]:
         if isinstance(value, str):
             return [value]
         if isinstance(value, dict):

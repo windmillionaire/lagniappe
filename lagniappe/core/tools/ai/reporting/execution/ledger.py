@@ -1,6 +1,16 @@
 """Durable ledger construction and restoration for report execution."""
 
+from __future__ import annotations
+
+from typing import Required, TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+
+
 import hashlib
+
 
 from lagniappe.core import exceptions
 from lagniappe.core.properties.ai_report_proposal import (
@@ -13,6 +23,33 @@ from .actions.references import (
 from .actions.results import (
     _remember_created,
 )
+
+class ActionRecord(TypedDict, total=False):
+    id: str | None
+    type: str
+    display_label: str | None
+    idempotency_key: Required[str]
+    status: str
+    attempts: int
+    prepared: bool
+    expected: dict[str, object]
+    before: dict[str, object]
+    note: str
+    error: str
+    document_at: str
+    document_after: dict[str, str | None]
+    entity: dict[str, object]
+    migration_id: str
+    batch_skipped: bool
+
+
+class ReportLedger(TypedDict, total=False):
+    ledger_version: int
+    proposal_fingerprint: str
+    status: str
+    actions: Required[list[ActionRecord]]
+    failed_at: int
+
 
 REPORT_LEDGER_VERSION = 1
 
@@ -36,7 +73,9 @@ def _action_idempotency_key(report, proposal_fingerprint, index, action):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason ledger construction is asserted through public retry behavior
-def _new_report_ledger(report, proposal, proposal_fingerprint):
+def _new_report_ledger(
+    report: models.AIReport, proposal: ReportProposal, proposal_fingerprint: str
+) -> ReportLedger:
     return {
         "ledger_version": REPORT_LEDGER_VERSION,
         "proposal_fingerprint": proposal_fingerprint,
@@ -44,7 +83,7 @@ def _new_report_ledger(report, proposal, proposal_fingerprint):
         "actions": [
             {
                 "id": action.get("id"),
-                "type": action.get("type"),
+                "type": action["type"],
                 "display_label": action.get("display_label"),
                 "idempotency_key": _action_idempotency_key(
                     report,

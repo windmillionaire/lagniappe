@@ -33,7 +33,7 @@ REPORT_ACTION_ADAPTERS = {adapter.action_type: adapter for adapter in (
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_report_action_registry_matches_proposal_contracts
 # @matrix ai-report : action-registry contract
-def validate_report_action_registry():
+def validate_report_action_registry() -> None:
     if set(REPORT_ACTION_ADAPTERS) != set(REPORT_ACTION_DATA_CONTRACTS) or set(REPORT_ACTION_ADAPTERS) != set(ALLOWED_ACTIONS):
         raise RuntimeError("Report action contracts and lifecycle adapters are inconsistent.")
 
@@ -42,7 +42,7 @@ validate_report_action_registry()
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason forward dispatch is exercised through deterministic report execution
-def report_action_adapter(action_type):
+def report_action_adapter(action_type: str) -> ReportActionAdapter:
     return REPORT_ACTION_ADAPTERS[action_type]
 
 

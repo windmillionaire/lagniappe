@@ -1,5 +1,16 @@
 """Behavior-preserving validation for stored AI report proposals."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+    from lagniappe.core.tools.cache.details import CachedDetail
+
+
 import re
 
 from lagniappe.core import exceptions
@@ -28,7 +39,7 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_renders_page_document_markdown
 # @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
-def normalize_report_markdown(proposal, *, preserve_markdown=False):
+def normalize_report_markdown[T](proposal: T, *, preserve_markdown: bool = False) -> T:
     """Render new model-facing Markdown fields into legacy executable HTML."""
     if not isinstance(proposal, dict):
         return proposal
@@ -67,17 +78,17 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
     proposal: object,
-    allowed_actions=None,
-    allow_pending_submissions=False,
-    required_file_refs=None,
-    require_file_summaries=False,
-    validate_reference_kinds=False,
-    user=None,
-    preserve_document_markdown=False,
-    resolved_reference_details=None,
-    prepare_schema_changes=False,
-    require_response=False,
-):
+    allowed_actions: Iterable[str] | None = None,
+    allow_pending_submissions: bool = False,
+    required_file_refs: Iterable[str] | None = None,
+    require_file_summaries: bool = False,
+    validate_reference_kinds: bool = False,
+    user: models.User | None = None,
+    preserve_document_markdown: bool = False,
+    resolved_reference_details: dict[str, CachedDetail] | None = None,
+    prepare_schema_changes: bool = False,
+    require_response: bool = False,
+) -> ReportProposal:
     """Validate the JSON proposal returned by native or external report planning."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
     raw_proposal = proposal
@@ -92,8 +103,8 @@ def validate_proposal(
         resolved_details=resolved_reference_details,
     )
     proposal = normalized["proposal"]
-    required_file_refs = normalized["required_file_refs"]
-    assert isinstance(required_file_refs, list)
+    normal_refs = normalized["required_file_refs"]
+    assert isinstance(normal_refs, list)
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Report proposal must be a JSON object.")
     if require_response:
@@ -191,7 +202,7 @@ def validate_proposal(
             seen_ids.add(action_id)
             seen_actions[action_id] = action
 
-    if required_file_refs:
+    if normal_refs:
         attached_file_refs = {
             action.get("data", {}).get("file")
             for action in actions
@@ -205,7 +216,7 @@ def validate_proposal(
         missing_file_refs = [
             submitted_file_ref
             for file_ref, submitted_file_ref in zip(
-                required_file_refs,
+                normal_refs,
                 submitted_required_file_refs,
                 strict=True,
             )
@@ -231,7 +242,7 @@ def validate_proposal(
                 file_ref = action["data"].get("file")
                 summary_counts[file_ref] = summary_counts.get(file_ref, 0) + 1
 
-            required_file_ref_set = set(required_file_refs)
+            required_file_ref_set = set(normal_refs)
             if any(file_ref not in required_file_ref_set for file_ref in summary_counts):
                 raise exceptions.AIException(
                     "summarize_file actions must target uploads classified as organize."
@@ -240,7 +251,7 @@ def validate_proposal(
             missing_summary_refs = []
             duplicate_summary_refs = []
             for file_ref, submitted_file_ref in zip(
-                required_file_refs,
+                normal_refs,
                 submitted_required_file_refs,
                 strict=True,
             ):
@@ -262,17 +273,19 @@ def validate_proposal(
                     f"{', '.join(str(file_ref) for file_ref in duplicate_summary_refs)}"
                 )
 
+    # The action, data, and dependency contracts have been validated above.
+    checked = cast("ReportProposal", proposal)
     if prepare_schema_changes:
         from ..schema_updates import prepare_schema_updates
 
         try:
-            prepare_schema_updates(proposal, user)
+            prepare_schema_updates(checked, user)
             from ..entity_updates import prepare_entity_updates
-            prepare_entity_updates(proposal, user)
+            prepare_entity_updates(checked, user)
         except exceptions.ValidationError as error:
             raise exceptions.AIException(f"update_form_schema: {error}") from error
 
-    return proposal
+    return checked
 
 
 # @testable false

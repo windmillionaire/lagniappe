@@ -1,5 +1,14 @@
 """Input-file preparation for AI reports."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from lagniappe.core.entities import types as models
+
+
 from lagniappe.core.definitions import LARGE_ASSET_BYTES
 
 from ...summarize import (
@@ -86,13 +95,13 @@ def _set_oversized_report_summary(file):
 # @matrix ai-report : issue persistence
 # @matrix ai-report : active-request fallback large-file quota search-opt-in service-tier summary-prepass unreadable-pdf
 def summarize_report_input_files(
-    report,
-    save=None,
-    search=True,
-    raise_quota=True,
-    service_tier=None,
-    ensure_active=None,
-):
+    report: models.AIReport,
+    save: Callable[[models.File], object] | None = None,
+    search: bool = True,
+    raise_quota: bool = True,
+    service_tier: str | None = None,
+    ensure_active: Callable[[], None] | None = None,
+) -> list[models.File]:
     """Generate missing summaries for uploaded files before report planning."""
     summarized = []
     for file in report.input_files:
@@ -105,10 +114,10 @@ def summarize_report_input_files(
         large = _is_large_report_file(file)
         if _can_summarize_report_file(file):
             attempted_summary = True
-            summary_options = {"raise_quota": raise_quota}
             if service_tier:
-                summary_options["service_tier"] = service_tier
-            generate_summary(file, **summary_options)
+                generate_summary(file, raise_quota=raise_quota, service_tier=service_tier)
+            else:
+                generate_summary(file, raise_quota=raise_quota)
 
         if _report_file_summary_warning(file):
             if save and attempted_summary:

@@ -1,5 +1,13 @@
 """User selection and dependency-aware skip projection for proposals."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+
 from lagniappe.core import exceptions
 
 from .references import _referenced_action_ids
@@ -9,7 +17,7 @@ from .validation import validate_proposal
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_skip_proposal_actions_marks_dependencies
 # @matrix ai-report : dependencies proposal skip
-def skip_proposal_actions(proposal, index):
+def skip_proposal_actions(proposal: object, index: int) -> list[int]:
     """Mark one proposal action and all dependent actions as skipped."""
     proposal = validate_proposal(proposal)
     actions = proposal.get("actions") or []
@@ -26,7 +34,7 @@ def skip_proposal_actions(proposal, index):
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
 # @matrix ai-report : dependencies proposal restore skip
-def toggle_proposal_action_skip(proposal, index):
+def toggle_proposal_action_skip(proposal: object, index: int) -> dict[str, list[int]]:
     """Toggle skipped state for an action and its dependent actions."""
     proposal = validate_proposal(proposal)
     actions = proposal.get("actions") or []
@@ -40,7 +48,12 @@ def toggle_proposal_action_skip(proposal, index):
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
 # @matrix ai-report : dependencies exact-indexes grouped-display proposal restore schema-section skip
-def toggle_proposal_action_indexes(proposal, index, indexes, include_dependencies=True):
+def toggle_proposal_action_indexes(
+    proposal: object,
+    index: int,
+    indexes: Iterable[int] | None,
+    include_dependencies: bool = True,
+) -> dict[str, list[int]]:
     """Toggle skipped state for a display group of proposal actions."""
     proposal = validate_proposal(proposal)
     actions = proposal.get("actions") or []

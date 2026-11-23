@@ -1,12 +1,21 @@
 """User capability projection for AI report actions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from lagniappe.core.entities import types as models
+
+
 from .actions import ACTION_ORDER
 
 
 # @testable true
 # @matrix ai-report : action-capabilities permissions
 # @pair permissions:own-page
-def allowed_report_actions(user):
+def allowed_report_actions(user: models.User) -> tuple[str, ...]:
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
     allowed = {"create_task", "complete_task", "skip", "needs_review", "update_task", "update_page", "update_project", "update_model_task", "update_file"}
@@ -39,7 +48,9 @@ def allowed_report_actions(user):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/planner.py::report_prompt
 # @reason prompt text is verified through public prompt builders
-def report_action_permission_context(user, allowed_actions=None):
+def report_action_permission_context(
+    user: models.User, allowed_actions: Iterable[str] | None = None
+) -> dict[str, list[str]]:
     allowed = tuple(allowed_report_actions(user) if allowed_actions is None else allowed_actions)
     allowed_set = set(allowed)
     rules = ["Only return action types listed in allowed_actions."]

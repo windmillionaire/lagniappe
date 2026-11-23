@@ -1,5 +1,14 @@
 """Entity-oriented proposal display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ReportAction
+    from lagniappe.core.tools.ai.reporting.display.details import ProposalDetailCollector
+
+
 from ..contracts import (
     InheritedProposalDetail,
     ProposalActionDisplay,
@@ -8,12 +17,20 @@ from ..contracts import (
 
 
 # @testable infrastructure
-def category_details(details, data, action=None):
+def category_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Form", data, "form")
 
 
 # @testable infrastructure
-def page_details(details, data, action=None):
+def page_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Category", data, "category", "model")
     details.reference("Form", data, "form")
     details.submission(data, form_present=bool(details.first_value(data, "form")))
@@ -25,7 +42,11 @@ def page_details(details, data, action=None):
 
 
 # @testable infrastructure
-def document_details(details, data, action=None):
+def document_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Page", data, "page")
     replacing = (action or {}).get("type") == "replace_page_document"
     details.add(

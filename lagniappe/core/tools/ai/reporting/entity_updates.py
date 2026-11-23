@@ -5,11 +5,24 @@ cutover. These functions never save; the report runner owns the atomic write of
 the returned entities and its execution receipt.
 """
 
-from copy import deepcopy
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
     from lagniappe.core.entities.project import Project
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ReportAction, ReportProposal
+    from lagniappe.core.tools.ai.reporting.display.details import ProposalDetailCollector
+    from lagniappe.core.tools.ai.reporting.execution.batch import WorkingEntities
+    from lagniappe.core.tools.ai.reporting.execution.runner import ExecutionContext
+    from lagniappe.core.tools.entity_patches import PreparedPatch
+
+
+from copy import deepcopy
+
 import hashlib
 import json
 
@@ -38,7 +51,11 @@ RELATION_FIELDS = {
 # @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
 # @tests tests_unit/test_032g_entity_patches.py::test_update_missing_dependencies_never_fall_back_to_entity_lookup
 # @matrix entity-patch : integration review dependencies stale-state
-def prepare_update_action(action, user, outputs=None):
+def prepare_update_action(
+    action: ReportAction,
+    user: models.User,
+    outputs: Mapping[str, Entity] | WorkingEntities | None = None,
+) -> PreparedPatch:
     """Resolve one action against current entities or earlier successful outputs."""
     kind = UPDATE_TARGETS.get(action.get("type"))
     data = action.get("data")
@@ -67,11 +84,15 @@ def prepare_update_action(action, user, outputs=None):
 # @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
 # @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
 # @matrix entity-patch : integration review dependencies stale-state
-def review_update_action(action, user, outputs=None):
+def review_update_action(
+    action: ReportAction,
+    user: models.User,
+    outputs: Mapping[str, Entity] | WorkingEntities | None = None,
+) -> PreparedPatch:
     """Replace any submitted review metadata with a server-prepared snapshot."""
     prepared = prepare_update_action(action, user, outputs)
     action["_entity_update"] = {
-        "proposal": _fingerprint({"type": action["type"], "data": action["data"]}),
+        "proposal": _fingerprint({"type": action.get("type"), "data": action.get("data", {})}),
         "sources": _sources(prepared, outputs),
         "comparison": _comparison(prepared.before, outputs),
         "before": deepcopy(prepared.before),
@@ -87,7 +108,13 @@ def review_update_action(action, user, outputs=None):
 # @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
 # @tests tests_unit/test_032g_entity_patches.py::test_update_missing_dependencies_never_fall_back_to_entity_lookup
 # @matrix entity-patch : integration review dependencies stale-state
-def execute_update_action(action, report, user, created, context=None):
+def execute_update_action(
+    action: ReportAction,
+    report: models.AIReport,
+    user: models.User,
+    created: WorkingEntities,
+    context: ExecutionContext | None = None,
+) -> tuple[Entity, list[Entity], dict[str, object]]:
     """Return validated writes only when they match the server-reviewed proposal."""
     reviewed = action.get("_entity_update")
     if not isinstance(reviewed, dict) or reviewed.get("proposal") != _fingerprint({"type": action.get("type"), "data": action.get("data")}):
@@ -165,12 +192,16 @@ def _fingerprint(value):
 # @tests tests_unit/test_032g_entity_patches.py::test_proposal_prepares_new_forms_and_model_order
 # @tests tests_unit/test_032g_entity_patches.py::test_proposal_orders_models_on_a_new_project
 # @matrix entity-patch : integration review dependencies stale-state
-def prepare_entity_updates(proposal, user):
+def prepare_entity_updates(
+    proposal: ReportProposal, user: models.User | None
+) -> ReportProposal:
     """Prepare updates in proposal order without creating workspace records."""
     if not any(action.get("type") in UPDATE_TARGETS for action in proposal.get("actions", [])):
         return proposal
+    if user is None:
+        raise ValidationError("An actor is required to review updates.")
     outputs = {}
-    action_ids = {action["id"] for action in proposal["actions"] if action.get("id")}
+    action_ids = {action_id for action in proposal["actions"] if (action_id := action.get("id"))}
     touched = set()
     for index, action in enumerate(proposal["actions"], 1):
         action_id = action.get("id")
@@ -196,7 +227,7 @@ def prepare_entity_updates(proposal, user):
                 entity.description = data.get("description")
                 entity.properties.model_tasks._value = []
             else:
-                reference = data.get("project") or "$" + data.get("project_action", "")
+                reference = data.get("project") or f"${data.get('project_action', '')}"
                 project = cast("Project", _resolve(reference, "project", outputs))
                 if project.urlsafe_key not in outputs:
                     original = project
@@ -204,7 +235,7 @@ def prepare_entity_updates(proposal, user):
                     project.properties.model_tasks._value = list(original.model_tasks)
                     outputs[project.urlsafe_key] = project
                 entity.project = project
-                form_ref = data.get("form") or ("$" + data["form_action"] if data.get("form_action") else None)
+                form_ref = data.get("form") or (f"${data['form_action']}" if data.get("form_action") else None)
                 entity.form = _resolve(form_ref, "form", outputs) if form_ref else None
                 entity.order = len(project.model_tasks) + 1
                 project.properties.model_tasks._value = [*project.model_tasks, entity]
@@ -219,7 +250,8 @@ def prepare_entity_updates(proposal, user):
             outputs[action_id] = prepared.entity
             outputs[target_id] = prepared.entity
             # Ordering depends on all newly created models in that Project.
-            if kind == "update_project" and "model_tasks" in data.get("changes", {}):
+            changes = data.get("changes")
+            if kind == "update_project" and isinstance(changes, dict) and "model_tasks" in changes:
                 dependencies = set(action.get("depends_on", []))
                 dependencies.update(name for name, entity in outputs.items() if name in action_ids and entity.entity_kind == "model" and entity.project.key == prepared.entity.key)
                 action["depends_on"] = sorted(dependencies)
@@ -234,16 +266,23 @@ def prepare_entity_updates(proposal, user):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::review_update_action
 # @reason display projects the complete server-prepared before/after snapshot
-def update_details(details, data, action=None):
+def update_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Entity", data, "entity")
     review = (action or {}).get("_entity_update", {})
     before, after = review.get("before", {}), review.get("display_after", {})
-    for field in sorted(data.get("changes", {})):
+    changes = data.get("changes", {})
+    if not isinstance(before, dict) or not isinstance(after, dict) or not isinstance(changes, dict):
+        return
+    for field in sorted(changes):
         values = [before.get(field), after.get(field)]
         if field in RELATION_FIELDS:
             values = [[item.get("name") for item in value] if isinstance(value, list) else value.get("name") if isinstance(value, dict) else value for value in values]
         details.add(field.replace("_", " ").title(), " → ".join(json.dumps(value, ensure_ascii=False, default=str) for value in values))
     if review.get("removed_values"):
         details.add("Removed answers", json.dumps(review["removed_values"], ensure_ascii=False, default=str))
-    if (action or {}).get("type") == "update_model_task" and "form" in data.get("changes", {}):
+    if (action or {}).get("type") == "update_model_task" and "form" in changes:
         details.add("Existing tasks", "Unchanged. This default applies to future tasks only.")

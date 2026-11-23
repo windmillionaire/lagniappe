@@ -2,6 +2,7 @@
 
 
 from lagniappe.core import exceptions
+from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.database import get as database_get
 
@@ -159,11 +160,14 @@ def _inspect_action_applied(action, report, user, record):
             else ACTION_DRIFTED
         )
     if action_type == "summarize_file":
+        if not isinstance(entity, Entities.FILE):
+            return ACTION_DRIFTED
+        terms = entity.properties.summarize.retrieval_terms or []
         return (
             ACTION_APPLIED
-            if entity is not None and entity.summary == expected.get("summary")
+            if entity.summary == expected.get("summary")
             and entity.properties.summarize.complete is True
-            and list(entity.properties.summarize.retrieval_terms or [])
+            and isinstance(terms, (list, tuple)) and list(terms)
             == expected.get("retrieval_terms")
             and entity.properties.summarize.search is expected.get("search")
             else ACTION_DRIFTED

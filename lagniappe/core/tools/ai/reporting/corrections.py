@@ -1,6 +1,12 @@
 """Linked corrective reports and guarded supersession of executed plans."""
 
-from typing import cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+
 
 from copy import deepcopy
 import json
@@ -17,7 +23,9 @@ from .entity_updates import _fingerprint
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_correction_snapshot_and_approval_reject_changed_source
 # @matrix ai-report : correction ownership supersession
-def link_correction(report, source, user):
+def link_correction(
+    report: models.AIReport, source: models.AIReport, user: models.User
+) -> models.AIReport:
     """Retain bounded source evidence without changing its retry eligibility."""
     _check_source(source, user)
     snapshot = {"proposal": deepcopy(source.proposal), "result": deepcopy(source.result)}
@@ -31,15 +39,16 @@ def link_correction(report, source, user):
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_correction_snapshot_and_approval_reject_changed_source
 # @matrix ai-report : correction ownership supersession
-def approve_correction(report, user):
+def approve_correction(report: models.AIReport, user: models.User) -> None:
     """Atomically fence source retries when the browser approves a correction."""
     correction = report.db.get("correction")
-    if not correction:
+    if not isinstance(correction, dict) or not correction:
         return
     source = Entities.fetch_one(correction["source"], request=Fetch.direct())
     if source and source.db.get("superseded_by") == report.urlsafe_key:
         return
     _check_source(source, user)
+    assert isinstance(source, Entities.REPORT)
     if correction["fingerprint"] != _fingerprint({"proposal": source.proposal, "result": source.result}):
         raise ValidationError("The original execution changed. Create a fresh correction before approving it.")
     guards = [(source.key, ExactEntityState(deepcopy(dict(source.db)))), (report.key, ExactEntityState(deepcopy(dict(report.db))))]
@@ -67,12 +76,18 @@ def _check_source(source, user):
 # @testable true
 # @tests tests_unit/test_032g_entity_patches.py::test_corrections_share_evidence_across_origins_and_fence_source_retries
 # @matrix ai-report : correction ownership supersession
-def save_correction(report, source):
+def save_correction(report: models.AIReport, source: models.AIReport) -> None:
     guards = [(source.key, ExactEntityState(deepcopy(dict(source.db))))]
-    source.db["correction_children"] = list(dict.fromkeys([*source.db.get("correction_children", []), report.urlsafe_key]))
+    children = source.db.get("correction_children", [])
+    if not isinstance(children, list):
+        raise ValidationError("Stored correction links are invalid.")
+    source.db["correction_children"] = list(dict.fromkeys([*children, report.urlsafe_key]))
     for file in report.input_files:
         guards.append((file.key, ExactEntityState(deepcopy(dict(file.db)))))
-        file.db["report_refs"] = list(dict.fromkeys([*file.db.get("report_refs", []), source.urlsafe_key, report.urlsafe_key]))
+        references = file.db.get("report_refs", [])
+        if not isinstance(references, list):
+            raise ValidationError("Stored file report references are invalid.")
+        file.db["report_refs"] = list(dict.fromkeys([*references, source.urlsafe_key, report.urlsafe_key]))
     report._form_additional_guards = guards
     Entities.save(source, report, *report.input_files)
 

@@ -1,5 +1,14 @@
 """Grouped display projection for stored AI report proposals."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.properties.ai_report_proposal import Proposal
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionReferences, ReportAction
+
+
 import json
 
 from .contracts import ProposalActionGrouping
@@ -12,12 +21,12 @@ from .registry import proposal_action_display
 class ProposalDisplayProjector:
     """Compose registered action adapters into a grouped display tree."""
 
-    def __init__(self, proposal):
+    def __init__(self, proposal: Proposal) -> None:
         self.proposal = proposal
         self.references = ProposalReferenceResolver(proposal)
 
     @property
-    def value(self):
+    def value(self) -> object:
         return self.proposal.value
 
     # @testable true
@@ -26,7 +35,7 @@ class ProposalDisplayProjector:
     # @matrix ai-report : details proposal submission-review
     # @pair form-schema:submission-review
     @property
-    def display_actions(self):
+    def display_actions(self) -> list[dict[str, object]]:
         if not isinstance(self.value, dict):
             return []
 
@@ -63,7 +72,8 @@ class ProposalDisplayProjector:
                 self.references.entity_label,
             )
             if definition.details:
-                definition.details(details, data, item)
+                # Display fields extend a copy of the registered report action.
+                definition.details(details, data, cast("ReportAction", item))
             self._add_submission_preview(details, data, actions_by_id)
             item["details"] = details.values
             item["display_label"] = self._proposal_display_action_label(item)
@@ -118,7 +128,7 @@ class ProposalDisplayProjector:
             return schema
 
         visited = visited or set()
-        action = {"data": data}
+        action: ActionReferences = {"data": data}
         for root in ("form", "category", "model", "project", "task"):
             action_id = self.references.reference_action_id(action, root)
             if action_id and action_id not in visited:

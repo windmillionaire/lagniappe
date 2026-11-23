@@ -1,5 +1,14 @@
 """Server-owned preparation and review of report schema-change actions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+
+
 from copy import deepcopy
 import json
 
@@ -17,7 +26,9 @@ from lagniappe.core.tools.forms import (
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_schema_preparation_binds_impact_and_external_candidates
 # @tests tests_unit/test_004l_form_schema_updates.py::test_schema_preparation_assigns_missing_ids_without_collisions
 # @matrix ai-report form-migration : preview preparation approval external
-def prepare_schema_updates(proposal, user, *, verify=False):
+def prepare_schema_updates(
+    proposal: ReportProposal, user: models.User | None, *, verify: bool = False
+) -> ReportProposal:
     """Bind existing Form edits to complete impact before the report is reviewed."""
     if not any(
         action.get("type") == "update_form_schema"
@@ -54,6 +65,8 @@ def prepare_schema_updates(proposal, user, *, verify=False):
             if not verify:
                 action.pop("_schema_change", None)
             continue
+        if not isinstance(reference, str):
+            raise ValidationError("You do not have permission to update this Form.")
         form = Entities.fetch_one(reference, request=Fetch.direct())
         if (
             not isinstance(form, Entities.FORM)
@@ -219,7 +232,9 @@ def _bind_dependencies(proposal, schema_actions):
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_impact_redacts_revoked_access_and_paginates
 # @tests tests_unit/test_004l_form_schema_updates.py::test_report_impact_matches_positions_without_action_ids
 # @matrix ai-report form-migration : review links pagination permissions
-def report_impact(report, user, *, page=1):
+def report_impact(
+    report: models.AIReport, user: models.User, *, page: int = 1
+) -> dict[int, dict[str, object]]:
     """Project saved affected identities through current permissions, one page at a time."""
     result = {}
     for index, action in enumerate((getattr(report, "proposal", None) or {}).get("actions", []), 1):
@@ -275,7 +290,7 @@ def report_impact(report, user, *, page=1):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason report ownership protects candidates until a linked migration publishes
-def migration_pending(report):
+def migration_pending(report: models.AIReport) -> bool:
     if getattr(report, "status", None) == "running" and any(
         (action.get("_schema_change") or {}).get("migration")
         for action in (getattr(report, "proposal", None) or {}).get("actions", [])

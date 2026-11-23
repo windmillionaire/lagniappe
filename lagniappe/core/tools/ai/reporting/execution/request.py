@@ -1,11 +1,18 @@
 """Shared browser, auto-execute, and external-API/MCP request to execute a saved proposal."""
 
-import hashlib
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
     from lagniappe.core.entities.ai_report import AIReport
     from lagniappe.core.entities.user import User
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+
+
+import hashlib
+
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, DeferredJobSpec, DeferredJobType, Fetch
@@ -36,7 +43,7 @@ def request_execution(
     remote_mcp: bool = False,
     external_execution: bool = False,
     auto_execute: bool = False,
-):
+) -> tuple[models.DeferredJob | None, models.Notification | None]:
     """Validate current state, then use the ordinary idempotent deferred runner."""
     if not report.available or not report.allowed(Action.EDIT, user=actor):
         raise exceptions.ValidationError(
@@ -145,7 +152,11 @@ def request_execution(
 
     try:
         if not retryable:
-            prepare_schema_updates(report.proposal, actor, verify=True)
+            saved = report.proposal
+            if not isinstance(saved, dict) or not isinstance(saved.get("actions"), list):
+                raise exceptions.ValidationError("This report has no executable proposal.")
+            # Published proposals have already passed the action validator.
+            prepare_schema_updates(cast("ReportProposal", saved), actor, verify=True)
         else:
             for record in cast(list[_MigrationCheckpoint], result.get("actions", [])):
                 if record.get("migration_id"):
