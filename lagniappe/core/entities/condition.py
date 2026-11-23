@@ -18,7 +18,6 @@ from ..tools import cache
 
 
 if TYPE_CHECKING:
-    from _typeshed import SupportsRichComparison
     from ..mixins import FilterMixin
     from ..tools.filters.contract import FilterCondition
     from .category import Category
@@ -158,8 +157,8 @@ class Condition:
                 setattr(field, "value", v)  # noqa: B010 -- filter fields have heterogeneous value setters.
                 normalized.append(field.filter_value)
 
-        # One field normalizes its inputs to the same sortable scalar type.
-        normalized = list(sorted(cast("Iterable[SupportsRichComparison]", normalized)))
+        # One condition compares text (including entity hashes) or numbers (including timestamps).
+        cast("list[str] | list[float]", normalized).sort()
 
         if not normalized:
             self._condition_value = None
