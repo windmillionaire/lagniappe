@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from lagniappe.core.entities.task import Task
     from lagniappe.core.entities.user import User
 
 from google.genai import types
@@ -102,7 +103,7 @@ def execute_get_task_history(args: Mapping[str, object], user: User) -> Mapping[
 # @testable false
 # @covered-by lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
 # @reason original snapshot selection and safe projection are exercised through the public read
-def _original_answers(task, user):
+def _original_answers(task: Task, user: User) -> dict[str, object]:
     original = original_completion(task)
     definition = original["definition"]
     result = {
@@ -118,7 +119,7 @@ def _original_answers(task, user):
     fields, signatures = {}, {}
     for schema in definition.schema:
         field_id = schema["id"]
-        if field_id not in original["submission"]:
+        if not isinstance(field_id, str) or field_id not in original["submission"]:
             continue
         value = original["submission"][field_id]
         if schema["type"] == "signature":
