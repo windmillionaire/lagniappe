@@ -15,7 +15,7 @@ import yaml
 import run
 from runner import pytest_routing
 from testing.utility import (
-    traceability_common,
+    test_evidence,
     traceability_results,
 )
 
@@ -140,17 +140,17 @@ def test_traceability_snapshot_interning_round_trips_path_maps():
         },
     }
 
-    fingerprint_pairs, encoded = traceability_common.encode_test_run_snapshots(
+    fingerprint_pairs, encoded = test_evidence.encode_test_run_snapshots(
         snapshots
     )
     manifest = {
-        "schema_version": traceability_common.TEST_RUN_SCHEMA_VERSION,
+        "schema_version": test_evidence.TEST_RUN_SCHEMA_VERSION,
         "fingerprint_pairs": fingerprint_pairs,
         "snapshots": encoded,
     }
 
     assert fingerprint_pairs.count(["pkg/shared.py", "shared"]) == 1
-    assert traceability_common.decode_test_run_snapshots(manifest) == snapshots
+    assert test_evidence.decode_test_run_snapshots(manifest) == snapshots
 
 
 def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path):
@@ -160,7 +160,7 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
     workflow = tmp_path / ".github/workflows/release.yml"
     workflow.parent.mkdir(parents=True)
     workflow.write_text("name: CI\n")
-    evidence = tmp_path / traceability_common.LATEST_TEST_RUN
+    evidence = tmp_path / test_evidence.LATEST_TEST_RUN
     evidence.parent.mkdir(parents=True)
     evidence.write_text('{"tests": {}}\n')
 
@@ -175,9 +175,9 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
         )
         return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr=b"")
 
-    monkeypatch.setattr(traceability_common, "_git", fake_git)
+    monkeypatch.setattr(test_evidence, "_git", fake_git)
 
-    fingerprints = traceability_common.behavior_path_fingerprints(tmp_path)
+    fingerprints = test_evidence.behavior_path_fingerprints(tmp_path)
 
     assert "src/example.py" in fingerprints
     assert ".github/workflows/release.yml" not in fingerprints
@@ -190,13 +190,13 @@ def test_source_archive_snapshot_excludes_installed_mcp_environment(monkeypatch,
     installed.parent.mkdir(parents=True)
     source.write_text("VALUE = 1\n")
     installed.write_text("VALUE = 2\n")
-    monkeypatch.setattr(traceability_common, "_git", lambda *_a, **_kw:
+    monkeypatch.setattr(test_evidence, "_git", lambda *_a, **_kw:
                         subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"no git"))
-    fingerprints = traceability_common.behavior_path_fingerprints(tmp_path)
+    fingerprints = test_evidence.behavior_path_fingerprints(tmp_path)
     assert "mcp/server.py" in fingerprints
     assert not any(path.startswith("mcp/.venv/") for path in fingerprints)
     installed.write_text("VALUE = 3\n")
-    assert traceability_common.behavior_path_fingerprints(tmp_path) == fingerprints
+    assert test_evidence.behavior_path_fingerprints(tmp_path) == fingerprints
 
 
 def test_traceability_result_plugin_merges_focused_results_without_session_history(
@@ -296,7 +296,7 @@ def test_traceability_result_plugin_replaces_a_tests_previous_result(
     assert payload["fingerprint_pairs"] == [
         ["testing/tests_unit/test_a.py", "b"]
     ]
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-two": {"testing/tests_unit/test_a.py": "b"}
     }
     assert len(payload["sessions"]) == 1
@@ -382,7 +382,7 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
         "tests_unit/test_b.py::test_b",
     ]
     assert set(payload["snapshots"]) == {"snapshot-one", "snapshot-two"}
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-one": {"testing/tests_unit/test_a.py": "a"},
         "snapshot-two": {"testing/tests_unit/test_b.py": "b"},
     }
@@ -436,7 +436,7 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
     payload = json.loads((tmp_path / "testing/evidence/latest.json").read_text())
     assert set(payload["tests"]) == {retained_nodeid}
     assert set(payload["snapshots"]) == {"snapshot-two"}
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-two": {"testing/tests_unit/test_retained.py": "retained-current"}
     }
 
@@ -543,13 +543,13 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
     )
 
     payload = json.loads(destination.read_text())
-    assert payload["schema_version"] == traceability_common.TEST_RUN_SCHEMA_VERSION
+    assert payload["schema_version"] == test_evidence.TEST_RUN_SCHEMA_VERSION
     assert sorted(payload["tests"]) == [
         "tests_unit/test_a.py::test_a",
         "tests_unit/test_b.py::test_b",
     ]
     assert payload["fingerprint_pairs"].count(["pkg/shared.py", "shared"]) == 1
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-one": {
             "testing/tests_unit/test_a.py": "test-a",
             "pkg/shared.py": "shared",
@@ -566,7 +566,7 @@ def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     python_path.write_text(
         '"""first module note"""\n# @matrix old : behavior\ndef value():\n    """old note"""\n    return 1\n'
     )
-    python_before = traceability_common.behavior_file_fingerprint(python_path)
+    python_before = test_evidence.behavior_file_fingerprint(python_path)
     python_path.write_text(
         '"""new module note"""\n# @matrix new : behavior\ndef value():\n    """new note"""\n    return 1\n'
     )
@@ -575,14 +575,14 @@ def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     javascript_path.write_text(
         "/** @matrix old : behavior */\nexport function value() { return 'https://a.test'; }\n"
     )
-    javascript_before = traceability_common.behavior_file_fingerprint(javascript_path)
+    javascript_before = test_evidence.behavior_file_fingerprint(javascript_path)
     javascript_path.write_text(
         "// @matrix new : behavior\nexport function value() { return 'https://a.test'; }\n"
     )
 
-    assert traceability_common.behavior_file_fingerprint(python_path) == python_before
+    assert test_evidence.behavior_file_fingerprint(python_path) == python_before
     assert (
-        traceability_common.behavior_file_fingerprint(javascript_path)
+        test_evidence.behavior_file_fingerprint(javascript_path)
         == javascript_before
     )
 
@@ -591,13 +591,13 @@ def test_behavior_fingerprint_ignores_generated_build_id(tmp_path):
     constants_path = tmp_path / "config/constants.py"
     constants_path.parent.mkdir(parents=True)
     constants_path.write_text('BUILD_ID = "b0000000"\nVALUE = 1\n')
-    before = traceability_common.behavior_file_fingerprint(constants_path)
+    before = test_evidence.behavior_file_fingerprint(constants_path)
 
     constants_path.write_text('BUILD_ID = "b1234567"\nVALUE = 1\n')
-    assert traceability_common.behavior_file_fingerprint(constants_path) == before
+    assert test_evidence.behavior_file_fingerprint(constants_path) == before
 
     constants_path.write_text('BUILD_ID = "b1234567"\nVALUE = 2\n')
-    assert traceability_common.behavior_file_fingerprint(constants_path) != before
+    assert test_evidence.behavior_file_fingerprint(constants_path) != before
 
 
 def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
@@ -612,7 +612,7 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
         "    classes: font-semibold\n"
     )
 
-    before = traceability_common.behavior_path_fingerprints(tmp_path)
+    before = test_evidence.behavior_path_fingerprints(tmp_path)
     styles.write_text(
         "button:\n"
         "  submit:\n"
@@ -621,7 +621,7 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
         "  default:\n"
         "    classes: font-semibold\n"
     )
-    after = traceability_common.behavior_path_fingerprints(tmp_path)
+    after = test_evidence.behavior_path_fingerprints(tmp_path)
 
     assert before["@style/button.submit"] != after["@style/button.submit"]
     assert before["@style/label.default"] == after["@style/label.default"]

@@ -153,7 +153,7 @@ def _pytest_command(
 def _run_complete_suites(environment):
     """Keep non-browser suites serial, then coordinate the complete E2E suite."""
     from runner.pytest_reports import merge_junit_reports
-    from testing.utility.traceability_common import load_json
+    from testing.utility.test_evidence import load_json
     from testing.utility.traceability_results import _write_manifest
 
     # Each hosted execution owns its container. Historical or partial evidence
@@ -233,7 +233,7 @@ def _archive_reports(destination: Path) -> None:
 
 
 def _stamp_evidence(manifest: dict) -> None:
-    from testing.utility.traceability_common import load_json, write_json
+    from testing.utility.test_evidence import load_json, write_json
 
     evidence = load_json(EVIDENCE_PATH)
     if not evidence or evidence.get("kind") != "test-run":

@@ -12,7 +12,7 @@ import sys
 
 from testing.utility import native_js
 
-from testing.utility.traceability_common import (
+from testing.utility.test_evidence import (
     LATEST_TEST_RUN,
     TEST_RUN_SCHEMA_VERSION,
     behavior_snapshot,

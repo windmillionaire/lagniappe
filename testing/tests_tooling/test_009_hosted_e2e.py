@@ -25,7 +25,7 @@ from runner.hosted_e2e import (
     merge_remote_evidence,
     require_clean_source,
 )
-from testing.utility.traceability_common import (
+from testing.utility.test_evidence import (
     TEST_RUN_SCHEMA_VERSION,
     behavior_snapshot,
     decode_test_run_snapshots,
@@ -33,7 +33,7 @@ from testing.utility.traceability_common import (
 )
 from testing.utility import (
     hosted_e2e_job,
-    traceability_common,
+    test_evidence,
 )
 
 
@@ -526,8 +526,8 @@ def _release_evidence_repository(
     _git(repo, "config", "user.email", "hosted-release@example.test")
     source = repo / "source.py"
     source.write_text("VALUE = 1\n", encoding="utf-8")
-    evidence_path = repo / traceability_common.LATEST_TEST_RUN
-    traceability_common.write_json(evidence_path, {})
+    evidence_path = repo / test_evidence.LATEST_TEST_RUN
+    test_evidence.write_json(evidence_path, {})
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Base")
     base = _git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -555,7 +555,7 @@ def _release_evidence_repository(
     }
     if targets is not None:
         payload["provenance"]["hosted_e2e"]["targets"] = targets
-    traceability_common.write_json(evidence_path, payload)
+    test_evidence.write_json(evidence_path, payload)
     if extra_change:
         (repo / "unexpected.txt").write_text("changed\n", encoding="utf-8")
     _git(repo, "add", ".")
@@ -695,7 +695,7 @@ def test_release_rejects_passing_evidence_for_another_source_or_selection(
 
 def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):
     evidence_path = tmp_path / "latest.json"
-    traceability_common.write_json(
+    test_evidence.write_json(
         evidence_path,
         _evidence(
             "snapshot",
@@ -719,7 +719,7 @@ def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):
 
     hosted_e2e_job._stamp_evidence(manifest)
 
-    evidence = traceability_common.load_json(evidence_path)
+    evidence = test_evidence.load_json(evidence_path)
     assert evidence["provenance"]["hosted_e2e"] == manifest
 
 
@@ -1542,7 +1542,7 @@ def test_remote_evidence_merges_tests_and_snapshot_provenance():
 
 
 # @pair hosted-e2e:ci-import
-def test_traceability_common_import_does_not_require_playwright():
+def test_test_evidence_import_does_not_require_playwright():
     script = """
 import builtins
 
@@ -1554,7 +1554,7 @@ def guarded_import(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = guarded_import
-from testing.utility.traceability_common import TEST_RUN_SCHEMA_VERSION
+from testing.utility.test_evidence import TEST_RUN_SCHEMA_VERSION
 print(TEST_RUN_SCHEMA_VERSION)
 """
     result = subprocess.run(
@@ -1594,8 +1594,8 @@ def test_hosted_result_directory_import_requires_the_exact_source(
         "source_snapshot": snapshot,
         "suite": "all",
     }
-    traceability_common.write_json(result_dir / "manifest.json", manifest)
-    traceability_common.write_json(
+    test_evidence.write_json(result_dir / "manifest.json", manifest)
+    test_evidence.write_json(
         result_dir / "evidence.json",
         _evidence(
             snapshot,
@@ -1618,8 +1618,8 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr or result.stdout
     assert json.loads(result.stdout) == manifest
-    evidence = traceability_common.load_json(
-        checkout / traceability_common.LATEST_TEST_RUN
+    evidence = test_evidence.load_json(
+        checkout / test_evidence.LATEST_TEST_RUN
     )
     assert (
         evidence["tests"]["tests_e2e/test_remote.py::test_remote"]["outcome"]
@@ -1627,11 +1627,11 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     )
 
     manifest["source"] = "b" * 40
-    traceability_common.write_json(result_dir / "manifest.json", manifest)
+    test_evidence.write_json(result_dir / "manifest.json", manifest)
     result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
     assert result.returncode == 2
     assert "source does not match" in result.stdout
-    assert traceability_common.load_json(checkout / traceability_common.LATEST_TEST_RUN) == evidence
+    assert test_evidence.load_json(checkout / test_evidence.LATEST_TEST_RUN) == evidence
 
 
 # @matrix hosted-e2e traceability : evidence merge
@@ -1651,12 +1651,12 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
     source = "a" * 40
     (tmp_path / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
     snapshot, paths = behavior_snapshot(tmp_path)
-    evidence_path = tmp_path / traceability_common.LATEST_TEST_RUN
+    evidence_path = tmp_path / test_evidence.LATEST_TEST_RUN
     bare = "tests_e2e/test_live.py::test_provider"
     local = _evidence("old", {"source.py": "old"}, bare, outcome="failed")
     local["tests"][f"{bare}[removed]"] = dict(local["tests"][bare])
     local["tests"]["tests_unit/test_other.py::test_other"] = dict(local["tests"][bare])
-    traceability_common.write_json(evidence_path, local)
+    test_evidence.write_json(evidence_path, local)
     remote = _evidence(snapshot, paths, f"{bare}[live]")
     remote["exit_status"] = remote_status
     remote["tests"][f"{bare}[quota-fallback]"] = dict(remote["tests"][f"{bare}[live]"])
@@ -1668,8 +1668,8 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
     if targets:
         manifest["targets"] = [bare]
     result_dir = tmp_path / "reports/result"
-    traceability_common.write_json(result_dir / "manifest.json", manifest)
-    traceability_common.write_json(result_dir / "evidence.json", remote)
+    test_evidence.write_json(result_dir / "manifest.json", manifest)
+    test_evidence.write_json(result_dir / "evidence.json", remote)
     monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
     monkeypatch.setattr(
         hosted_e2e, "_git",
@@ -1678,7 +1678,7 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
 
     hosted_e2e.import_result_directory(result_dir)
 
-    merged = traceability_common.load_json(evidence_path)
+    merged = test_evidence.load_json(evidence_path)
     complete = suite == "all" and not status and not remote_status and not targets
     expected = set(remote["tests"]) if complete else set(local["tests"]) | set(remote["tests"])
     assert set(merged["tests"]) == expected
@@ -1699,12 +1699,12 @@ def test_source_archive_snapshot_falls_back_when_git_is_not_installed(
     def missing_git(*_arguments, **_options):
         raise FileNotFoundError("git is not installed")
 
-    monkeypatch.setattr(traceability_common.subprocess, "run", missing_git)
+    monkeypatch.setattr(test_evidence.subprocess, "run", missing_git)
 
     snapshot, paths = behavior_snapshot(tmp_path)
 
     assert len(snapshot) == 64
-    assert paths == {"source.py": traceability_common.behavior_file_fingerprint(source)}
+    assert paths == {"source.py": test_evidence.behavior_file_fingerprint(source)}
 
 
 def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
