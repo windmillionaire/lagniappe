@@ -1,5 +1,8 @@
 """Revisioned Redis caches for anonymous public discovery surfaces."""
 
+from collections.abc import Callable
+from typing import NotRequired, TypedDict, cast
+
 import json
 
 from redis.exceptions import WatchError
@@ -8,6 +11,24 @@ from lagniappe.core.exceptions import capture
 
 from .core import cache
 from .keys import Keys
+
+
+class DirectoryPage(TypedDict):
+    path: str
+    title: str
+    description: NotRequired[str | None]
+
+
+class DirectoryGroup(TypedDict):
+    id: str
+    name: str
+    pages: list[DirectoryPage]
+
+
+class DirectorySnapshot(TypedDict):
+    schema: int
+    site_indexing: bool
+    groups: list[DirectoryGroup]
 
 
 PUBLIC_DIRECTORY_SCHEMA = 1
@@ -27,7 +48,7 @@ def _sitemap_cache_key(public_manual):
 # @testable false
 # @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_public_directory
 # @reason malformed cache rejection is exercised through the public cache reader
-def _decode_directory(value):
+def _decode_directory(value: str | bytes) -> DirectorySnapshot | None:
     if isinstance(value, bytes):
         value = value.decode("utf-8")
     try:
@@ -60,14 +81,22 @@ def _decode_directory(value):
                 )
             ):
                 return None
-    return snapshot
+    return cast(DirectorySnapshot, snapshot)  # Every nested field is validated above.
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_public_directory
 # @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_sitemap
 # @reason shared revision publication is covered through both public cache APIs
-def _cached_revision(key, builder, *, ttl, encode, decode, operation):
+def _cached_revision[T: (str, DirectorySnapshot)](
+    key: str,
+    builder: Callable[[], T],
+    *,
+    ttl: int,
+    encode: Callable[[T], str],
+    decode: Callable[[str | bytes], T | None],
+    operation: str,
+) -> T:
     try:
         cached = cache.redis.get(key)
     except Exception as error:
@@ -78,9 +107,8 @@ def _cached_revision(key, builder, *, ttl, encode, decode, operation):
         if decoded is not None:
             return decoded
 
-    missing = object()
     for _attempt in range(2):
-        value = missing
+        value: T | None = None
         builder_failed = False
         try:
             with cache.redis.pipeline() as pipe:
@@ -100,7 +128,7 @@ def _cached_revision(key, builder, *, ttl, encode, decode, operation):
             if builder_failed:
                 raise
             capture(error, context={"operation": f"{operation}-publish"})
-            return value if value is not missing else builder()
+            return value if value is not None else builder()
     return builder()
 
 
@@ -108,7 +136,9 @@ def _cached_revision(key, builder, *, ttl, encode, decode, operation):
 # @tests tests_unit/test_017_cache_query.py::test_public_directory_cache_only_publishes_for_unchanged_epoch
 # @tests tests_unit/test_017_cache_query.py::test_public_directory_publish_failure_does_not_repeat_durable_build
 # @matrix cache public-directory : durable-fallback epoch json redis-failure redis-race single-rebuild ttl
-def cached_public_directory(builder):
+def cached_public_directory(
+    builder: Callable[[], DirectorySnapshot],
+) -> DirectorySnapshot:
     """Return a privacy-bounded public catalog, rebuilding it after its TTL."""
     return _cached_revision(
         Keys.PUBLIC_DIRECTORY.value,
@@ -123,7 +153,7 @@ def cached_public_directory(builder):
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_sitemap_cache_only_publishes_for_unchanged_epoch
 # @matrix cache sitemap : epoch public-manual-variant redis-race ttl
-def cached_sitemap(builder, *, public_manual=False):
+def cached_sitemap(builder: Callable[[], str], *, public_manual: bool = False) -> str:
     """Return cached XML, publishing newly built XML only for a stable epoch."""
     return _cached_revision(
         _sitemap_cache_key(public_manual),
@@ -140,7 +170,7 @@ def cached_sitemap(builder, *, public_manual=False):
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_public_discovery_invalidation_advances_epoch_and_deletes_outputs
 # @matrix cache public-directory sitemap : invalidation redis-failure shared-epoch
-def invalidate_public_discovery():
+def invalidate_public_discovery() -> bool:
     """Expire cached discovery outputs without blocking the durable mutation."""
     try:
         with cache.redis.pipeline() as pipe:

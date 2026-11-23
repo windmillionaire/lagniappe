@@ -1,5 +1,10 @@
 """Cache query operations for entity search."""
 
+from collections.abc import Collection
+from typing import Literal
+from ...restrictions import QueryHashes
+from .details import SearchRecord
+
 import re
 
 from markupsafe import Markup, escape
@@ -25,6 +30,9 @@ EXACT_LOOKUP_CANDIDATE_LIMIT = 100
 CANDIDATE_SEARCH_LIMIT = 100
 CANDIDATE_RELAXATION_MAX_TERMS = 12
 CANDIDATE_MIN_STRICT_RESULTS = 3
+
+type GroupScope = list[str] | Literal[Restriction.BELONGS_TO_ALL, Restriction.BELONGS_TO_NONE]
+
 
 STOPWORDS = frozenset(
     {
@@ -74,9 +82,9 @@ def _current_search_results(results):
     hydrated = [result if result.get("kind") == "help" else next(entities) for result in results]
     stale = [result for result in hydrated if not result.get("details")]
     keys = [
-        Search[result.get("kind")].value.format(result.get("id"))
+        Search[result.get("kind") or ""].value.format(result.get("id"))
         for result in stale
-        if Search[result.get("kind")].value and result.get("id")
+        if Search[result.get("kind") or ""].value and result.get("id")
     ]
     if keys:
         cache.delete(*keys)
@@ -307,7 +315,9 @@ def _expand_result_kinds(kinds):
 # @testable infrastructure
 # @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
 # @matrix search : empty-access permissions
-def entity_search(query_string, restrictions, belongs_to):
+def entity_search(
+    query_string: str, restrictions: QueryHashes, belongs_to: GroupScope
+) -> list[SearchRecord]:
     """Search cached entities by query string with permission filtering."""
     if Restriction.is_denied(restrictions):
         return []
@@ -350,7 +360,7 @@ def _add_models(results, project_hashes, restriction_clause):
     for result in results.docs:
         expanded_results.append(result)
         if hasattr(result, "hash") and to_append.get(result.hash):
-            for m in to_append.get(result.hash):
+            for m in to_append[result.hash]:
                 if m.id not in result_ids:
                     expanded_results.append(m)
 
@@ -361,7 +371,13 @@ def _add_models(results, project_hashes, restriction_clause):
 # @tests tests_unit/test_017_cache_query.py::test_search_queries_use_redis_cloud_compatible_tag_syntax
 # @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
 # @matrix search : empty-access permissions redis-cloud tag-syntax
-def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
+def kind_search(
+    query_string: str,
+    kind: str,
+    restrictions: QueryHashes,
+    belongs_to: GroupScope,
+    **kwargs: str | bool | None,
+) -> list[SearchRecord]:
     """Search cached entities filtered by kind and optional form type."""
     if kind == "help" or Restriction.is_denied(restrictions):
         return []
@@ -414,7 +430,16 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 # @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
 # @matrix search permissions : source-clauses pagination restricted-access
 # @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
-def search(user_query, required, belongs_to, kinds=None, page=1, limit=10, *, include_help=False):
+def search(
+    user_query: str,
+    required: QueryHashes,
+    belongs_to: GroupScope,
+    kinds: Collection[str] | None = None,
+    page: int = 1,
+    limit: int = 10,
+    *,
+    include_help: bool = False,
+) -> tuple[list[SearchRecord], int]:
     """Run a full-text search with highlighting, snippets, and pagination."""
     allow_help = include_help and (not kinds or "help" in kinds)
     if Restriction.is_denied(required) and not allow_help:
@@ -465,14 +490,14 @@ def search(user_query, required, belongs_to, kinds=None, page=1, limit=10, *, in
 # @tests tests_unit/test_017_cache_query.py::test_exact_name_search_is_bounded_permission_and_parent_scoped
 # @matrix search : exact-name parent-scope permissions bounded-query
 def exact_name_search(
-    name,
-    required,
-    belongs_to,
+    name: str,
+    required: QueryHashes,
+    belongs_to: GroupScope,
     *,
-    kinds=None,
-    parent_hash=None,
-    limit=10,
-):
+    kinds: Collection[str] | None = None,
+    parent_hash: str | None = None,
+    limit: int = 10,
+) -> list[SearchRecord]:
     """Run a bounded exact-name lookup without changing full-text ``search``."""
     if Restriction.is_denied(required):
         return []
@@ -521,8 +546,14 @@ def exact_name_search(
 # @tests tests_e2e/009_search/test_009d_ai_candidate_search.py::test_candidate_search_keeps_redis_scope_and_ranks_partial_names
 # @matrix search : candidate-ranking term-relaxation permissions bounded-query cached-details
 def candidate_search(
-    user_query, required, belongs_to, *, kinds=None, parent_hash=None, limit=10
-):
+    user_query: str,
+    required: QueryHashes,
+    belongs_to: GroupScope,
+    *,
+    kinds: Collection[str] | None = None,
+    parent_hash: str | None = None,
+    limit: int = 10,
+) -> list[SearchRecord]:
     """Return bounded AI candidates, relaxing sparse multiword searches once."""
     if Restriction.is_denied(required):
         return []

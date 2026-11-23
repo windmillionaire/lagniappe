@@ -1,5 +1,8 @@
 """Expiring Redis revision projections for durable deferred operations."""
 
+from collections.abc import Iterable, Mapping
+from typing import TypedDict
+
 import hashlib
 import time
 
@@ -7,8 +10,14 @@ from redis import WatchError
 from config.datastore import encode_urlsafe_key
 
 from .core import cache
-from .notification_state import decode_map as _decode_map
+from .notification_state import NotificationState, decode_map as _decode_map
 from .keys import Keys
+
+
+class OperationState(TypedDict):
+    revision: int
+    terminal: bool
+    verified_at: float
 
 
 OPERATION_TTL_SECONDS = 30 * 60
@@ -25,7 +34,7 @@ def _decode(value):
 
 
 # @testable infrastructure
-def _operation_id(operation):
+def _operation_id(operation: object) -> str | None:
     if isinstance(operation, str):
         return operation
     if isinstance(operation, dict):
@@ -40,7 +49,7 @@ def _operation_id(operation):
 
 
 # @testable infrastructure
-def _redis_key(operation):
+def _redis_key(operation: object) -> str:
     identifier = _operation_id(operation)
     if not identifier:
         raise ValueError("Operation state requires a deferred-job key.")
@@ -49,7 +58,7 @@ def _redis_key(operation):
 
 
 # @testable infrastructure
-def _project(raw):
+def _project(raw: Mapping[str | bytes, str | bytes] | None) -> OperationState | None:
     values = _decode_map(raw)
     if values.get("schema") != OPERATION_SCHEMA_VERSION:
         return None
@@ -66,7 +75,7 @@ def _project(raw):
 
 
 # @testable infrastructure
-def _values(operation):
+def _values(operation: object) -> tuple[int, bool]:
     if isinstance(operation, dict):
         revision = operation.get("revision", operation.get("status_revision", 0))
         terminal = operation.get("terminal")
@@ -88,7 +97,9 @@ def _values(operation):
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
 # @matrix deferred-jobs : redis-projection ttl
 # @pair polling:batching
-def peek_operation_states(operations):
+def peek_operation_states(
+    operations: Iterable[object] | None,
+) -> dict[str, OperationState | None]:
     """Read known job revisions in one Redis round trip and slide their TTLs."""
     identifiers = list(dict.fromkeys(filter(None, map(_operation_id, operations or ()))))
     if not identifiers:
@@ -108,7 +119,9 @@ def peek_operation_states(operations):
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
 # @pair deferred-jobs:ttl
-def operation_state_current(state, revision, *, now=None):
+def operation_state_current(
+    state: OperationState | None, revision: int, *, now: float | None = None
+) -> bool:
     """Return whether a cached revision is equal and recently durable."""
     if not state or state["revision"] != revision:
         return False
@@ -119,7 +132,9 @@ def operation_state_current(state, revision, *, now=None):
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_rejects_delayed_older_revision
 # @matrix deferred-jobs : concurrency redis-projection revision
-def update_operation_projection(*operations, now=None):
+def update_operation_projection(
+    *operations: object, now: float | None = None
+) -> dict[str, OperationState]:
     """Publish committed job revisions without allowing an older writer to win."""
     observed_at = time.time() if now is None else float(now)
     grouped = {}
@@ -143,7 +158,7 @@ def update_operation_projection(*operations, now=None):
                     pipe.multi()
                     if current and int(current["revision"]) > revision:
                         pipe.expire(key, OPERATION_TTL_SECONDS)
-                        state = current
+                        state: OperationState = current
                     else:
                         pipe.delete(key)
                         pipe.hset(
@@ -174,7 +189,7 @@ def update_operation_projection(*operations, now=None):
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_deletes_with_durable_job
 # @pair deferred-jobs:redis-projection
-def delete_operation_projection(*operations):
+def delete_operation_projection(*operations: object) -> None:
     """Delete cache projections for durably deleted job records."""
     keys = list(
         dict.fromkeys(
@@ -189,7 +204,9 @@ def delete_operation_projection(*operations):
 # @tests tests_unit/test_025b_operation_state.py::test_poll_state_read_batches_notifications_and_operations
 # @matrix deferred-jobs notifications : redis-projection
 # @pair polling:batching
-def peek_poll_states(user, operations):
+def peek_poll_states(
+    user: object, operations: Iterable[object] | None
+) -> tuple[NotificationState | None, dict[str, OperationState | None]]:
     """Read notification and operation projections through one Redis pipeline."""
     from .notifications import (
         NOTIFICATION_TTL_SECONDS,

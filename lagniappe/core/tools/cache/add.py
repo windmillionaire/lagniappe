@@ -1,5 +1,12 @@
 """Cache write operations for entity hash and JSON index updates."""
 
+from collections.abc import Collection
+from typing import TYPE_CHECKING, cast
+from redis.typing import EncodableT, FieldT
+
+if TYPE_CHECKING:
+    from ...entities.entity import Entity
+
 import json
 
 from .core import cache, filter_cache
@@ -39,7 +46,7 @@ end
 # @testable true
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
 # @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
-def invalidate_revisions(*entities):
+def invalidate_revisions(*entities: Entity) -> None:
     """Invalidate modified-only owners without rebuilding their relation graph."""
     owners = {entity.hash: entity for entity in entities if entity.hash}
     if not owners:
@@ -116,7 +123,7 @@ def _kind_search_score(kind):
 
 
 # @testable infrastructure
-def delete_entity_from_search(kind, entity):
+def delete_entity_from_search(kind: str, entity: Entity) -> None:
     """Delete an entity from the search index."""
     key = Search[kind].key(entity)
     if not key:
@@ -130,7 +137,7 @@ def delete_entity_from_search(kind, entity):
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_reserved_form_is_not_a_cached_permission_source
 # @matrix cache : details parent-key redis-storage search-visibility
 # @matrix permissions cache : reserved-form form-version no-extra-read
-def update(*entities, update=True):
+def update(*entities: Entity, update: bool = True) -> None:
     """Write entity data to the hash cache and update JSON indexes."""
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]
     if not cacheable:
@@ -143,7 +150,7 @@ def update(*entities, update=True):
             cache_map = dict(entity.to_cache)
             cache_map.pop("details", None)
 
-            key = Search[cache_map["kind"]].key(entity)
+            key = Search[cast(str, cache_map["kind"])].key(entity)
             if not key:
                 continue
             pipe.delete(key)
@@ -164,13 +171,14 @@ def update(*entities, update=True):
 
             if cache_map.get("keys") and cache_map.get("values"):
                 cache_map["keys"] = "|".join(
-                    _escape_pipe(k) for k in cache_map["keys"]
+                    _escape_pipe(k) for k in cast(list[str], cache_map["keys"])
                 )
                 cache_map["values"] = "|".join(
-                    _escape_pipe(v) for v in cache_map["values"]
+                    _escape_pipe(v) for v in cast(list[str], cache_map["values"])
                 )
 
-            pipe.hset(key, mapping=cache_map)
+            # Form search lists have been encoded above. All remaining Redis fields are scalar.
+            pipe.hset(key, mapping=cast(dict[FieldT, EncodableT], cache_map))
 
             if entity.hash:
                 pipe.hset(
@@ -188,7 +196,7 @@ def update(*entities, update=True):
 
 
 # @testable infrastructure
-def update_json_index(entities):
+def update_json_index(entities: Collection[Entity]) -> None:
     """Propagate entity changes to parent JSON filter indexes."""
     if not entities:
         return
@@ -204,7 +212,7 @@ def update_json_index(entities):
             parent_ops = parents.setdefault(
                 parent_hash, {"cache_key": p, "remove": [], "update": []}
             )
-            if parent_hash not in entity_hash_map[entity_hash].required:
+            if parent_hash not in cast(list[str], entity_hash_map[entity_hash].required):
                 parent_ops["remove"].append(entity_hash)
             else:
                 parent_ops["update"].append(entity_hash)
@@ -214,7 +222,7 @@ def update_json_index(entities):
     for e in entities:
         project = getattr(e, "project", None)
         if project and project.hash not in parents:
-            new_parents.setdefault(e.project.hash, []).append(e.hash)
+            new_parents.setdefault(project.hash, []).append(e.hash)
 
         categories = [c.hash for c in getattr(e, "categories", [])]
         for h in [h for h in categories if h not in parents]:

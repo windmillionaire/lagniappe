@@ -1,5 +1,8 @@
 """Revisioned Redis state for collaborative documents and presence."""
 
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import Literal, NotRequired, TypedDict, cast
+
 import hashlib
 import json
 import uuid
@@ -9,6 +12,53 @@ from redis import WatchError
 
 from .core import cache
 from .keys import Sync
+
+
+class DocumentSeed(TypedDict, total=False):
+    ydoc: str | None
+    markup: str | None
+    fingerprint: str | None
+
+
+class DocumentDelta(TypedDict):
+    revision: int
+    update: str
+    user_hash: str | None
+
+
+class DocumentState(TypedDict):
+    generation: str
+    revision: int
+    base_revision: int
+    ydoc: str | None
+    markup: str | None
+    fingerprint: str | None
+    checkpoint_author_hash: str | None
+    authors: dict[str, dict[str, str]]
+    updates: list[DocumentDelta]
+
+
+class DocumentAcknowledgement(TypedDict):
+    generation: str
+    revision: int
+    fingerprint: str | None
+    checkpoint_accepted: bool
+
+
+class DocumentPoll(TypedDict):
+    generation: str
+    revision: int
+    fingerprint: str | None
+    mode: Literal["snapshot", "delta"]
+    updates: list[DocumentDelta]
+    checkpoint_required: bool
+    ydoc: NotRequired[str | None]
+    markup: NotRequired[str | None]
+    user_hash: NotRequired[str]
+    authors: NotRequired[dict[str, dict[str, str]]]
+    users: NotRequired[list[dict[str, object]]]
+    user: NotRequired[dict[str, object]]
+    presence_digest: NotRequired[str]
 
 
 DOCUMENT_TTL_SECONDS = 300
@@ -21,7 +71,7 @@ MAX_TRANSACTION_ATTEMPTS = 8
 # @tests tests_unit/test_010b_document_append.py::test_document_write_lock_is_scoped_and_bounded
 # @matrix editor sync : document append write-lock
 @contextmanager
-def document_write_lock(sync_id):
+def document_write_lock(sync_id: str) -> Iterator[None]:
     """Serialize checkpoint preparation; durable CAS still fences expired locks."""
     with cache.redis.lock(f"{Sync.DOCUMENTS.key(sync_id)}:write", timeout=60, blocking_timeout=5):
         yield
@@ -30,7 +80,7 @@ def document_write_lock(sync_id):
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
 # @matrix editor sync : document append cache-recovery offline-replay
-def publish_document_checkpoint(sync_id, *, seed):
+def publish_document_checkpoint(sync_id: str, *, seed: DocumentSeed) -> DocumentState:
     """Reconcile a committed checkpoint, retaining any uncheckpointed CRDT work."""
     from lagniappe.core.tools.document_crdt import merge_documents
 
@@ -55,7 +105,9 @@ def publish_document_checkpoint(sync_id, *, seed):
 # @testable true
 # @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
 # @matrix editor sync : document append cache-recovery offline-replay
-def current_document_state(sync_id, *, seed, reconcile=True):
+def current_document_state(
+    sync_id: str, *, seed: DocumentSeed, reconcile: bool = True
+) -> DocumentState:
     """Read under the write lock; only reconcile a freshly loaded durable seed."""
     state = _read_document_state(sync_id, seed)
     if reconcile and state.get("fingerprint") != seed.get("fingerprint") and seed.get("ydoc"):
@@ -67,8 +119,8 @@ def current_document_state(sync_id, *, seed, reconcile=True):
 # @covered-by lagniappe/core/tools/cache/documents.py::poll_document
 # @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
 # @reason stored-state normalization is exercised through the public cache operations
-def _new_state(seed):
-    seed = dict(seed or {})
+def _new_state(seed: DocumentSeed) -> DocumentState:
+    seed = seed or {}
     return {
         "generation": str(uuid.uuid4()),
         "revision": 0,
@@ -97,7 +149,7 @@ def _decode(value):
 # @testable false
 # @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
 # @reason author projection is exercised through the public document update contract
-def _author_projection(author):
+def _author_projection(author: object) -> dict[str, str] | None:
     """Return the minimal identity needed to attribute a transient revision."""
     if not isinstance(author, dict):
         return None
@@ -114,14 +166,16 @@ def _author_projection(author):
 # @tests tests_unit/test_010_sync_cache.py::test_document_transactions_are_key_isolated_and_expiring
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
 # @matrix polling sync : concurrency document isolation ttl
-def _mutate(sync_id, seed, transform):
+def _mutate[T](
+    sync_id: str, seed: DocumentSeed, transform: Callable[[DocumentState], T]
+) -> tuple[DocumentState, T]:
     """Apply ``transform`` under an isolated optimistic document transaction."""
     document_key = Sync.DOCUMENTS.key(sync_id)
     for _attempt in range(MAX_TRANSACTION_ATTEMPTS):
         with cache.redis.pipeline() as pipe:
             try:
                 pipe.watch(document_key)
-                state = _decode(pipe.get(document_key))
+                state = cast(DocumentState | None, _decode(pipe.get(document_key)))  # The document key stores this schema.
                 if state is None:
                     state = _new_state(seed)
                 result = transform(state)
@@ -147,15 +201,17 @@ def _mutate(sync_id, seed, transform):
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_preserves_generation_created_while_loading_seed
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_seed_failure_leaves_cache_uninitialized
 # @matrix polling : concurrency document initialization read-path ttl write-amplification
-def _read_document_state(sync_id, seed):
+def _read_document_state(
+    sync_id: str, seed: DocumentSeed | Callable[[], DocumentSeed]
+) -> DocumentState:
     """Read with a sliding TTL; resolve a seed mapping or factory only on a miss."""
     document_key = Sync.DOCUMENTS.key(sync_id)
-    state = _decode(
+    state = cast(DocumentState | None, _decode(
         cache.redis.getex(
             document_key,
             ex=DOCUMENT_TTL_SECONDS,
         )
-    )
+    ))
     if state is not None:
         return state
 
@@ -204,7 +260,7 @@ def _register_presence(sync_id, client_id, user):
         for value in client_ids
     )
     raw_users = cache.hmget(Sync.CLIENTS.value, client_ids) if client_ids else []
-    users = [_decode(value) for value in raw_users if value]
+    users = [json.loads(value) for value in raw_users if value]
     users.sort(key=lambda value: value.get("client_id", ""))
     digest = hashlib.sha256(
         json.dumps(users, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -219,15 +275,15 @@ def _register_presence(sync_id, client_id, user):
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
 # @matrix polling sync : author-attribution delta document presence revision snapshot
 def poll_document(
-    sync_id,
+    sync_id: str,
     *,
-    seed,
-    client_id,
-    user,
-    generation=None,
-    revision=None,
-    presence_digest=None,
-):
+    seed: DocumentSeed | Callable[[], DocumentSeed],
+    client_id: str,
+    user: Mapping[str, object],
+    generation: str | None = None,
+    revision: int | None = None,
+    presence_digest: str | None = None,
+) -> DocumentPoll:
     """Return changes after ``revision``; ``seed`` may be a lazy fallback factory."""
     state = _read_document_state(sync_id, seed)
     users, current_presence_digest = _register_presence(
@@ -247,7 +303,7 @@ def poll_document(
         for update in state.get("updates", [])
         if int(update.get("revision") or 0) > delta_start
     ]
-    payload = {
+    payload: DocumentPoll = {
         "generation": state["generation"],
         "revision": int(state["revision"]),
         "fingerprint": state.get("fingerprint"),
@@ -260,13 +316,13 @@ def poll_document(
     if requires_snapshot:
         payload["ydoc"] = state.get("ydoc")
         payload["markup"] = state.get("markup")
-        if generation_matches and state.get("checkpoint_author_hash"):
-            payload["user_hash"] = state["checkpoint_author_hash"]
+        if generation_matches and (checkpoint_author := state.get("checkpoint_author_hash")):
+            payload["user_hash"] = checkpoint_author
     referenced_authors = {
         update.get("user_hash") for update in updates if update.get("user_hash")
     }
-    if payload.get("user_hash"):
-        referenced_authors.add(payload["user_hash"])
+    if checkpoint_author := payload.get("user_hash"):
+        referenced_authors.add(checkpoint_author)
     authors = state.get("authors", {})
     projected_authors = {
         author_hash: authors[author_hash]
@@ -291,23 +347,23 @@ def poll_document(
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
 # @matrix polling sync : author-attribution compaction concurrency document revision
 def apply_document_update(
-    sync_id,
+    sync_id: str,
     *,
-    seed,
-    generation=None,
-    revision=None,
-    update=None,
-    ydoc=None,
-    author=None,
-):
+    seed: DocumentSeed,
+    generation: str | None = None,
+    revision: int | None = None,
+    update: str | None = None,
+    ydoc: str | None = None,
+    author: Mapping[str, object] | None = None,
+) -> DocumentAcknowledgement:
     """Append one Yjs update and compact only from a current client."""
-    author = _author_projection(author)
-    author_hash = author["hash"] if author else None
+    projected_author = _author_projection(author)
+    author_hash = projected_author["hash"] if projected_author else None
 
     # @testable false
     # @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
     # @reason transaction-local state mutation is asserted through update acknowledgements
-    def transform(state):
+    def transform(state: DocumentState) -> DocumentAcknowledgement:
         previous_revision = int(state.get("revision") or 0)
         current_client = (
             generation == state.get("generation")
@@ -316,8 +372,8 @@ def apply_document_update(
         if update:
             next_revision = previous_revision + 1
             state["revision"] = next_revision
-            if author:
-                state.setdefault("authors", {})[author_hash] = author
+            if projected_author:
+                state.setdefault("authors", {})[projected_author["hash"]] = projected_author
             state.setdefault("updates", []).append(
                 {
                     "revision": next_revision,
@@ -362,7 +418,7 @@ def apply_document_update(
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_asset_refresh_keeps_live_generation
 # @matrix polling sync : document fingerprint persistence
-def update_document_asset(sync_id, *, seed):
+def update_document_asset(sync_id: str, *, seed: DocumentSeed) -> DocumentState:
     """Refresh durable document metadata without discarding live revisions."""
 
     # @testable false
@@ -380,7 +436,7 @@ def update_document_asset(sync_id, *, seed):
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_presence_close_removes_client
 # @matrix polling sync : document lifecycle presence
-def close_presence(client_id, sync_ids):
+def close_presence(client_id: str, sync_ids: Iterable[str] | None) -> None:
     """Remove a browser client from the supplied collaborative documents."""
     if not client_id:
         return
@@ -394,6 +450,6 @@ def close_presence(client_id, sync_ids):
 # @testable false
 # @covered-by lagniappe/core/mutations/executor.py::execute_post_commit
 # @reason external entity invalidation calls this one-command cache boundary
-def clear_document(sync_id):
+def clear_document(sync_id: str) -> None:
     """Discard an externally invalidated live generation."""
     cache.redis.delete(Sync.DOCUMENTS.key(sync_id))

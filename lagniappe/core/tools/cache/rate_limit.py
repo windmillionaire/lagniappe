@@ -1,15 +1,25 @@
 """Minimal Redis-backed fixed-window rate limiting helpers."""
 
+from flask import Request
+from typing import TypedDict
+
 import hashlib
 
 from .core import cache
 from .keys import Keys
 
 
+class RateLimit(TypedDict):
+    allowed: bool
+    count: int
+    remaining: int
+    retry_after: int
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/cache/rate_limit.py::check_limit
 # @reason client identifier selection is exercised through the live limiter path
-def client_ip(request):
+def client_ip(request: Request) -> str:
     """Return the most useful client IP from App Engine / proxy headers."""
     forwarded = request.headers.get("X-Forwarded-For", "")
     if forwarded:
@@ -24,7 +34,9 @@ def client_ip(request):
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
 # @matrix login : identity-platform rate-limit
-def check_limit(scope, identifier, limit, window_seconds):
+def check_limit(
+    scope: str, identifier: object, limit: int, window_seconds: int
+) -> RateLimit:
     """Increment and evaluate a fixed-window rate limit."""
     digest = hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:16]
     key = Keys.RATE_LIMIT.value.format(scope, digest)
