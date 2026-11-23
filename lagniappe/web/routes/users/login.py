@@ -381,11 +381,10 @@ def login() -> ResponseReturnValue:
         if not exists and test_user == CONFIG.ADMIN_EMAIL:
             user = Entities.USER.create({"email": test_user, "name": CONFIG.ADMIN_NAME})
             user.save()
-            exists = user.db
         elif not exists:
             abort(403, "User not registered")
-
-        user = Entities.USER(exists)
+        else:
+            user = Entities.USER(exists)
         if not user.is_test_user:
             user.is_test_user = True
             user.save()

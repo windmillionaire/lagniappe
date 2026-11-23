@@ -192,7 +192,7 @@ def add_document_image(
             return responses.error("please describe the image you'd like to generate")
 
         if isinstance(entity, Entities.PAGE):
-            page_details = entity.to_ai(user=current_user)
+            page_details: dict[str, object] = entity.to_ai(user=current_user)
         else:
             page_details = {"document": content}
 
@@ -264,15 +264,15 @@ def generate_text(
         request=Fetch.direct(),
     )
 
-    user_prompt = request.form.get("prompt")
+    user_prompt = request.form.get("prompt") or ""
     field = request.values.get("field")
 
     try:
-        context_data: dict[str, object] = dict(ai_text.document_generation_context(
+        context_data = ai_text.document_generation_context(
             entity,
-            user=current_user,
+            user=authenticated_user(),
             field=field,
-        ))
+        )
     except exceptions.ValidationError as e:
         return responses.error(str(e))
 
@@ -304,7 +304,7 @@ def list_document_history(
     )
     results = database_get.document_history(entity)
     entries = Entities.fetch(*results, request=Fetch.root()) if results else []
-    entries = Entities.DOCUMENT_HISTORY.ordered(entries)
+    entries = Entities.DOCUMENT_HISTORY.ordered(entry for entry in entries if isinstance(entry, Entities.DOCUMENT_HISTORY))
     return responses.json_response(
         {
             "entries": [entry.entry for entry in entries],

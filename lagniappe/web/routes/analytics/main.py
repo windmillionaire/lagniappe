@@ -484,8 +484,10 @@ def index() -> ResponseReturnValue:
     ]
     own_report_keys = set()
     for operation in deferred_operations:
-        report_ref = operation.get("input_refs", {}).get("report", {})
-        report_key = report_ref.get("id")
+        refs = operation.get("input_refs")
+        report_ref = refs.get("report") if isinstance(refs, dict) else None
+        if not isinstance(report_ref, dict) or not isinstance(report_key := report_ref.get("id"), str):
+            continue
         try:
             if decode_urlsafe_key(report_key).parent == current_user.key:
                 own_report_keys.add(report_key)

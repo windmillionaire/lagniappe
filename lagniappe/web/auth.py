@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from flask import Request
     from flask.typing import ResponseReturnValue
     from google.cloud.datastore import Key
-    from lagniappe.core.definitions import Action, Resource
+    from lagniappe.core.definitions import Resource
     from lagniappe.core.entities import types as models
     from lagniappe.core.entities.entity import Entity
 
@@ -36,7 +36,7 @@ from flask_login import current_user
 
 from lagniappe import CONFIG
 from uuid import uuid4
-from lagniappe.core.definitions import AI, Fetch, FetchReason
+from lagniappe.core.definitions import AI, Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
@@ -453,7 +453,7 @@ def permission[T](
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 
             if entity:
-                allowed = entity.allowed(requested, user)
+                allowed = entity.allowed(requested or Action.ALL, user)
             elif resource and user.has_permission(resource, requested):
                 allowed = True
 

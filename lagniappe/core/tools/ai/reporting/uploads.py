@@ -204,11 +204,12 @@ def finalize_report_upload_manifest(
             continue
 
         upload = upload_loader(record)
+        filename = getattr(upload, "filename", record.get("filename"))
         try:
             enforce_file_consumer(
                 upload,
                 FileConsumer.AI_REPORT,
-                filename=getattr(upload, "filename", record.get("filename")),
+                filename=filename if isinstance(filename, str) else None,
             )
         except FileConsumerLimitError as error:
             raise exceptions.ValidationError(str(error)) from error

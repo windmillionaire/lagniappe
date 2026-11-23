@@ -171,12 +171,15 @@ def authorize() -> ResponseReturnValue:
             samesite="Lax",
         )
         return response
+    client_id = pending_request["client_id"]
+    if not isinstance(client_id, str):
+        raise auth.OAuthError("invalid_request")
     return render_template(
         "oauth/connection.html",
         consent=True,
         pending=pending,
         resource=CONFIG.MCP_RESOURCE,
-        client_name=_CLIENT_NAME_BY_ID.get(pending_request["client_id"], "ChatGPT"),
+        client_name=_CLIENT_NAME_BY_ID.get(client_id, "ChatGPT"),
     )
 
 

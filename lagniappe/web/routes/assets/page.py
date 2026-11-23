@@ -99,8 +99,8 @@ def generate_page_image(
 
     page = kwargs["entity"]
 
-    generate_data: dict[str, object] = {
-        "user_prompt": request.form.get("prompt"),
+    generate_data: ai_images.ImagePromptOptions = {
+        "user_prompt": request.form.get("prompt") or "",
     }
 
     if request.form.get("info"):

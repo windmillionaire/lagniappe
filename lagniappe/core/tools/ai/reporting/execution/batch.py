@@ -146,8 +146,11 @@ class WorkingEntities(dict["Key | str | None", "Entity"]):
                 for relation in value.relations:
                     relation._invalidate_projections()
             value._mutation_intents = [
-                replace_intent(intent, entity=by_key[intent.entity.key])
-                if intent.entity is not None and intent.entity.key in by_key and by_key[intent.entity.key] is not intent.entity
+                replace_intent(intent, entity=replacement)
+                if intent.entity is not None
+                and (key := intent.entity.key) is not None
+                and (replacement := by_key.get(key)) is not None
+                and replacement is not intent.entity
                 else intent
                 for intent in value.mutation_intents
             ]
@@ -187,7 +190,7 @@ class ExecutionBatch:
             # Detached preparation can also patch a shared relationship owner.
             # Adopt its final state so the next action extends the same record.
             for intent in item.mutation_intents:
-                if intent.intent is MutationIntentType.PATCH:
+                if intent.intent is MutationIntentType.PATCH and intent.entity is not None:
                     self.workspace.remember(intent.entity)
             self.workspace.remember(item)
             self.roots[item.key] = True

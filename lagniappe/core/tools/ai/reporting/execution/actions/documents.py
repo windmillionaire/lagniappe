@@ -122,7 +122,7 @@ def _append_page_document(action, report, user, created, context):
             assert history is not None
             snapshot, receipt = replace_fragment(
                 document.ydoc, html, record["idempotency_key"],
-                previous_version=history.urlsafe_key, name=history.name,
+                previous_version=history.urlsafe_key, name="Before document replacement",
             )
         else:
             snapshot, receipt = append_fragment(

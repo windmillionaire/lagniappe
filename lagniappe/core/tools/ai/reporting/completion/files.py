@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from lagniappe.core.entities import types as models
 
 
@@ -16,6 +16,11 @@ from ...summarize import (
     can_summarize_file,
     generate_summary,
 )
+
+class ReportInputFiles(Protocol):
+    @property
+    def input_files(self) -> Sequence[models.File]: ...
+
 
 OVERSIZED_REPORT_SUMMARY = "File too large to summarize."
 
@@ -95,7 +100,7 @@ def _set_oversized_report_summary(file):
 # @matrix ai-report : issue persistence
 # @matrix ai-report : active-request fallback large-file quota search-opt-in service-tier summary-prepass unreadable-pdf
 def summarize_report_input_files(
-    report: models.AIReport,
+    report: ReportInputFiles,
     save: Callable[[models.File], object] | None = None,
     search: bool = True,
     raise_quota: bool = True,

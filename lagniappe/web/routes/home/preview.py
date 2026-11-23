@@ -6,11 +6,10 @@ if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
 
 from flask import g, request
-from flask_login import current_user
 
 from lagniappe.core.tools.links import preview as link_preview
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import internal
 
@@ -26,7 +25,7 @@ def preview() -> ResponseReturnValue:
     try:
         data = link_preview.preview_for_url(
             request.args.get("url"),
-            user=current_user,
+            user=authenticated_user(),
             base_url=request.host_url,
         )
     except link_preview.PreviewError as error:

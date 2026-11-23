@@ -188,7 +188,7 @@ def test(key: str, **kwargs: Unpack[EntityContext[Entity]]) -> ResponseReturnVal
 # @matrix filters : save saved-filter saved-filters
 @filters.route("<key>/save", methods=["POST"])
 @permission(requested=Action.EDIT)
-def save(key: str, **kwargs: Unpack[EntityContext[Entity]]) -> ResponseReturnValue:
+def save(key: str, **kwargs: Unpack[EntityContext[models.Category | models.Project]]) -> ResponseReturnValue:
     entity = kwargs["entity"]
     try:
         compiled = _compiled_from_request(entity)
@@ -366,7 +366,7 @@ def _validated_display_condition(parent, condition):
 @filters.route("/<key>/condition", methods=["GET"])
 @permission(requested=Action.VIEW)
 def condition(
-    key: str, **kwargs: Unpack[EntityContext[models.Filter]]
+    key: str, **kwargs: Unpack[EntityContext[models.Project | models.Category]]
 ) -> ResponseReturnValue:
     entity = load_route_entity(
         kwargs["entity"],
@@ -395,7 +395,10 @@ def condition(
             if str(entity_key) != str(related_entity.urlsafe_key):
                 raise FilterContractError("Filter entity is unavailable.")
             condition.field = related_entity.hash
-            updates["kind"] = condition.field.filter_kind
+            selected = condition.field
+            if selected is None:
+                raise FilterContractError("Filter field is unavailable.")
+            updates["kind"] = selected.filter_kind
             condition.entity_map[related_entity.hash] = related_entity
             condition.set_value(value, default_comparator=None)
             condition = _validated_display_condition(entity, condition)
@@ -522,7 +525,7 @@ def _filter_options_owner(condition):
 @filters.route("/<key>/options", methods=["GET"])
 @permission(requested=Action.VIEW)
 def options(
-    key: str, **kwargs: Unpack[EntityContext[models.Filter]]
+    key: str, **kwargs: Unpack[EntityContext[models.Project | models.Category]]
 ) -> ResponseReturnValue:
     entity = load_route_entity(
         kwargs["entity"],

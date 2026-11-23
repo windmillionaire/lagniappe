@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
 
 from flask import g, request
-from flask_login import current_user
 
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.definitions import MessageConflict, MessageRevisionConflict
@@ -46,7 +45,7 @@ def conversations() -> ResponseReturnValue:
     _managed_only()
     g.NO_CACHE = True
     return responses.json_response(
-        message_views.conversations(current_user, request.args.get("cursor"))
+        message_views.conversations(authenticated_user(), request.args.get("cursor"))
     )
 
 
@@ -58,7 +57,7 @@ def history(key: str) -> ResponseReturnValue:
     g.NO_CACHE = True
     try:
         payload = message_views.conversation_history(
-            current_user,
+            authenticated_user(),
             key,
             request.args.get("cursor"),
         )
@@ -74,11 +73,11 @@ def clear_modal(key: str) -> ResponseReturnValue:
     _managed_only()
     g.NO_CACHE = True
     try:
-        conversation = message_views.get_conversation(current_user, key)
+        conversation = message_views.get_conversation(authenticated_user(), key)
     except PermissionError:
         return responses.json_response({"error": "Conversation not found."}, 404)
     peer_name = message_views.serialize_conversation(
-        conversation, current_user
+        conversation, authenticated_user()
     )["peer"]["name"]
     return responses.message_clear_modal(key, peer_name=peer_name)
 
@@ -90,10 +89,10 @@ def send() -> ResponseReturnValue:
     _managed_only()
     try:
         payload = message_service.send_message(
-            current_user,
-            request.form.get("recipient"),
-            request.form.get("body"),
-            request.form.get("operation_id"),
+            authenticated_user(),
+            request.form.get("recipient", ""),
+            request.form.get("body", ""),
+            request.form.get("operation_id", ""),
             request.form.get("conversation"),
         )
     except PermissionError as error:
@@ -113,7 +112,7 @@ def read(key: str) -> ResponseReturnValue:
     revision = request.form.get("revision")
     try:
         conversation = message_service.mark_read(
-            current_user,
+            authenticated_user(),
             key,
             expected_revision=int(revision) if revision else None,
         )
@@ -132,7 +131,7 @@ def read(key: str) -> ResponseReturnValue:
 def hide_message(key: str) -> ResponseReturnValue:
     _managed_only()
     try:
-        found = message_service.hide_message(current_user, key)
+        found = message_service.hide_message(authenticated_user(), key)
     except PermissionError:
         return responses.json_response({"error": "Message not found."}, 404)
     if not found:
@@ -146,7 +145,7 @@ def hide_message(key: str) -> ResponseReturnValue:
 def clear(key: str) -> ResponseReturnValue:
     _managed_only()
     try:
-        conversation = message_service.clear_conversation(current_user, key)
+        conversation = message_service.clear_conversation(authenticated_user(), key)
     except (PermissionError, ValueError):
         return responses.json_response({"error": "Conversation not found."}, 404)
     return responses.json_response({"conversation": conversation})

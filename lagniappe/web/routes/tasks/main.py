@@ -52,6 +52,7 @@ from lagniappe.web.auth import (
     permission,
     require_ai_access,
 )
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web import deferred_autofill
@@ -93,7 +94,7 @@ def task_index() -> ResponseReturnValue:
 @tasks.route("/rows", methods=["GET"])
 @logged_in
 def rows() -> ResponseReturnValue:
-    task_index = index.TaskIndex(**request.values)
+    task_index = index.TaskIndex(undated=bool(request.values.get("undated")), **pagination_options())
     tasks = task_index.tasks
 
     return responses.rows(tasks, task_index)
@@ -144,8 +145,12 @@ def settings(
 def view(key: str, **kwargs: Unpack[EntityContext[models.Task]]) -> ResponseReturnValue:
     task = kwargs["entity"]
     page = Entities.fetch_one(task.page, request=Fetch.direct())
+    if not isinstance(page, Entities.PAGE):
+        return responses.not_found("Page not found")
     if not page.allowed(Action.VIEW) and task.is_assigned_to(current_user):
         page = Entities.fetch_one(current_user.page, request=Fetch.direct())
+        if not isinstance(page, Entities.PAGE):
+            return responses.not_found("Page not found")
 
     _load_page_settings_relations(
         page, restrictions=Resource.USER.allowed(Action.PERMISSIONS)
@@ -219,7 +224,7 @@ def combine(
         abort(404)
 
     if request.method == "GET":
-        compatible = task_combine.compatible_tasks(task, page, current_user)
+        compatible = task_combine.compatible_tasks(task, page, authenticated_user())
         return responses.task_combine_form(task, compatible)
 
     try:
@@ -549,7 +554,7 @@ def task_data(
             return (file.has_references and file.allowed(Action.VIEW, user=current_user)) or any(
                 valid_task_attachment_claim(
                     claim,
-                    actor=current_user,
+                    actor=authenticated_user(),
                     file=file,
                     scope=scope,
                 )
@@ -596,7 +601,7 @@ def upload_file(
 
     scope = kwargs["entity"]
     attachment_claim = sign_task_attachment_claim(
-        actor=current_user,
+        actor=authenticated_user(),
         file=file,
         scope=scope,
     )
@@ -687,7 +692,10 @@ def update(
     update_data = None
     if "TaskSettings" in active:
         try:
-            update_data = task_data(request, task.page, task)
+            page = task.page
+            if page is None:
+                return responses.error("The task page is no longer available.")
+            update_data = task_data(request, page, task)
         except exceptions.ValidationError as error:
             return responses.error(str(error))
 

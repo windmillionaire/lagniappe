@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
+    from lagniappe.core.tools.ai.form_draft import FormDraft
     from lagniappe.core.entities import types as models
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
@@ -26,6 +27,7 @@ from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import authenticated_user, load_route_entity, permission, require_ai_access
 
 from . import forms
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses, direct_uploads
 
 
@@ -123,7 +125,7 @@ def form_index() -> ResponseReturnValue:
 @forms.route("/rows", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
 def rows() -> ResponseReturnValue:
-    form_index = index.FormIndex(**request.values)
+    form_index = index.FormIndex(**pagination_options())
     forms = form_index.forms
 
     return responses.rows(forms, form_index)
@@ -390,11 +392,14 @@ def create_schema() -> ResponseReturnValue:
         revision = int(request.form.get("draft_revision", "-1"))
         if not isinstance(request_id, str) or not form_drafts.IMAGE_ID.fullmatch(request_id) or revision < 0:
             raise exceptions.ValidationError("Generation needs a valid draft request identity.")
-        draft = {"schema": schema, "html_fields": html_fields}
-        prompt = ai_schema.form_generation_prompt(form.form_type, description=description, draft=draft)
+        draft: FormDraft = {"schema": schema, "html_fields": html_fields}
+        form_type = form.form_type
+        if form_type is None:
+            raise exceptions.ValidationError("The Form type is unavailable.")
+        prompt = ai_schema.form_generation_prompt(form_type, description=description, draft=dict(draft))
         sources = _draft_image_sources(form, html_fields)
         result = ai_schema.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
-            value, draft, form_type=form.form_type, image_sources=sources,
+            value, draft, form_type=form_type, image_sources=sources,
         ))
         current = Entities.fetch_one(form.key, request=Fetch.direct())
         if current is None or not current.allowed(Action.EDIT, user=current_user):

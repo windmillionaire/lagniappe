@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.model_task import ModelTaskData
     from lagniappe.core.entities import types as models
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
@@ -32,7 +33,7 @@ from . import projects
 # @reason form parsing helper owned by model-task create/update routes
 def create_update_data(
     form: MultiDict[str, str], model_task: models.ModelTask | None = None
-) -> dict[str, object]:
+) -> ModelTaskData:
     form_id = form.get("form")
     current_form = model_task.form if model_task else None
     selected_form = SubmittedReferenceResolver(authenticated_user(), form_id).one(
@@ -46,7 +47,7 @@ def create_update_data(
         Action.VIEW, user=current_user
     ):
         selected_form = current_form
-    data = {
+    data: ModelTaskData = {
         "name": form.get("name"),
         "form": selected_form,
     }

@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
+    from werkzeug.datastructures import MultiDict
+    from lagniappe.core.entities.category import CategoryData
     from lagniappe.core.entities import types as models
     from lagniappe.core.entities.entity import Entity
     from lagniappe.web.auth import EntityContext
@@ -24,6 +26,7 @@ from lagniappe.core.definitions import (
     Resource,
 )
 from lagniappe.web.auth import authenticated_user, permission, require_ai_access
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses
 from lagniappe.core.tools.diagnostics import timed
 
@@ -45,7 +48,7 @@ def index(
 
     filters.FilterCache(category).update()
 
-    category_index = category.index(**request.values)
+    category_index = category.index(**pagination_options())
     pages = category_index.pages
 
     return responses.index("categories", category_index, pages=pages)
@@ -61,7 +64,7 @@ def rows(
 ) -> ResponseReturnValue:
     category = kwargs["entity"]
 
-    category_index = category.index(**request.values)
+    category_index = category.index(**pagination_options())
     pages = category_index.pages
 
     return responses.rows(pages, category_index)
@@ -81,7 +84,7 @@ def info(
 # @covered-by lagniappe/web/routes/categories/main.py::create
 # @covered-by lagniappe/web/routes/categories/main.py::update
 # @reason form parsing helper owned by category create/update routes
-def _category_data(form, category=None):
+def _category_data(form: MultiDict[str, str], category: models.Category | None = None) -> CategoryData:
     form_key = form.get("form")
     current_form = category.form if category else None
     selected_form = SubmittedReferenceResolver(authenticated_user(), form_key).one(
@@ -126,7 +129,7 @@ def update(
 # @testable false
 # @covered-by lagniappe/web/routes/categories/main.py::create
 # @reason AI response shaping is exercised through the category create route
-def _generate_category(generated_data):
+def _generate_category(generated_data: ai_category.GeneratedCategory) -> CategoryData:
     if generated_data.get("form_schema"):
         create_form_data = {
             "name": generated_data.get("form_name"),
@@ -137,7 +140,7 @@ def _generate_category(generated_data):
     else:
         form = None
 
-    category_data = {
+    category_data: CategoryData = {
         "name": generated_data.get("category_name"),
         "description": generated_data.get("category_description"),
         "form": form,
@@ -161,7 +164,7 @@ def create() -> ResponseReturnValue:
 
     if generate:
         require_ai_access(AI.CREATE)
-        prompt = ai_category.category_creation_prompt(request.form.get("user_description"))
+        prompt = ai_category.category_creation_prompt(request.form.get("user_description") or "")
         try:
             results = ai_category.generate_category(prompt)
             generated_data = _generate_category(results)
@@ -170,12 +173,13 @@ def create() -> ResponseReturnValue:
 
         category = Entities.CATEGORY().create(generated_data)
         category.ai_generated = True
-        category.add_mutation_intents(
-            MutationIntent.standard(
-                category.form,
-                reason="generated-category-form",
+        if category.form is not None:
+            category.add_mutation_intents(
+                MutationIntent.standard(
+                    category.form,
+                    reason="generated-category-form",
+                )
             )
-        )
     else:
         try:
             category = Entities.CATEGORY().create(_category_data(request.form))

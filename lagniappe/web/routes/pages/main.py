@@ -317,7 +317,7 @@ def _apply_user_settings_update(page, page_data, user=None):
 def _offline_update_notification(page):
     notification = Entities.NOTIFICATION.create(
         {
-            "parent": current_user,
+            "parent": authenticated_user(),
             "target": page,
             "body": "Offline page update synced.",
         }

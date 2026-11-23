@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.note import NoteCreation
 
 from flask import abort, request, g, make_response
 
@@ -33,7 +34,7 @@ from . import home, internal
 @home.route("/")
 @home_permission(anonymous_endpoint="home.public_directory")
 def home_page() -> ResponseReturnValue:
-    home = Entities.HOME(user=current_user._get_current_object())
+    home = Entities.HOME(user=authenticated_user())
     return responses.home_page(home)
 
 
@@ -49,7 +50,7 @@ def home_page() -> ResponseReturnValue:
 def get(kind: str) -> ResponseReturnValue:
     if kind == "tools" and getattr(current_user, "is_public", False):
         abort(403)
-    home = Entities.HOME(user=current_user._get_current_object())
+    home = Entities.HOME(user=authenticated_user())
     section = home.section(kind, cursor=request.args.get("cursor"))
     if kind == "tools":
         render_operation_statuses(section.list, current_user)
@@ -72,7 +73,7 @@ def get(kind: str) -> ResponseReturnValue:
 @internal.route("/activity")
 @home_permission()
 def activity() -> ResponseReturnValue:
-    home = Entities.HOME(user=current_user._get_current_object())
+    home = Entities.HOME(user=authenticated_user())
     return responses.activity(home.section("notes"))
 
 
@@ -131,9 +132,9 @@ def notifications() -> ResponseReturnValue:
 @logged_in
 def clear_notifications() -> ResponseReturnValue:
     notification_keys = database_notifications.notification_keys(authenticated_user())
-    notification_service.clear_ordinary_notifications(current_user, notification_keys)
+    notification_service.clear_ordinary_notifications(authenticated_user(), notification_keys)
     aggregate = database_notifications.get_notification_aggregate(authenticated_user())
-    notification_service.publish_notification_aggregate(current_user, aggregate)
+    notification_service.publish_notification_aggregate(authenticated_user(), aggregate)
 
     return responses.ok()
 
@@ -159,9 +160,10 @@ def create_note() -> ResponseReturnValue:
     if visibility == "everyone" and not Resource.SITE.allowed(Action.EDIT):
         abort(403)
 
-    note_data = {
-        "parent": current_user,
-        "user": current_user,
+    actor = authenticated_user()
+    note_data: NoteCreation = {
+        "parent": actor,
+        "user": actor,
         "body": body,
         "photo": photo if has_photo else None,
         "visibility": visibility,
@@ -195,9 +197,11 @@ def delete_activity(key: str) -> ResponseReturnValue:
     if activity.kind == "notification":
         if activity.notification_type != "ordinary":
             abort(403)
-        notification_service.delete_ordinary_notification(current_user, activity.key)
+        if activity.key is None:
+            return responses.not_found("Activity item not found")
+        notification_service.delete_ordinary_notification(authenticated_user(), activity.key)
         aggregate = database_notifications.get_notification_aggregate(authenticated_user())
-        notification_service.publish_notification_aggregate(current_user, aggregate)
+        notification_service.publish_notification_aggregate(authenticated_user(), aggregate)
     else:
         Entities.delete(activity)
 

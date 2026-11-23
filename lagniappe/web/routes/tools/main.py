@@ -228,8 +228,8 @@ def _start_tool_report(
     input_files = list(input_files or [])
     report = Entities.REPORT.create(
         {
-            "parent": current_user,
-            "user": current_user,
+            "parent": authenticated_user(),
+            "user": authenticated_user(),
             "name": request.form.get("name") or default_name,
             "instructions": instructions,
             "input_files": input_files,
@@ -464,9 +464,9 @@ def revise_report(key: str) -> ResponseReturnValue:
     if correcting:
         from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction
         source = report
-        report = Entities.REPORT.create({"user": authenticated_user(), "name": "Correction: " + source.name, "instructions": feedback, "origin": "web"})
+        report = Entities.REPORT.create({"user": authenticated_user(), "name": "Correction: " + (source.name or "Report"), "instructions": feedback, "origin": "web"})
         try:
-            link_correction(report, source, current_user)
+            link_correction(report, source, authenticated_user())
             save_correction(report, source)
         except exceptions.ValidationError as error:
             return responses.error(str(error))
@@ -595,5 +595,5 @@ def delete_executed_reports() -> ResponseReturnValue:
     ):
         return responses.error("Provide the report keys to delete.")
     return responses.json_response(
-        report_history.delete_executed_reports(current_user, keys)
+        report_history.delete_executed_reports(authenticated_user(), keys)
     )

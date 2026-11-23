@@ -16,7 +16,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.web import responses
-from lagniappe.web.auth import permission
+from lagniappe.web.auth import authenticated_user, permission
 
 from . import pages
 
@@ -71,7 +71,7 @@ def create_note(
     note = Entities.NOTE.create(
         {
             "parent": page,
-            "user": current_user,
+            "user": authenticated_user(),
             "body": body,
             "photo": photo if has_photo else None,
             "visibility": visibility,

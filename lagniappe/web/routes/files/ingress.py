@@ -99,6 +99,8 @@ def ingress_stage(
         else request.args.get("stage")
     )
     try:
+        if not isinstance(target, str):
+            raise ValueError(f"Invalid stage: {target}")
         IngressService(file).navigate(target)
     except IngressError as error:
         return responses.json_response({"error": str(error)}, 409)

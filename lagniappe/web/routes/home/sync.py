@@ -116,7 +116,7 @@ def _sync_document(update, entity):
             seed=_document_seed(entity),
         )
         mentions.deliver_mentions(
-            current_user,
+            authenticated_user(),
             entity,
             update.get("html") or "",
             update.get("mentions") or [],

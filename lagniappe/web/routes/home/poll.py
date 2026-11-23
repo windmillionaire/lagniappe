@@ -17,8 +17,8 @@ from lagniappe.core.tools import cache
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
 from lagniappe.core.tools.polling.contract import (
-    POLL_TYPES,
     PollContractError,
+    PollRequest,
     parse_poll_request,
 )
 from lagniappe.core.tools.polling.projections import (
@@ -65,7 +65,7 @@ def _poll_context():
         "context_keys": tuple(set(database_utility.site_fingerprint_keys(paths).values())),
         "context_entity_keys": tuple(dict.fromkeys(
             descriptor["key"] for descriptor in descriptors
-            if descriptor["type"] in {"entity", "form-lock", "document", "ingress"}
+            if descriptor["type"] != "channel" and descriptor["type"] != "operation"
         )),
     }
 
@@ -183,7 +183,9 @@ def _document_result(descriptor, entity, client_id):
 def poll() -> ResponseReturnValue:
     """Resolve every due browser subscription through one typed contract."""
     try:
-        parsed = g.get("poll_request") or parse_poll_request(request.get_json(silent=True))
+        parsed = g.get("poll_request")
+        if not isinstance(parsed, PollRequest):
+            parsed = parse_poll_request(request.get_json(silent=True))
     except PollContractError as error:
         return responses.json_response(
             {
@@ -201,20 +203,11 @@ def poll() -> ResponseReturnValue:
     if closed_documents:
         cache.close_presence(client_id, closed_documents)
 
-    grouped = {
-        subscription_type: [
-            descriptor
-            for descriptor in descriptors
-            if descriptor["type"] == subscription_type
-        ]
-        for subscription_type in POLL_TYPES
-    }
-
     entity_keys = [
-        descriptor["key"]
-        for subscription_type in ("entity", "form-lock", "document", "ingress")
-        for descriptor in grouped[subscription_type]
+        descriptor["key"] for descriptor in descriptors
+        if descriptor["type"] != "channel" and descriptor["type"] != "operation"
     ]
+    operations = [descriptor for descriptor in descriptors if descriptor["type"] == "operation"]
     prefetched = g.get("request_context_entities")
     entities = (
         {key: prefetched[key] for key in entity_keys if key in prefetched}
@@ -231,7 +224,7 @@ def poll() -> ResponseReturnValue:
         request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
     )
     lock_entities = [
-        entities.get(descriptor["key"]) for descriptor in grouped["form-lock"]
+        entities.get(descriptor["key"]) for descriptor in descriptors if descriptor["type"] == "form-lock"
     ]
     lock_entities = [
         entity
@@ -245,11 +238,11 @@ def poll() -> ResponseReturnValue:
     notification_polled = notification_request is not None
     notification_state = None
     prefetched_operation_states = None
-    if grouped["operation"] and notification_polled:
+    if operations and notification_polled:
         try:
             notification_state, prefetched_operation_states = cache.peek_poll_states(
                 current_user,
-                [descriptor["key"] for descriptor in grouped["operation"]],
+                [descriptor["key"] for descriptor in operations],
             )
         except Exception as error:
             prefetched_operation_states = {}
@@ -257,7 +250,7 @@ def poll() -> ResponseReturnValue:
 
     operation_statuses, unchanged_operations = (
         _operation_statuses(
-            grouped["operation"],
+            operations,
             current_user,
             state_loader=(
                 (
@@ -269,7 +262,7 @@ def poll() -> ResponseReturnValue:
                 else cache.peek_operation_states
             ),
         )
-        if grouped["operation"]
+        if operations
         else ({}, set())
     )
 
@@ -277,7 +270,7 @@ def poll() -> ResponseReturnValue:
         try:
             if prefetched_operation_states is None:
                 notification_state = cache.peek_notification_state(current_user)
-            if notification_state is None and notification_request["seed"]:
+            if notification_state is None and notification_request and notification_request["seed"]:
                 notification_state = cache.seed_notification_state(current_user)
             responses.publish_notification_state(notification_state)
         except Exception as error:
@@ -286,7 +279,7 @@ def poll() -> ResponseReturnValue:
                 context={"operation": "poll_notification_state"},
             )
 
-    channels = [descriptor["channel"] for descriptor in grouped["channel"]]
+    channels = [descriptor["channel"] for descriptor in descriptors if descriptor["type"] == "channel"]
     channel_revisions = _channel_revisions(
         channels,
         current_user,
@@ -299,33 +292,32 @@ def poll() -> ResponseReturnValue:
     results = []
     for descriptor in descriptors:
         try:
-            subscription_type = descriptor["type"]
-            if subscription_type == "entity":
+            if descriptor["type"] == "entity":
                 result = _entity_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                 )
-            elif subscription_type == "ingress":
+            elif descriptor["type"] == "ingress":
                 result = _entity_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                     ingress=True,
                 )
-            elif subscription_type == "form-lock":
+            elif descriptor["type"] == "form-lock":
                 result = _project_lock_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                     active_locks,
                     user=current_user,
                 )
-            elif subscription_type == "channel":
+            elif descriptor["type"] == "channel":
                 revision = channel_revisions[descriptor["channel"]]
                 result = _revision_result(
                     descriptor,
                     revision,
                     {"refresh": True},
                 )
-            elif subscription_type == "operation":
+            elif descriptor["type"] == "operation":
                 if descriptor["key"] in unchanged_operations:
                     result = _result(
                         descriptor,

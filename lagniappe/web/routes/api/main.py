@@ -853,6 +853,7 @@ def get_plan_contract(plan_id: str) -> ResponseReturnValue:
         **({"view": request.args["view"]} if "view" in request.args else {}),
         execution_allowed=_experiments_execution_allowed(),
     )
+    payload_sizes = contract.get("payload_sizes")
     LOGGER.info(
         "agent_api_contract request_id=%s user_hash=%s plan=%s "
         "contract_bytes=%d proposal_schema_bytes=%d",
@@ -860,7 +861,7 @@ def get_plan_contract(plan_id: str) -> ResponseReturnValue:
         g.agent_api_user.hash,
         report.hash,
         len(json.dumps(contract, ensure_ascii=False, default=str).encode("utf-8")),
-        (contract.get("payload_sizes") or {}).get("proposal_schema_bytes", 0),
+        payload_sizes.get("proposal_schema_bytes", 0) if isinstance(payload_sizes, dict) else 0,
     )
     return contract
 

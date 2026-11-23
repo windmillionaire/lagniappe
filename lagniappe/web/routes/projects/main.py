@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
@@ -8,6 +8,9 @@ if TYPE_CHECKING:
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
     from werkzeug.datastructures import MultiDict
+
+from lagniappe.core.entities.project import ProjectData
+from lagniappe.core.entities.model_task import ModelTaskData
 
 from flask import abort, request
 
@@ -63,7 +66,7 @@ def info(
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
 # @matrix projects : create-manual
-def create_update_data(form: MultiDict[str, str]) -> dict[str, str | None]:
+def create_update_data(form: MultiDict[str, str]) -> ProjectData:
     return {
         "name": form.get("name"),
         "description": form.get("description"),
@@ -88,18 +91,32 @@ def update(
     return responses.project_info(project)
 
 
+class _GeneratedForm(TypedDict):
+    name: str | None
+    schema: object
+    form_type: str
+
+
+class _GeneratedModelTask(ModelTaskData, total=False):
+    form_data: _GeneratedForm
+
+
+class _GeneratedProject(ProjectData):
+    model_tasks: list[_GeneratedModelTask]
+
+
 # @testable false
 # @covered-by lagniappe/web/routes/projects/main.py::create
 # @reason AI response shaping is exercised through the project create route
-def _create_project(generated_data):
-    project_data = {
+def _create_project(generated_data: ai_project.GeneratedProject) -> _GeneratedProject:
+    project_data: _GeneratedProject = {
         "name": generated_data.get("project_name"),
         "description": generated_data.get("project_description"),
         "model_tasks": [],
     }
 
     for model_task in generated_data.get("model_tasks"):
-        new_model_task_data = {
+        new_model_task_data: _GeneratedModelTask = {
             "name": model_task.get("name"),
         }
         project_data["model_tasks"].append(new_model_task_data)
@@ -108,7 +125,7 @@ def _create_project(generated_data):
             new_model_task_data["form_data"] = {
                 "name": model_task.get("name"),
                 "schema": model_task.get("form_schema"),
-                "form-type": "task",
+                "form_type": "task",
             }
 
     return project_data
@@ -127,7 +144,7 @@ def create() -> ResponseReturnValue:
 
     if generate:
         require_ai_access(AI.CREATE)
-        prompt = ai_project.project_creation_prompt(request.form.get("user_description"))
+        prompt = ai_project.project_creation_prompt(request.form.get("user_description") or "")
         try:
             generated_data = ai_project.generate_project(prompt)
         except (exceptions.AIException, Exception) as e:
@@ -145,12 +162,11 @@ def create() -> ResponseReturnValue:
                     reason="generated-project-model-task",
                 )
             )
-            if model_task.get("form_data"):
-                form_data = model_task.get("form_data")
+            if form_data := model_task.get("form_data"):
                 form = Entities.FORM.create(
                     {
                         "name": form_data.get("name"),
-                        "form-type": form_data.get("form-type"),
+                        "form-type": form_data["form_type"],
                     }
                 )
                 form.properties.schema.validate_ai(form_data.get("schema"))

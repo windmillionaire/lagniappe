@@ -26,7 +26,10 @@ from . import users
 @users.route("/create-group", methods=["POST"])
 @permission(Resource.USER_GROUPS, Action.CREATE)
 def create_group() -> ResponseReturnValue:
-    group = Entities.USER_GROUP.create(request.form.get("name"))
+    name = request.form.get("name")
+    if not name:
+        return responses.error("A group name is required.")
+    group = Entities.USER_GROUP.create(name)
     Entities.save(group)
 
     return responses.create_group(group)

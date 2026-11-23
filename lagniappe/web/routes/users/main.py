@@ -18,6 +18,7 @@ from lagniappe.core.entities import Entities, index
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.tools.services import identity_platform
 from lagniappe.web.auth import permission
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses
 
 from . import users
@@ -44,7 +45,7 @@ def user_index() -> ResponseReturnValue:
 @users.route("/rows", methods=["GET"])
 @permission(Resource.USERS, Action.VIEW)
 def rows() -> ResponseReturnValue:
-    user_index = index.UserIndex(**request.values)
+    user_index = index.UserIndex(**pagination_options())
     users = user_index.users
 
     return responses.rows(users, user_index)

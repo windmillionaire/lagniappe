@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
     from lagniappe.core.entities import types as models
     from lagniappe.core.entities.index import Index
-    from lagniappe.core.properties.base_property import Property
+    from lagniappe.core.properties.form_table import Table
     from lagniappe.core.properties.home import HomeProperty, TaskList
     from lagniappe.core.tools.cache.notification_state import NotificationState
     from lagniappe.core.tools.files.ranges import ByteRange
@@ -399,11 +399,12 @@ def form_submission(
         if not isinstance(fields, list):
             raise exceptions.ValidationError("Invalid submission schema")
         for schema_field in fields:
-            if schema_field["id"] not in values:
+            field_id = schema_field["id"]
+            if not isinstance(field_id, str) or field_id not in values:
                 continue
             field = SchemaFields.create_field(schema_field, entity)
             if field is not None:
-                field.db_value = values[schema_field["id"]]
+                field.db_value = values[field_id]
                 if field.form_value is not None:
                     submission[field.id] = field.form_value
     else:
@@ -426,7 +427,7 @@ def form_submission(
     }), 200
 
 
-def expanded_table_cell(field: Property) -> tuple[Response, int]:
+def expanded_table_cell(field: Table) -> tuple[Response, int]:
     return jsonify(
         {"schema": field, "submission": field.form_value, "kind": field.kind}
     ), 200
@@ -768,10 +769,11 @@ def tool_report(report: models.AIReport) -> tuple[str, int]:
         return render_template("tools/report.html", report=report), 200
     render_operation_statuses((report,), current_user)
     from lagniappe.core.tools.ai.reporting.schema_updates import report_impact, migration_pending
+    from lagniappe.web.auth import authenticated_user
 
     page = max(1, request.args.get("schema_page", 1, type=int))
     return render_template("tools/report.html", report=report,
-                           schema_impacts=report_impact(report, current_user, page=page),
+                           schema_impacts=report_impact(report, authenticated_user(), page=page),
                            migration_pending=migration_pending(report)), 200
 
 
@@ -904,7 +906,9 @@ def home_section(section: HomeProperty) -> tuple[str, int] | None:
 # @covered-by lagniappe/web/routes/tasks/main.py::update
 # @reason route response adapter is exercised through its owning task mutation
 def home_task_list() -> tuple[str, int]:
-    home = Entities.HOME(user=current_user._get_current_object())
+    from lagniappe.web.auth import authenticated_user
+
+    home = Entities.HOME(user=authenticated_user())
     template = get_template_attribute("home/tasks.html", "list")
     task_list_html = template(home.section("tasks"))
 
@@ -1168,7 +1172,7 @@ def delete_entity(
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
 # @matrix manual : canonical-url metadata search-discovery section-navigation
-def manual_index(section: str, index: Iterable[Mapping[str, object]]) -> Response:
+def manual_index(section: str, index: Iterable[Mapping[str, str]]) -> Response:
     from lagniappe.core.tools.site import public_pages
 
     if section not in VALID_MANUAL_SECTIONS:

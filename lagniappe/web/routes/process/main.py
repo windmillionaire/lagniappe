@@ -144,10 +144,11 @@ def notification_email_delivery() -> ResponseReturnValue:
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if set(payload) != {"delivery_key"} or not payload.get("delivery_key"):
+    delivery_key = payload.get("delivery_key")
+    if set(payload) != {"delivery_key"} or not isinstance(delivery_key, str) or not delivery_key:
         return jsonify({"success": False, "error": "Invalid email payload."}), 400
     try:
-        result = email_delivery.deliver(payload["delivery_key"])
+        result = email_delivery.deliver(delivery_key)
     except NotificationEmailError as error:
         return jsonify({"success": False, "error": str(error)}), 503
     except Exception as error:
@@ -195,9 +196,10 @@ def uncomplete_task() -> ResponseReturnValue:
                 and token == task.scheduled_uncomplete_token
             )
         else:
+            next_due = payload.get("next_due_date")
             expected_due = (
-                dates.utc_date_string_to_utc_datetime(payload["next_due_date"])
-                if payload.get("next_due_date")
+                dates.utc_date_string_to_utc_datetime(next_due)
+                if isinstance(next_due, str) and next_due
                 else None
             )
             valid = bool(
@@ -248,7 +250,10 @@ def update_cache() -> ResponseReturnValue:
     entity = None
 
     try:
-        user = Entities.USER(payload.get("user_key"))
+        user_key = payload.get("user_key")
+        if user_key is not None and not isinstance(user_key, str):
+            raise ValueError("Invalid user key.")
+        user = Entities.USER(user_key)
         entity = Entities.fetch_one(
             entity_key,
             request=Fetch.direct(),
@@ -307,8 +312,9 @@ def ingress() -> ResponseReturnValue:
             return jsonify({"success": True}), 200
 
         if outcome.state == "completed":
+            user_key = payload.get("user_key")
             create_process_notification(
-                payload,
+                {"user_key": user_key} if isinstance(user_key, str) else {},
                 f"Data import complete for {file.name}",
             )
         elif outcome.dispatch_next:

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
 
-from types import SimpleNamespace
+from dataclasses import dataclass
 
 from flask import request
 from flask_login import current_user
@@ -161,14 +161,19 @@ def _page_upload_data(upload, multiple_uploads=False, batch_summarize=False):
     return data
 
 
+@dataclass
+class _PageUploadBatch:
+    input_files: list[models.File]
+
+
 # @testable false
 # @covered-by lagniappe/web/routes/files/main.py::upload
 # @reason batch summaries reuse the organize prepass and are route-local glue
-def _summarize_page_uploads(files):
+def _summarize_page_uploads(files: list[models.File]) -> list[models.File]:
     if len(files) <= 1 or request.form.get("summarize") is None:
         return []
 
-    report = SimpleNamespace(input_files=files)
+    report = _PageUploadBatch(files)
     return report_files.summarize_report_input_files(
         report,
         search=request.form.get("search-summary") is not None,
