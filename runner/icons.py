@@ -35,7 +35,7 @@ def subset_request(icons_path=ICONS_PATH):
     definitions = flatten_icon_definitions(
         registry, schema=load_icons_schema(REPOSITORY_ROOT)
     )
-    icon_names = sorted({definition["glyph"] for definition in definitions.values()})
+    icon_names = sorted({str(definition["glyph"]) for definition in definitions.values()})
     query = urlencode(
         {
             "family": FONT_FAMILY_QUERY,

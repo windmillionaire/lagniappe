@@ -142,7 +142,7 @@ def merge_results(batches, directory, statuses, *, attempt, snapshot, destinatio
                 if not isinstance(row, dict) or row.get("outcome") not in {"passed", "failed", "skipped"}:
                     raise ValueError("missing terminal outcome")
                 duration = row.get("duration")
-                if type(duration) not in {int, float} or not math.isfinite(duration) or duration < 0:
+                if (type(duration) is not int and type(duration) is not float) or not math.isfinite(duration) or duration < 0:
                     raise ValueError("invalid worker duration")
             failed = any(row["outcome"] == "failed" for row in rows.values())
             if (status == 0) == failed:

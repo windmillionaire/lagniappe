@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 import uuid
 
-ACTIVE = ContextVar("hosted_checkpoint", default=None)
 OBJECT = "hosted-e2e/checkpoint.json"
 DOCUMENTS = {"setup.json": "setup", "state.json": "state"}
 
@@ -142,6 +141,9 @@ class Checkpoint:
         finally:
             self.doc["operation"] = None
             self.save()
+
+
+ACTIVE: ContextVar[Checkpoint | None] = ContextVar("hosted_checkpoint", default=None)
 
 
 # @testable true

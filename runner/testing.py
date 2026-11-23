@@ -173,7 +173,7 @@ def ensure_test_frontend_bundle(authority):
     authority.assert_active()
     try:
         result = subprocess.run(
-            [NPM_CLI, "run", "dev"],
+            [NPM_CLI or "npm", "run", "dev"],
             cwd=APP_DIR,
             check=False,
         )

@@ -55,6 +55,7 @@ def activate_repository_gcloud(
             target["ACCOUNT"],
             allow_login=allow_cli_login,
         )
+    adc_identity = None
     if ensure_adc:
         from runner.adc import ensure_adc_target
 
@@ -83,8 +84,8 @@ def activate_repository_gcloud(
         ("Project", target["PROJECT"]),
     ):
         print(ui.value(label, value, column=17, verbatim=True))
-    if ensure_adc:
-        principal = (adc_identity or {}).get("principal")
+    if adc_identity:
+        principal = adc_identity.get("principal")
         if principal and principal.casefold() != target["ACCOUNT"].casefold():
             print(ui.value("ADC account", principal, column=17, verbatim=True))
     return True

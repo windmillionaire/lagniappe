@@ -36,7 +36,7 @@ def _stop_process_group(process):
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_dev_server_forwards_signals_and_restores_handlers
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_dev_server_cleans_up_process_group_after_runner_failure
 # @matrix development : adc escalation exceptional-cleanup gcloud-config launch-order lifecycle noninteractive process-ownership signals
-def run_dev_server():
+def run_dev_server() -> int:
     try:
         activate_repository_gcloud(
             ensure_adc=True,
@@ -59,7 +59,7 @@ def run_dev_server():
             "--debug",
             "run",
             "--port",
-            dev_settings["SERVER_PORT"],
+            str(dev_settings["SERVER_PORT"]),
         ],
         env=env,
         cwd=APP_DIR,

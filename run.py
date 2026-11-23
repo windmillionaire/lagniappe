@@ -631,14 +631,14 @@ def run_version_command(command_args: list[str]) -> int:
         from config import File, SETTINGS
         from runner.deploy import update_package_lock_version
 
-        SETTINGS.NODE["version"] = args.version
-        SETTINGS.APP["VERSION"] = args.version
+        SETTINGS.NODE["version"] = version
+        SETTINGS.APP["VERSION"] = version
         SETTINGS.APP.pop("BUILD_ID", None)
         SETTINGS.save(File.PACKAGE_JSON, File.APP_SETTINGS_YAML)
-        update_package_lock_version(args.version)
-        _ensure_release_note(args.version)
-        _update_reporting_privacy_version(args.version)
-        print(f"VERSION set to {args.version}")
+        update_package_lock_version(version)
+        _ensure_release_note(version)
+        _update_reporting_privacy_version(version)
+        print(f"VERSION set to {version}")
         return 0
 
     if args.action == "note":
@@ -674,7 +674,7 @@ def _run_release_git(
     args: list[str],
 ) -> subprocess.CompletedProcess:
     result = subprocess.run(
-        [GIT_CLI, *args],
+        [GIT_CLI or "git", *args],
         cwd=repo_root,
         capture_output=True,
         text=True,
@@ -690,7 +690,7 @@ def _resolve_release_base(repo_root: Path, requested: str | None) -> str:
     candidates = [requested] if requested else ["origin/main", "main"]
     for candidate in candidates:
         result = subprocess.run(
-            [GIT_CLI, "rev-parse", "--verify", f"{candidate}^{{commit}}"],
+            [GIT_CLI or "git", "rev-parse", "--verify", f"{candidate}^{{commit}}"],
             cwd=repo_root,
             capture_output=True,
             text=True,
@@ -804,7 +804,7 @@ def _migration_catalog_metadata(content: str) -> dict[str, dict]:
             ) from error
         id_node = keywords.get("id")
         try:
-            migration_id = ast.literal_eval(id_node)
+            migration_id = ast.literal_eval(id_node) if id_node is not None else None
         except (ValueError, TypeError):
             migration_id = id_node.id if isinstance(id_node, ast.Name) else None
         if not isinstance(migration_id, str) or not migration_id:

@@ -19,6 +19,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
 from urllib.request import Request, urlopen
 
 from config import Directory
@@ -240,7 +241,7 @@ def run_command(
             )
     if failure:
         if isinstance(failure, subprocess.TimeoutExpired):
-            failure.output, failure.stderr = stdout, stderr
+            raise subprocess.TimeoutExpired(failure.cmd, failure.timeout, stdout, stderr) from failure
         raise failure
     if check and process.returncode:
         raise subprocess.CalledProcessError(process.returncode, command, stdout, stderr)
@@ -1067,8 +1068,13 @@ def _is_warning_line(line: str) -> bool:
     return bool(re.match(r"^(WARNING:|WARN\b|npm warn\b)", line.strip(), re.IGNORECASE))
 
 
-def _warning_summary(report: UpgradeReport) -> dict[str, dict[str, object]]:
-    warnings: dict[str, dict[str, object]] = {}
+class WarningSummary(TypedDict):
+    count: int
+    commands: list[int]
+
+
+def _warning_summary(report: UpgradeReport) -> dict[str, WarningSummary]:
+    warnings: dict[str, WarningSummary] = {}
     for index, log in enumerate(report.command_logs, start=1):
         for output in (log.stdout, log.stderr, log.error):
             for line in output.splitlines():
@@ -1079,9 +1085,9 @@ def _warning_summary(report: UpgradeReport) -> dict[str, dict[str, object]]:
                     warning,
                     {"count": 0, "commands": []},
                 )
-                item["count"] = int(item["count"]) + 1
+                item["count"] += 1
                 commands = item["commands"]
-                if isinstance(commands, list) and index not in commands:
+                if index not in commands:
                     commands.append(index)
     return warnings
 
@@ -1099,11 +1105,7 @@ def _render_warnings(report: UpgradeReport) -> list[str]:
     ]
     for warning, details in warnings.items():
         commands = details["commands"]
-        command_list = (
-            ", ".join(f"#{index}" for index in commands)
-            if isinstance(commands, list)
-            else ""
-        )
+        command_list = ", ".join(f"#{index}" for index in commands)
         lines.append(
             "| "
             + " | ".join(

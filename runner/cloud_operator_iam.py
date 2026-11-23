@@ -234,9 +234,10 @@ def main():
     bundle = cloud_settings._local_bundle(root, project, cloud_settings._receipt(root))
     app, dev = cloud_settings.validate_bundle(bundle, project)
     target = dev["gcloud_config"]
-    setup = json.loads(
-        cloud_settings._read(root, Path("reports/hosted-e2e/setup.json"))
-    )
+    setup_text = cloud_settings._read(root, Path("reports/hosted-e2e/setup.json"))
+    if setup_text is None:
+        raise SystemExit("The selected checkout has no hosted E2E setup.")
+    setup = json.loads(setup_text)
     base = [
         GCLOUD_CLI,
         "--quiet",

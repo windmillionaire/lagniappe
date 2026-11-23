@@ -16,9 +16,13 @@ import sys
 import threading
 from time import monotonic, sleep
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from config import APP_DIR, Directory, File, SETTINGS, _atomic_write_text
 from runner.context import format_command
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
 
 
 SESSION_SCHEMA_VERSION = 1
@@ -296,12 +300,15 @@ def _configured_namespace():
 
 def _configured_port():
     try:
-        return int(SETTINGS.test_config["SERVER_PORT"])
+        value = SETTINGS.test_config["SERVER_PORT"]
+        if not isinstance(value, (int, float, str, bytes, bytearray)):
+            raise TypeError
+        return int(value)
     except (KeyError, TypeError, ValueError) as error:
         raise TestSessionStateError("Testing SERVER_PORT must be an integer.") from error
 
 
-def _new_owned_data_lease(nonce):
+def _new_owned_data_lease(nonce: str) -> E2ELease:
     from lagniappe.core.tools.hosted_e2e.lease import E2ELease
 
     return E2ELease(run_id=nonce)
@@ -329,7 +336,7 @@ class TestSessionAuthority:
     nonce: str
     mode: str
     owner: dict
-    data_lease: object
+    data_lease: E2ELease
     _heartbeat_stop: threading.Event
     _heartbeat_lost: threading.Event
     _heartbeat_thread: threading.Thread | None
@@ -430,7 +437,7 @@ def acquire_test_session(
     mode: str,
     command,
     *,
-    data_lease_factory: Callable[[str], object] = _new_owned_data_lease,
+    data_lease_factory: Callable[[str], E2ELease] = _new_owned_data_lease,
 ) -> TestSessionAuthority:
     """Publish a durable local owner, then acquire the shared data lease."""
     if mode not in SESSION_MODES:

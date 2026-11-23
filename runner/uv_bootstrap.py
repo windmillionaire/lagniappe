@@ -481,19 +481,9 @@ class _AllowedRedirectHandler(HTTPRedirectHandler):
         super().__init__()
         self._allowed_hosts = allowed_hosts
 
-    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
-        _validate_https_url(
-            new_url,
-            self._allowed_hosts,
-        )
-        return super().redirect_request(
-            request,
-            file_pointer,
-            code,
-            message,
-            headers,
-            new_url,
-        )
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_https_url(newurl, self._allowed_hosts)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 # @testable false

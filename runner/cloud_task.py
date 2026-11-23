@@ -67,9 +67,9 @@ def connection_file(account):
 
 
 # @testable infrastructure
-def _gcloud(*arguments, env):
+def _gcloud(*arguments: str, env: dict[str, str]) -> None:
     result = subprocess.run(
-        [GCLOUD_CLI, *arguments, "--quiet"], env=env, capture_output=True
+        [GCLOUD_CLI or "gcloud", *arguments, "--quiet"], env=env, capture_output=True
     )
     if result.returncode:
         raise RuntimeError(

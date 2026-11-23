@@ -57,7 +57,7 @@ def _json(value):
 
 
 # @testable infrastructure
-def _read(root, path):
+def _read(root: Path, path: Path) -> str | None:
     target = root / path
     if target.resolve() != target:
         raise CloudSettingsError(f"Expected an installation-owned file at {path}.")
@@ -76,7 +76,7 @@ def _receipt(root):
 # @testable infrastructure
 def _source(root):
     result = subprocess.run(
-        [GIT_CLI, "-C", str(root), "rev-parse", "HEAD"],
+        [GIT_CLI or "git", "-C", str(root), "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
         check=False,
@@ -450,7 +450,10 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
             "author_target": {k: dev["gcloud_config"][k] for k in operator},
         }
         dev["gcloud_config"].update(operator)
-        version_from_source = json.loads(_read(root, Path("package.json")))["version"]
+        package = _read(root, Path("package.json"))
+        if package is None:
+            raise CloudSettingsError("The checkout has no package.json.")
+        version_from_source = json.loads(package)["version"]
         if not isinstance(version_from_source, str) or not re.fullmatch(
             r"\d+\.\d+\.\d+", version_from_source
         ):

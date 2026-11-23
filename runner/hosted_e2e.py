@@ -2014,14 +2014,14 @@ def _wait_for_execution(
 def format_execute_summary(
     payload,
     *,
-    imported=True,
-    state_root=STATE_ROOT,
-    result_root=None,
-    environment="standard",
-):
+    imported: bool = True,
+    state_root: Path = STATE_ROOT,
+    result_root: Path | None = None,
+    environment: str = "standard",
+) -> str:
     """Format an operator-facing summary for one hosted execution result."""
     execution = str(payload.get("execution") or "unknown")
-    exit_status = int(payload.get("exit_status") or 0)
+    exit_status = _evidence_exit_status(payload)
     result = "PASSED" if exit_status == 0 else "FAILED"
     lines = [
         "",
@@ -2280,7 +2280,7 @@ def _latest_execution(infrastructure, *, environment="standard"):
     return newest.name.split("/", 2)[1]
 
 
-def _evidence_exit_status(document) -> int:
+def _evidence_exit_status(document: object) -> int:
     status = document.get("exit_status") if isinstance(document, dict) else None
     if type(status) is not int:
         raise HostedE2EError("Hosted result evidence requires an integer exit status.")
@@ -2384,6 +2384,8 @@ def import_result_directory(directory, *, expected_execution=None):
         )
 
     remote = load_json(directory / "evidence.json")
+    if not isinstance(remote, dict):
+        raise HostedE2EError("Hosted result evidence is malformed.")
     status = _evidence_exit_status(manifest)
     if _evidence_exit_status(remote) != status:
         raise HostedE2EError("Hosted result manifest and evidence exit statuses disagree.")
@@ -2816,7 +2818,7 @@ def status(*, environment="standard"):
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_command_routes_preflight_base
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_release_evidence_command_routes_validation
 # @matrix hosted-e2e : cli-routing evidence-import suite-scope
-def run_hosted_e2e_command(arguments):
+def run_hosted_e2e_command(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="run.py hosted-e2e",
         description="Run repository tests in an isolated Google-hosted environment.",
@@ -2927,7 +2929,7 @@ def run_hosted_e2e_command(arguments):
 # @testable false
 # @covered-by runner/hosted_e2e.py::run_hosted_e2e_command
 # @reason command execution inside the optional project checkpoint transaction
-def _dispatch_hosted_command(args):
+def _dispatch_hosted_command(args: argparse.Namespace) -> int:
     with cloud_checkpoints.lifecycle(sys.modules[__name__], args):
         if args.action == "setup":
             payload = setup(args.github_repository)
@@ -2956,21 +2958,14 @@ def _dispatch_hosted_command(args):
             payload = execute(
                 **execute_options,
             )
-            summary_options = {"imported": not args.no_import_results}
-            if args.environment != "standard":
-                summary_options.update(
-                    {
-                        "environment": args.environment,
-                        "result_root": _environment(args.environment).result_root,
-                    }
-                )
-            print(
-                format_execute_summary(
-                    payload,
-                    **summary_options,
-                )
+            result_root = (
+                _environment(args.environment).result_root if args.environment != "standard" else None
             )
-            return int(payload.get("exit_status") or 0)
+            print(format_execute_summary(
+                payload, imported=not args.no_import_results,
+                environment=args.environment, result_root=result_root,
+            ))
+            return _evidence_exit_status(payload)
         elif args.action == "import-results":
             payload = import_result_directory(
                 args.directory,
@@ -2991,7 +2986,7 @@ def _dispatch_hosted_command(args):
                 **result_options,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
-            return int(payload.get("exit_status") or 0)
+            return _evidence_exit_status(payload)
         elif args.action == "validate-release-evidence":
             payload = validate_release_evidence(
                 args.candidate,
