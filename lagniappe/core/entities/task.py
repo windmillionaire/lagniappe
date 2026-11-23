@@ -56,6 +56,13 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         def due_date(self, value: datetime | str | float | None) -> None: ...
 
         page: Page | None
+        description: str | None
+        @property
+        def submission(self) -> dict[str, object]: ...
+
+        @submission.setter
+        def submission(self, value: dict[str, object] | str | None) -> None: ...
+
         linked_pages: list[Page]
         files: list[File]
 

@@ -23,6 +23,23 @@ from testing.utility.test_entities import TestEntities
 _USER_TZ = "lagniappe.core.mixins.date.dates.user_timezone"
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("history_type", [TaskHistory, FormHistory, DocumentHistory])
+def test_unsaved_history_identity_and_immutable_modification_time(history_type):
+    history = history_type(testing=True)
+    assert history.hash is None
+    history.created = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
+    assert history.modified == history.created
+    with pytest.raises(AttributeError):
+        history.modified = datetime.now(UTC)
+    if isinstance(history, DocumentHistory):
+        history.hash = "named-version"
+        assert history.hash == "named-version"
+    else:
+        with pytest.raises(AttributeError):
+            history.hash = "named-version"
+
+
 # @matrix task-completion : assignee complete completed-by no-schedule
 @pytest.mark.unit
 def test_task_complete_without_schedule(get_test_entities):
