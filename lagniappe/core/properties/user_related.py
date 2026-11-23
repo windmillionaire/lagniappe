@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..entities.category import UserCategory
     from ..entities.entity import Entity
     from ..entities.group import UserGroup
-    from ..entities.page import Page
+    from ..entities.page import Page, PageData
     from ..entities.user import User as User
 
 
@@ -160,7 +160,7 @@ class UserPage(RelatedEntityMixin["Page"], DBProperty["Page", "User"]):
         )
 
     def _create_user_page(self, user_model: UserCategory) -> Page:
-        data = {
+        data: PageData = {
             "model": user_model,
             "user": self.entity,
             "name": self.entity.name,
