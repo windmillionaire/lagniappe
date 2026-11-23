@@ -6,6 +6,7 @@ import hashlib
 import re
 import secrets
 import threading
+from types import TracebackType
 from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
@@ -311,7 +312,12 @@ class E2ELease:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
     # @matrix hosted-e2e : lease ownership
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=2)
@@ -376,7 +382,12 @@ class E2ELeaseHeartbeat:
         ):
             raise RuntimeError("The adopted E2E data lease was lost.")
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=2)

@@ -132,7 +132,7 @@ class Filter:
     final filter object for use with query.add_filter().
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._conditions: list[datastore_query.PropertyFilter] = []
         self._or_groups: list[Filter] = []
         self._requires: list | None = None
@@ -351,7 +351,7 @@ class Query:
         results = Query(KINDS.users).project("email", "name").fetch_all()
     """
 
-    def __init__(self, kind: KINDS | str, ancestor: Key | None = None):
+    def __init__(self, kind: KINDS | str, ancestor: Key | None = None) -> None:
         """
         Initialize a query for the given kind.
 

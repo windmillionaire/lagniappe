@@ -185,7 +185,7 @@ class ProgressLabel:
         self.message = " ".join(unstyle(message).split())
         self.initial_width = terminal_width()
 
-    def __str__(self):
+    def __str__(self) -> str:
         # Reserve room for the marker, spacing, and a truncation indication.
         width = max(1, min(self.initial_width, terminal_width()) - 8)
         if cell_width(self.message) <= width:

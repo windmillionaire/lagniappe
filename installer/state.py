@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
+from types import TracebackType
 from typing import Self
 
 
@@ -189,7 +190,12 @@ class SetupProcessLock:
     def __enter__(self) -> Self:
         return self.acquire()
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.release()
 
 

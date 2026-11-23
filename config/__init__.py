@@ -453,7 +453,7 @@ class RuntimeSettings:
     environment: Environment
     values: Mapping[str, object] = field(repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         object.__setattr__(self, "environment", Environment(self.environment))
         object.__setattr__(self, "values", _freeze_settings(self.values))
 

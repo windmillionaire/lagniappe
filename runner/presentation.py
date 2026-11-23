@@ -7,7 +7,8 @@ import os
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Self, TextIO, TypedDict, Unpack
+from types import TracebackType
+from typing import TYPE_CHECKING, Literal, Self, TextIO, TypedDict, Unpack
 
 from runner.console import (
     ProgressLabel,
@@ -259,7 +260,7 @@ class Progress:
         self.announced = False
         self.live = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         for progress in reversed(ACTIVE_PROGRESS):
             progress.stop()
         ACTIVE_PROGRESS.append(self)
@@ -270,7 +271,12 @@ class Progress:
             raise
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> Literal[False]:
         try:
             self.stop()
         finally:
