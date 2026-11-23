@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 # @testable true
 # @tests tests_unit/test_013f_process_property_complete_error.py::test_process_property_contract_errors_are_explicit
 # @matrix process-property : initialization validation
-class ProcessProperty[Owner: Entity = Entity]:
+class ProcessProperty[Owner: Entity = "Entity"]:
     """Property backed by a JSON process section in entity.db.
 
     Stores multi-step workflow state (ingress stages, file options, etc.).

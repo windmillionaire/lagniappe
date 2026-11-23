@@ -18,7 +18,7 @@ UNSET = object()
 # @tests tests_unit/test_002_entity_general_properties.py::test_property_unset_state_is_distinct_from_explicit_values
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_property_defaults_to_config_test_user
 # @matrix property : current-user explicit-false explicit-none initialization propagation unset validation
-class Property[Value = object, Owner: Entity | Site = Entity, Write = Value | None]:
+class Property[Value = object, Owner: Entity | Site = "Entity", Write = Value | None]:
     """Base property class. Most entity properties inherit from this.
 
     Subclasses must set _id (unique within the entity). Optionally set

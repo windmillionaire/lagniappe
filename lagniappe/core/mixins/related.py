@@ -30,7 +30,7 @@ else:
 # @covered-by lagniappe/core/properties/common_related.py::Projects
 # @covered-by lagniappe/core/properties/page_related.py::PageCategories
 # @covered-by lagniappe/core/properties/user_related.py::Groups
-class RelatedEntityListMixin[Related: Entity = Entity](_RelationHost):
+class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
     _touch_members = True
     """Adds storage for a list of related entities.
 
@@ -237,7 +237,7 @@ class RelatedEntityListMixin[Related: Entity = Entity](_RelationHost):
 # @covered-by lagniappe/core/properties/common_related.py::AttachedProject
 # @covered-by lagniappe/core/properties/project.py::ModelTaskProject
 # @covered-by lagniappe/core/properties/task_related.py::AssignedTo
-class RelatedEntityMixin[Related: Entity = Entity](_RelationHost):
+class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
     """Adds storage for a single related entity.
 
     Stores the entity key in entity.db and expects loaded values to be attached

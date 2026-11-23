@@ -12,7 +12,7 @@ from .base_property import Property
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_custom_blank_values_can_keep_empty_lists
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_write_refreshes_entity_details_and_cache
 # @matrix db-property : blank-values cache-invalidation custom-blank-values explicit-false missing-key
-class DBProperty[Value = object, Owner: Entity = Entity, Write = Value | None](Property[Value, Owner, Write]):
+class DBProperty[Value = object, Owner: Entity = "Entity", Write = Value | None](Property[Value, Owner, Write]):
     """Property that persists its value in entity.db.
 
     Reads from entity.db on first access and writes back on set.
