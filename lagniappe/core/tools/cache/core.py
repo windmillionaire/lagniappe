@@ -2,16 +2,18 @@
 
 from contextlib import suppress
 from datetime import timedelta
+from typing import cast
 
 import redis
-from redis import ResponseError
+from redis import Redis, ResponseError
+from redis.client import Pipeline
 from redis.commands.search.field import NumericField, TagField, TextField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.commands.search.result import Result
 
 from config.redis import redis_client_kwargs
-from lagniappe import CONFIG
+from lagniappe import CONFIG, Config
 from lagniappe.core.exceptions import capture
 from ..auth.restrictions import RESTRICTION_SOURCES
 
@@ -21,7 +23,7 @@ from .keys import HELP_PREFIX, SEARCH_SCORE_FIELD, Keys, Search
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_runtime_redis_client_uses_shared_tls_options
 # @matrix cache : redis-connection redis-tls
-def _create_redis_client(settings=CONFIG):
+def _create_redis_client(settings: Config = CONFIG) -> Redis:
     """Create the shared runtime Redis client from application settings."""
     client = redis.Redis(
         **redis_client_kwargs(
@@ -56,25 +58,26 @@ def _query_context(query):
 class Cache:
     """Redis hash cache client with full-text search indexing."""
 
-    def __init__(self):
-        self._redis = None
+    def __init__(self) -> None:
+        self._redis: Redis | None = None
         self.INDEX = Keys.SEARCH_INDEX.value
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
     # @pair cache:redis-connection
     @property
-    def redis(self):
+    def redis(self) -> Redis:
         """Return the Redis connection, initializing if needed."""
         if not self._redis:
             self.initialize()
 
+        assert self._redis is not None
         return self._redis
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
     # @pair cache:redis-connection
-    def initialize(self):
+    def initialize(self) -> None:
         """Establish the Redis connection pool."""
         if self._redis:
             return
@@ -85,7 +88,7 @@ class Cache:
     # @tests tests_unit/test_017_cache_query.py::test_search_index_indexes_empty_requires_tags
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
     # @matrix cache : empty-requires index-recreation index-schema redis-cloud search-ranking tag-syntax
-    def create_index(self):
+    def create_index(self) -> None:
         """Create the RediSearch full-text index if it doesn't exist."""
         try:
             self.redis.ft(self.INDEX).info()
@@ -111,7 +114,7 @@ class Cache:
                 score_field=SEARCH_SCORE_FIELD,
             )
             try:
-                self.redis.ft(self.INDEX).create_index(schema, definition=definition)
+                self.redis.ft(self.INDEX).create_index(list(schema), definition=definition)
             except ResponseError as error:
                 if "index already exists" not in str(error).lower():
                     raise
@@ -119,13 +122,13 @@ class Cache:
     # @testable false
     # @covered-by lagniappe/core/tools/cache/utility.py::delete_cache
     # @reason maintenance api-wrapper owned by full cache reset workflow
-    def flush(self):
+    def flush(self) -> None:
         """Flush the entire Redis database."""
         self.redis.flushdb()
 
     # @testable false
     # @reason api-wrapper; callers own pipeline command semantics
-    def pipeline(self):
+    def pipeline(self) -> Pipeline:
         """Return a new Redis pipeline."""
         return self.redis.pipeline()
 
@@ -141,7 +144,8 @@ class Cache:
     # @reason decoded Redis get wrapper used by provider-specific cache consumers
     def get(self, key):
         """Return the decoded string value for a key, or None."""
-        value = self.redis.get(key)
+        # This client is constructed with decode_responses=False.
+        value = cast(bytes | None, self.redis.get(key))
         return value.decode("utf-8") if value else None
 
     # @testable false
@@ -187,10 +191,11 @@ class Cache:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_cache_search_delegates_to_redisearch_client
     # @matrix search : parser redis-cloud redis-py
-    def search(self, query):
+    def search(self, query: Query | str) -> Result:
         """Execute a RediSearch query against the primary index."""
         try:
-            return self.redis.ft(self.INDEX).search(query)
+            # A synchronous search on a client returns Result. The SDK also types pipelines and profiles here.
+            return cast(Result, self.redis.ft(self.INDEX).search(query))
         except ResponseError as e:
             capture(
                 e,
@@ -233,32 +238,33 @@ cache = Cache()
 class CacheJSON:
     """Redis JSON cache client for filter and relationship data."""
 
-    def __init__(self):
-        self._redis = None
+    def __init__(self) -> None:
+        self._redis: Redis | None = None
         self.INDEX = Keys.JSON_INDEX.value
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
     # @pair cache:redis-connection
     @property
-    def redis(self):
+    def redis(self) -> Redis:
         """Return the Redis connection, initializing if needed."""
         if not self._redis:
             self.initialize()
 
+        assert self._redis is not None
         return self._redis
 
     # @testable true
     # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
     # @pair cache:redis-connection
-    def initialize(self):
+    def initialize(self) -> None:
         """Bind to the shared Redis connection from the hash cache."""
         self._redis = cache.redis
 
     # @testable false
     # @covered-by lagniappe/core/tools/cache/core.py::initialize
     # @reason index setup is owned by module-level cache startup
-    def create_index(self):
+    def create_index(self) -> None:
         """Create the JSON search index if it doesn't exist."""
         try:
             self.redis.ft(self.INDEX).info()
@@ -273,7 +279,7 @@ class CacheJSON:
                 prefix=[f"{CONFIG.PREFIX}JSON:"],
             )
             with suppress(ResponseError):
-                self.redis.ft(self.INDEX).create_index(schema, definition=definition)
+                self.redis.ft(self.INDEX).create_index(list(schema), definition=definition)
 
     # @testable false
     # @reason api-wrapper; currently reserved for direct JSON key deletion
@@ -296,10 +302,11 @@ class CacheJSON:
 
     # @testable false
     # @reason api-wrapper; no current direct caller owns this search helper
-    def search(self, query):
+    def search(self, query: Query | str) -> Result:
         """Execute a RediSearch query against the JSON index."""
         try:
-            return self.redis.ft(self.INDEX).search(query)
+            # A synchronous search on a client returns Result. The SDK also types pipelines and profiles here.
+            return cast(Result, self.redis.ft(self.INDEX).search(query))
         except ResponseError as e:
             capture(
                 e,
@@ -404,7 +411,7 @@ filter_cache = CacheJSON()
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
 # @matrix cache : cleanup index-recreation
 # @pair server:initialization
-def initialize():
+def initialize() -> None:
     """Initialize both cache clients and create their search indexes."""
     cache.initialize()
     filter_cache.initialize()
