@@ -15,21 +15,9 @@ from lagniappe.core.tools.database.core import DATA, KINDS
 # @matrix experiments : execution-policy
 def can_execute(user, *, remote_mcp=False):
     """Additional capability never substitutes for ordinary record permissions."""
-    return bool(
-        remote_mcp
-        and getattr(CONFIG, "EXPERIMENTS_ENABLED", False)
-        and getattr(CONFIG, "EXPERIMENTS_EXECUTION_ENABLED", False)
-        and getattr(CONFIG, "EXPERIMENTS_PROJECT", None) == CONFIG.GOOGLE_CLOUD_PROJECT
-        and CONFIG.AI_ENABLED
-        and CONFIG.EXTERNAL_AI_ENABLED
-        and getattr(CONFIG, "AGENT_ACCESS_ENABLED", False)
-        and user
-        and user.is_authenticated
-        and user.is_admin
-        and not user.is_public
-        and str(user.email or "").strip().casefold()
-        == str(CONFIG.AGENT_ACCESS_EMAIL).strip().casefold()
-    )
+    from lagniappe.core.tools.ai.auto_execute import experiments_execution_allowed
+
+    return experiments_execution_allowed(user, remote_mcp=remote_mcp, config=CONFIG)
 
 
 # @testable true

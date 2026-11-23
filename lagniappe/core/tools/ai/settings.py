@@ -22,7 +22,7 @@ RUNTIME_AI_SETTING_KEYS = (
 # @matrix ai : deployment-fallback model-routing runtime-settings
 def runtime_ai_settings(config=CONFIG):
     """Return live site AI settings over deployment-configured fallbacks."""
-    settings = {
+    settings: dict[str, object] = {
         "AI_MODEL": getattr(config, "AI_MODEL", constants.DEFAULT_AI_MODEL),
         "AI_UTILITY_MODEL": getattr(
             config,
@@ -39,6 +39,7 @@ def runtime_ai_settings(config=CONFIG):
             "AI_LOCATION",
             constants.DEFAULT_AI_LOCATION,
         ),
+        "AI_AUTO_EXECUTE": bool(getattr(config, "AI_AUTO_EXECUTE", False)),
     }
     try:
         persisted = site_database.ai()
@@ -57,4 +58,6 @@ def runtime_ai_settings(config=CONFIG):
                 if persisted.get(key)
             }
         )
+        if "AI_AUTO_EXECUTE" in persisted:
+            settings["AI_AUTO_EXECUTE"] = bool(persisted.get("AI_AUTO_EXECUTE"))
     return settings

@@ -9,6 +9,12 @@ LEGACY_SCOPE = "mcp:use"
 USER_TOKEN_HEADER = "X-Lagniappe-MCP-Token"
 CLIENT_ID = "https://chatgpt.com/oauth/client.json"
 REDIRECT_URI = "https://chatgpt.com/connector_platform_oauth_redirect"
+ANTIGRAVITY_CLIENT_ID = "https://antigravity.google/oauth/client-metadata.json"
+ANTIGRAVITY_REDIRECT_URI = "https://antigravity.google/oauth-callback"
+CIMD_CLIENTS: dict[str, str] = {
+    CLIENT_ID: REDIRECT_URI,
+    ANTIGRAVITY_CLIENT_ID: ANTIGRAVITY_REDIRECT_URI,
+}
 CODEX_CLIENT_ID = "lagniappe-codex"
 ACCESS_SECONDS = 30 * 60
 CODE_SECONDS = 5 * 60
@@ -92,18 +98,21 @@ def mcp_issuer(settings):
 # @testable true
 # @tests tests_tooling/test_012c_remote_mcp_config.py::test_supported_clients_require_exact_callbacks
 # @matrix mcp-oauth : configuration validation loopback
-def client_allowed(client_id):
-    return client_id in (CLIENT_ID, CODEX_CLIENT_ID)
+def client_allowed(client_id: object) -> bool:
+    return isinstance(client_id, str) and (
+        client_id in CIMD_CLIENTS or client_id == CODEX_CLIENT_ID
+    )
 
 
 # @testable true
 # @tests tests_tooling/test_012c_remote_mcp_config.py::test_supported_clients_require_exact_callbacks
 # @matrix mcp-oauth : configuration validation loopback
-def redirect_allowed(client_id, redirect_uri):
+def redirect_allowed(client_id: object, redirect_uri: object) -> bool:
     if not client_allowed(client_id):
         return False
-    if client_id == CLIENT_ID:
-        return redirect_uri == REDIRECT_URI
+    assert isinstance(client_id, str)
+    if client_id in CIMD_CLIENTS:
+        return redirect_uri == CIMD_CLIENTS[client_id]
     # RFC 8252 native clients bind an ephemeral port. Every other byte of the
     # pre-registered loopback callback stays exact; localhost/DNS is not used.
     if not isinstance(redirect_uri, str) or not re.fullmatch(

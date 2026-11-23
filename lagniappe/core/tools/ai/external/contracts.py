@@ -107,7 +107,7 @@ def answer_context(user):
             "Prefer keyword candidates and compare names and context. A user's abbreviation or paraphrase is not an exact name; names_only category browsing is available when useful.",
             "Answer directly in the conversation, distinguishing workspace evidence from inference. Use human names and tool-returned URLs for links.",
             "After answering, offer to save the answer in Lagniappe. Only after the user requests saving, start a Plan and submit the agreed answer. Do not generate an unwanted draft or automatically save every follow-up.",
-            "For requested workspace changes, start a Plan and follow its execution policy. Ordinary installations require authenticated browser review; only an explicitly authorized experiments MCP connection may execute_plan. Answering never authorizes mutations.",
+            "For requested workspace changes, start a Plan and follow its execution policy. Plans require authenticated browser review unless capabilities.execute_plan is enabled for this connection. Answering never authorizes mutations.",
             "No answer or query session is persisted by this context endpoint. Normal authenticated request/security logging still applies.",
         ],
     }
@@ -314,7 +314,7 @@ def plan_contract(report, user, *, submit_url, actions=None, view=DEFAULT_CONTRA
         "Return a direct summary and optional answer_markdown. Empty actions save an answer. Questions and changes can share one proposal. Use human names and tool-returned URLs, never visible hash tokens.",
         "Author complete final submission values and schema conversions before submitting; the server never calls a model to complete or repair external proposals.",
         (
-            "Submission saves the proposal. This experiments MCP connection may call execute_plan with the submitted proposal_fingerprint and a stable operation_id. Poll get_plan and reuse the same operation on uncertain delivery; never recreate successful actions."
+            "Submission saves the proposal. Because capabilities.execute_plan is enabled, you may pass execute=true and a stable operation_id to submitPlan/submit_plan (or call execute_plan afterward with proposal_fingerprint and operation_id). Safe proposals start immediately; proposals with update_form_schema, needs_review, issues, or require_review=true pause in ready state for browser review. Poll get_plan and reuse the same operation_id on uncertain delivery; never recreate successful actions."
             if execution_allowed else
             "Submission only saves the proposal for authenticated browser approval. Present preview_url. This connection cannot execute mutations. Replace the whole proposal for follow-ups until execution begins."
         ),

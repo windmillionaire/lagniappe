@@ -505,9 +505,9 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
         ingress_requests.append(True)
         return ["ingress-1"]
 
-    def get_ai_reports(requested_user):
-        ai_report_requests.append(requested_user)
-        return ["report-1"]
+    def get_ai_reports(requested_user, **kwargs):
+        ai_report_requests.append((requested_user, kwargs))
+        return SimpleNamespace(results=["report-1"], next_cursor="reports-next")
 
     def load_entities(*keys, request):
         load_requests.append((keys, request))
@@ -522,14 +522,14 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
 
     note_section = home_properties.NoteList(user=user)
     ingress_section = home_properties.IngressList(user=user)
-    tools_section = home_properties.ToolsList(user=user)
+    tools_section = home_properties.ToolsList(user=user, cursor="reports-page-1")
     notes = note_section.list
     ingress_files = ingress_section.list
     reports = tools_section.list
 
     assert notes_requests == [user]
     assert ingress_requests == [True]
-    assert ai_report_requests == [user]
+    assert ai_report_requests == [(user, {"start_cursor": "reports-page-1"})]
     assert load_requests == [
         (("note-1", "note-2"), home_properties.Fetch.direct()),
         (("ingress-1",), home_properties.Fetch.direct()),
@@ -541,4 +541,6 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     assert note_section.list is notes
     assert ingress_section.list is ingress_files
     assert tools_section.list is reports
+    assert tools_section.cursor == "reports-next"
+    assert tools_section.back is True
     assert tools_section.label == "Plans & Reports"

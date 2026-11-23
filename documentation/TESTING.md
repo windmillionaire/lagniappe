@@ -157,6 +157,25 @@ leave a reviewable artifact.
 Keep the `testing/` root clean. Place test files by suite, not by the location
 of a helper they happen to import.
 
+## Static typing, linting, and cross-boundary contracts
+
+During the `v2.5` (`EXP-034`) workflow trial, static quality checks prioritize:
+
+```bash
+venv/bin/python -m basedpyright
+venv/bin/python -m ruff check .
+npm run check
+venv/bin/python run.py template-contracts --changed --check
+venv/bin/python run.py traceability --styles --check
+venv/bin/python run.py mutation-contracts --check
+```
+
+`pyrightconfig.json` enables incremental `basedpyright` checking on typed
+modules, and `ruff.toml` enforces `E4`, `E7`, `E9`, `F`, `B`, `UP`, and `SIM`
+for `py314` (with an explicit legacy baseline ignore list). Per-symbol
+`traceability --changed --check` is frozen (not deleted) during the trial and
+is no longer a blocking preflight gate.
+
 ## Traceability and template tools
 
 ```bash

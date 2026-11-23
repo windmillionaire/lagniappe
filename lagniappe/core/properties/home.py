@@ -289,6 +289,7 @@ class ToolsList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        reports = database_get.ai_reports(self._user)
-        self._list = Entities.fetch(*reports, request=Fetch.direct())
+        db = database_get.ai_reports(self._user, start_cursor=self.cursor)
+        self._list = Entities.fetch(*db.results, request=Fetch.direct())
+        self.cursor = db.next_cursor
         return self._list

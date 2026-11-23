@@ -302,6 +302,13 @@
     <div id="layout" class="sm:mt-4">
       <div class="{{ styles.card.primary }} overflow-hidden">
         <section class="flex flex-col gap-5 p-4 sm:p-5">
+          {% if report.status == "ready" and report.db.get("auto_execute_pause_reason") %}
+            <div data-role="auto-execute-paused"
+                 class="rounded-md border border-task-light/70 bg-task-bg p-3 text-sm text-task-dark">
+              <strong class="block">Automatic execution paused for review</strong>
+              <p class="mt-1">{{ report.db.get("auto_execute_pause_reason") }}</p>
+            </div>
+          {% endif %}
           {% if report.origin == "email" and report.inbound_manifest %}
             {% set inbound = report.inbound_manifest %}
             <details data-role="email-submission"

@@ -140,6 +140,7 @@ SAFE_PLAN_SCHEMA = {
         "execution": {"type": ["object", "null"]},
         "original_brief": {"type": ["object", "null"]},
         "action_summary": ACTION_SUMMARY_SCHEMA,
+        "require_review": {"type": "boolean"},
     },
     "additionalProperties": False,
 }
@@ -232,7 +233,7 @@ SAFE_RECEIPT_SCHEMA = {
     "properties": {
         "action_summary": ACTION_SUMMARY_SCHEMA,
         "id": {"type": "string"},
-        "status": {"enum": ["ready", "complete"]},
+        "status": {"enum": ["ready", "running", "complete"]},
         "preview_url": {"type": "string"},
         "review_url": {"type": "string"},
         "contract_version": {
@@ -245,6 +246,24 @@ SAFE_RECEIPT_SCHEMA = {
                 {"type": "string", "minLength": 1},
                 {"type": "null"},
             ]
+        },
+        "operation": {
+            "type": "object",
+            "required": ["id", "status"],
+            "properties": {
+                "id": {"type": "string"},
+                "status": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+        "execution": {
+            "type": "object",
+            "required": ["started"],
+            "properties": {
+                "started": {"type": "boolean"},
+                "reason": {"type": "string"},
+            },
+            "additionalProperties": False,
         },
     },
     "additionalProperties": False,
@@ -478,6 +497,10 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
             },
             "name": {"type": "string", "maxLength": 120},
             "revises_plan_id": {"type": ["string", "null"], "minLength": 1, "description": "Creator-owned stopped execution to correct. Omit or use null for an independent Plan. Read current workspace state; propose only additional changes."},
+            "require_review": {
+                "type": "boolean",
+                "description": "When true, lock this Plan to browser review only so external execution is rejected.",
+            },
             **(
                 {
                     "actions": {
@@ -754,8 +777,17 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan",
-            "Return current Plan state, current/original brief, round-trippable proposal, and bounded execution outcomes with currently viewable result entities. Before execution, revise the existing plan_id. After execution, start_plan with revises_plan_id creates a linked correction; never replay successful creations. Entity null means unavailable, not proof an action never ran.",
-            _plan_id_input(),
+            "Return current Plan state, current/original brief, and bounded execution outcomes with currently viewable result entities. Defaults to include_proposal=false for compact status polling; pass include_proposal=true to fetch the full round-trippable proposal body. Before execution, revise the existing plan_id. After execution, start_plan with revises_plan_id creates a linked correction; never replay successful creations. Entity null means unavailable, not proof an action never ran.",
+            {
+                **_plan_id_input(),
+                "properties": {
+                    **_plan_id_input()["properties"],
+                    "include_proposal": {
+                        "type": "boolean",
+                        "description": "Include the full round-trippable proposal body (default false for compact polling).",
+                    },
+                },
+            },
             SAFE_PLAN_SCHEMA,
             "get_plan",
             READ_ANNOTATIONS,
@@ -823,6 +855,10 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 65536,
+                    },
+                    "require_review": {
+                        "type": "boolean",
+                        "description": "When true, lock this Plan to browser review only.",
                     },
                 },
                 "additionalProperties": False,
@@ -995,13 +1031,33 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
 def build_tool_registry(catalog: dict[str, Any], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
     tools = (*lifecycle_tools(), *catalog_tools(catalog), *((execution_tool(),) if execute_plan else ()))
     if execute_plan:
-        tools = tuple(
-            replace(tool, description=tool.description.replace(
-                "Give preview_url for authenticated review, never claim a proposal was applied.",
-                "Use execute_plan with the returned fingerprint and a stable operation_id to apply it; poll get_plan for the outcome.",
-            )) if tool.name == "submit_plan" else tool
-            for tool in tools
-        )
+        updated_tools = []
+        for tool in tools:
+            if tool.name == "submit_plan":
+                submit_schema = deepcopy(tool.input_schema)
+                submit_schema["properties"].update(
+                    {
+                        "execute": {
+                            "type": "boolean",
+                            "description": "When true, immediately start executing the submitted proposal (requires operation_id). Plans marked require_review or containing form schema changes, review items, or flagged issues still pause in ready state for browser review.",
+                        },
+                        "operation_id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9._-]{1,128}$",
+                            "description": "Stable operation ID (required when execute is true).",
+                        },
+                    }
+                )
+                tool = replace(
+                    tool,
+                    description=tool.description.replace(
+                        "Give preview_url for authenticated review, never claim a proposal was applied.",
+                        "Pass execute=true with a stable operation_id to run safe proposals immediately, or call execute_plan with the returned fingerprint; poll get_plan for the outcome. Respect user requests for review by setting require_review=true.",
+                    ),
+                    input_schema=submit_schema,
+                )
+            updated_tools.append(tool)
+        tools = tuple(updated_tools)
     if len(tools) > MAX_TOOL_COUNT:
         raise TransportError(
             "catalog_too_large", "Published MCP catalog contains too many tools."
@@ -1023,7 +1079,7 @@ def build_tool_registry(catalog: dict[str, Any], *, execute_plan: bool = False) 
 def execution_tool() -> ToolDefinition:
     return ToolDefinition(
         "execute_plan",
-        "Execute an already submitted proposal on this experiments installation as its designated Administrator agent. Use the proposal_fingerprint returned by submit_plan and a stable operation_id. Retry an uncertain request with those same values; poll get_plan for outcomes and never recreate successful actions. Current permissions and the exact proposal are checked again. This applies app records, not shell commands or deployments.",
+        "Execute an already submitted proposal when automatic plan execution is enabled for this connection. Use the proposal_fingerprint returned by submit_plan and a stable operation_id. Retry an uncertain request with those same values; poll get_plan for outcomes and never recreate successful actions. Plans marked require_review or containing form schema changes, review items, or flagged issues still require browser review. Current permissions and the exact proposal are checked again. This applies app records, not shell commands or deployments.",
         {
             "type": "object",
             "required": ["plan_id", "proposal_fingerprint", "operation_id"],

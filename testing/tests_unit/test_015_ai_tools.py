@@ -663,6 +663,7 @@ def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
         "AI_UTILITY_MODEL": "runtime-utility",
         "AI_IMAGE_MODEL": "runtime-image",
         "AI_LOCATION": "global",
+        "AI_AUTO_EXECUTE": False,
     }
 
     monkeypatch.setattr(runtime_ai_settings_module.site_database, "ai", lambda: None)
@@ -671,6 +672,7 @@ def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
         "AI_UTILITY_MODEL": "deployed-utility",
         "AI_IMAGE_MODEL": "deployed-image",
         "AI_LOCATION": "global",
+        "AI_AUTO_EXECUTE": False,
     }
 
 

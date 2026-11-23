@@ -376,6 +376,14 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 )
             allow_site_email = bool(data.get("allow_site_email"))
 
+        allow_auto_execute = None
+        if "allow_auto_execute" in data:
+            if not is_own_page or target_user.is_public:
+                raise PermissionError(
+                    "Only a managed user can change their own automatic plan execution preference."
+                )
+            allow_auto_execute = bool(data.get("allow_auto_execute"))
+
         if not target_is_privileged or is_owner_viewer:
             target_user.name = data.get("name")
         if ai_access is not None:
@@ -384,6 +392,8 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             target_user.notification_email_mode = notification_email_mode
         if allow_site_email is not None:
             target_user.allow_site_email = allow_site_email
+        if allow_auto_execute is not None:
+            target_user.allow_auto_execute = allow_auto_execute
         inbound_toggles = {
             key: data[key]
             for key in ("allow_messages_and_mentions", "allow_task_assignments")

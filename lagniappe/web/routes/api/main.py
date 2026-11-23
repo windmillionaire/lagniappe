@@ -446,15 +446,16 @@ def _plan_payload(report, *, include_proposal=True):
     }
     if include_proposal:
         payload["proposal"] = external_api.public_plan_proposal(report, g.agent_api_user)
-        if report.output_kind == "proposal":
-            payload["execution"] = external_api.public_execution_receipt(
-                report, g.agent_api_user
-            )
-        payload["correction"] = report.db.get("correction")
-        payload["superseded_by"] = report.db.get("superseded_by")
-        payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
     if report.output_kind == "proposal":
+        payload["execution"] = external_api.public_execution_receipt(
+            report, g.agent_api_user
+        )
         payload["action_summary"] = summarize_actions(report.proposal, maximum=external_api.MAX_PROPOSAL_ACTIONS)
+    payload["correction"] = report.db.get("correction")
+    payload["superseded_by"] = report.db.get("superseded_by")
+    payload["original_brief"] = (report.agent_manifest or {}).get("original_brief")
+    if (report.agent_manifest or {}).get("require_review") is True:
+        payload["require_review"] = True
     return _json_safe(payload)
 
 
@@ -603,7 +604,7 @@ def me():
         "credential": g.agent_api_credential,
         "capabilities": {
             "plans": True,
-            **({"execute_plan": _experiments_execution_allowed()} if CONFIG.EXPERIMENTS_ENABLED else {}),
+            "execute_plan": _execution_allowed(),
         },
         **({"installation": {
             "project": CONFIG.GOOGLE_CLOUD_PROJECT,
@@ -712,54 +713,95 @@ def create_plan():
                 "expected": f"string with at most {definitions.MAX_PLAN_NAME_CHARACTERS} characters",
             },
         )
+    require_review = data.get("require_review", False)
+    if "require_review" in data and not isinstance(require_review, bool):
+        raise APIProblem(
+            "invalid_require_review",
+            "require_review must be a boolean.",
+            422,
+            details={"path": "$.require_review", "expected": "boolean"},
+        )
     report = external_api.create_plan(
         actor,
         instructions=instructions,
         name=name,
         remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)),
         revises_plan_id=data.get("revises_plan_id"),
+        require_review=require_review,
     )
     return _plan_payload(report), 201
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : plan-session
 @api.get("/plans/<plan_id>")
 @_route
 def get_plan(plan_id):
-    return _plan_payload(_load_plan(plan_id))
+    raw_include = request.args.get("include_proposal")
+    if raw_include is None:
+        include_proposal = True
+    else:
+        normalized = str(raw_include).strip().casefold()
+        if normalized in {"true", "1"}:
+            include_proposal = True
+        elif normalized in {"false", "0"}:
+            include_proposal = False
+        else:
+            raise APIProblem(
+                "invalid_query",
+                "include_proposal must be true or false.",
+                422,
+            )
+    return _plan_payload(_load_plan(plan_id), include_proposal=include_proposal)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::execute_plan
-# @reason capability discovery and the write boundary share this gate
+def _execution_allowed():
+    from lagniappe.core.tools.ai.auto_execute import can_execute_external_plan
+
+    return can_execute_external_plan(
+        g.agent_api_user,
+        remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)),
+    )
+
+
 def _experiments_execution_allowed():
-    from lagniappe.core.tools.experiments import can_execute
-    return can_execute(g.agent_api_user, remote_mcp=bool(getattr(g, "remote_mcp_authenticated", False)))
+    return _execution_allowed()
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013g_experiments.py::test_experiments_execute_requires_remote_admin_and_exact_proposal
-# @matrix experiments : http-execution
 @api.post("/plans/<plan_id>/execute")
 @_route
 def execute_plan(plan_id):
-    if not _experiments_execution_allowed():
-        raise APIProblem("execution_forbidden", "This connection cannot execute experiments plans.", 403)
+    if not _execution_allowed():
+        raise APIProblem(
+            "execution_forbidden",
+            "Automatic plan execution is not enabled for this connection.",
+            403,
+        )
     data = _json_body()
-    if set(data) != {"proposal_fingerprint", "operation_id"} or not isinstance(data.get("proposal_fingerprint"), str) or not re.fullmatch(r"[a-f0-9]{64}", data["proposal_fingerprint"]) or not isinstance(data.get("operation_id"), str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", data["operation_id"]):
-        raise APIProblem("invalid_execution", "Supply the submitted proposal_fingerprint and a stable operation_id (1–128 letters, digits, dots, underscores or hyphens).", 422)
+    if (
+        set(data) != {"proposal_fingerprint", "operation_id"}
+        or not isinstance(data.get("proposal_fingerprint"), str)
+        or not re.fullmatch(r"[a-f0-9]{64}", data["proposal_fingerprint"])
+        or not isinstance(data.get("operation_id"), str)
+        or not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", data["operation_id"])
+    ):
+        raise APIProblem(
+            "invalid_execution",
+            "Supply the submitted proposal_fingerprint and a stable operation_id (1–128 letters, digits, dots, underscores or hyphens).",
+            422,
+        )
     report = _load_plan(plan_id)
     from lagniappe.core.tools.ai.reporting.execution.request import request_execution
+
+    remote_mcp = bool(getattr(g, "remote_mcp_authenticated", False))
     job, _notification = request_execution(
-        report, g.agent_api_user,
+        report,
+        g.agent_api_user,
         operation_id=data["operation_id"],
         expected_fingerprint=data["proposal_fingerprint"],
-        remote_mcp=True,
+        remote_mcp=remote_mcp,
+        external_execution=True,
     )
     return {
-        "plan": _plan_payload(_load_plan(plan_id)),
+        "plan": _plan_payload(_load_plan(plan_id), include_proposal=False),
         "operation": {"id": job.idempotency_key, "status": job.status},
     }, 202
 
@@ -1004,4 +1046,37 @@ def submit_plan(plan_id):
     submitted = external_api.submit_plan_request(
         report, g.agent_api_user, data, request_id=g.agent_api_request_id,
     )
-    return _submission_receipt(submitted)
+    receipt = _submission_receipt(submitted)
+    if data.get("execute") is True and submitted.output_kind == "proposal":
+        from lagniappe.core.tools.ai.auto_execute import plan_requires_review
+        from lagniappe.core.tools.ai.reporting.execution.request import (
+            request_execution,
+        )
+
+        if not _execution_allowed():
+            receipt["execution"] = {
+                "started": False,
+                "reason": "Automatic plan execution is not enabled for this connection.",
+            }
+        else:
+            pause_reason = plan_requires_review(submitted)
+            if pause_reason:
+                receipt["execution"] = {"started": False, "reason": pause_reason}
+            else:
+                remote_mcp = bool(getattr(g, "remote_mcp_authenticated", False))
+                job, _notification = request_execution(
+                    submitted,
+                    g.agent_api_user,
+                    operation_id=data["operation_id"],
+                    expected_fingerprint=receipt["proposal_fingerprint"],
+                    remote_mcp=remote_mcp,
+                    external_execution=True,
+                )
+                refreshed = _load_plan(plan_id)
+                receipt["status"] = refreshed.status
+                receipt["operation"] = {
+                    "id": job.idempotency_key,
+                    "status": job.status,
+                }
+                receipt["execution"] = {"started": True}
+    return receipt

@@ -216,8 +216,9 @@ API](AI_EXTERNAL_API.md).
 
 ## Remote MCP
 
-The optional Cloud Run service uses existing browser login to authorize one
-supported ChatGPT CIMD client and one pre-registered public Codex client.
+The optional Cloud Run service uses existing browser login to authorize the
+supported ChatGPT and Antigravity CIMD clients and the pre-registered public
+Codex client.
 Both site AI policy flags gate authorization and existing grants. Eligible
 active non-public Lagniappe users may connect. There is no actor allowlist in
 installation configuration. The login email need not
@@ -251,6 +252,9 @@ Opaque codes and tokens have digest-addressed records in the `mcp_oauth`
 Datastore kind. Pending requests last ten minutes, codes five minutes, access
 tokens thirty minutes, and grants at most thirty days. Refresh rotates the
 token; reuse of an already-used refresh token revokes its grant family.
+Per RFC 8707, `refresh_token` grants may omit `resource` and inherit the
+resource already bound to the stored grant (an explicit mismatched `resource`
+is still rejected with `invalid_target`).
 There is one active grant per Lagniappe user **and client**. Reconnecting
 ChatGPT replaces that user's ChatGPT grant; reconnecting Codex replaces only
 Codex. **Manage AI connections**

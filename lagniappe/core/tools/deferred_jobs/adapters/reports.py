@@ -1,6 +1,7 @@
 """Deferred-job adapters for the reports domain."""
 
 from copy import deepcopy
+import hashlib
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -8,6 +9,7 @@ from lagniappe.core.definitions import (
     Action,
     DeferredJobInspection,
     DeferredJobPhase,
+    DeferredJobStatus,
     DeferredJobType,
     Fetch,
     MutationIntent,
@@ -172,6 +174,47 @@ class ReportAdapter(DeferredJobAdapter):
         outcome = external_operations.save_plan_if_idle(report, snapshot)
         if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
             raise DeferredJobDriftError("Report changed during generation cleanup.")
+        if (
+            context.job.status == DeferredJobStatus.SUCCEEDED.value
+            and context.parameters.get("auto_execute")
+            and report.status == "ready"
+            and (report.proposal or {}).get("actions")
+            and getattr(report, "origin", "web") == "web"
+        ):
+            context.parameters.pop("auto_execute", None)
+            self._chain_auto_execution(context, report)
+
+    def _chain_auto_execution(self, context, report):
+        from lagniappe.core.tools.ai.auto_execute import (
+            can_auto_execute_onsite_plan,
+            plan_requires_review,
+        )
+        from lagniappe.core.tools.ai.reporting.execution.request import (
+            request_execution,
+        )
+
+        actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+        if not can_auto_execute_onsite_plan(actor):
+            return
+        pause_reason = plan_requires_review(report)
+        if pause_reason:
+            report.db["auto_execute_pause_reason"] = pause_reason
+            Entities.save_root(report, property_mask=("auto_execute_pause_reason",))
+            return
+        identity = hashlib.sha256(
+            str(context.job.idempotency_key or context.job.urlsafe_key).encode("utf-8")
+        ).hexdigest()[:48]
+        try:
+            request_execution(
+                report,
+                actor,
+                operation_id=f"auto-execute-{identity}",
+                expected_fingerprint=proposal_fingerprint(report.proposal),
+                auto_execute=True,
+            )
+        except exceptions.ValidationError as error:
+            report.db["auto_execute_pause_reason"] = str(error)
+            Entities.save_root(report, property_mask=("auto_execute_pause_reason",))
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
@@ -381,6 +424,17 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             from lagniappe.core.tools.experiments import can_execute
             if not can_execute(context.actor, remote_mcp=True):
                 raise exceptions.ValidationError("Experiments execution is no longer allowed for this actor.")
+        elif context.parameters.get("external_execution"):
+            from lagniappe.core.tools.ai.auto_execute import can_execute_external_plan
+            if not can_execute_external_plan(
+                context.actor,
+                remote_mcp=bool(context.parameters.get("remote_mcp")),
+            ):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
+        elif context.parameters.get("auto_execute"):
+            from lagniappe.core.tools.ai.auto_execute import can_auto_execute_onsite_plan
+            if not can_auto_execute_onsite_plan(context.actor):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         super().authorize(context)
@@ -459,6 +513,19 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
             if not can_execute(actor, remote_mcp=True):
                 raise exceptions.ValidationError("Experiments execution is no longer allowed for this actor.")
+        elif context.parameters.get("external_execution"):
+            from lagniappe.core.tools.ai.auto_execute import can_execute_external_plan
+            actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+            if not can_execute_external_plan(
+                actor,
+                remote_mcp=bool(context.parameters.get("remote_mcp")),
+            ):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
+        elif context.parameters.get("auto_execute"):
+            from lagniappe.core.tools.ai.auto_execute import can_auto_execute_onsite_plan
+            actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+            if not can_auto_execute_onsite_plan(actor):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
 
     def failure(self, context, error):
         report = context.input("report")

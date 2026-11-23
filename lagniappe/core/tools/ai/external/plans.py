@@ -48,13 +48,34 @@ def _plan_name(instructions, requested=None):
 # @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
 # @matrix agent-api ai-report : draft report-session
 # @pair agent-api:entitlement-independent
-def create_plan(user, *, instructions="", name=None, remote_mcp=False, revises_plan_id=None):
+def create_plan(
+    user,
+    *,
+    instructions="",
+    name=None,
+    remote_mcp=False,
+    revises_plan_id=None,
+    require_review=False,
+):
     """Create a durable draft report without dispatching a provider job."""
     if revises_plan_id is not None and (not isinstance(revises_plan_id, str) or not revises_plan_id):
         raise exceptions.ValidationError("revises_plan_id must be a nonempty plan ID.")
     instructions = str(instructions or "").strip()
     if _text_bytes(instructions) > MAX_INSTRUCTIONS_BYTES:
         raise exceptions.ValidationError("Instructions are too large.")
+
+    manifest = {
+        "version": 1,
+        "source": "remote_mcp" if remote_mcp else "api",
+        "contract_version": CONTRACT_VERSION,
+        "created_at": _utcnow().isoformat(),
+        "original_brief": {
+            "name": _plan_name(instructions, name),
+            "instructions": instructions,
+        },
+    }
+    if require_review:
+        manifest["require_review"] = True
 
     report = Entities.REPORT.create(
         {
@@ -65,16 +86,7 @@ def create_plan(user, *, instructions="", name=None, remote_mcp=False, revises_p
             "origin": "api",
             "status": "draft",
             "pending": False,
-            "agent_manifest": {
-                "version": 1,
-                "source": "remote_mcp" if remote_mcp else "api",
-                "contract_version": CONTRACT_VERSION,
-                "created_at": _utcnow().isoformat(),
-                "original_brief": {
-                    "name": _plan_name(instructions, name),
-                    "instructions": instructions,
-                },
-            },
+            "agent_manifest": manifest,
         }
     )
     if revises_plan_id:
@@ -104,6 +116,7 @@ def submit_plan(
     save=None,
     name=None,
     instructions=None,
+    require_review=None,
 ):
     if getattr(report, "result", None):
         raise exceptions.ValidationError(
@@ -142,11 +155,17 @@ def submit_plan(
     brief_changed = any(
         getattr(report, field) != value.strip() for field, value in brief.items()
     )
+    review_changed = (
+        require_review is not None
+        and bool((report.agent_manifest or {}).get("require_review", False))
+        != bool(require_review)
+    )
     if report.status in {"draft", "ready"} or (
         report.output_kind == "answer" and report.status == "complete"
     ):
         if (
             not brief_changed
+            and not review_changed
             and file_usage == (report.file_usage or [])
             and proposal_fingerprint(normalized)
             == proposal_fingerprint(report.proposal)
@@ -180,6 +199,11 @@ def submit_plan(
     manifest["submitted_at"] = _utcnow().isoformat()
     manifest["proposal_fingerprint"] = proposal_fingerprint(normalized)
     manifest["public_references"] = public_references
+    if require_review is not None:
+        if require_review:
+            manifest["require_review"] = True
+        else:
+            manifest.pop("require_review", None)
     report.agent_manifest = manifest
     (save or Entities.save)(report)
     return report
@@ -295,7 +319,7 @@ def submit_plan_request(report, user, data, *, request_id):
                 save=save,
                 **{
                     field: data[field]
-                    for field in ("name", "instructions")
+                    for field in ("name", "instructions", "require_review")
                     if field in data
                 },
             )

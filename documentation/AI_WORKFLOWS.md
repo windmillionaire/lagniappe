@@ -55,9 +55,18 @@ and file_usage before publication.
 A proposal contains summary, optional answer_markdown, confidence, issues, and
 actions. Markdown is sanitized by the server. `output_kind` is derived from
 actions: empty means answer, otherwise proposal. Answers complete immediately;
-proposals become ready for browser review. Revisions may cross that boundary
-until execution begins. Approval, execution ledgers, and skip controls use
-the existing deterministic report runner.
+proposals become ready for browser review. When the site setting
+`AI_AUTO_EXECUTE` is enabled in Admin → Site Settings → AI Models, non-public
+users may opt in via their Settings page (`User.allow_auto_execute`). The
+homepage **Create a Plan** form shows an **Automatically run safe plans**
+checkbox mirroring the user's saved default so it can be turned off or on per
+request; safe on-site web plans with that option enabled chain directly from
+`ready` into `REPORT_EXECUTION`. Proposals containing `update_form_schema`,
+`needs_review` actions, or non-empty `issues` always pause in `ready` state for
+browser review with an explicit reason banner. Inbound AI email plans never
+auto-execute and always remain review-required. Revisions may cross the
+answer/proposal boundary until execution begins. Approval, execution ledgers,
+and skip controls use the existing deterministic report runner.
 
 Generation and revision can be cancelled from report list/detail views or AI
 Analytics. The control is bound to the exact operation; it requires the creator
@@ -197,13 +206,15 @@ previous version and edits the existing CRDT, with the same checkpoint and retry
 guards as append. Inline changes still belong in the editor; there is no
 block-addressing or separate document replay protocol.
 
-The homepage Plans & Reports panel has independent Active, Executed, and Answers
+The homepage Plans & Reports panel uses Datastore cursor pagination (10 reports
+per page, newest first) and has independent Active, Executed, and Answers
 filters. Active includes unfinished proposals and pending requests (including
 failed and revising states); Executed includes completed proposals.
-Saved answers appear under Answers. Counts include hidden reports. The browser
-remembers each user's choices, initially Active and Answers, and reveals a newly
-created report's category. Unavailable old reports remain visible under Active
-with their normal Delete control.
+Saved answers appear under Answers. Counts reflect the current page, including
+hidden reports on that page. The browser remembers each user's choices,
+initially Active and Answers, and reveals a newly created report's category.
+Unavailable old reports remain visible under Active with their normal Delete
+control.
 
 List snippets flatten Markdown to plain text and show at most five lines at
 the current screen width. Full summaries remain available in each report.

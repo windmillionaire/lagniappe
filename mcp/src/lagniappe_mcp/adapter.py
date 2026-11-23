@@ -270,7 +270,10 @@ class LagniappeAdapter:
             elif definition.kind.startswith("start_"):
                 result = await self._start_plan(definition.kind, value)
             elif definition.kind == "get_plan":
-                result = await self._get_plan(value["plan_id"])
+                result = await self._get_plan(
+                    value["plan_id"],
+                    include_proposal=bool(value.get("include_proposal", False)),
+                )
             elif definition.kind == "get_plan_contract":
                 result = await self._get_contract_projection(
                     value["plan_id"],
@@ -329,6 +332,8 @@ class LagniappeAdapter:
             body["name"] = arguments["name"]
         if "revises_plan_id" in arguments:
             body["revises_plan_id"] = arguments["revises_plan_id"]
+        if "require_review" in arguments:
+            body["require_review"] = arguments["require_review"]
         value, _request_id = await self.rest.request_json(method, route, body=body)
         plan = self._safe_plan(value)
         return await self._with_lifecycle_context(
@@ -405,12 +410,17 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _get_plan(self, plan_id: str) -> AdapterResult:
+    async def _get_plan(
+        self, plan_id: str, *, include_proposal: bool = False
+    ) -> AdapterResult:
         encoded = quote_path_segment(plan_id)
         method, route, _tool = PLAN_ROUTES["get_plan"]
+        target = route.format(plan_id=encoded)
+        if not include_proposal:
+            target += "?include_proposal=false"
         value, _request_id = await self.rest.request_json(
             method,
-            route.format(plan_id=encoded),
+            target,
         )
         return AdapterResult(self._safe_plan(value, expected_plan_id=plan_id))
 
@@ -513,7 +523,7 @@ class LagniappeAdapter:
         body["contract_version"] = arguments["contract_version"]
         body["file_usage"] = deepcopy(arguments["file_usage"])
         body["proposal"] = deepcopy(arguments["proposal"])
-        for field in ("name", "instructions"):
+        for field in ("name", "instructions", "require_review", "execute", "operation_id"):
             if field in arguments:
                 body[field] = arguments[field]
         value, _request_id = await self.rest.request_json(

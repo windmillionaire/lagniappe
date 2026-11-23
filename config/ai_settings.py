@@ -2,6 +2,22 @@
 
 
 AI_SETTING_KEYS = ("AI_MODEL", "AI_UTILITY_MODEL", "AI_IMAGE_MODEL", "AI_LOCATION")
+AI_PERSISTED_SETTING_KEYS = (*AI_SETTING_KEYS, "AI_AUTO_EXECUTE")
+
+
+def _parse_auto_execute(value: object, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off", ""}:
+            return False
+    AISettingsError = _ai_settings_error_class()
+    raise AISettingsError("Automatic plan execution setting must be a boolean.")
 
 
 # @testable false
@@ -67,10 +83,18 @@ def normalize_ai_settings(ai_settings=None, current_settings=None, model_options
     AISettingsError = _ai_settings_error_class()
     defaults = _default_settings(current_settings)
     incoming = dict(ai_settings or {})
-    values = {
+    values: dict[str, object] = {
         key: str(incoming.get(key, defaults[key]) or defaults[key]).strip()
         for key in AI_SETTING_KEYS
     }
+    default_auto_execute = bool((current_settings or {}).get("AI_AUTO_EXECUTE", False))
+    if "AI_AUTO_EXECUTE" in incoming:
+        values["AI_AUTO_EXECUTE"] = _parse_auto_execute(
+            incoming.get("AI_AUTO_EXECUTE"),
+            default=default_auto_execute,
+        )
+    elif default_auto_execute:
+        values["AI_AUTO_EXECUTE"] = True
 
     if values["AI_LOCATION"] != constants.DEFAULT_AI_LOCATION:
         raise AISettingsError("AI endpoint must be global.")
@@ -122,9 +146,16 @@ def apply_ai_settings(app_settings=None, updated_settings=None):
         target = SETTINGS.APP if SETTINGS is not None else app_settings
         settings = app_settings
     else:
-        target = app_settings if app_settings is not None else SETTINGS.APP
+        if app_settings is not None:
+            target = app_settings
+        elif SETTINGS is not None:
+            target = SETTINGS.APP
+        else:
+            raise RuntimeError("SETTINGS is required when app settings are not provided.")
         settings = updated_settings
 
+    if target is None:
+        raise RuntimeError("SETTINGS is required when app settings are not provided.")
     current_settings = settings if settings is not target else target
     normalized = normalize_ai_settings(settings, current_settings=current_settings)
     target.update(normalized)

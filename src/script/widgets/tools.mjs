@@ -35,6 +35,9 @@ export class CreateToolReport extends BaseUpload {
 		this.emailCopyButton = this.target.querySelector(
 			"[data-role='email-copy']",
 		);
+		this.autoExecuteControl = this.target.querySelector(
+			"[data-role='auto-execute-control']",
+		);
 		this.context = uploadElement.contextUpload({
 			text: AI_DROPZONE_TEXT,
 			label: false,
@@ -60,7 +63,7 @@ export class CreateToolReport extends BaseUpload {
 	}
 
 	get html() {
-		return [this.context.element];
+		return [this.context.element, this.autoExecuteControl];
 	}
 
 	async copyEmailAddress() {
@@ -120,6 +123,10 @@ export class CreateToolReport extends BaseUpload {
 	_resetUI() {
 		this.context?.clear();
 		this.dropzone?.show();
+		const autoExecute = this.target.querySelector("[name='auto_execute']");
+		if (autoExecute) {
+			autoExecute.checked = autoExecute.dataset.defaultChecked === "true";
+		}
 		this.form?.hideSubmitButton();
 	}
 

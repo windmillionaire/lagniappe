@@ -44,7 +44,7 @@ def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatc
     monkeypatch.setattr(
         api, "_load_plan", lambda identifier: SimpleNamespace(id=identifier)
     )
-    monkeypatch.setattr(api, "_plan_payload", lambda plan: {"id": plan.id})
+    monkeypatch.setattr(api, "_plan_payload", lambda plan, **kwargs: {"id": plan.id})
     calls = []
 
     def execute(report, user, **kwargs):
@@ -90,6 +90,147 @@ def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatc
     monkeypatch.setattr(CONFIG, "EXPERIMENTS_ENABLED", False)
     assert client.post(url, json=body, headers=remote).status_code == 403
     assert len(calls) == before
+
+
+def test_app_wide_auto_execute_api_key_compact_get_and_one_step_submit(monkeypatch):
+    from lagniappe.core.tools.ai import auto_execute
+
+    actor = SimpleNamespace(
+        email="member@example.test",
+        key="member-key",
+        urlsafe_key="member-key",
+        hash="memberhash12",
+        name="Member",
+        db={"timezone": "UTC"},
+        page=SimpleNamespace(
+            hash="memberhash12",
+            name="Member",
+            url="/pages/member",
+            allowed=lambda *_a, **_k: True,
+        ),
+        is_authenticated=True,
+        is_active=True,
+        is_public=False,
+        is_admin=False,
+        allow_auto_execute=True,
+    )
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "EXPERIMENTS_ENABLED", False)
+    monkeypatch.setattr(
+        auto_execute,
+        "runtime_ai_settings",
+        lambda config=CONFIG: {"AI_AUTO_EXECUTE": True},
+    )
+    monkeypatch.setattr(agent_api, "authenticate_credential", lambda token: (actor, {"active": True}))
+    monkeypatch.setattr(api, "_rate_limit", lambda *args: None)
+
+    plan_calls = []
+
+    def fake_plan_payload(plan, *, include_proposal=True):
+        plan_calls.append(include_proposal)
+        return {
+            "id": plan.urlsafe_key,
+            "status": plan.status,
+            "preview_url": "https://example.test/tools/api-plan/plan-1",
+            "review_url": "https://example.test/tools/reports/plan-1",
+            "status_url": "https://example.test/api/v1/plans/plan-1",
+            "contract_version": 10,
+            "proposal": {"summary": "full"} if include_proposal else None,
+        }
+
+    report = SimpleNamespace(
+        urlsafe_key="plan-1",
+        status="ready",
+        available=True,
+        output_kind="proposal",
+        proposal={"summary": "Create a task", "actions": [{"id": "a1", "type": "create_task", "data": {}}], "issues": []},
+        agent_manifest={"proposal_fingerprint": "f" * 64},
+    )
+    monkeypatch.setattr(api, "_load_plan", lambda identifier: report)
+    monkeypatch.setattr(api, "_plan_payload", fake_plan_payload)
+    monkeypatch.setattr(api.external_api, "require_submission_available", lambda _r: None)
+
+    def fake_request_execution(r, u, **kwargs):
+        r.status = "running"
+        return (
+            SimpleNamespace(idempotency_key=kwargs["operation_id"], status="queued"),
+            None,
+        )
+
+    monkeypatch.setattr(execution, "request_execution", fake_request_execution)
+
+    client = app.test_client()
+    headers = {"Authorization": "Bearer direct-key"}
+
+    me = client.get("/api/v1/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json["capabilities"] == {"plans": True, "execute_plan": True}
+
+    compact = client.get("/api/v1/plans/plan-1?include_proposal=false", headers=headers)
+    assert compact.status_code == 200
+    assert compact.json["proposal"] is None
+    assert plan_calls[-1] is False
+
+    full = client.get("/api/v1/plans/plan-1", headers=headers)
+    assert full.status_code == 200
+    assert full.json["proposal"] == {"summary": "full"}
+    assert plan_calls[-1] is True
+
+    executed = client.post(
+        "/api/v1/plans/plan-1/execute",
+        headers=headers,
+        json={"proposal_fingerprint": "f" * 64, "operation_id": "direct-op-1"},
+    )
+    assert executed.status_code == 202
+    assert executed.json["plan"]["proposal"] is None
+    assert plan_calls[-1] is False
+    assert executed.json["operation"] == {"id": "direct-op-1", "status": "queued"}
+
+    # One-step submit with execute=True (safe -> starts execution)
+    monkeypatch.setattr(
+        api.external_api,
+        "submit_plan_request",
+        lambda *_a, **_k: report,
+    )
+    submitted_run = client.post(
+        "/api/v1/plans/plan-1/submit",
+        headers=headers,
+        json={
+            "contract_version": 10,
+            "proposal": {},
+            "file_usage": [],
+            "execute": True,
+            "operation_id": "one-step-1",
+        },
+    )
+    assert submitted_run.status_code == 200
+    assert submitted_run.json["status"] == "running"
+    assert submitted_run.json["operation"] == {"id": "one-step-1", "status": "queued"}
+    assert submitted_run.json["execution"] == {"started": True}
+
+    # One-step submit with execute=True on a safety-paused proposal -> stays ready with pause reason
+    report.status = "ready"
+    report.proposal = {
+        "summary": "Schema change",
+        "actions": [{"id": "a1", "type": "update_form_schema", "data": {}}],
+        "issues": [],
+    }
+    submitted_paused = client.post(
+        "/api/v1/plans/plan-1/submit",
+        headers=headers,
+        json={
+            "contract_version": 10,
+            "proposal": {},
+            "file_usage": [],
+            "execute": True,
+            "operation_id": "one-step-2",
+        },
+    )
+    assert submitted_paused.status_code == 200
+    assert submitted_paused.json["status"] == "ready"
+    assert submitted_paused.json["execution"]["started"] is False
+    assert "form schema" in submitted_paused.json["execution"]["reason"].lower()
 
 
 # @matrix experiments : request-measurements

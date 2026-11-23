@@ -366,9 +366,29 @@ def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth, 
     refreshed = auth.exchange_token(
         _refresh(oauth, tokens["refresh_token"]), now=NOW + timedelta(days=29)
     )
+    # RFC 8707: refresh_token may omit resource (inheriting the grant's bound resource),
+    # while an explicit mismatched resource is still rejected with invalid_target.
+    with pytest.raises(auth.OAuthError) as bad_refresh_target:
+        auth.exchange_token(
+            {**_refresh(oauth, refreshed["refresh_token"]), "resource": oauth.config["issuer"]},
+            now=NOW + timedelta(days=29, minutes=1),
+        )
+    assert bad_refresh_target.value.code == "invalid_target"
+    refreshed_without_resource = auth.exchange_token(
+        {
+            "grant_type": "refresh_token",
+            "client_id": oauth.config["client_id"],
+            "refresh_token": refreshed["refresh_token"],
+        },
+        now=NOW + timedelta(days=29, minutes=2),
+    )
+    assert auth.authenticate_access(
+        refreshed_without_resource["access_token"],
+        now=NOW + timedelta(days=29, minutes=3),
+    )[0] is oauth.actor
     with pytest.raises(auth.OAuthError):
         auth.exchange_token(
-            _refresh(oauth, refreshed["refresh_token"]),
+            _refresh(oauth, refreshed_without_resource["refresh_token"]),
             now=NOW + timedelta(seconds=REFRESH_SECONDS),
         )
     oauth.actor.is_active = False
@@ -708,6 +728,60 @@ def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
     assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
     with pytest.raises(auth.OAuthError):
         auth.begin_authorization({**request, "client_id": "unregistered"})
+
+
+# @matrix mcp-oauth : cimd authorization consent token refresh revocation client-isolation
+def test_antigravity_cimd_grants_coexist_with_chatgpt_and_codex(oauth, monkeypatch):
+    from config.remote_mcp import ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI
+
+    documents = {
+        oauth.config["client_id"]: oauth.document,
+        ANTIGRAVITY_CLIENT_ID: {
+            "client_id": ANTIGRAVITY_CLIENT_ID,
+            "redirect_uris": [ANTIGRAVITY_REDIRECT_URI],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+        },
+    }
+
+    def fetch(url, policy):
+        oauth.downloads.append((url, policy))
+        return SimpleNamespace(
+            ok=True,
+            http_status=200,
+            redirect_count=0,
+            body=json.dumps(documents[url]).encode(),
+        )
+
+    monkeypatch.setattr(auth, "fetch_user_content", fetch)
+    chatgpt = auth.exchange_token(_code(oauth))
+    request = {
+        **oauth.request,
+        "client_id": ANTIGRAVITY_CLIENT_ID,
+        "redirect_uri": ANTIGRAVITY_REDIRECT_URI,
+    }
+    pending = auth.begin_authorization(request)
+    target, response = auth.consent(pending, oauth.actor, allow=True)
+    assert target == ANTIGRAVITY_REDIRECT_URI
+    assert response["iss"] == oauth.config["issuer"]
+    antigravity = auth.exchange_token({
+        "grant_type": "authorization_code",
+        "client_id": ANTIGRAVITY_CLIENT_ID,
+        "redirect_uri": target,
+        "resource": oauth.config["resource"],
+        "code": response["code"],
+        "code_verifier": VERIFIER,
+    })
+    assert auth.authenticate_access(antigravity["access_token"])[0] is oauth.actor
+    assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
+    assert auth.connection_status(oauth.actor)["active"]
+    assert auth.connection_status(oauth.actor, client_id=ANTIGRAVITY_CLIENT_ID)["active"]
+    # Revoking Antigravity leaves ChatGPT intact.
+    auth.connection_status(oauth.actor, client_id=ANTIGRAVITY_CLIENT_ID, revoke=True)
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(antigravity["access_token"])
+    assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
 
 
 # @matrix mcp-oauth : site-policy existing-grants user-binding

@@ -13,7 +13,13 @@ from flask import (
 )
 from flask_login import current_user
 
-from config.remote_mcp import CLIENT_ID, CODEX_CLIENT_ID, PENDING_SECONDS, mcp_issuer
+from config.remote_mcp import (
+    ANTIGRAVITY_CLIENT_ID,
+    CLIENT_ID,
+    CODEX_CLIENT_ID,
+    PENDING_SECONDS,
+    mcp_issuer,
+)
 from lagniappe import CONFIG
 from lagniappe.core.tools.auth import remote_mcp as auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
@@ -22,6 +28,12 @@ from . import oauth, oauth_metadata
 
 
 _PENDING_COOKIE = "__Secure-lagniappe-mcp-pending"
+_CLIENT_LABELS = (
+    (CLIENT_ID, "ChatGPT"),
+    (CODEX_CLIENT_ID, "Codex"),
+    (ANTIGRAVITY_CLIENT_ID, "Antigravity"),
+)
+_CLIENT_NAME_BY_ID = dict(_CLIENT_LABELS)
 
 
 # @testable false
@@ -152,7 +164,7 @@ def authorize():
         consent=True,
         pending=pending,
         resource=CONFIG.MCP_RESOURCE,
-        client_name="Codex" if pending_request["client_id"] == CODEX_CLIENT_ID else "ChatGPT",
+        client_name=_CLIENT_NAME_BY_ID.get(pending_request["client_id"], "ChatGPT"),
     )
 
 
@@ -206,9 +218,8 @@ def connection():
         auth.connection_status(
             user, client_id=parameters.get("client_id", CLIENT_ID), revoke=True
         )
-    clients = [(CLIENT_ID, "ChatGPT"), (CODEX_CLIENT_ID, "Codex")]
     connections = [
         {"client_id": client_id, "name": name, **auth.connection_status(user, client_id=client_id)}
-        for client_id, name in clients
+        for client_id, name in _CLIENT_LABELS
     ]
     return render_template("oauth/connection.html", connections=connections)

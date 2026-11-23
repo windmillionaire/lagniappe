@@ -16,11 +16,24 @@ permission-bounded read tools as the built-in AI workflows. Ordinary questions
 and task lookups use plan-free reads and are answered in the conversation. Only
 when the user requests saving an answer or workspace changes does the client
 create a Plan. All requests share one contract; the server derives output_kind
-from actions. Ordinary connections require browser approval of proposals. A
-dedicated [experiments installation](INFRA_EXPERIMENTS.md) can grant its admin
-agent the `execute_plan` tool through verified remote MCP; direct API keys
-remain on the browser review workflow. External requests do not call Lagniappe's
-model.
+from actions. Ordinary connections require browser approval of proposals. When an
+Administrator enables **Allow automatic plan execution** (`AI_AUTO_EXECUTE` in
+Admin → Site Settings → AI Models) and a non-public user opts in on their own
+Settings page (`User.allow_auto_execute`), both direct REST API keys and remote
+MCP connections receive `capabilities.execute_plan: true`. A dedicated
+[experiments installation](INFRA_EXPERIMENTS.md) may also grant its designated
+admin agent `execute_plan` through verified remote MCP via
+`EXPERIMENTS_EXECUTION_ENABLED`. When `capabilities.execute_plan` is true,
+clients can execute safe submitted proposals either via standalone
+`POST /api/v1/plans/{plan_id}/execute` (or MCP `execute_plan`) or in one step
+via `submitPlan` / `submit_plan` with `execute: true` and a stable
+`operation_id`. Proposals containing `update_form_schema`, `needs_review`
+actions, non-empty `issues`, or per-request `require_review: true` always pause
+in `ready` state for authenticated browser review. `POST /plans/{plan_id}/execute`
+returns a compact plan receipt (`include_proposal=false`), and
+`GET /plans/{plan_id}` accepts `?include_proposal=false` (the default for MCP
+`get_plan`, with optional `include_proposal=true`) for compact status polling.
+External requests do not call Lagniappe's model.
 
 Database operation claims and publication notifications use the shared
 `REPORT_FORMAT_VERSION`, just like report creation and availability checks.

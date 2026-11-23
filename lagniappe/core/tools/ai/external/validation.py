@@ -84,6 +84,47 @@ def submission_validation_errors(data, report, user):
                 }
             )
 
+    for field in ("require_review", "execute"):
+        if field in data and not isinstance(data[field], bool):
+            errors.append(
+                {
+                    "code": "type",
+                    "path": f"$.{field}",
+                    "message": f"{field} must be a boolean.",
+                    "expected": "boolean",
+                }
+            )
+    if "operation_id" in data:
+        from ..auto_execute import OPERATION_ID_PATTERN
+
+        op_id = data["operation_id"]
+        if not isinstance(op_id, str) or not OPERATION_ID_PATTERN.fullmatch(op_id):
+            errors.append(
+                {
+                    "code": "invalid_operation_id",
+                    "path": "$.operation_id",
+                    "message": "operation_id must be 1–128 ASCII letters, digits, dots, underscores, or hyphens.",
+                }
+            )
+    if data.get("execute") is True:
+        if "operation_id" not in data:
+            errors.append(
+                {
+                    "code": "required",
+                    "path": "$.operation_id",
+                    "message": "operation_id is required when execute is true.",
+                    "expected": "string",
+                }
+            )
+        if data.get("require_review") is True:
+            errors.append(
+                {
+                    "code": "invalid_execution",
+                    "path": "$.execute",
+                    "message": "execute cannot be true when require_review is true.",
+                }
+            )
+
     version = data.get("contract_version")
     if "contract_version" in data and (
         isinstance(version, bool)

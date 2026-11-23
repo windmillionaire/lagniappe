@@ -365,6 +365,10 @@ export class UserSettings extends FormWidget {
 		return this.target.querySelector("[data-role='api-key-settings']");
 	}
 
+	get autoExecuteElement() {
+		return this.target.querySelector("[data-role='auto-execute-settings']");
+	}
+
 	get ownerInboundElement() {
 		return this.target.querySelector("[data-role='owner-inbound']");
 	}
@@ -405,6 +409,7 @@ export class UserSettings extends FormWidget {
 				this.userGroupsElement,
 				this.userAiAccessElement,
 				this.notificationEmailElement,
+				this.autoExecuteElement,
 				this.apiKeyElement,
 				publicEmailConsent,
 				this.ownerInboundElement,
@@ -454,6 +459,17 @@ export class UserSettings extends FormWidget {
 			notificationEmail
 		) {
 			data.set("notification_email_mode", notificationEmail.value);
+		}
+		if (this.target.dataset.canEditAutoExecute === "true") {
+			const allowAutoExecute = card?.querySelector(
+				"[name='allow_auto_execute']",
+			);
+			if (allowAutoExecute) {
+				data.set(
+					"allow_auto_execute",
+					allowAutoExecute.checked ? "true" : "false",
+				);
+			}
 		}
 		if (this.target.dataset.canEditPublicEmail === "true") {
 			const allowSiteEmail = card?.querySelector("[name='allow_site_email']");

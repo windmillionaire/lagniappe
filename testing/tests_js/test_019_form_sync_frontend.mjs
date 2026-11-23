@@ -309,6 +309,7 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 		value: "native-utility",
 		closest: () => ({ _lp_combobox: { values: new Set() } }),
 	};
+	const autoExecuteInput = { checked: true };
 	const form = {
 		initialData: [
 			["AI_MODEL", "stale-form-primary"],
@@ -317,6 +318,8 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 			["AI_LOCATION", "global"],
 		],
 		querySelectorAll: () => [primary, utility],
+		querySelector: (selector) =>
+			selector === "[name='AI_AUTO_EXECUTE']" ? autoExecuteInput : null,
 	};
 	const settings = Object.create(SiteAiModels.prototype);
 	settings.aiForm = form;
@@ -335,6 +338,17 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 		[data.get("AI_IMAGE_MODEL"), data.get("AI_LOCATION")],
 		["saved-image", "global"],
 		"preserves non-combobox fields",
+	);
+	assert.equal(
+		data.get("AI_AUTO_EXECUTE"),
+		"true",
+		"submits AI_AUTO_EXECUTE checkbox state",
+	);
+	autoExecuteInput.checked = false;
+	assert.equal(
+		settings._aiSettingsFormData().get("AI_AUTO_EXECUTE"),
+		"false",
+		"submits false when AI_AUTO_EXECUTE is unchecked",
 	);
 });
 

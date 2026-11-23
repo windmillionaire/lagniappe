@@ -16,10 +16,11 @@ from google.oauth2 import id_token
 
 from config.remote_mcp import (
     ACCESS_SECONDS,
+    ANTIGRAVITY_CLIENT_ID,
+    CIMD_CLIENTS,
     CODE_SECONDS,
     CODEX_CLIENT_ID,
     CLIENT_ID,
-    REDIRECT_URI,
     mcp_issuer,
     client_allowed,
     redirect_allowed,
@@ -49,7 +50,7 @@ _CLIENT_POLICY = UserFetchPolicy(
     read_timeout=5,
     deadline=10,
 )
-_client_cache = None
+_client_cache: dict[tuple[str, str], tuple[float, dict[str, str]]] | None = {}
 _client_lock = threading.Lock()
 _CERTIFICATE_URL = "https://www.googleapis.com/oauth2/v1/certs"
 _CERTIFICATE_POLICY = UserFetchPolicy(
@@ -231,19 +232,19 @@ def _certificate_request(url, method="GET"):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection
 # @matrix mcp-oauth : cimd validation
 def client_metadata(client_id):
-    """Fetch only the supported ChatGPT document, with no DCR or client secret."""
+    """Fetch only supported CIMD documents, with no DCR or client secret."""
     global _client_cache
     settings()
-    if client_id != CLIENT_ID:
+    expected_redirect = CIMD_CLIENTS.get(client_id)
+    if expected_redirect is None:
         raise OAuthError("invalid_client")
-    cache_key = (client_id, REDIRECT_URI)
+    cache_key = (client_id, expected_redirect)
     with _client_lock:
-        if (
-            _client_cache
-            and _client_cache[0] == cache_key
-            and _client_cache[1] > time.monotonic()
-        ):
-            return _client_cache[2]
+        if not isinstance(_client_cache, dict):
+            _client_cache = {}
+        cached = _client_cache.get(cache_key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
         result = fetch_user_content(client_id, _CLIENT_POLICY)
         if not result.ok or result.http_status != 200 or result.redirect_count:
             raise OAuthError("temporarily_unavailable", 503)
@@ -263,7 +264,7 @@ def client_metadata(client_id):
                 or "none" not in methods
                 or not all(isinstance(item, str) for item in methods)
                 or not isinstance(redirects, list)
-                or REDIRECT_URI not in redirects
+                or expected_redirect not in redirects
                 or not all(isinstance(item, str) for item in redirects)
                 or not isinstance(grants, list)
                 or "authorization_code" not in grants
@@ -274,8 +275,8 @@ def client_metadata(client_id):
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise OAuthError("invalid_client") from None
         # Cache only the already validated, minimal public projection.
-        metadata = {"client_id": client_id, "redirect_uri": REDIRECT_URI}
-        _client_cache = (cache_key, time.monotonic() + 300, metadata)
+        metadata = {"client_id": client_id, "redirect_uri": expected_redirect}
+        _client_cache[cache_key] = (time.monotonic() + 300, metadata)
         return metadata
 
 
@@ -321,7 +322,7 @@ def begin_authorization(parameters, *, now=None):
         or any(ord(char) < 32 or ord(char) == 127 for char in state)
     ):
         raise OAuthError("invalid_request")
-    if parameters["client_id"] == CLIENT_ID:
+    if parameters["client_id"] in CIMD_CLIENTS:
         client_metadata(parameters["client_id"])
     now = _now(now)
     pending = _secret("p")
@@ -390,8 +391,11 @@ def consent(pending, user, *, allow, now=None):
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _grant_name(user, client_id=None):
-    # Preserve existing ChatGPT grants when adding independent Codex grants.
-    suffix = "-codex" if client_id == CODEX_CLIENT_ID else ""
+    # Preserve existing ChatGPT and Codex grants when adding independent client grants.
+    suffix = {
+        CODEX_CLIENT_ID: "-codex",
+        ANTIGRAVITY_CLIENT_ID: "-antigravity",
+    }.get(client_id, "")
     return "grant-" + credential_id(user) + suffix
 
 
@@ -405,14 +409,18 @@ def exchange_token(parameters, *, now=None):
     now = _now(now)
     if not client_allowed(parameters.get("client_id")):
         raise OAuthError("invalid_client")
-    if parameters.get("resource") != config["resource"]:
-        raise OAuthError("invalid_target")
     if parameters.get("scope") not in (None, "", LEGACY_SCOPE):
         raise OAuthError("invalid_scope")
     grant_type = parameters.get("grant_type")
     if grant_type not in {"authorization_code", "refresh_token"}:
         raise OAuthError("unsupported_grant_type")
     is_code = grant_type == "authorization_code"
+    resource = parameters.get("resource")
+    if is_code:
+        if resource != config["resource"]:
+            raise OAuthError("invalid_target")
+    elif resource not in (None, "", config["resource"]):
+        raise OAuthError("invalid_target")
     incoming = parameters.get("code" if is_code else "refresh_token")
     name = _name(incoming, "c" if is_code else "r")
     candidate = store.read(name)

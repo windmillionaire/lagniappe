@@ -64,7 +64,18 @@ def _load_page_settings_relations(page, *, restrictions=False):
 # @matrix notes : empty-presence etag
 def _page_view_fingerprint(page, user):
     """Empty-notes discovery changes initial HTML, not the Page's content revision."""
-    return f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
+    base = f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
+    if getattr(page, "user", None):
+        from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
+
+        return f"{base}:{int(site_auto_execute_enabled())}"
+    return base
+
+
+def _user_settings_fingerprint(page, user):
+    from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
+
+    return f"{page.fingerprint}:{int(site_auto_execute_enabled())}"
 
 
 # @testable true
@@ -98,7 +109,7 @@ def info(key, **kwargs):
 # @testable infrastructure
 # @covered-by lagniappe/web/responses.py::user_settings
 @pages.route("<key>/user-settings/replace", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
+@permission(Resource.PAGE, Action.VIEW, fingerprint=_user_settings_fingerprint)
 def user_settings(key, **kwargs):
     page = kwargs["entity"]
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
@@ -233,6 +244,8 @@ def _page_data(form, page=None, category=None):
         page_data["notification_email_mode"] = form.get("notification_email_mode")
     if "allow_site_email" in form:
         page_data["allow_site_email"] = form.get("allow_site_email") == "true"
+    if "allow_auto_execute" in form:
+        page_data["allow_auto_execute"] = form.get("allow_auto_execute") == "true"
     for toggle in ("allow_messages_and_mentions", "allow_task_assignments"):
         if toggle in form:
             page_data[toggle] = form.get(toggle) == "true"

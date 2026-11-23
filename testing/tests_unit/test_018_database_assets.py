@@ -1448,6 +1448,7 @@ def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch
         "AI_UTILITY_MODEL": "gemini-3.1-flash-lite",
         "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
         "AI_LOCATION": "global",
+        "AI_AUTO_EXECUTE": True,
         "unrelated": "ignored",
     }
     site_database.save_ai(ai_data)
@@ -1459,6 +1460,7 @@ def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch
             "AI_UTILITY_MODEL": "gemini-3.1-flash-lite",
             "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
             "AI_LOCATION": "global",
+            "AI_AUTO_EXECUTE": True,
             "version": 3,
         }
     ]

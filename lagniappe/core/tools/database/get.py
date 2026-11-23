@@ -794,10 +794,22 @@ def notes_by_user(user):
 
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @matrix ai-report home : list query
-def ai_reports(user_key):
-    """Fetch AI report activity records belonging to a user."""
-    return activity(user_key, types=("report",))
+# @matrix ai-report home : list query pagination
+def ai_reports(user_key, *, start_cursor=None, limit=10):
+    """Fetch paginated AI report activity records belonging to a user."""
+    parent_key = datastore_key(user_key)
+    if not parent_key:
+        return _empty_results()
+
+    return (
+        Query(KINDS.activity)
+        .ancestor(parent_key)
+        .filter(Filter().eq("type", "report"))
+        .order("-created")
+        .limit(limit)
+        .cursor(start_cursor)
+        .fetch()
+    )
 
 
 # @testable false

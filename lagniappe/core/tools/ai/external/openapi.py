@@ -213,13 +213,16 @@ def build_openapi_document(*, app_name, server_url):
         "/api/v1/plans/{plan_id}/execute": {
             "post": {
                 "operationId": "executePlan",
-                "summary": "Execute a submitted plan on an experiments installation",
+                "summary": "Execute a submitted plan when auto-execution is enabled",
                 "description": (
-                    "Requires the designated Administrator agent, a verified remote MCP "
-                    "connection, and the installation's explicit execute_plan capability. "
-                    "Ordinary API keys cannot execute. Supply the fingerprint from submit "
-                    "and a stable operation_id; repeat the exact request after an ambiguous "
-                    "timeout, then poll getPlan. Uses the normal report execution ledger."
+                    "Available when capabilities.execute_plan is true (either via "
+                    "site+user automatic plan execution on API/MCP, or an experiments "
+                    "installation's designated remote MCP admin agent). Supply the "
+                    "proposal_fingerprint from submit and a stable operation_id; "
+                    "repeat the exact request after an ambiguous timeout, then poll "
+                    "getPlan. Proposals with update_form_schema, needs_review, issues, "
+                    "or require_review=true pause in ready state for browser review. "
+                    "Returns a compact plan receipt without echoing the full proposal."
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -248,15 +251,27 @@ def build_openapi_document(*, app_name, server_url):
                 "operationId": "getPlan",
                 "summary": "Get plan state",
                 "description": (
-                    "Checks draft/ready state, finalized files, pending uploads, "
-                    "contract and browser-review URLs, and any submitted execution-"
-                    "normalized proposal. The proposal is projected back into the "
-                    "public hash-reference and Markdown submission contract so a "
-                    "reusable Plan can be edited and submitted again. The plan ID is "
-                    "the top-level id field in every plan response."
+                    "Checks draft/ready/running/complete state, finalized files, "
+                    "pending uploads, contract and browser-review URLs, execution "
+                    "outcomes, and optionally the submitted execution-normalized "
+                    "proposal. Pass include_proposal=false for compact polling "
+                    "without re-sending the full proposal. The plan ID is the "
+                    "top-level id field in every plan response."
                 ),
                 "tags": ["Plans"],
-                "parameters": [plan_parameter],
+                "parameters": [
+                    plan_parameter,
+                    {
+                        "name": "include_proposal",
+                        "in": "query",
+                        "required": False,
+                        "description": (
+                            "Include the full public proposal body. Set to false "
+                            "for compact status and execution-outcome polling."
+                        ),
+                        "schema": {"type": "boolean", "default": True},
+                    },
+                ],
                 "responses": {
                     "200": {
                         "description": "Current plan state.",
@@ -442,11 +457,14 @@ def build_openapi_document(*, app_name, server_url):
                     "do not require files. Supply file_usage for every upload; only organize files "
                     "require summaries and placement. Empty actions save an answer, only after "
                     "the user requests saving. A mutation proposal becomes ready for review. "
-                    "Submission never executes actions. Repeating the same result is accepted; "
+                    "When capabilities.execute_plan is true, pass execute=true and a stable "
+                    "operation_id to save and start safe execution in one step (proposals with "
+                    "update_form_schema, needs_review, issues, or require_review=true pause in "
+                    "ready state for browser review). Pass require_review=true to force browser "
+                    "review for a specific request. Repeating the same result is accepted; "
                     "a later valid mutation proposal replaces the saved result until execution "
                     "begins. Revise the complete result and submit it again. Direct the user to "
                     "preview_url in the authenticated website to review and approve changes."
-
                 ),
                 "tags": ["Plans"],
                 "parameters": [plan_parameter],
@@ -461,8 +479,9 @@ def build_openapi_document(*, app_name, server_url):
                         "description": (
                             "Compact publication receipt. Present preview_url to the user "
                             "for browser review; retain review_url as the canonical full "
-                            "URL. Fetch status_url for detailed plan state. Proposals can only be applied with the existing Execute "
-                            "control on that authenticated browser page."
+                            "URL. Fetch status_url for detailed plan state. When execute=true "
+                            "starts execution, operation and execution.started=true are included; "
+                            "when safety-paused, execution.started is false with a reason."
                         ),
                         **json_content(
                             {"$ref": "#/components/schemas/SubmissionReceipt"}
@@ -536,8 +555,11 @@ def build_openapi_document(*, app_name, server_url):
                 "context; load selected action schemas and get_guidelines task=filing for artifacts. "
                 "Classify every upload in file_usage as evidence or organize. Only organize files "
                 "require an attachment, one summary and two retrieval terms. The server does not call a model "
-                "to complete or repair external proposals. The external API never applies those proposals; "
-                "the website Execute control is the only approval and application path. Reuse a Plan "
+                "to complete or repair external proposals. Proposals require authenticated browser approval "
+                "unless capabilities.execute_plan is enabled for this installation and user, in which case "
+                "safe proposals may be executed through executePlan or submitPlan(execute=true, operation_id=...). "
+                "Proposals with update_form_schema, needs_review, issues, or require_review=true always "
+                "pause in ready state for browser review. Reuse a Plan "
                 "for revisions until execution begins; follow returned lifecycle URLs."
 
             ),
@@ -832,7 +854,7 @@ def build_openapi_document(*, app_name, server_url):
                         "id": {"type": "string"},
                         "status": {
                             "type": "string",
-                            "enum": ["ready", "complete"],
+                            "enum": ["ready", "running", "complete"],
                         },
                         "preview_url": {"type": "string", "format": "uri"},
                         "review_url": {"type": "string", "format": "uri"},
@@ -851,6 +873,22 @@ def build_openapi_document(*, app_name, server_url):
                                 "Digest of the validated normalized proposal. It may "
                                 "differ from a digest of the raw request body."
                             ),
+                        },
+                        "operation": {
+                            "type": "object",
+                            "required": ["id", "status"],
+                            "properties": {
+                                "id": {"type": "string"},
+                                "status": {"type": "string"},
+                            },
+                        },
+                        "execution": {
+                            "type": "object",
+                            "required": ["started"],
+                            "properties": {
+                                "started": {"type": "boolean"},
+                                "reason": {"type": "string"},
+                            },
                         },
                     },
                 },

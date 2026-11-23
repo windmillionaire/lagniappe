@@ -248,6 +248,37 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 	assert.deepEqual(state.getStored(), ["executed", "answers"]);
 });
 
+test("test_paginated_report_list_clarifies_page_scoped_empty_and_delete_labels", async () => {
+	const state = await loadToolReportList();
+	const f = fixture(state.ToolReportList);
+	const clearLabel = { textContent: "" };
+	f.clear.querySelector = (selector) =>
+		selector === "[data-role='delete-executed-label']" ? clearLabel : null;
+	const originalQuery = f.target.querySelector.bind(f.target);
+	f.target.querySelector = (selector) => {
+		if (selector === "[lp-control='next'], [lp-control='previous']") {
+			return { dataset: { route: "/internal/get/tools?cursor=next" } };
+		}
+		return originalQuery(selector);
+	};
+	f.add("done-1", "proposal", "complete");
+	f.widget.filters = new Set(["active", "answers"]);
+	f.widget._renderFilters();
+	assert.equal(f.empty.hidden, false);
+	assert.equal(
+		f.empty.textContent,
+		"No reports match the selected types on this page.",
+	);
+
+	f.widget.filters = new Set(["executed"]);
+	f.widget._renderFilters();
+	assert.equal(f.clear.hidden, false);
+	assert.equal(
+		clearLabel.textContent,
+		"Delete executed proposals on this page",
+	);
+});
+
 // @matrix ai-report : bulk-delete delete-failure delete-snapshot loading-indicator
 test("test_bulk_delete_recovers_from_partial_and_network_failures", async (t) => {
 	replaceGlobal(t, "DOMParser", class {});

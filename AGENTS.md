@@ -129,17 +129,21 @@ These instructions apply to the whole repository unless a more specific
 
 ## Source And Docs
 
-- Before adding or reshaping durable classes/functions/methods, check
-  `documentation/TESTING_TRACEABILITY_TOOL.md` for the source annotation convention.
-- When reviewing whether annotated tests actually cover their referenced source
-  symbols, use `documentation/TESTING_SOURCE_REVIEW.md`.
-- When reviewing UI/E2E tests with `@template` tags, use
-  `venv/bin/python run.py template-contracts`.
-- Run `venv/bin/python run.py traceability --changed --check` after adding,
-  moving, or renaming source symbols in inventoried paths.
+- **EXP-034 (v2.5 active workflow trial)**: Per-symbol `@testable` / `@tests` /
+  `@covered-by` / `@matrix` source annotations and
+  `run.py traceability --changed --check` are **frozen** (non-blocking) while
+  evaluating incremental static typing (`basedpyright` via `pyrightconfig.json`)
+  and stricter `ruff` linting (`B`, `UP`, `SIM`). Do not add new per-symbol
+  traceability comment blocks during this trial; instead:
+  - add Python type annotations to new and modified functions and include
+    newly typed modules in `pyrightconfig.json`;
+  - run `venv/bin/python -m ruff check .` and `venv/bin/python -m basedpyright`;
+  - keep running cross-boundary static checkers when touching their domains:
+    - `venv/bin/python run.py template-contracts --changed --check` (Jinja/JS DOM)
+    - `venv/bin/python run.py traceability --styles --check` (styles/icons)
+    - `venv/bin/python run.py mutation-contracts --check` (entity mutations)
 - Update `documentation/` when changing commands, setup behavior, test layout,
-  source annotation conventions, or other workflows another developer/agent
-  would need to know.
+  or other workflows another developer/agent would need to know.
 - Prefer updating an existing focused doc over creating a new one unless the
   topic clearly needs its own page.
 

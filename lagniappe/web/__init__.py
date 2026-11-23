@@ -187,7 +187,7 @@ def add_lagniappe_headers(response):
         if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE:
             # Browsers enforce form-action on the POST's redirect chain,
             # including the native client's ephemeral loopback listener.
-            destinations = "https://chatgpt.com http://127.0.0.1:*/callback"
+            destinations = "https://chatgpt.com https://antigravity.google http://127.0.0.1:*/callback"
             headers["Content-Security-Policy"] = CSP.replace(
                 "form-action 'self'", "form-action 'self' " + destinations
             )

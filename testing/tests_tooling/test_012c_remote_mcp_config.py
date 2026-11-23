@@ -62,17 +62,30 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
 # @matrix mcp-oauth : configuration validation loopback
 @pytest.mark.tooling
 def test_supported_clients_require_exact_callbacks():
-    from config.remote_mcp import CODEX_CLIENT_ID, client_allowed, redirect_allowed
+    from config.remote_mcp import (
+        ANTIGRAVITY_CLIENT_ID,
+        ANTIGRAVITY_REDIRECT_URI,
+        CODEX_CLIENT_ID,
+        client_allowed,
+        redirect_allowed,
+    )
 
     assert client_allowed(CLIENT_ID)
     assert redirect_allowed(CLIENT_ID, REDIRECT_URI)
+    assert client_allowed(ANTIGRAVITY_CLIENT_ID)
+    assert redirect_allowed(ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI)
+    assert not redirect_allowed(ANTIGRAVITY_CLIENT_ID, REDIRECT_URI)
+    assert not redirect_allowed(CLIENT_ID, ANTIGRAVITY_REDIRECT_URI)
+    assert not redirect_allowed(ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI + "/")
     assert client_allowed(CODEX_CLIENT_ID)
     assert not redirect_allowed(CODEX_CLIENT_ID, REDIRECT_URI)
+    assert not redirect_allowed(CODEX_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI)
     assert not redirect_allowed(CLIENT_ID, REDIRECT_URI + "/")
     assert not redirect_allowed("unregistered", REDIRECT_URI)
     for target in ("http://127.0.0.1/callback", "http://127.0.0.1:54321/callback"):
         assert redirect_allowed(CODEX_CLIENT_ID, target)
         assert not redirect_allowed(CLIENT_ID, target)
+        assert not redirect_allowed(ANTIGRAVITY_CLIENT_ID, target)
     for target in (
         "http://localhost:54321/callback", "http://127.0.0.2:54321/callback",
         "http://127.0.0.1:0/callback", "http://127.0.0.1:65536/callback",

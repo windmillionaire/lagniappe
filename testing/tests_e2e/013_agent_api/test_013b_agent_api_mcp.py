@@ -863,6 +863,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert actor["user"]["name"] == owner.name
         assert actor["capabilities"] == {
             "plans": True,
+            "execute_plan": False,
         }
         assert actor["credential"]["active"] is True
         assert _structured(workflow["answer_context"])["report_created"] is False

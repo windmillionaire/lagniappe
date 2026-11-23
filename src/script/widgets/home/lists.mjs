@@ -185,6 +185,14 @@ export class ToolReportList extends BaseList {
 		return this.reportItems.length;
 	}
 
+	get isPaginated() {
+		return Boolean(
+			this.target.querySelector?.(
+				"[lp-control='next'], [lp-control='previous']",
+			),
+		);
+	}
+
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
@@ -239,18 +247,22 @@ export class ToolReportList extends BaseList {
 			button.querySelector("[data-role='report-count']").textContent =
 				counts[button.dataset.filter];
 		}
+		const paginated = this.isPaginated;
 		const empty = this.target.querySelector("[data-role='report-empty']");
 		if (empty) {
 			empty.hidden = visible > 0;
+			const suffix = paginated ? " on this page." : ".";
 			empty.textContent = !this.filters.size
 				? "Select a report type to show."
 				: this.filters.size === 1
-					? {
-							active: "No active proposals.",
-							executed: "No executed proposals.",
-							answers: "No answers.",
-						}[[...this.filters][0]]
-					: "No reports match the selected types.";
+					? `${
+							{
+								active: "No active proposals",
+								executed: "No executed proposals",
+								answers: "No answers",
+							}[[...this.filters][0]]
+						}${suffix}`
+					: `No reports match the selected types${suffix}`;
 		}
 		const clear = this.target.querySelector(
 			"[data-role='delete-executed-reports']",
@@ -262,6 +274,14 @@ export class ToolReportList extends BaseList {
 				counts.executed > 0
 			);
 			clear.disabled = Boolean(this._deleting);
+			const clearLabel = clear.querySelector?.(
+				"[data-role='delete-executed-label']",
+			);
+			if (clearLabel) {
+				clearLabel.textContent = paginated
+					? "Delete executed proposals on this page"
+					: "Delete all executed proposals";
+			}
 		}
 		const result = this.target.querySelector(
 			"[data-role='report-delete-result']",

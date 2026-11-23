@@ -237,7 +237,9 @@ version. Only installer workflows generate installation settings. See
 
 Deployed defaults include `AI_MODEL`, `AI_UTILITY_MODEL`, `AI_IMAGE_MODEL`, and
 `AI_LOCATION`. The Datastore `site/ai` row is the live authority for new
-generations and the Administrator form; deployed values are the fallback.
+generations and the Administrator form (including the opt-in boolean
+`AI_AUTO_EXECUTE`, which defaults to `false` fail-closed); deployed values are
+the fallback for model settings.
 Each top-level generation resolves one model and pins it through its calls.
 The current defaults are `gemini-3.7-flash` for primary generation,
 `gemini-3.5-flash-lite` for utility work, and `gemini-3.1-flash-image` for image

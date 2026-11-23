@@ -174,27 +174,42 @@ def validate_api_url(
         raise TransportError("incompatible_url", "Upstream API URL changed authority.")
     if parsed.query and allow_contract_query:
         pairs = parse_qsl(parsed.query, keep_blank_values=True)
-        if (
-            len(parsed.query) > 8192
-            or not re.fullmatch(r"/api/v1/plans/[^/]+/contract", parsed.path)
-            or not pairs
-            or len({key for key, _ in pairs}) != len(pairs)
-            or any(
-                not (
+        is_contract = bool(re.fullmatch(r"/api/v1/plans/[^/]+/contract", parsed.path))
+        is_plan = bool(re.fullmatch(r"/api/v1/plans/[^/]+", parsed.path))
+        valid_contract_query = (
+            is_contract
+            and all(
+                (
                     key == "view"
                     and item in {"full", "summary", "schema"}
-                    or key == "actions"
+                )
+                or (
+                    key == "actions"
                     and (
                         item == ""
-                        or 1 <= len(item.split(",")) <= 100
-                        and all(
-                            re.fullmatch(r"[a-z][a-z0-9_]{0,63}", action)
-                            for action in item.split(",")
+                        or (
+                            1 <= len(item.split(",")) <= 100
+                            and all(
+                                re.fullmatch(r"[a-z][a-z0-9_]{0,63}", action)
+                                for action in item.split(",")
+                            )
                         )
                     )
                 )
                 for key, item in pairs
             )
+        )
+        valid_plan_query = (
+            is_plan
+            and len(pairs) == 1
+            and pairs[0][0] == "include_proposal"
+            and pairs[0][1] in {"true", "false"}
+        )
+        if (
+            len(parsed.query) > 8192
+            or not pairs
+            or len({key for key, _ in pairs}) != len(pairs)
+            or not (valid_contract_query or valid_plan_query)
         ):
             raise TransportError("incompatible_url", "Unexpected contract query.")
     elif parsed.query:

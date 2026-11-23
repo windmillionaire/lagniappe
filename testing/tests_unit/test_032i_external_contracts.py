@@ -20,9 +20,15 @@ def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     assert document["servers"] == [{"url": "https://example.test"}]
     paths = document["paths"]
     create = paths["/api/v1/plans"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-    assert set(create["properties"]) == {"instructions", "name", "revises_plan_id"}
+    assert set(create["properties"]) == {"instructions", "name", "require_review", "revises_plan_id"}
     assert create["properties"]["revises_plan_id"]["type"] == ["string", "null"]
     assert create["properties"]["name"]["maxLength"] == 120
+    assert create["properties"]["require_review"]["type"] == "boolean"
+    get_plan = paths["/api/v1/plans/{plan_id}"]["get"]
+    include_proposal = next(
+        item["schema"] for item in get_plan["parameters"] if item["name"] == "include_proposal"
+    )
+    assert include_proposal == {"type": "boolean", "default": True}
     contract = paths["/api/v1/plans/{plan_id}/contract"]["get"]
     view = next(item["schema"] for item in contract["parameters"] if item["name"] == "view")
     assert view["enum"] == ["full", "summary", "schema"]
@@ -30,6 +36,7 @@ def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     submit = paths["/api/v1/plans/{plan_id}/submit"]["post"]["requestBody"]["content"]["application/json"]["schema"]
     assert submit["required"] == ["contract_version", "proposal", "file_usage"]
     assert submit["additionalProperties"] is False
+    assert {"execute", "operation_id", "require_review"}.issubset(submit["properties"])
     upload = document["components"]["schemas"]["UploadFile"]
     assert upload["required"] == ["filename", "size"]
     assert upload["properties"]["size"] == {

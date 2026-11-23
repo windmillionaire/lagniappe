@@ -464,23 +464,33 @@ def _run_create_preflight(source, *, base_ref=None):
     base_revision = _resolve_create_preflight_base(base_ref)
     python = sys.executable
     run_py = APP_DIR / "run.py"
-    traceability_options = [
-        "--check",
-        "--fail-on",
-        "warning",
-        "--no-report",
-        "--no-manifest",
-    ]
     gates = (
         ("authored frontend source", [NPM_CLI, "run", "check"]),
         ("Python source", [python, "-m", "ruff", "check", "."]),
+        ("Python type checking", [python, "-m", "basedpyright"]),
         (
             "tooling tests",
             [python, run_py, "test", "--no-test-evidence", "tooling"],
         ),
         (
-            "full source traceability",
-            [python, run_py, "traceability", *traceability_options],
+            "template contracts",
+            [python, run_py, "template-contracts", "--check", "--no-report"],
+        ),
+        (
+            "style traceability",
+            [
+                python,
+                run_py,
+                "traceability",
+                "--styles",
+                "--check",
+                "--no-report",
+                "--no-manifest",
+            ],
+        ),
+        (
+            "mutation contracts",
+            [python, run_py, "mutation-contracts", "--check"],
         ),
         (
             "complete release tree",

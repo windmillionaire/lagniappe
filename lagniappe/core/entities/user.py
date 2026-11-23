@@ -35,6 +35,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "photo",
                 "allow_messages_and_mentions",
                 "allow_task_assignments",
+                "allow_auto_execute",
                 "notification_email_mode",
                 "notification_email_opt_out_epoch",
                 "cache_invalidation_revision",
@@ -103,6 +104,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "allow_messages_and_mentions": user_entity.AllowMessagesAndMentions,
                 "allow_task_assignments": user_entity.AllowTaskAssignments,
                 "allow_site_email": user_entity.AllowSiteEmail,
+                "allow_auto_execute": user_entity.AllowAutoExecute,
                 "notification_email_mode": user_entity.NotificationEmailPreference,
             }
         )
@@ -151,7 +153,8 @@ class User(AssetMixin, UserMixin, Entity):
         value = (
             f"{role}:{self.permissions_fingerprint}:{self.ai_access}:"
             f"{getattr(CONFIG, 'AI_ENABLED', True)}:"
-            f"{getattr(CONFIG, 'EXTERNAL_AI_ENABLED', True)}:{groups}"
+            f"{getattr(CONFIG, 'EXTERNAL_AI_ENABLED', True)}:"
+            f"{self.allow_auto_execute}:{groups}"
         )
         return hashlib.md5(value.encode("utf-8")).hexdigest()
 

@@ -501,6 +501,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     }
     assert authorized.json["capabilities"] == {
         "plans": True,
+        "execute_plan": False,
     }
 
     family = client.get(
@@ -572,10 +573,10 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
     assert set(openapi.json["paths"]["/api/v1/plans/{plan_id}/execute"]) == {"post"}
     assert (
-        "external API never applies those proposals"
+        "Proposals require authenticated browser approval"
         in openapi.json["info"]["description"]
     )
-    assert "website Execute control is the only" in openapi.json["info"]["description"]
+    assert "capabilities.execute_plan" in openapi.json["info"]["description"]
     assert "task=filing" in openapi.json["info"]["description"]
     assert "does not call a model" in openapi.json["info"]["description"]
     assert "one summary and two retrieval terms" in openapi.json["info"]["description"]
@@ -1733,6 +1734,7 @@ def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibili
     assert actor_without_provider_access.status_code == 200
     assert actor_without_provider_access.json["capabilities"] == {
         "plans": True,
+        "execute_plan": False,
     }
 
     actor.is_public = True
@@ -1818,9 +1820,18 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     )
     created_tools = []
 
-    def create(current, *, instructions, name=None, remote_mcp=False, revises_plan_id=None):
+    def create(
+        current,
+        *,
+        instructions,
+        name=None,
+        remote_mcp=False,
+        revises_plan_id=None,
+        require_review=False,
+    ):
         assert current is actor
         assert remote_mcp is False
+        assert require_review is False
         created_tools.append(instructions)
         report.instructions = instructions
         return report
@@ -1858,6 +1869,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     assert capabilities.status_code == 200
     assert capabilities.json["capabilities"] == {
         "plans": True,
+        "execute_plan": False,
     }
 
     create_draft = client.post(

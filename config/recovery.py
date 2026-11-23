@@ -8,7 +8,7 @@ import re
 import tempfile
 from urllib.parse import urlparse
 
-from config.ai_settings import AI_SETTING_KEYS
+from config.ai_settings import AI_PERSISTED_SETTING_KEYS
 from config.ai_email import AIEmailConfigurationError, normalize_ai_email_config
 from config.constants import (
     DEFAULT_DEPLOYMENT_SETTINGS,
@@ -126,7 +126,7 @@ def build_recovery_snapshot(
             {
                 key: value
                 for key, value in dict(ai_settings).items()
-                if key in AI_SETTING_KEYS
+                if key in AI_PERSISTED_SETTING_KEYS
             }
         )
     if public_page_settings:

@@ -346,8 +346,11 @@ class _WorkflowREST:
             return _actor(), "request-actor"
         if target == "plans":
             return _plan(), "request-start"
-        if target == "plans/abcdefghijkl":
-            return _plan(), "request-plan"
+        if target.split("?", 1)[0] == "plans/abcdefghijkl":
+            plan = _plan()
+            if parse_qs(urlsplit(target).query).get("include_proposal") == ["false"]:
+                plan["proposal"] = None
+            return plan, "request-plan"
         if target.split("?", 1)[0] == "plans/abcdefghijkl/contract":
             contract = _contract()
             if parse_qs(urlsplit(target).query).get("view") == ["summary"]:
@@ -416,6 +419,33 @@ def test_experiments_execution_is_advertised_only_when_authorized(allowed):
         with pytest.raises(TransportError, match="no longer enabled"):
             await adapter.execute("execute_plan", arguments)
         assert len(rest.requests) == 2
+
+        # One-step submit_plan(execute=True, operation_id=...) and start_plan(require_review=True)
+        started_review = await adapter.execute(
+            "start_plan", {"instructions": "Needs review", "require_review": True}
+        )
+        assert started_review.value["id"] == "abcdefghijkl"
+        assert ("POST", "plans", {"instructions": "Needs review", "require_review": True}) in rest.requests
+
+        submitted = await adapter.execute(
+            "submit_plan",
+            {
+                "plan_id": "abcdefghijkl",
+                "contract_version": CONTRACT_VERSION_MAX,
+                "proposal": {"title": "Run now"},
+                "file_usage": [],
+                "execute": True,
+                "operation_id": "one-step-op-1",
+            },
+        )
+        assert submitted.value["id"] == "abcdefghijkl"
+        assert rest.requests[-1][2] == {
+            "contract_version": CONTRACT_VERSION_MAX,
+            "proposal": {"title": "Run now"},
+            "file_usage": [],
+            "execute": True,
+            "operation_id": "one-step-op-1",
+        }
 
     asyncio.run(exercise())
 
@@ -1863,6 +1893,12 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
         )
         fetched = await adapter.execute("get_plan", {"plan_id": "abcdefghijkl"})
         assert fetched.value["id"] == "abcdefghijkl"
+        assert ("GET", "plans/abcdefghijkl?include_proposal=false", None) in rest.requests
+        fetched_full = await adapter.execute(
+            "get_plan", {"plan_id": "abcdefghijkl", "include_proposal": True}
+        )
+        assert fetched_full.value["id"] == "abcdefghijkl"
+        assert ("GET", "plans/abcdefghijkl", None) in rest.requests
         projected = await adapter.execute(
             "get_plan_contract", {"plan_id": "abcdefghijkl"}
         )

@@ -216,6 +216,7 @@ def _start_tool_report(
     default_name,
     input_files=None,
     upload_manifest=None,
+    auto_execute=False,
 ):
     input_files = list(input_files or [])
     report = Entities.REPORT.create(
@@ -230,6 +231,8 @@ def _start_tool_report(
             "pending": True,
         }
     )
+    if auto_execute:
+        report.db["auto_execute"] = True
     Entities.save(*input_files, report, current_user)
 
     try:
@@ -239,6 +242,7 @@ def _start_tool_report(
                 actor=current_user._get_current_object(),
                 idempotency_key=request.form.get("operation-id"),
                 inputs={"report": report},
+                parameters={"auto_execute": True} if auto_execute else {},
                 notification_body="Creating AI report...",
                 notification_target=report,
                 client={
@@ -294,7 +298,19 @@ def create_ai_report():
     default_name = _report_name(instructions) if instructions else (
         filenames[0] if len(filenames) == 1 else f"{len(filenames)} files"
     )
-    return _start_tool_report(instructions, default_name=default_name, input_files=input_files, upload_manifest=upload_manifest)
+    from lagniappe.core.tools.ai.auto_execute import can_auto_execute_onsite_plan
+
+    auto_execute = (
+        request.form.get("auto_execute") == "true"
+        and can_auto_execute_onsite_plan(current_user._get_current_object())
+    )
+    return _start_tool_report(
+        instructions,
+        default_name=default_name,
+        input_files=input_files,
+        upload_manifest=upload_manifest,
+        auto_execute=auto_execute,
+    )
 
 
 # @testable false

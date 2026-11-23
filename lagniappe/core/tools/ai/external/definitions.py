@@ -70,6 +70,10 @@ def create_plan_request_schema():
                 "minLength": 1,
                 "description": "Optional creator-owned stopped execution to correct. Omit or use null for a new independent Plan.",
             },
+            "require_review": {
+                "type": "boolean",
+                "description": "When true, lock this Plan to browser review only so external execution is rejected.",
+            },
         },
     }
 
@@ -97,6 +101,19 @@ def submission_request_schema():
                 "type": "string",
                 "minLength": 1,
                 "description": f"Updated current brief, at most {MAX_INSTRUCTIONS_BYTES} UTF-8 bytes. Original brief is retained; updates are atomic with proposal submission.",
+            },
+            "require_review": {
+                "type": "boolean",
+                "description": "When true, lock this submitted Plan to browser review only.",
+            },
+            "execute": {
+                "type": "boolean",
+                "description": "When true and execution is enabled for this connection, immediately start executing the submitted proposal (requires operation_id).",
+            },
+            "operation_id": {
+                "type": "string",
+                "pattern": r"^[A-Za-z0-9._-]{1,128}$",
+                "description": "Stable client operation ID (1–128 ASCII letters, digits, dots, underscores, or hyphens) when execute is true.",
             },
         },
     }

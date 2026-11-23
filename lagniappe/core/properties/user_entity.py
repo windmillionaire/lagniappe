@@ -301,3 +301,9 @@ class AllowSiteEmail(OwnerInboundToggle):
     """Fail-closed public-user consent for email sent by the site owner."""
 
     _id = "allow_site_email"
+
+
+class AllowAutoExecute(OwnerInboundToggle):
+    """Fail-closed user opt-in for automatic safe plan execution."""
+
+    _id = "allow_auto_execute"

@@ -58,14 +58,20 @@ export class SiteAiModels extends SiteSetting {
 		this._setAiField("AI_UTILITY_MODEL", settings.AI_UTILITY_MODEL);
 		this._setAiField("AI_IMAGE_MODEL", settings.AI_IMAGE_MODEL);
 		this._setAiField("AI_LOCATION", settings.AI_LOCATION || "global");
+		const autoExecute = this.aiForm.querySelector("[name='AI_AUTO_EXECUTE']");
+		if (autoExecute) {
+			autoExecute.checked = settings.AI_AUTO_EXECUTE === true;
+		}
 
 		const pricing = this.aiForm.querySelector("[data-role='ai-pricing-link']");
 		if (pricing && modelOptions?.pricing_url) {
 			pricing.href = modelOptions.pricing_url;
 		}
 
+		const autoSuffix =
+			settings.AI_AUTO_EXECUTE === true ? " · auto-execute on" : "";
 		this.updateSummary(
-			`${settings.AI_MODEL} · utility ${settings.AI_UTILITY_MODEL} · image ${settings.AI_IMAGE_MODEL}`,
+			`${settings.AI_MODEL} · utility ${settings.AI_UTILITY_MODEL} · image ${settings.AI_IMAGE_MODEL}${autoSuffix}`,
 		);
 	}
 
@@ -153,6 +159,10 @@ export class SiteAiModels extends SiteSetting {
 				const selected = combobox?.values?.values().next().value;
 				data.set(select.name, selected ?? select.value ?? "");
 			});
+		const autoExecute = this.aiForm.querySelector?.("[name='AI_AUTO_EXECUTE']");
+		if (autoExecute) {
+			data.set("AI_AUTO_EXECUTE", autoExecute.checked ? "true" : "false");
+		}
 		return data;
 	}
 

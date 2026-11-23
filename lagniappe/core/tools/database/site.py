@@ -1,6 +1,8 @@
 """Datastore persistence for singleton site settings."""
 
-from config.ai_settings import AI_SETTING_KEYS
+import uuid
+
+from config.ai_settings import AI_PERSISTED_SETTING_KEYS
 from config.constants import DEFAULT_DEPLOYMENT_SETTINGS
 from config.public_pages import PUBLIC_PAGE_SETTING_KEYS
 
@@ -104,7 +106,9 @@ def save_ai(data):
         entity = DATA.datastore.entity(key=ai_key)
 
     version = int(entity.get("version", 0)) + 1
-    canonical = {name: value for name, value in data.items() if name in AI_SETTING_KEYS}
+    canonical = {
+        name: value for name, value in data.items() if name in AI_PERSISTED_SETTING_KEYS
+    }
     entity.clear()
     entity.update({**canonical, "version": version})
     DATA.datastore.put(entity)
@@ -127,3 +131,15 @@ def save_public_pages(data):
     entity.clear()
     entity.update({**canonical, "version": version})
     DATA.datastore.put(entity)
+
+
+def bump_fingerprint(identifier: str) -> str:
+    """Advance the stored site fingerprint for a singleton channel such as home."""
+    record_key = key(identifier)
+    entity = DATA.datastore.get(record_key)
+    if not entity:
+        entity = DATA.datastore.entity(key=record_key)
+    fingerprint = str(uuid.uuid4())
+    entity["fingerprint"] = fingerprint
+    DATA.datastore.put(entity)
+    return fingerprint

@@ -474,6 +474,10 @@ def set_ai_settings():
         return responses.error(str(e))
 
     site_database.save_ai(ai_settings)
+    if bool(ai_settings.get("AI_AUTO_EXECUTE", False)) != bool(
+        current.get("AI_AUTO_EXECUTE", False)
+    ):
+        site_database.bump_fingerprint("home")
     return responses.json_response(
         {
             "ai_settings": ai_settings,

@@ -36,6 +36,8 @@ class AIReport(Entity):
                 "error",
                 "deferred_job",
                 "correction",
+                "auto_execute",
+                "auto_execute_pause_reason",
             }
         )
 
