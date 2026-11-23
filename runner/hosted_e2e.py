@@ -9,7 +9,6 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import secrets
@@ -28,13 +27,16 @@ from config.constants import (
     RUNTIME_BUCKET_ROLES,
     RUNTIME_PROJECT_ROLES,
 )
+from config.hosted_e2e import hosted_test_service_cors_origin
 from config.storage import (
     BUCKET_CORS_HEADERS,
     BUCKET_CORS_MAX_AGE_SECONDS,
     BUCKET_CORS_METHODS,
+    has_browser_cors_origin,
     storage_bucket_names,
 )
 from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
+from runner import cloud_checkpoints
 from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.gcloud import activate_repository_gcloud
 from runner.process import run_command
@@ -322,6 +324,9 @@ def _infrastructure(*, project_number=None):
 
 # @testable infrastructure
 def _write_json(path: Path, payload: dict, *, owner_only=False):
+    checkpoint = cloud_checkpoints.ACTIVE.get()
+    if checkpoint and path in checkpoint.paths:
+        return checkpoint.write(path, payload)
     return _atomic_write_text(
         path,
         f"{json.dumps(payload, indent=2, sort_keys=True)}\n",
@@ -347,6 +352,9 @@ def _setup_contract_fingerprint():
 
 # @testable infrastructure
 def _load_json(path: Path):
+    checkpoint = cloud_checkpoints.ACTIVE.get()
+    if checkpoint and path in checkpoint.paths:
+        return copy.deepcopy(checkpoint.doc[checkpoint.paths[path]])
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
@@ -1126,14 +1134,21 @@ def _hosted_app_descriptor(
     }
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_preserves_standing_and_exact_origin_lifecycles
+# @matrix hosted-e2e storage : cors teardown
 def _change_test_bucket_cors(infrastructure, origin, *, present):
     from google.cloud import storage
 
     client = storage.Client(project=infrastructure.project)
+    service_origin = hosted_test_service_cors_origin(
+        infrastructure.project, origin, from_candidate=True
+    )
     for bucket_name in _test_bucket_names():
         bucket = client.get_bucket(bucket_name)
         rules = copy.deepcopy(list(bucket.cors or []))
+        if present and has_browser_cors_origin(rules, service_origin):
+            continue
         if present and not rules:
             rules = [
                 {
@@ -1148,17 +1163,41 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
         for rule in rules:
             origins = list(rule.get("origin") or [])
             if present and origin not in origins:
-                origins.append(origin)
+                rule["origin"] = sorted({*origins, origin})
                 changed = True
-            if not present and origin in origins:
-                origins = [value for value in origins if value != origin]
+            elif not present and origin in origins:
+                remaining = [value for value in origins if value != origin]
                 changed = True
-            if origins:
-                rule["origin"] = sorted(set(origins))
-                updated.append(rule)
+                if not remaining:
+                    continue
+                rule["origin"] = remaining
+            updated.append(rule)
         if changed:
             bucket.cors = updated
-            bucket.patch()
+            bucket.patch(if_metageneration_match=bucket.metageneration)
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_uses_the_exported_commit
+# @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_source_requires_the_operators_own_bucket
+# @matrix hosted-e2e storage : project-identity
+def _operator_build_staging_dir(infrastructure):
+    """Select the operator's provisioned build bucket after a direct ownership check."""
+    name = f"{infrastructure.project}_cloudbuild"
+    uri = f"gs://{name}"
+    bucket = _describe(
+        ["storage", "buckets", "describe", uri, "--raw", f"--project={infrastructure.project}"]
+    )
+    if (
+        not bucket
+        or bucket.get("name") != name
+        or str(bucket.get("projectNumber") or "") != infrastructure.project_number
+    ):
+        raise HostedE2EError(
+            f"Cloud Build source staging requires {uri} to exist and belong to "
+            f"project {infrastructure.project} ({infrastructure.project_number})."
+        )
+    return f"{uri}/source"
 
 
 # @testable true
@@ -1198,10 +1237,16 @@ def _build_runner_image(
     if timings.exists() or timings.is_symlink():
         raise HostedE2EError("The runner image's staged duration hints path is not clean.")
     timings.write_text(json.dumps(duration_estimates(Path(source_root))), encoding="utf-8")
+    staging_args = []
+    if cloud_checkpoints.ACTIVE.get() is not None:
+        staging_dir = _operator_build_staging_dir(infrastructure)
+        print(f"Using verified Cloud Build source staging at {staging_dir}.", flush=True)
+        staging_args.append(f"--gcs-source-staging-dir={staging_dir}")
     result = _gcloud(
         "builds",
         "submit",
         source_root,
+        *staging_args,
         f"--config={container_root / 'cloudbuild.yaml'}",
         f"--ignore-file={container_root / 'gcloudignore'}",
         f"--substitutions=_IMAGE={image}",
@@ -2513,26 +2558,9 @@ def results(
     return manifest
 
 
-# @testable infrastructure
-def _acquire_cleanup_lease():
-    """Clean stale data and keep the lease until provider teardown finishes."""
-    os.environ["FLASK_ENV"] = "testing"
-    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
-    from runner.testing import cleanup_test_data
-
-    lease = E2ELease()
-    lease.__enter__()
-    try:
-        lease.assert_active()
-        cleanup_test_data(lease)
-        lease.assert_active()
-    except BaseException:
-        lease.__exit__(None, None, None)
-        raise
-    return lease
-
-
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_checks_all_executions
+# @matrix hosted-e2e : deletion-safety teardown
 def _active_job_executions(infrastructure, *, job=None):
     job = job or infrastructure.job
     result = _gcloud(
@@ -2543,11 +2571,10 @@ def _active_job_executions(infrastructure, *, job=None):
         f"--job={job}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
-        "--limit=20",
-        "--format=json",
+        "--format=json(name,metadata.name,completionTime,status.completionTime)",
     )
     try:
-        executions = json.loads(result.stdout or "[]")
+        executions = json.loads(result.stdout)
     except json.JSONDecodeError as error:
         raise HostedE2EError(
             "Cloud Run execution listing returned invalid JSON."
@@ -2558,7 +2585,7 @@ def _active_job_executions(infrastructure, *, job=None):
     active = []
     for execution in executions:
         if not isinstance(execution, dict):
-            continue
+            raise HostedE2EError("Cloud Run returned an invalid hosted execution.")
         status = execution.get("status")
         status = status if isinstance(status, dict) else {}
         if execution.get("completionTime") or status.get("completionTime"):
@@ -2569,8 +2596,15 @@ def _active_job_executions(infrastructure, *, job=None):
             name = metadata.get("name")
         if isinstance(name, str) and "/" in name:
             name = name.rsplit("/", 1)[-1]
-        if isinstance(name, str) and EXECUTION_RE.fullmatch(name):
-            active.append(name)
+        if (
+            not isinstance(name, str)
+            or not name.startswith(job + "-")
+            or not EXECUTION_RE.fullmatch(name)
+        ):
+            raise HostedE2EError(
+                "Cloud Run returned an unidentified active hosted execution."
+            )
+        active.append(name)
     return tuple(sorted(set(active)))
 
 
@@ -2591,10 +2625,10 @@ def _clear_local_result_artifacts(*, environment="standard"):
 
 
 # @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_downloaded_results_after_success
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_resources_and_results_without_redis
 # @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
 def teardown(*, force=False, environment="standard"):
-    """Delete ephemeral resources and downloaded artifacts for the lifecycle."""
+    """Remove the hosted resources. Each E2E runner owns its test-data cleanup."""
     selected = _environment(environment)
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
     _activate(adc=True)
@@ -2650,59 +2684,44 @@ def teardown(*, force=False, environment="standard"):
                 "--quiet",
             )
 
-    cleanup_lease = None
-    try:
-        cleanup_lease = _acquire_cleanup_lease()
-    except Exception as error:
-        if not force:
-            raise HostedE2EError(
-                "Could not acquire the shared data lease for final cleanup; "
-                f"wait for an active run or resolve the cleanup error ({error}), "
-                "then retry or use --force."
-            ) from error
-
-    try:
-        if job is not None:
-            _gcloud(
-                "run",
-                "jobs",
-                "delete",
-                selected.job,
-                f"--region={infrastructure.region}",
-                f"--project={infrastructure.project}",
-                "--quiet",
-            )
-        app_version = _describe(
-            [
-                "app",
-                "versions",
-                "describe",
-                version,
-                f"--service={SERVICE}",
-                f"--project={infrastructure.project}",
-            ]
+    if job is not None:
+        _gcloud(
+            "run",
+            "jobs",
+            "delete",
+            selected.job,
+            f"--region={infrastructure.region}",
+            f"--project={infrastructure.project}",
+            "--quiet",
         )
-        if app_version is not None:
-            _gcloud(
-                "app",
-                "versions",
-                "delete",
-                version,
-                f"--service={SERVICE}",
-                f"--project={infrastructure.project}",
-                "--quiet",
-                timeout=1800,
-            )
-        if base_url.startswith("https://"):
-            _change_test_bucket_cors(infrastructure, base_url, present=False)
-        state["status"] = "torn-down"
-        state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
-        _write_json(selected.state_path, state, owner_only=True)
-        _clear_local_result_artifacts(environment=selected.name)
-        return state
-    finally:
-        if cleanup_lease is not None:
-            cleanup_lease.__exit__(None, None, None)
+    app_version = _describe(
+        [
+            "app",
+            "versions",
+            "describe",
+            version,
+            f"--service={SERVICE}",
+            f"--project={infrastructure.project}",
+        ]
+    )
+    if app_version is not None:
+        _gcloud(
+            "app",
+            "versions",
+            "delete",
+            version,
+            f"--service={SERVICE}",
+            f"--project={infrastructure.project}",
+            "--quiet",
+            timeout=1800,
+        )
+    if base_url.startswith("https://"):
+        _change_test_bucket_cors(infrastructure, base_url, present=False)
+    state["status"] = "torn-down"
+    state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
+    _write_json(selected.state_path, state, owner_only=True)
+    _clear_local_result_artifacts(environment=selected.name)
+    return state
 
 
 # @testable true
@@ -2763,6 +2782,11 @@ def run_hosted_e2e_command(arguments):
         description="Run repository tests in an isolated Google-hosted environment.",
     )
     commands = parser.add_subparsers(dest="action", required=True)
+    parser.add_argument("--recover-generation", type=int, metavar="GENERATION",
+                        help="Take over this GCS generation after the previous operator stopped.")
+    init_parser = commands.add_parser("checkpoint-init", help="Seed private Cloud storage from a torn-down installation.")
+    init_parser.add_argument("--from-checkout", type=Path, required=True)
+    init_parser.add_argument("--project", required=True)
 
     # @testable true
     # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cli_routes_closed_environment
@@ -2848,6 +2872,23 @@ def run_hosted_e2e_command(arguments):
     args = parser.parse_args(arguments)
 
     try:
+        if args.action == "checkpoint-init":
+            cloud_checkpoints.seed(args.from_checkout.resolve(), args.project)
+            return 0
+        return _dispatch_hosted_command(args)
+    except HostedE2EError as error:
+        print(f"Hosted E2E command stopped: {error}")
+        return 2
+    except RuntimeError as error:
+        print(f"Hosted E2E command failed: {error}")
+        return 1
+
+
+# @testable false
+# @covered-by runner/hosted_e2e.py::run_hosted_e2e_command
+# @reason command execution inside the optional project checkpoint transaction
+def _dispatch_hosted_command(args):
+    with cloud_checkpoints.lifecycle(sys.modules[__name__], args):
         if args.action == "setup":
             payload = setup(args.github_repository)
             print(json.dumps(payload, indent=2, sort_keys=True))
@@ -2930,12 +2971,6 @@ def run_hosted_e2e_command(arguments):
                 teardown_options["environment"] = args.environment
             payload = teardown(**teardown_options)
             print(f"Hosted E2E version {payload['version']} was torn down.")
-    except HostedE2EError as error:
-        print(f"Hosted E2E command stopped: {error}")
-        return 2
-    except RuntimeError as error:
-        print(f"Hosted E2E command failed: {error}")
-        return 1
     return 0
 
 

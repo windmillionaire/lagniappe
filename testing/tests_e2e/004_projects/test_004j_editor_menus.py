@@ -39,10 +39,20 @@ def test_compact_editor_menus(get_admin, mobile):
     assert editor.toolbar.locator('[data-role="toolbar-menus"] > button').evaluate_all(
         "buttons => buttons.map(button => button.title)"
     ) == ["Style", "Headings", "Lists", "Table", "Align", "Insert", "History"]
-    first_row = editor.toolbar.get_by_title("Bold", exact=True).bounding_box()
-    for title in ["Style", "Headings"]:
-        box = editor.toolbar.get_by_label(title, exact=True).bounding_box()
-        assert first_row and box and abs(box["y"] - first_row["y"]) <= 1
+    # A resize can move the toolbar between browser calls. Measure the row together.
+    row_controls = editor.toolbar.locator(
+        'button:is([title="Bold"], [title="Style"], [title="Headings"])'
+    )
+    row = row_controls.evaluate_all(
+        """buttons => Object.fromEntries(buttons.map(button => {
+            const {top, bottom} = button.getBoundingClientRect();
+            return [button.title, [top, bottom]];
+        }))"""
+    )
+    assert set(row) == {"Bold", "Style", "Headings"}
+    bold_top, bold_bottom = row["Bold"]
+    row_center = (bold_top + bold_bottom) / 2
+    assert all(top < row_center < bottom for top, bottom in row.values()), row
     for title, option in [
         ("History", "Pin Version"),
         ("Style", "Underline"),

@@ -49,6 +49,8 @@ configuration.
 
 ## Current installation
 
+For an optional private Cloud operator, the same two YAML files and Redis trust bundle can be published as one Secret Manager version. The task restores them into its own checkout. [Cloud operator setup](INFRA_CLOUD_OPERATOR.md)
+
 The checkout and its saved local configuration together identify the installation
 being managed. Separate checkouts can manage unrelated installations while
 sharing the same source revision. A branch name or directory name does not

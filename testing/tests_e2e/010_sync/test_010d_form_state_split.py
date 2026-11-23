@@ -77,40 +77,6 @@ def test_form_submission_reconciliation_uses_latest_schema(
     added_value = f"Value from the new schema field {suffix}"
     added_id = f"reconcile-added-field-{suffix}"
 
-    _fill_form_field(info, "sync-text-renderer", local_value)
-    first.wait_for_function(
-        "() => !document.fonts || document.fonts.status === 'loaded'"
-    )
-    with browser_failures.expect_offline(owner):
-        owner.offline = True
-        expect(owner.locate("[data-role='offline']")).to_be_visible()
-
-    original_schema = deepcopy(form.schema)
-    form.schema = [
-        *original_schema,
-        {
-            "id": added_id,
-            "type": "input",
-            "input": "text",
-            "title": "Reconciliation Added Field",
-        },
-    ]
-    form.save()
-
-    other = collaborator.page
-    other.goto(first.url)
-    other_info = other.locator("[data-widget='PageInfo']")
-    expect(other_info).to_have_attribute("rendered", "")
-    _fill_form_field(other_info, "sync-text-renderer", server_value)
-    _fill_form_field(other_info, added_id, added_value)
-    with expect_successful_response(
-        other,
-        method="PUT",
-        path=f"/pages/{page.key}/update",
-        entity_key=page.key,
-    ):
-        other_info.locator('button[type="submit"]:not([data-role])').click()
-
     replacement_requests = []
 
     def record_replacement(request):
@@ -119,21 +85,55 @@ def test_form_submission_reconciliation_uses_latest_schema(
         ):
             replacement_requests.append(request)
 
-    first.on("request", record_replacement)
-    try:
-        with expect_poll_result(
-            first,
-            subscription_id=f"view:entity:{page.key}",
+    _fill_form_field(info, "sync-text-renderer", local_value)
+    first.wait_for_function(
+        "() => !document.fonts || document.fonts.status === 'loaded'"
+    )
+    # The owner's health checks can retry while the collaborator saves.
+    with browser_failures.expect_offline(owner, max_ping_count=12):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
+
+        original_schema = deepcopy(form.schema)
+        form.schema = [
+            *original_schema,
+            {
+                "id": added_id,
+                "type": "input",
+                "input": "text",
+                "title": "Reconciliation Added Field",
+            },
+        ]
+        form.save()
+
+        other = collaborator.page
+        other.goto(first.url)
+        other_info = other.locator("[data-widget='PageInfo']")
+        expect(other_info).to_have_attribute("rendered", "")
+        _fill_form_field(other_info, "sync-text-renderer", server_value)
+        _fill_form_field(other_info, added_id, added_value)
+        with expect_successful_response(
+            other,
+            method="PUT",
+            path=f"/pages/{page.key}/update",
+            entity_key=page.key,
         ):
-            with expect_successful_response(
-                first,
-                method="GET",
-                path=f"/pages/{page.key}/info/replace",
-                entity_key=page.key,
+            other_info.locator('button[type="submit"]:not([data-role])').click()
+
+        first.on("request", record_replacement)
+        try:
+            with (
+                expect_poll_result(first, subscription_id=f"view:entity:{page.key}"),
+                expect_successful_response(
+                    first,
+                    method="GET",
+                    path=f"/pages/{page.key}/info/replace",
+                    entity_key=page.key,
+                ),
             ):
                 owner.offline = False
-    finally:
-        first.remove_listener("request", record_replacement)
+        finally:
+            first.remove_listener("request", record_replacement)
 
     assert len(replacement_requests) == 1
     expect(owner.locate("[data-role='offline']")).to_be_hidden()

@@ -209,15 +209,27 @@ def test_server_running(get_user):
 def test_ping_notification_state_is_redis_only_and_optional(get_user):
     """A real notification reaches a reloaded page through the ping header."""
     user = get_user(Users.OWNER)
-    user.go(SitePages.HOME)
 
-    # Establish the empty durable/projection baseline before measuring mutation
-    # propagation. Otherwise initial page startup can race the first mutation's
-    # cold aggregate repair and leave the projection one revision behind.
+    def ping_state_after(navigate):
+        # A response from an earlier page can arrive during reload. Follow the
+        # HEAD request issued by this navigation through to its own response.
+        with user.page.expect_request(
+            lambda request: request.method == "HEAD" and urlsplit(request.url).path == "/l/ping"
+        ) as ping:
+            navigate()
+        response = ping.value.response()
+        assert response is not None and response.ok
+        return json.loads(response.headers["x-lagniappe-notification-state"])
+
+    # Warm the projection before opening Home so its startup ping observes the
+    # empty baseline before we save the notification.
     existing = Entities.NOTIFICATION.keys_for_parent(user.entity)
     assert not existing
     aggregate = notification_database.ensure_notification_aggregate(user.entity)
     cache.repair_notification_state(user.entity, existing, aggregate=aggregate)
+    initial = ping_state_after(lambda: user.go(SitePages.HOME))
+    assert isinstance(initial["generation"], str)
+    assert initial["count"] == 0
 
     notification = Entities.NOTIFICATION.create(
         {
@@ -234,19 +246,9 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
             notification_requests.append(request.url)
 
     user.page.on("request", record_request)
-    with user.page.expect_response(
-        lambda response: (
-            urlsplit(response.url).path == "/l/ping"
-            and response.request.method == "HEAD"
-        )
-    ) as ping_info:
-        user.page.reload()
-
-    state = json.loads(
-        ping_info.value.headers["x-lagniappe-notification-state"]
-    )
-    assert isinstance(state["generation"], str)
-    assert state["revision"] >= 1
+    state = ping_state_after(user.page.reload)
+    assert state["generation"] == initial["generation"]
+    assert state["revision"] > initial["revision"]
     assert state["count"] == 1
     expect(user.page.locator("[data-role='notification-count']")).to_have_text("1")
     expect(user.page.locator("[data-role='notifications']")).to_have_attribute(

@@ -1162,6 +1162,10 @@ if __name__ == "__main__":
         from runner.hosted_e2e import run_hosted_e2e_command
 
         sys.exit(run_hosted_e2e_command(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "cloud-settings":
+        from runner.cloud_settings import main as cloud_settings
+
+        sys.exit(cloud_settings(sys.argv[2:]))
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1169,6 +1173,7 @@ if __name__ == "__main__":
         choices=[
             "auth",
             "browser-review",
+            "cloud-settings",
             "dev",
             "indexes",
             "deploy",

@@ -43,6 +43,7 @@ from playwright.sync_api import expect
 
 from testing.definitions import Categories, Projects, SitePages
 from testing.elements import List
+from testing.utility.network import expect_successful_response
 from testing.utility.test_file import TestFile as _TestFile
 
 pytestmark = pytest.mark.e2e
@@ -189,6 +190,7 @@ def test_tasks_prefetch(get_admin, get_user):
 
 
 # @matrix home : category-list lazy-load loading-indicator project-list
+# @scaffolding testing/elements/containers.py::List.find_item
 def test_model_lists_load_on_toggle(get_admin, get_user):
     """Verify project and category home lists load through their /l/get branches on demand."""
     user = get_admin()
@@ -205,10 +207,12 @@ def test_model_lists_load_on_toggle(get_admin, get_user):
     expect(user.locate(home.PROJECT_LOADING)).to_be_hidden()
     expect(user.locate(home.CATEGORY_LOADING)).to_be_hidden()
 
-    assert home.project_list.is_loaded
-    assert home.category_list.is_loaded
-    expect(home.project_list.get_item(project)).to_be_visible()
-    expect(home.category_list.get_item(category)).to_be_visible()
+    with expect_successful_response(user.page, method="GET", path="/l/get/projects"):
+        project_list = home.project_list
+    with expect_successful_response(user.page, method="GET", path="/l/get/categories"):
+        category_list = home.category_list
+    expect(project_list.find_item(project)).to_be_visible()
+    expect(category_list.find_item(category)).to_be_visible()
     expect(user.locate("[data-role='project-count']")).to_have_count(0)
     expect(user.locate("[data-role='category-count']")).to_have_count(0)
     expect(user.locate(home.PROJECT_LIST_TOGGLE)).not_to_have_attribute(

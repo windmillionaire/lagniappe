@@ -437,6 +437,7 @@ def configure_service_account():
 def configure_storage_buckets(*, include_production=True, include_test=False):
     """Provision the selected production or developer bucket families."""
     from config import SETTINGS
+    from config.hosted_e2e import hosted_test_service_cors_origin
     from config.storage import (
         BUCKET_CREATE_LOCATION,
         BUCKET_DEFAULT_STORAGE_CLASS,
@@ -475,43 +476,49 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
     client = storage.Client(project=project_id)
     runtime_member = f"serviceAccount:{runtime_email}"
     operator_member = iam_access.principal_member(operator_email)
-    config = SimpleNamespace(
-        APP_URL=SETTINGS.APP.get("APP_URL"),
-        CUSTOM_DOMAIN=SETTINGS.APP.get("CUSTOM_DOMAIN"),
-        local=False,
-    )
+    site_origins = {
+        "APP_URL": SETTINGS.APP.get("APP_URL"),
+        "CUSTOM_DOMAIN": SETTINGS.APP.get("CUSTOM_DOMAIN"),
+    }
 
     if not include_production and not include_test:
         raise ValueError("At least one Cloud Storage bucket family is required.")
 
-    bucket_settings = []
+    managed_buckets = {}
     if include_production:
-        bucket_settings.append(SETTINGS.APP)
-    test_prefix = str(
-        (getattr(SETTINGS, "TEST_CONFIG", {}) or {}).get("PREFIX") or ""
-    )
-    app_prefix = str(SETTINGS.APP.get("PREFIX") or "")
+        config = SimpleNamespace(**site_origins, local=False)
+        managed_buckets.update(
+            (name, (kind, config, None))
+            for kind, name in storage_bucket_names(SETTINGS.APP).items()
+        )
+        managed_buckets[recovery_bucket_name(SETTINGS.APP)] = ("recovery", None, None)
     if include_test:
+        test_settings = getattr(SETTINGS, "TEST_CONFIG", {}) or {}
+        test_prefix = str(test_settings.get("PREFIX") or "")
+        app_prefix = str(SETTINGS.APP.get("PREFIX") or "")
         if not test_prefix or test_prefix == app_prefix:
             raise RuntimeError(
                 "Developer bucket provisioning requires a distinct test prefix."
             )
-        test_bucket_settings = dict(SETTINGS.APP)
-        test_bucket_settings["PREFIX"] = test_prefix
-        bucket_settings.append(test_bucket_settings)
-    managed_buckets = {
-        bucket_name: bucket_kind
-        for settings in bucket_settings
-        for bucket_kind, bucket_name in storage_bucket_names(settings).items()
-    }
-    if include_production:
-        managed_buckets[recovery_bucket_name(SETTINGS.APP)] = "recovery"
+        host = test_settings.get("SERVER_NAME") or constants.DEFAULT_SERVER_NAME
+        port = test_settings.get("SERVER_PORT") or constants.DEFAULT_TEST_PORT
+        test_config = SimpleNamespace(
+            **site_origins,
+            local=host in {"127.0.0.1", "localhost", "[::1]"},
+            SERVER_NAME=host,
+            SERVER_PORT=port,
+        )
+        test_names = storage_bucket_names(dict(SETTINGS.APP, PREFIX=test_prefix))
+        service_origin = hosted_test_service_cors_origin(project_id, site_origins["APP_URL"])
+        managed_buckets.update(
+            (name, (kind, test_config, service_origin)) for kind, name in test_names.items()
+        )
 
     with f.progress(
         text="Configure Cloud Storage buckets",
         success_text='Cloud Storage buckets configured',
     ) as sp:
-        for bucket_name, bucket_kind in managed_buckets.items():
+        for bucket_name, (bucket_kind, config, service_origin) in managed_buckets.items():
             created = False
             try:
                 bucket = client.get_bucket(bucket_name)
@@ -544,7 +551,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
             if bucket_kind == "recovery":
                 configure_recovery_bucket(bucket)
             else:
-                configure_storage_bucket(bucket, config)
+                configure_storage_bucket(bucket, config, preserve_cors_origin=service_origin)
             policy = bucket.get_iam_policy(requested_policy_version=3)
             changed = iam_access.reconcile_member_roles(
                 policy,

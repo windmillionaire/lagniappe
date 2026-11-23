@@ -18,6 +18,7 @@ trusted clean commit with production build
        acquire shared Redis lease
        clean test-prefixed data
        run complete suites or individual nodeids against exact version
+       clean test-prefixed data before releasing the lease
        upload reports, JUnit, evidence, manifest-last
   -> validate and merge exact-source evidence
   -> hosted-e2e teardown removes runnable version/job
@@ -26,6 +27,16 @@ trusted clean commit with production build
 An inert App Engine anchor remains as the service traffic owner. Teardown keeps
 the reusable Artifact Registry repository, Secret Manager mounts, WIF provider,
 result bucket, service accounts, and anchor.
+
+By default, creation adds the exact candidate's browser origin to each test
+bucket and teardown removes it. An installation owner can opt into a standing
+origin for the project's `e2e` service. On each test bucket, add
+`https://*-dot-e2e-dot-APP_DEFAULT_HOSTNAME` to the existing Lagniappe CORS
+rule, using the default hostname returned by `gcloud app describe` for that
+project. This permits browser requests from future versions of that service.
+Create and teardown can then use the buckets without updating their CORS.
+Teardown still removes an exact origin added by an earlier runner. Development
+setup preserves a previously installed service origin on the test buckets.
 
 ## Security boundary
 
@@ -184,11 +195,17 @@ venv/bin/python run.py hosted-e2e status
 venv/bin/python run.py hosted-e2e teardown
 ```
 
-The Redis lease serializes local and hosted sessions outside the test cleanup
-prefix. Teardown refuses an active execution unless `--force` is explicit,
-acquires the data lease before cleanup, deletes only the Cloud Run job and
-ephemeral App Engine version, and removes only that version's test-bucket CORS
-origin.
+The E2E runner owns test-data cleanup. While holding the shared Redis lease,
+it clears the reserved Redis and database test namespaces before initialization
+and again when the session finishes, including after a test failure. If the
+runner is killed before its final cleanup, the next E2E session cleans the
+namespace after it acquires the lease.
+
+`hosted-e2e teardown` uses Google APIs and can run from an operator with HTTPS
+access alone. It checks for active Cloud Run executions before deleting the job
+and ephemeral App Engine version and removing that version's test-bucket CORS
+origin. With `--force`, it first cancels active executions and waits for
+cancellation.
 
 Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 
@@ -320,7 +337,9 @@ additional server URLs.
 pull-request candidates. It resolves the exact pull-request head commit,
 then enters the protected environment, verifies that the already-preflighted
 Cloud Run job was created from that source, invokes through WIF, and waits for
-the result bucket's last-uploaded `manifest.json` completion marker.
+the result bucket's last-uploaded `manifest.json` completion marker. Once the
+bundle is downloaded, the evidence importer runs locally with PyYAML as its
+only Python dependency.
 
 The workflow validates and merges evidence, confirms that no tracked file other
 than `testing/evidence/latest.json` changed, and non-force pushes an
@@ -371,3 +390,6 @@ user agents; narrow and sanitize them before sharing.
 
 Successful teardown removes downloaded execution bundles after provider and
 test-data cleanup. Imported evidence and reusable setup metadata remain.
+## Resume from a fresh Cloud task
+
+The private experiments operator stores setup, candidate state, source commit, numeric settings version and execution name in its project-owned checkpoint bucket. A generation precondition excludes simultaneous lifecycle writers. Use the same hosted commands inside the operator shell. [Cloud setup and two-task rehearsal](INFRA_CLOUD_OPERATOR.md#rehearse-before-moving-the-release-gate)

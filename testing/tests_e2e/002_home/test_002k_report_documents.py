@@ -66,7 +66,7 @@ def test_reviewed_document_append_updates_open_editor(get_admin, get_user, actio
     Entities.save(report)
     collaborator_page = Page(user=collaborator)
     collaborator_page.entity = page
-    collaborator.go(collaborator_page)
+    collaborator.go(collaborator_page).wait_for_interaction_readiness()
     editor = collaborator_page.editor
     expect(editor.text_entry).to_contain_text("Keep the original notes.")
     report_page = owner.go(Report.for_entity(owner, report))
@@ -103,5 +103,5 @@ def test_reviewed_document_append_updates_open_editor(get_admin, get_user, actio
     assert before_document.get() == html
     assert before_snapshot.get() == snapshot
     expect(owner.page.get_by_role("button", name="Undo Report")).to_have_count(0)
-    collaborator.go(collaborator_page)
+    collaborator.go(collaborator_page).wait_for_interaction_readiness()
     expect(collaborator_page.editor.text_entry).to_contain_text("Added reviewed notes.")

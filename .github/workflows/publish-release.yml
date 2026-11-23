@@ -1,0 +1,58 @@
+name: Publish merged release
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Merged release PR whose main smoke test has passed
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: publish-merged-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release-publisher
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    env:
+      REPOSITORY: ${{ github.repository }}
+      REVISION: ${{ github.sha }}
+      PULL_REQUEST: ${{ inputs.pull_request }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify the merged release and hosted attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m venv venv
+          venv/bin/python -m runner.publish_release "$REPOSITORY" "$REVISION" "$PULL_REQUEST"
+      - name: Mint a repository-scoped publisher token
+        id: publisher
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Publish the annotated tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+          RELEASE_VALIDATION_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git config user.name "Lagniappe release publisher"
+          git config user.email "release-publisher@users.noreply.github.com"
+          venv/bin/python -m runner.publish_release "$REPOSITORY" "$REVISION" "$PULL_REQUEST" --publish

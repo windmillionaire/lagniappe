@@ -1,9 +1,11 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
+from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -64,6 +66,83 @@ def _git(repo, *arguments):
         capture_output=True,
         text=True,
     )
+
+
+# @matrix hosted-e2e storage : cors project-identity
+def test_hosted_cors_only_recognizes_this_test_service():
+    from config.hosted_e2e import hosted_test_service_cors_origin
+
+    project = "project-1"
+    for host in ("project-1.uc.r.appspot.com", "project-1.appspot.com"):
+        service = f"https://*-dot-e2e-dot-{host}"
+        assert hosted_test_service_cors_origin(project, f"https://{host}/") == service
+        candidate = f"https://e2e-1234567890abcdef-dot-e2e-dot-{host}"
+        assert hosted_test_service_cors_origin(project, candidate, from_candidate=True) == service
+        for wrong in (
+            f"https://{host}",
+            candidate.replace("project-1", "project-2"),
+            candidate.replace("-dot-e2e-dot-", "-dot-default-dot-"),
+            candidate.replace("https:", "http:"),
+            candidate + "/asset",
+            candidate + ".example.com",
+            candidate.replace("1234567890abcdef", "other"),
+        ):
+            assert hosted_test_service_cors_origin(project, wrong, from_candidate=True) is None
+
+
+# @matrix hosted-e2e storage : cors teardown
+def test_hosted_cors_preserves_standing_and_exact_origin_lifecycles(monkeypatch):
+    from google.cloud import storage
+
+    site = "https://project-1.uc.r.appspot.com"
+    hosted = "https://*-dot-e2e-dot-project-1.uc.r.appspot.com"
+    candidate = hosted.replace("*", "e2e-1234567890abcdef")
+    unrelated = {"origin": ["https://docs.example.com"], "method": ["GET"]}
+    base = {
+        "method": hosted_e2e.BUCKET_CORS_METHODS,
+        "responseHeader": hosted_e2e.BUCKET_CORS_HEADERS,
+        "maxAgeSeconds": 3600,
+    }
+
+    class Bucket:
+        def __init__(self, rules):
+            self.cors = deepcopy(rules)
+            self.metageneration = 3
+
+        def patch(self, *, if_metageneration_match):
+            assert if_metageneration_match == self.metageneration
+            self.metageneration += 1
+
+    installed = [dict(base, origin=[site, hosted]), unrelated]
+    exact = [dict(base, origin=[site])]
+    partial = [*exact, {"origin": [hosted], "method": ["GET"]}]
+    buckets = {
+        "standing": Bucket(installed),
+        "exact": Bucket(exact),
+        "partial": Bucket(partial),
+        "empty": Bucket([]),
+    }
+    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: tuple(buckets))
+    monkeypatch.setattr(storage, "Client", lambda **_: SimpleNamespace(get_bucket=buckets.__getitem__))
+    infrastructure = SimpleNamespace(project="project-1")
+    for _ in range(2):
+        hosted_e2e._change_test_bucket_cors(infrastructure, candidate, present=True)
+    assert buckets["standing"].cors == installed
+    assert buckets["standing"].metageneration == 3
+    for name in ("exact", "partial", "empty"):
+        assert candidate in buckets[name].cors[0]["origin"]
+        assert buckets[name].metageneration == 4
+
+    # An older candidate may have added its exact origin before the standing rule existed.
+    buckets["older"] = Bucket([dict(base, origin=[site, candidate, hosted]), unrelated])
+    for _ in range(2):
+        hosted_e2e._change_test_bucket_cors(infrastructure, candidate, present=False)
+    assert buckets["standing"].metageneration == 3
+    assert buckets["older"].metageneration == 4
+    assert buckets["older"].cors == installed
+    assert buckets["exact"].cors == exact
+    assert buckets["partial"].cors == partial
+    assert buckets["empty"].cors == []
 
 
 # @matrix hosted-e2e : deletion-safety provider-errors
@@ -1275,11 +1354,40 @@ def test_hosted_results_can_skip_large_report_archive(tmp_path, monkeypatch, cap
     assert "downloading manifest.json" in output
 
 
+# @matrix hosted-e2e : deletion-safety teardown
+def test_hosted_teardown_checks_all_executions(monkeypatch):
+    infrastructure = _infrastructure()
+    job = infrastructure.job
+    executions = [{"status": {"completionTime": "2026-01-01T00:00:00Z"}}] * 21
+    executions.extend(
+        [
+            {"metadata": {"name": f"{job}-older"}},
+            {"name": f"projects/demo/locations/test/jobs/{job}/executions/{job}-newer"},
+        ]
+    )
+
+    def list_executions(*arguments):
+        assert arguments[:4] == ("run", "jobs", "executions", "list")
+        assert f"--job={job}" in arguments
+        assert not any(arg.startswith("--limit=") for arg in arguments)
+        return SimpleNamespace(stdout=json.dumps(executions))
+
+    monkeypatch.setattr(hosted_e2e, "_gcloud", list_executions)
+    assert hosted_e2e._active_job_executions(infrastructure) == (
+        f"{job}-newer", f"{job}-older",
+    )
+    executions.append({"status": {}})
+    with pytest.raises(HostedE2EError, match="unidentified active"):
+        hosted_e2e._active_job_executions(infrastructure)
+
+
 # @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
-def test_hosted_teardown_removes_downloaded_results_after_success(
+@pytest.mark.parametrize("force", [False, True])
+def test_hosted_teardown_removes_resources_and_results_without_redis(
     tmp_path,
     monkeypatch,
     capsys,
+    force,
 ):
     infrastructure = _infrastructure()
     state_root = tmp_path / "reports/hosted-e2e"
@@ -1306,10 +1414,6 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     }
     hosted_e2e._write_json(state_path, state)
 
-    class CleanupLease:
-        def __exit__(self, *_arguments):
-            return None
-
     monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
     monkeypatch.setattr(hosted_e2e, "STATE_ROOT", state_root)
     monkeypatch.setattr(hosted_e2e, "STATE_PATH", state_path)
@@ -1329,7 +1433,10 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
         "_gcloud",
         lambda *arguments, **options: provider_calls.append((arguments, options)),
     )
-    monkeypatch.setattr(hosted_e2e, "_acquire_cleanup_lease", CleanupLease)
+    monkeypatch.setattr(
+        "redis.Redis.execute_command",
+        lambda *args, **kwargs: pytest.fail("Resource teardown issued a Redis command"),
+    )
     monkeypatch.setattr(
         hosted_e2e,
         "_version_url",
@@ -1347,13 +1454,20 @@ def test_hosted_teardown_removes_downloaded_results_after_success(
     assert provider_calls == []
     assert result_root.exists()
 
-    active_executions.clear()
-    result = hosted_e2e.teardown()
+    if not force:
+        active_executions.clear()
+    result = hosted_e2e.teardown(force=force)
 
     assert result["status"] == "torn-down"
     assert hosted_e2e._load_json(state_path)["status"] == "torn-down"
     assert not result_root.exists()
     assert setup_path.exists()
+    if force:
+        cancellation, _ = provider_calls.pop(0)
+        assert cancellation[:5] == (
+            "run", "jobs", "executions", "cancel", "lagniappe-e2e-active1",
+        )
+        assert "--no-async" in cancellation
     assert [call[0][:4] for call in provider_calls] == [
         ("run", "jobs", "delete", infrastructure.job),
         ("app", "versions", "delete", version),
@@ -1425,11 +1539,17 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     tmp_path,
     monkeypatch,
 ):
-    source = "a" * 40
-    source_file = tmp_path / "source.py"
-    source_file.write_text("VALUE = 1\n", encoding="utf-8")
-    snapshot, paths = behavior_snapshot(tmp_path)
-    result_dir = tmp_path / "reports/result"
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    _git(checkout, "init")
+    (checkout / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(checkout, "add", "source.py")
+    _git(checkout, "config", "user.name", "Test")
+    _git(checkout, "config", "user.email", "ci@example.test")
+    _git(checkout, "commit", "-m", "Candidate")
+    source = _git(checkout, "rev-parse", "HEAD").stdout.strip()
+    snapshot, paths = behavior_snapshot(checkout)
+    result_dir = tmp_path / "result"
     result_dir.mkdir(parents=True)
     manifest = {
         "schema_version": 1,
@@ -1450,23 +1570,22 @@ def test_hosted_result_directory_import_requires_the_exact_source(
             outcome="failed",
         ),
     )
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_git",
-        lambda *_arguments, **_options: subprocess.CompletedProcess(
-            ["git"], 0, stdout=f"{source}\n", stderr=""
-        ),
-    )
-
-    imported = hosted_e2e.import_result_directory(
-        result_dir,
-        expected_execution="lagniappe-e2e-result1",
-    )
-
-    assert imported == manifest
+    # The protected workflow imports its downloaded bundle with only PyYAML installed.
+    packages = tmp_path / "packages"
+    shutil.copytree(Path(yaml.__file__).parent, packages / "yaml")
+    monkeypatch.setenv("PYTHONPATH", str(packages))
+    monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(checkout))
+    command = [
+        sys.executable, "-S", hosted_e2e.APP_DIR / "run.py",
+        "hosted-e2e", "import-results",
+        "--directory", result_dir,
+        "--execution", manifest["execution"],
+    ]
+    result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert json.loads(result.stdout) == manifest
     evidence = traceability_common.load_json(
-        tmp_path / traceability_common.LATEST_TEST_RUN
+        checkout / traceability_common.LATEST_TEST_RUN
     )
     assert (
         evidence["tests"]["tests_e2e/test_remote.py::test_remote"]["outcome"]
@@ -1475,8 +1594,10 @@ def test_hosted_result_directory_import_requires_the_exact_source(
 
     manifest["source"] = "b" * 40
     traceability_common.write_json(result_dir / "manifest.json", manifest)
-    with pytest.raises(HostedE2EError, match="does not match"):
-        hosted_e2e.import_result_directory(result_dir)
+    result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "source does not match" in result.stdout
+    assert traceability_common.load_json(checkout / traceability_common.LATEST_TEST_RUN) == evidence
 
 
 # @matrix hosted-e2e traceability : evidence merge
@@ -1943,8 +2064,10 @@ def test_committed_source_export_ignores_generated_worktree_churn(tmp_path):
         ) == "committed production bundle\n"
 
 
-# @matrix hosted-e2e : deployment-source image-boundary
-def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
+# @matrix hosted-e2e : deployment-source image-boundary project-identity
+# @pair storage:project-identity
+@pytest.mark.parametrize("cloud_operator", [False, True], ids=["installer", "cloud-operator"])
+def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch, cloud_operator):
     monkeypatch.delenv("LAGNIAPPE_E2E_DURATIONS", raising=False)
     container_root = tmp_path / hosted_e2e.CONTAINER_RELATIVE_ROOT
     container_root.mkdir(parents=True)
@@ -1965,6 +2088,10 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
 
     def gcloud(*arguments, **options):
         calls.append((arguments, options))
+        if arguments[:3] == ("storage", "buckets", "describe"):
+            return subprocess.CompletedProcess(
+                arguments, 0, '{"name":"project-1_cloudbuild","projectNumber":"1234"}', "",
+            )
         return subprocess.CompletedProcess(
             ["gcloud"],
             returncode=0,
@@ -1978,15 +2105,25 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
         gcloud,
     )
 
-    image, returned_build_id = hosted_e2e._build_runner_image(
-        _infrastructure(),
-        "a" * 40,
-        tmp_path,
-    )
+    infrastructure = _infrastructure()
+    checkpoint = SimpleNamespace(project=infrastructure.project) if cloud_operator else None
+    with hosted_e2e.cloud_checkpoints.ACTIVE.set(checkpoint):
+        image, returned_build_id = hosted_e2e._build_runner_image(
+            infrastructure, "a" * 40, tmp_path,
+        )
 
     assert image.endswith(":" + "a" * 40)
     assert returned_build_id == cloud_build_id
-    arguments, options = calls[0]
+    arguments, options = calls[-1]
+    if cloud_operator:
+        assert [args for args, _ in calls[:-1]] == [(
+            "storage", "buckets", "describe", "gs://project-1_cloudbuild", "--raw",
+            "--project=project-1", "--format=json",
+        )]
+        assert "--gcs-source-staging-dir=gs://project-1_cloudbuild/source" in arguments
+    else:
+        assert len(calls) == 1
+        assert not any(str(arg).startswith("--gcs-source-staging-dir=") for arg in arguments)
     assert arguments[:3] == ("builds", "submit", tmp_path)
     assert f"--config={container_root / 'cloudbuild.yaml'}" in arguments
     assert f"--ignore-file={container_root / 'gcloudignore'}" in arguments
@@ -1999,6 +2136,19 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     assert (container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY).read_text(
         encoding="utf-8"
     ) == (tmp_path / ".gcloudignore").read_text(encoding="utf-8")
+
+
+# @matrix hosted-e2e storage : project-identity
+@pytest.mark.parametrize("metadata", [
+    None,
+    {"name": "project-1_cloudbuild"},
+    {"name": "project-1_cloudbuild", "projectNumber": "5678"},
+    {"name": "other-bucket", "projectNumber": "1234"},
+])
+def test_cloud_build_source_requires_the_operators_own_bucket(monkeypatch, metadata):
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda args: metadata)
+    with pytest.raises(HostedE2EError, match="gs://project-1_cloudbuild.*belong to project project-1"):
+        hosted_e2e._operator_build_staging_dir(_infrastructure())
 
 
 # @matrix hosted-e2e : deployment-source image-boundary symlink-safety

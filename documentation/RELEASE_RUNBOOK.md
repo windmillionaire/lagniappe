@@ -196,7 +196,13 @@ git switch main
 git pull --ff-only origin main
 ```
 
-Run the shortest critical release-specific smoke from `main`, then publish:
+Run the shortest critical release-specific smoke from `main`. For remote releases, dispatch the protected publisher on explicit release approval and supply the merged PR number. The workflow verifies the dispatched main commit, version, release notes and trusted hosted attestation. It checks any existing tag's type and peeled commit before completing a partial publication.
+
+```bash
+gh workflow run publish-release.yml --ref main -f pull_request=PR_NUMBER
+```
+
+The Owner can also publish manually from the verified main commit.
 
 ```bash
 git tag -a vX.Y.Z -m "Lagniappe X.Y.Z"
@@ -261,9 +267,10 @@ Verify these only when repository settings or release automation change:
   an up-to-date branch, and linear history; force pushes and deletion are
   blocked.
 - `next/*` and `hotfix/*` have no rulesets.
-- `v*` creation is restricted to the owner, and existing tags cannot be updated
+- `v*` creation is restricted to the owner and the configured publisher, and existing tags cannot be updated
   or deleted. Use separate creation and update/deletion rulesets so the owner's
   creation bypass cannot move an existing tag.
+- To enable the protected publisher, install a private GitHub App on this repository only with **Contents — Read and write**. Add the App to the creation ruleset's bypass list. Keep the update/deletion ruleset independently enforced. Restrict the `release-publisher` environment to the `main` branch and store the App's client ID as `RELEASE_APP_CLIENT_ID` and private key as the environment secret `RELEASE_APP_PRIVATE_KEY`. The workflow mints a short-lived installation token for the publication job. Run a tagged release only when the Owner requests it.
 - The default `GITHUB_TOKEN` is read-only. The release workflow receives only
   its scoped evidence, continuation, status, pull-request validation, hosted
   invocation, and result-read permissions.

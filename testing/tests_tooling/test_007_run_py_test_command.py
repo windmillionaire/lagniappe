@@ -2247,6 +2247,7 @@ def test_runner_adc_identity_is_secret_free_and_project_bound():
 def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
     identities = iter(
         [
             {
@@ -2318,6 +2319,7 @@ def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch
 def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     from runner import adc as runner_adc
 
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
     identities = iter(
         [
             {

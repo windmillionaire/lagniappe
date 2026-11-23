@@ -5596,6 +5596,10 @@ def test_setup_storage_provisioning_is_bucket_scoped_and_idempotent(monkeypatch)
         assert bucket.storage_class == "STANDARD"
         assert bucket.patches == 1
         assert bucket.policy_sets == 1
+        if bucket.name == recovery_name:
+            assert not bucket.cors
+        else:
+            assert bucket.cors[0]["origin"] == [settings.APP["APP_URL"]]
         assert bucket.policy.etag == f"etag-{bucket.name}".encode()
         bindings = {
             binding["role"]: set(binding["members"])
@@ -5636,6 +5640,9 @@ def test_setup_storage_provisioning_is_bucket_scoped_and_idempotent(monkeypatch)
         bucket = buckets[bucket_name]
         assert bucket.policy_sets == 1
         assert bucket.permission_checks == [expected_permissions]
+        assert set(bucket.cors[0]["origin"]) == {
+            settings.APP["APP_URL"], "http://127.0.0.1:5000"
+        }
         bindings = {
             binding["role"]: set(binding["members"])
             for binding in bucket.policy.bindings
@@ -5658,6 +5665,21 @@ def test_setup_storage_provisioning_is_bucket_scoped_and_idempotent(monkeypatch)
         ("project-1", runtime_email),
         ("project-1", runtime_email),
     ]
+    opted_in_bucket = storage_bucket_names(test_bucket_settings)["private"]
+    service_origin = "https://*-dot-e2e-dot-project-1.appspot.com"
+    buckets[opted_in_bucket].cors[0]["origin"].append(service_origin)
+    settings.TEST_CONFIG.update(SERVER_NAME="localhost", SERVER_PORT=5123)
+    assert gcloud.configure_storage_buckets(include_test=True)
+    assert gcloud.configure_storage_buckets(include_test=True)
+    for name, bucket in buckets.items():
+        if name in test_bucket_names:
+            allowed = {settings.APP["APP_URL"], "http://localhost:5123"}
+            if name == opted_in_bucket:
+                allowed.add(service_origin)
+            assert set(bucket.cors[0]["origin"]) == allowed
+            assert bucket.patches == 2
+        else:
+            assert bucket.patches == 1
 
 
 # @matrix setup : app-engine immutable-location keyless-config oidc provider-state

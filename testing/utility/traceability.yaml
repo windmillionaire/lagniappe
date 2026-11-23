@@ -48,6 +48,7 @@ test_roots:
   - testing/tests_tooling/test_012c_remote_mcp_config.py
   - testing/tests_tooling/test_014_dependency_upgrade.py
   - testing/tests_tooling/test_015_e2e_parallel.py
+  - testing/tests_tooling/test_016_cloud_operator.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:
@@ -97,6 +98,11 @@ annotated_source_roots:
   - runner/upgrade.py
   - runner/uv_bootstrap.py
   - runner/hosted_e2e.py
+  - runner/cloud_checkpoints.py
+  - runner/cloud_operator_iam.py
+  - runner/cloud_settings.py
+  - runner/cloud_task.py
+  - runner/publish_release.py
   - runner/hosted_e2e_anchor/main.py
   - config/hosted_e2e.py
   - lagniappe/__init__.py

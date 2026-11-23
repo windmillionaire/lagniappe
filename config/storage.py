@@ -146,6 +146,25 @@ def expected_storage_cors(config):
     ]
 
 
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_preserves_standing_and_exact_origin_lifecycles
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
+# @matrix storage hosted-e2e : cors provisioning
+def has_browser_cors_origin(rules, origin):
+    """Check for the explicit origin with all methods and headers used by the app."""
+    if not origin:
+        return False
+    required_headers = {header.lower() for header in BUCKET_CORS_HEADERS}
+    return any(
+        origin in (rule.get("origin") or [])
+        and set(BUCKET_CORS_METHODS).issubset(rule.get("method") or [])
+        and required_headers.issubset(
+            header.lower() for header in (rule.get("responseHeader") or [])
+        )
+        for rule in rules or []
+    )
+
+
 # @testable false
 # @covered-by config/storage.py::configure_storage_bucket
 # @reason normalization helper owned by idempotent metadata reconciliation
@@ -253,7 +272,7 @@ def _patch_bucket_metadata(bucket):
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_retries_transient_patch_failure
 # @matrix storage : bucket-metadata cors idempotent lifecycle-preservation object-versioning storage-class transient-retry
-def configure_storage_bucket(bucket, config):
+def configure_storage_bucket(bucket, config, *, preserve_cors_origin=None):
     """Reconcile runtime metadata and the setup-owned version-retention rule."""
     changed = False
 
@@ -266,9 +285,12 @@ def configure_storage_bucket(bucket, config):
         changed = True
 
     expected_cors = expected_storage_cors(config)
-    if _normalized_cors(getattr(bucket, "cors", None)) != _normalized_cors(
-        expected_cors
-    ):
+    existing_cors = getattr(bucket, "cors", None)
+    if expected_cors and has_browser_cors_origin(existing_cors, preserve_cors_origin):
+        expected_cors[0]["origin"] = sorted(
+            {*expected_cors[0]["origin"], preserve_cors_origin}
+        )
+    if _normalized_cors(existing_cors) != _normalized_cors(expected_cors):
         bucket.cors = expected_cors
         changed = True
 

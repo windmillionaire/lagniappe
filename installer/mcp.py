@@ -6,6 +6,7 @@ from runner.presentation import output as print, read_input as input
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import tempfile
@@ -353,7 +354,7 @@ def reconcile_resources(target, deployer):
 # @testable false
 # @covered-by installer/mcp.py::reconcile_resources
 # @reason token expiry cleanup and request-log privacy are owned by resource setup
-def _reconcile_oauth_resources(target):
+def _reconcile_oauth_resources(target, *, verify_only=False):
     flags = ["--collection-group=mcp_oauth", "--database=(default)"]
     result = _run(target, ["firestore", "fields", "ttls", "list", *flags, "--format=json"])
     try:
@@ -368,10 +369,14 @@ def _reconcile_oauth_resources(target):
     except (TypeError, ValueError, AttributeError) as error:
         raise SetupError("MCP TTL discovery returned invalid data.") from error
     if not configured:
+        if verify_only:
+            raise SetupError("The MCP token TTL needs installer repair before remote deployment.")
         _run(target, ["firestore", "fields", "ttls", "update", "expires_at", *flags, "--enable-ttl", "--async"])
     sink = describe(target, ["logging", "sinks", "describe", "_Default"])
     exclusion = next((row for row in sink.get("exclusions", []) if row.get("name") == AUTH_LOG_EXCLUSION), None)
     if exclusion is None or exclusion.get("filter") != AUTH_LOG_FILTER or exclusion.get("disabled"):
+        if verify_only:
+            raise SetupError("The MCP OAuth log exclusion needs installer repair before remote deployment.")
         action = "add" if exclusion is None else "update"
         _run(target, ["logging", "sinks", "update", "_Default",
                       f"--{action}-exclusion=name={AUTH_LOG_EXCLUSION},filter={AUTH_LOG_FILTER},disabled="])
@@ -479,6 +484,7 @@ def _deploy_service(target, resource, *, enabled):
 # @testable true
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app
 # @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
+# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_cloud_operator_requires_preprovisioned_mcp_and_oauth_controls
 # @matrix mcp-install : bootstrap configuration source-version update-order
 def prepare_deployment(settings=None, *, announce_progress=True):
     """Prepare the optional service and configuration before publishing App Engine."""
@@ -492,9 +498,26 @@ def prepare_deployment(settings=None, *, announce_progress=True):
         raise SetupError("MCP requires the saved installer/deployer identity.")
     if announce_progress:
         print(ui.activity("Preparing MCP service before App Engine deployment"), flush=True)
-    reconcile_resources(target, deployer)
-    service = _service(target)
     saved_resource = settings.get("MCP_RESOURCE")
+    operator_project = os.environ.get("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT")
+    if operator_project:
+        if (target.project != operator_project or settings.get("EXPERIMENTS_PROJECT") != operator_project
+                or not settings.get("EXPERIMENTS_ENABLED")):
+            raise SetupError("The Cloud operator can deploy only its configured experiments installation.")
+        service = _service(target)
+        if (not service or not saved_resource or _resource(service) != saved_resource
+                or service.get("metadata", {}).get("labels", {}).get("managed-by") != "lagniappe"
+                or service.get("spec", {}).get("template", {}).get("spec", {}).get("serviceAccountName") != target.runtime):
+            raise SetupError("The existing MCP service, resource and runtime must match before remote deployment.")
+        _reconcile_oauth_resources(target, verify_only=True)
+        bucket = describe(target, ["storage", "buckets", "describe", f"gs://{target.bucket}", "--raw"])
+        project = describe(target, ["projects", "describe", target.project])
+        if (not project.get("projectNumber") or str(bucket.get("projectNumber")) != str(project["projectNumber"])
+                or str(bucket.get("location", "")).casefold() != target.region):
+            raise SetupError("The MCP build bucket must belong to the experiments project and region.")
+    else:
+        reconcile_resources(target, deployer)
+        service = _service(target)
     if service is not None:
         resource = _resource(service)
         if saved_resource and saved_resource != resource:
@@ -515,9 +538,10 @@ def prepare_deployment(settings=None, *, announce_progress=True):
         **settings, "MCP_RESOURCE": resource, "MCP_SERVICE_ACCOUNT": target.runtime,
     }))
     settings["MCP_VERSION"] = target.version
-    reconcile_access(target, ["run", "services"], SERVICE,
-                     [(iam.principal_member(deployer), ["roles/run.admin"])],
-                     flags=[f"--region={target.region}"])
+    if not operator_project:
+        reconcile_access(target, ["run", "services"], SERVICE,
+                         [(iam.principal_member(deployer), ["roles/run.admin"])],
+                         flags=[f"--region={target.region}"])
     if announce_progress:
         print(ui.success("MCP preparation complete"), flush=True)
     return target

@@ -139,7 +139,10 @@ conditional grants, remain operator-owned and are not automatically removed.
 
 Production uses deterministic private, public, history, and operator-only
 recovery buckets. Development adds test-prefixed private/public/history
-buckets.
+buckets. On those three buckets, setup includes the configured loopback test
+server in the browser CORS rule. Its default origin is `http://127.0.0.1:5000`.
+A browser running in a Codex task can use that same origin for its managed
+test server.
 
 - Runtime buckets use uniform bucket-level access, browser CORS, bucket-scoped
   runtime object administration, and runtime bucket metadata read.

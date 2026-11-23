@@ -4,6 +4,7 @@ from runner.presentation import output as print
 import ast
 import fnmatch
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -438,6 +439,8 @@ def ensure_production_frontend_bundle(*, announce_progress=True):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
+# @tests tests_tooling/test_016_cloud_operator.py::test_deploy_requires_pinned_experiments_target
+# @pair deploy:project-identity
 # @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version app-failure update-order
 def deploy(
     *,
@@ -449,6 +452,10 @@ def deploy(
     announce_completion=True,
 ):
     """Prepare current frontend assets, refresh metadata, and deploy the app."""
+    operator_project = os.environ.get("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT")
+    if operator_project:
+        from runner.cloud_settings import verify_operator_target
+        verify_operator_target(Directory.APP.value, operator_project, SETTINGS)
     verify_runtime_deploy_surface()
 
     if build_assets:

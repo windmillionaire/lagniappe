@@ -27,7 +27,7 @@ from testing.utility.network import (
     manual_mutation_headers,
     scoped_browser_route,
 )
-from testing.utility.offline import wait_for_offline_mutations
+from testing.utility.offline import wait_for_connectivity_replay, wait_for_offline_mutations
 from testing.utility.test_file import TestFile as _TestFile
 from testing.utility.local_time import local_date_from_utc_datetime
 
@@ -607,8 +607,11 @@ def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user,
                 wait_for_offline_mutations(
                     user, record_id=task_mutation_id, exact=0
                 )
+    # The queue clears before replay refreshes Home's prefetched lists.
+    wait_for_connectivity_replay(user)
     home.activity_list
     expect(_activity_item(home, note_body)).to_be_visible()
+    expect(_task_item(home, task_name)).to_be_attached()
     home.task_list
     expect(_task_item(home, task_name)).to_be_visible()
 
