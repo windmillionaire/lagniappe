@@ -184,7 +184,10 @@ exception should explain the supported behavior it preserves.
 Template checks resolve tagged tests to Jinja macros and inspect selectors used
 by JavaScript. Style checks match styles and icons to their consumers and
 recorded test evidence. Mutation checks verify declared entity relationships
-and save requirements. For a behavioral change, find the entry point and its
+and save requirements. In a checkout without an installation, CI loads the
+real entity registry with `FLASK_ENV=testing` and
+`LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime"`.
+For a behavioral change, find the entry point and its
 callers and run tests that exercise the changed behavior. See
 [writing tests](TESTING_WRITING_TESTS.md),
 [template contracts](TESTING_TEMPLATE_CONTRACTS.md) and

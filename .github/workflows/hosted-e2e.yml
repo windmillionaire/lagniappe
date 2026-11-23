@@ -554,7 +554,8 @@ jobs:
         run: |
           venv/bin/python run.py template-contracts --check --no-report
           venv/bin/python run.py style-contracts --check --no-report --no-manifest
-          venv/bin/python run.py mutation-contracts --check
+          LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime" FLASK_ENV=testing \
+            venv/bin/python run.py mutation-contracts --check
 
       - name: Check complete release tree
         env:
