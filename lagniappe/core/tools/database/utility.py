@@ -1,5 +1,6 @@
 """Entity creation, persistence, deletion, and site fingerprinting."""
 
+from copy import copy
 from enum import Enum
 import uuid
 
@@ -20,6 +21,22 @@ PREFIX = CONFIG.PREFIX
 # @testable infrastructure
 class ExactEntityState(dict):
     """Guard a complete saved row, including absence of additional properties."""
+
+
+class PageSubmissionState(ExactEntityState):
+    """A full Page form edit leaves the revision-bound notes hint to its reader."""
+
+    @staticmethod
+    def with_current_note_hint[Row: dict[str, object]](
+        row: Row, current: dict[str, object]
+    ) -> Row:
+        result = copy(row)
+        for name in ("has_notes", "notes_checked_revision"):
+            if name in current:
+                result[name] = current[name]
+            else:
+                result.pop(name, None)
+        return result
 
 
 # @testable true
@@ -258,9 +275,12 @@ def save_mutations(writes, *, guards=None, deletes=()):
 @retry_aborted
 def _save_guarded_mutations(writes, fingerprints, guards, *, deletes=()):
     with DATA.datastore.transaction() as transaction:
-        check_mutation_guards(transaction, guards)
+        guarded_pages = check_mutation_guards(transaction, guards)
         for entity, mask in writes:
-            _put_mutation(transaction, entity.db, mask)
+            row = entity.db
+            if mask is None and (current := guarded_pages.get(row.key)) is not None:
+                row = PageSubmissionState.with_current_note_hint(row, current)
+            _put_mutation(transaction, row, mask)
         for fingerprint in fingerprints:
             transaction.put(fingerprint)
         for entity in deletes:
@@ -271,7 +291,7 @@ def _save_guarded_mutations(writes, fingerprints, guards, *, deletes=()):
 # @tests tests_unit/test_018c_mutation_guards.py::test_*
 # @matrix mutations : concurrency batched-reads
 def check_mutation_guards(transaction, guards):
-    """Batch distinct reads while enforcing every expectation in input order."""
+    """Check every precondition and return Page rows whose notes hints must survive full writes."""
     guards = tuple(guards)
     keys = list(dict.fromkeys(key for key, _expected in guards))
     current_rows = {}
@@ -286,8 +306,13 @@ def check_mutation_guards(transaction, guards):
         # resolving them. Only explicitly missing rows satisfy absence guards.
         if any(key not in current_rows for key in batch):
             raise ServiceUnavailable("Datastore did not resolve all mutation guards; retry.")
+    guarded_pages = {}
     for key, expected in guards:
         current = current_rows[key]
+        if isinstance(expected, PageSubmissionState) and current is not None:
+            # Compare all other properties, including additions and removals.
+            expected = PageSubmissionState.with_current_note_hint(expected, current)
+            guarded_pages[key] = current
         conflict = (
             current is not None if expected is None else
             current is None or (
@@ -298,6 +323,7 @@ def check_mutation_guards(transaction, guards):
         if conflict:
             from lagniappe.core.exceptions import MutationConflict
             raise MutationConflict("Saved state changed while saving; reload and retry.")
+    return guarded_pages
 
 
 # @testable true
