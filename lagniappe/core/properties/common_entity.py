@@ -739,7 +739,7 @@ class Active(DBProperty[bool, "Entity", bool]):
 # @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
 # @covered-by lagniappe/core/properties/user_groups.py::GroupPermissions.create
 # @covered-by lagniappe/core/properties/user_groups.py::PublicPermissions.create
-class Permissions(DBProperty[dict[str, str]]):
+class Permissions[Owner: Entity = "Entity"](DBProperty[dict[str, str], Owner]):
     """Permission map for an entity.
 
     Stores a dict mapping resource hashes/names to Action level names.
