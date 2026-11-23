@@ -92,6 +92,8 @@ def create_plan(
     if revises_plan_id:
         from ..reporting.corrections import link_correction, save_correction
         source = Entities.fetch_one(revises_plan_id, request=Fetch.direct())
+        if not isinstance(source, Entities.REPORT):
+            raise exceptions.ValidationError("Choose an available plan that you created.")
         link_correction(report, source, user)
         save_correction(report, source)
     else:
