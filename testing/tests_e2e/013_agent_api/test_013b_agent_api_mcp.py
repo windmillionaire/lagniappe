@@ -1133,7 +1133,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         assert review_response is not None and review_response.status == 200
         expect(owner.page.get_by_role("button", name="Execute")).to_be_visible()
-        assert "execute" not in {tool["name"] for tool in workflow["tools"]}
+        assert {"execute", "execute_plan"}.isdisjoint(tool["name"] for tool in workflow["tools"])
 
         hostile_setup = _request(
             "GET",
