@@ -403,15 +403,16 @@ class Entity:
     # @matrix ai file : metadata permissions
     # @pair permissions:authenticated-user
     # @pair ai:browser-url
-    def to_ai(self, user: FieldUser = None) -> dict[str | None, object]:
+    def to_ai(self, user: FieldUser = None) -> dict[str, object]:
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
             raise PermissionError("user must be authenticated")
 
-        values = {}
+        values: dict[str, object] = {}
         for p in self.properties.implementing(mixins.AIMixin):
             p.user = user
-            values[p.ai_key] = p.ai_value
+            # Every AI field in the entity registry supplies a string key.
+            values[cast(str, p.ai_key)] = p.ai_value
 
         if submission_field := self.properties.get("submission"):
             submission_field.user = user

@@ -1113,6 +1113,7 @@ def test_typed_property_interfaces_match_each_registered_entity():
 
     from lagniappe.core.entities import property_types
     from lagniappe.core.entities.types import EntityType
+    from lagniappe.core.mixins import AIMixin
 
     observed = defaultdict(set)
     for member in EntityType.__members__.values():
@@ -1144,6 +1145,13 @@ def test_typed_property_interfaces_match_each_registered_entity():
             declaration = declarations[key]
             assert implementation in (get_args(declaration) or (declaration,)), key
             observed[declaration].add(implementation)
+            if issubclass(implementation, AIMixin):
+                # Default AI keys are labels. Custom keys use the property ID
+                # or owner kind and are available before any stored value is read.
+                field = object.__new__(implementation)
+                object.__setattr__(field, "_entity", entity)
+                assert isinstance(field.ai_key, str) and field.ai_key, (member, key)
+
     for declaration, implementations in observed.items():
         assert implementations == set(get_args(declaration) or (declaration,))
 
