@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from werkzeug.datastructures import FileStorage
 
 from lagniappe.core.definitions import asset as asset_defs
 from lagniappe.core.definitions import Action, LARGE_ASSET_BYTES
@@ -20,6 +21,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import DeferredJobType
 from lagniappe.core.tools.ai import summarize as file_summary
 from lagniappe.core.tools.files import extract as file_extract
+from lagniappe.core.tools.files import utility as file_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.properties.file_assets import FileAsset
 from testing.utility.test_entities import TestEntities
@@ -1156,3 +1158,13 @@ def test_task_move_updates_history_only_file_page_without_consuming_pending_move
     assert file.page is None and file.task_page is destination and file.owner is task
     assert file.restricted_to == {"page": ["b"]} and task.files == []
     assert task._page_changed is True
+
+
+def test_unnamed_text_upload_preserves_stream_and_uses_text_mimetype():
+    upload = FileStorage(stream=BytesIO(b"hello"), filename=None)
+    upload.stream.seek(2)
+
+    encoding = file_utility.determine_encoding(upload)
+    assert encoding
+    assert file_utility.determine_mimetype(upload, upload.filename, None, encoding) == "text/plain"
+    assert upload.stream.tell() == 2
