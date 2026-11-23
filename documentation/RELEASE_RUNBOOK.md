@@ -141,8 +141,12 @@ clean.
 ```bash
 npm run check
 venv/bin/python -m ruff check .
-venv/bin/python run.py traceability --check --fail-on warning --no-report --no-manifest
-venv/bin/python run.py traceability --changed origin/main --check --fail-on warning --no-report --no-manifest
+venv/bin/python -m basedpyright --warnings
+venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
+venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+venv/bin/python run.py template-contracts --check --no-report
+venv/bin/python run.py style-contracts --check --no-report --no-manifest
+venv/bin/python run.py mutation-contracts --check
 venv/bin/python run.py release-check --base origin/main
 git show --check --oneline HEAD -- . ':(exclude)lagniappe/web/static/**'
 ```
@@ -168,13 +172,18 @@ gh pr checks --watch
 ```
 
 The required **Source quality and traceability** workflow first reruns the
-offline quality, traceability, and release checks in an unprivileged job. Only
+type, lint, contract, hosted evidence and release checks in an unprivileged job. Only
 a passing exact candidate can enter the protected environment and run hosted
 `all`. A manual diagnostic dispatch may bypass that preflight, but cannot
 publish release attestation. The automatic workflow may push one evidence-only
 child commit and then validate that child without rerunning the suites. Do not
 manually merge downloaded evidence into the release branch. Any later source
 change requires a new exact hosted lifecycle.
+
+The hosted result and the recorded test evidence must agree on the build ID.
+The importer and the final validation each verify it against the production
+artifacts of the exact candidate commit. A new source commit needs its own
+hosted run even when it reuses the same frontend build.
 
 ### 7. Tear down hosted resources
 

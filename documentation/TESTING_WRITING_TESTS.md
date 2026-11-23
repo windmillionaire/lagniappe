@@ -454,14 +454,12 @@ Tooling tests belong in `testing/tests_tooling/`. They test the repository and
 runner without importing `lagniappe.core` or `lagniappe.web` and without
 executing Node.
 
-## Traceability and Template Contracts
+## Template and style contracts
 
-Use supported `@matrix`, exact `@pair`, `@source`, `@template`, and `@todo`
-tags as evidence, not decoration. A test should claim only behavior that its
-assertions prove. Follow
-[TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) before adding or
-changing source annotations, and [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md)
-when judging whether a test really covers a source symbol.
+Identify the observable result each test proves, including relevant missing or
+invalid input behavior. Use `@style semantic.id` when the test directly
+exercises that style. The style checker also derives evidence from referenced
+template macros.
 
 Use `@template path.html::macro` when a template's DOM skeleton is part of the
 test contract. Run the template-contract reporter after changing tagged UI
@@ -477,7 +475,6 @@ change warrants:
 ```bash
 venv/bin/python run.py test testing/tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
 venv/bin/python run.py test testing/tests_e2e/003_forms/test_003b_form_builder.py
-venv/bin/python run.py traceability --changed --check
 venv/bin/python run.py template-contracts --changed --check
 ```
 

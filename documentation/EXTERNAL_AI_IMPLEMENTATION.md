@@ -158,7 +158,7 @@ follow the existing setup conventions.
 
 That integration passed focused configuration, provider-fake provisioning,
 auth/API, browser, upload and shared-template regression checks, together with
-build, template-contract and traceability checks. At the time of this overview,
+build, template-contract and style checks. At the time of this overview,
 the earlier remote-service testing had live deployment evidence, but the new managed
 installation lifecycle had not yet had a clean installation or real-cloud
 upgrade trial. Android/desktop behavior, refresh over time, cold starts and

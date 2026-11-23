@@ -1,8 +1,8 @@
 # Styles, Icons, and Source Linting
 
 The frontend style system combines authored CSS with semantic style and icon
-registries. One validated source feeds JavaScript, Python/Jinja, Tailwind, and
-traceability checks.
+registries. The build validates the registries used by JavaScript, Python/Jinja
+and Tailwind. The style checker uses the same registries to verify consumers.
 
 ## Source layout
 
@@ -128,7 +128,7 @@ artifacts, not edit targets. The style reporter checks both language outputs.
 Run:
 
 ```bash
-venv/bin/python run.py traceability --styles
+venv/bin/python run.py style-contracts
 ```
 
 The reporter checks:
@@ -142,7 +142,7 @@ The reporter checks:
 - template-contract and explicit `@style` test evidence.
 
 Normal runs write `reports/style-traceability.md` and the versioned
-`reports/style-manifest.json`. `--json` emits the shared traceability envelope;
+`reports/style-manifest.json`. `--json` emits the versioned report envelope;
 `--no-report --no-manifest` provides a console-only pass.
 
 ## JavaScript, CSS, and JSON
@@ -196,7 +196,7 @@ When adding or changing a shared style or icon:
 2. Use the semantic key on each server or frontend surface.
 3. Put geometry or behavior in the owning authored stylesheet.
 4. Run `npm run dev` to validate and regenerate maps.
-5. Run `venv/bin/python run.py traceability --styles`.
+5. Run `venv/bin/python run.py style-contracts`.
 6. Add or update focused UI evidence when the rendered contract changes.
 
 For build modes, bundles, cache generations, and releases, see

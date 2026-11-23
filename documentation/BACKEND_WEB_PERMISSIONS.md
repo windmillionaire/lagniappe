@@ -233,8 +233,8 @@ When changing route authorization or freshness:
 4. Keep poll payloads bounded and typed.
 5. Batch keys and relations before adding per-descriptor reads.
 6. Update focused unit tests and E2E coverage for observable browser behavior.
-7. Run the changed-source traceability and template-contract checks when their
-   respective contracts move.
+7. Run the type checker for permission changes. Run template contracts when an
+   edit changes rendered markup or selector behavior.
 
 ## Permission editing forms
 

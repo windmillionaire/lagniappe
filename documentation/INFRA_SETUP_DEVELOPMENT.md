@@ -39,7 +39,7 @@ Use the virtualenv for repository Python commands:
 
 ```bash
 venv/bin/python run.py test unit
-venv/bin/python run.py traceability --changed --check
+venv/bin/python -m basedpyright --warnings
 ```
 
 ## Supported platforms

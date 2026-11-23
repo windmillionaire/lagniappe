@@ -220,7 +220,7 @@ envelope or Maintenance UI changes. Follow
 [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md), then run:
 
 ```bash
-venv/bin/python run.py traceability --changed --check
+venv/bin/python -m basedpyright --warnings
 ```
 
 ## Fresh installations

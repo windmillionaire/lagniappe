@@ -213,7 +213,7 @@ Trace the whole effect, not just the root method:
 4. Separate durable changes from reconstructable/provider effects.
 5. Add focused unit coverage for commit failure, retry, and delete behavior.
 6. Run `mutation-contracts --check` and
-   `venv/bin/python run.py traceability --changed --check`.
+   `venv/bin/python -m basedpyright --warnings`.
 
 ## File ownership
 

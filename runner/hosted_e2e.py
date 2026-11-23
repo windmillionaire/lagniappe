@@ -2709,7 +2709,7 @@ def run_hosted_e2e_command(arguments: list[str]) -> int:
         dest="base_ref",
         metavar="REF",
         help=(
-            "Comparison base for changed traceability and release checks. "
+            "Comparison base for release tree validation. "
             "Defaults to origin/main, then main."
         ),
     )

@@ -159,45 +159,35 @@ of a helper they happen to import.
 
 ## Static typing, linting, and cross-boundary contracts
 
-During the `v2.5` (`EXP-034`) workflow trial, static quality checks prioritize:
+The application and installer target Python 3.14. The root type check covers
+config, the application, runner, installer and entry points. The adapter shares
+the standard-mode policy and resolves dependencies against its locked `mcp/.venv`.
 
 ```bash
-venv/bin/python -m basedpyright
+venv/bin/python -m basedpyright --warnings
+venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
+venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
 venv/bin/python -m ruff check .
 npm run check
-venv/bin/python run.py template-contracts --changed --check
-venv/bin/python run.py traceability --styles --check
+venv/bin/python run.py template-contracts --check
+venv/bin/python run.py style-contracts --check
 venv/bin/python run.py mutation-contracts --check
 ```
 
-`pyrightconfig.json` enables incremental `basedpyright` checking on typed
-modules, and `ruff.toml` enforces `E4`, `E7`, `E9`, `F`, `B`, `UP`, and `SIM`
-for `py314` (with an explicit legacy baseline ignore list). Per-symbol
-`traceability --changed --check` is frozen (not deleted) during the trial and
-is no longer a blocking preflight gate.
+Declare the inputs and results of public and shared functions. Describe stored
+records, request bodies, service results and dynamic properties at the boundary
+where callers rely on their shape. Ruff enforces its selected bug-risk,
+modernization and simplification rules across the repository. Each local
+exception should explain the supported behavior it preserves.
 
-## Traceability and template tools
-
-```bash
-venv/bin/python run.py traceability --changed --check
-venv/bin/python run.py traceability --source lagniappe/core/tools/cache/core.py
-venv/bin/python run.py traceability --test testing/tests_unit/test_file.py
-venv/bin/python run.py template-contracts --changed --check
-venv/bin/python run.py traceability --styles
-```
-
-`run.py test` records exact outcomes in `testing/evidence/latest.json`.
-Traceability checks whether referenced tests are current for their declared
-source/template/style dependencies. Use:
-
-- [TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) for syntax and
-  report behavior;
-- [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) when reviewing source
-  ownership;
-- [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md#basic-test-review-checklist)
-  for the behavior checklist when writing or reviewing a test; and
-- [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) for Jinja DOM
-  contracts.
+Template checks resolve tagged tests to Jinja macros and inspect selectors used
+by JavaScript. Style checks match styles and icons to their consumers and
+recorded test evidence. Mutation checks verify declared entity relationships
+and save requirements. For a behavioral change, find the entry point and its
+callers and run tests that exercise the changed behavior. See
+[writing tests](TESTING_WRITING_TESTS.md),
+[template contracts](TESTING_TEMPLATE_CONTRACTS.md) and
+[style review](INFRA_BUILD_STYLE_REVIEW.md).
 
 ## Artifacts and evidence
 
@@ -210,7 +200,7 @@ Generated artifacts live under `reports/`:
   `reports/test-session.lock`;
 - managed server log: `reports/test-server.log`;
 - hosted bundles: `reports/hosted-e2e/`; and
-- traceability/template/style reports at their named report paths.
+- template and style reports at their respective report paths.
 
 `testing/evidence/latest.json` is tracked current evidence, not a run log. It
 keeps one result per exact nodeid and only the newest session invocation

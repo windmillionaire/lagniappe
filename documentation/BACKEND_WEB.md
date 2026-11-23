@@ -202,7 +202,7 @@ manual readers receive generic guidance without live account details.
 
 Packaged Markdown is runtime data and must remain included in deployments.
 Focused validation lives in `test_035_help.py` and `test_009e_help.py`; run normal
-template contracts and traceability checks after rendering changes.
+template and style contracts after rendering changes.
 
 ### Template configuration
 

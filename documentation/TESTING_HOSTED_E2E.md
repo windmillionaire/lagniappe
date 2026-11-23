@@ -3,14 +3,14 @@
 Hosted testing runs the ordinary unit, JavaScript, tooling, and
 pytest/Playwright E2E suites in one Cloud Run job close to the application's
 GCP resources. It deploys an exact zero-traffic App Engine candidate and imports
-normal traceability evidence without exposing application secrets to GitHub.
+the tracked test-result manifest without exposing application secrets to GitHub.
 
 ## Architecture
 
 ```text
 trusted clean commit with production build
   -> hosted-e2e create
-       run source-quality, traceability, and release gates
+       run source quality, contract and release gates
        export exact commit
        deploy zero-traffic App Engine e2e version
        build/update matching Cloud Run job
@@ -127,8 +127,8 @@ venv/bin/python run.py hosted-e2e create --base origin/main
 `create` requires a clean committed production build. It exports that exact
 commit for both artifacts, never rebuilds, never edits canonical
 `lagniappe.yaml`, and deploys with `--no-promote`. Before gcloud activation or
-provider mutation, it runs npm source checks, Ruff, tooling tests, full
-structural traceability, and the release check against the clean local HEAD.
+provider mutation, it runs npm source checks, Ruff, both Python type checks, tooling tests,
+template, style and mutation contracts, and the release check against the clean local HEAD.
 Creation does not require current local test evidence; the hosted job produces
 that evidence when it runs the candidate's suites.
 
@@ -214,7 +214,7 @@ Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 Normal `hosted-e2e execute` and CI use one Cloud Run coordinator with six
 browser workers by default. Unit, JavaScript and tooling tests run first in
 their existing environments; the complete E2E selection then runs concurrently.
-Both phases contribute to one JUnit report and traceability manifest with
+Both phases contribute to one JUnit report and test-result manifest with
 `all` scope. A failure in either phase fails the run. Application experiments
 mode and measurement diagnostics remain disabled.
 
@@ -313,8 +313,7 @@ undo provider writes that were already in flight when authority was lost.
 
 Worker logs, browser diagnostics, HTML reports and JUnit have separate paths
 under `reports/e2e-pilot/ATTEMPT/`. The coordinator checks exact selected-nodeid,
-attempt and source identity, merges JUnit, then records ordinary traceability
-evidence once. Missing/crashed workers become explicit failed selected results;
+attempt and source identity, merges JUnit, then records test outcomes once. Missing/crashed workers become explicit failed selected results;
 old passing evidence cannot fill a missing worker. Explicit pilot and E2E-only
 invocations report `focused` and `e2e` scope respectively. The normal hosted
 job combines the support suites and coordinated E2E results into `all` scope,
@@ -344,7 +343,7 @@ only Python dependency.
 The workflow validates and merges evidence, confirms that no tracked file other
 than `testing/evidence/latest.json` changed, and non-force pushes an
 evidence-only child if the branch head is unchanged. It then dispatches a
-current-head continuation that verifies the parent source/snapshot and runs
+current-head continuation that verifies the parent source, semantic snapshot and production build ID and runs
 source lint and release-tree checks without rerunning suites. A scoped final job
 publishes the required **Source quality and traceability** status on the exact
 evidence head.
@@ -366,7 +365,7 @@ Every execution writes beneath
   exit status.
 
 Local downloads live under `reports/hosted-e2e/results/EXECUTION/`. Import
-requires both commit and semantic source snapshot to match the checkout. A
+requires the commit, semantic source snapshot and frontend build ID to match the checkout. A
 different result can be downloaded for diagnosis but cannot merge into tracked
 evidence. Failed results import their failures and bounded tracebacks as the
 latest selected evidence.

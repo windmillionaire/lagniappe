@@ -43,7 +43,8 @@ These instructions apply to the whole repository unless a more specific
   - `venv/bin/python run.py test js`
   - `venv/bin/python run.py test tooling`
   - `venv/bin/python run.py test setup`
-  - `venv/bin/python run.py traceability`
+  - `venv/bin/python run.py style-contracts --check`
+  - `venv/bin/python run.py mutation-contracts --check`
   - `venv/bin/python run.py template-contracts`
 - Run test commands directly, without shell redirection, pipes, or wrapper
   shells. Read ongoing output through the tool session; use runner-generated
@@ -77,9 +78,9 @@ These instructions apply to the whole repository unless a more specific
   others.
 - Before adding or materially reshaping tests, check
   `documentation/TESTING_WRITING_TESTS.md`.
-- When reviewing or annotating an existing test, check
-  `documentation/TESTING_TRACEABILITY_TOOL.md` as well as the test-writing
-  guidelines above.
+- For tests that assert rendered markup or styles, check
+  `documentation/TESTING_TEMPLATE_CONTRACTS.md` and
+  `documentation/INFRA_BUILD_STYLE_REVIEW.md`.
 - Keep the `testing/` root clean. Miscellaneous test utilities belong in
   `testing/utility/`; tooling and repository-health tests belong in
   `testing/tests_tooling/`.
@@ -129,19 +130,18 @@ These instructions apply to the whole repository unless a more specific
 
 ## Source And Docs
 
-- **EXP-034 (v2.5 active workflow trial)**: Per-symbol `@testable` / `@tests` /
-  `@covered-by` / `@matrix` source annotations and
-  `run.py traceability --changed --check` are **frozen** (non-blocking) while
-  evaluating incremental static typing (`basedpyright` via `pyrightconfig.json`)
-  and stricter `ruff` linting (`B`, `UP`, `SIM`). Do not add new per-symbol
-  traceability comment blocks during this trial; instead:
-  - add Python type annotations to new and modified functions and include
-    newly typed modules in `pyrightconfig.json`;
-  - run `venv/bin/python -m ruff check .` and `venv/bin/python -m basedpyright`;
-  - keep running cross-boundary static checkers when touching their domains:
-    - `venv/bin/python run.py template-contracts --changed --check` (Jinja/JS DOM)
-    - `venv/bin/python run.py traceability --styles --check` (styles/icons)
-    - `venv/bin/python run.py mutation-contracts --check` (entity mutations)
+- Require Python 3.14 for setup, development and deployment. Type public APIs,
+  shared interfaces and external data at their boundaries. Use local inference
+  for implementation details. Explain rule-specific suppressions at the site.
+- Run `venv/bin/python -m basedpyright --warnings` for the application.
+  After preparing the locked MCP environment, run the same command with
+  `--project mcp/pyrightconfig.json` for the adapter.
+- Run `venv/bin/python -m ruff check .` and `npm run check`.
+- Check the contracts affected by your changes:
+  - `venv/bin/python run.py template-contracts --changed --check` for Jinja and DOM selectors.
+  - `venv/bin/python run.py style-contracts --check` for styles, icons and test evidence.
+  - `venv/bin/python run.py mutation-contracts --check` for entity mutations.
+
 - Update `documentation/` when changing commands, setup behavior, test layout,
   or other workflows another developer/agent would need to know.
 - Prefer updating an existing focused doc over creating a new one unless the
