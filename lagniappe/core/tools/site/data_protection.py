@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, UTC
 import json
 import re
@@ -114,6 +115,8 @@ def data_protection_status(admin_client=None):
     schedule_values = getattr(schedules, "backup_schedules", schedules)
     backups = admin_client.list_backups(parent=f"projects/{project_id}/locations/-")
     backup_values = getattr(backups, "backups", backups)
+    if not isinstance(schedule_values, Iterable) or not isinstance(backup_values, Iterable):
+        raise TypeError("Backup inventory did not return iterable records")
     backup_payloads = [_message(item) for item in backup_values]
     backup_payloads = [
         item

@@ -2,6 +2,10 @@
 
 from dataclasses import dataclass
 import re
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.page import Page
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
 
@@ -14,6 +18,7 @@ from lagniappe.core.definitions.manual import MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import capture
 from lagniappe.core.properties.page_public import normalize_public_settings
+from lagniappe.core.tools.cache.public_discovery import DirectoryGroup, DirectorySnapshot
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import site as site_database
 from lagniappe.core.tools.email.notifications.links import absolute_url
@@ -261,7 +266,7 @@ def discoverable_manual_urls():
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_manual_directory_group_preserves_authored_section_order
 # @matrix manual public-directory : authored-order public-url
-def manual_directory_group():
+def manual_directory_group() -> DirectoryGroup:
     """Return the static manual as one directory group in authored order."""
     return {
         "id": "manual",
@@ -323,10 +328,10 @@ def sitemap_xml(urls):
 # @tests tests_unit/test_026_site_admin.py::test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents
 # @tests tests_unit/test_026_site_admin.py::test_public_directory_snapshot_skips_page_query_when_discovery_is_off
 # @matrix public-pages public-directory : active category description disabled opt-out public-url query-avoidance sorting
-def public_directory_snapshot():
+def public_directory_snapshot() -> DirectorySnapshot:
     """Build the privacy-bounded catalog stored for anonymous directory reads."""
     indexing = runtime_settings()["PUBLIC_PAGE_INDEXING"]
-    snapshot = {
+    snapshot: DirectorySnapshot = {
         "schema": PUBLIC_DIRECTORY_SCHEMA,
         "site_indexing": indexing,
         "groups": [],
@@ -338,7 +343,7 @@ def public_directory_snapshot():
         *database_get.discoverable_page_rows(),
         request=Fetch.direct(),
     )
-    groups = {}
+    groups: dict[str, DirectoryGroup] = {}
     for page in pages:
         settings = normalize_public_settings(getattr(page, "public_settings", None))
         if (
@@ -348,6 +353,7 @@ def public_directory_snapshot():
             or not settings["allow_indexing"]
         ):
             continue
+        page = cast("Page", page)
         public_id = page.db.get("public_id")
         if not public_id:
             continue
@@ -395,7 +401,7 @@ def public_directory_snapshot():
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_discoverable_page_urls_use_cached_directory_snapshot
 # @matrix public-pages sitemap public-directory : shared-catalog public-url
-def discoverable_page_urls(snapshot):
+def discoverable_page_urls(snapshot: DirectorySnapshot) -> list[str]:
     """Return absolute page URLs from the shared public-directory catalog."""
     return [
         absolute_url(page["path"])

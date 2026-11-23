@@ -11,6 +11,10 @@ import secrets
 import threading
 import time
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, TypeGuard
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
 
 from google.oauth2 import id_token
 
@@ -116,13 +120,13 @@ def settings():
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-def _now(now=None):
+def _now(now: datetime | None = None) -> datetime:
     return now or datetime.now(UTC)
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-def _secret(kind):
+def _secret(kind: str) -> str:
     return f"lgmo_{kind}_{secrets.token_urlsafe(32)}"
 
 
@@ -136,7 +140,7 @@ def _name(token, kind):
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-def _live(row, now):
+def _live[T: dict](row: T | None, now: datetime) -> TypeGuard[T]:
     return bool(
         row
         and not row.get("revoked")
@@ -158,7 +162,7 @@ def _bound(row, config):
 # @testable true
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
 # @matrix mcp-oauth : user-binding site-policy
-def eligible_user(user):
+def eligible_user(user: object) -> TypeGuard[User]:
     settings()
     return bool(
         isinstance(user, Entities.USER)
@@ -231,7 +235,7 @@ def _certificate_request(url, method="GET"):
 # @testable true
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection
 # @matrix mcp-oauth : cimd validation
-def client_metadata(client_id):
+def client_metadata(client_id: str):
     """Fetch only supported CIMD documents, with no DCR or client secret."""
     global _client_cache
     settings()
@@ -284,7 +288,7 @@ def client_metadata(client_id):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_authorization_requires_exact_bindings_state_and_s256
 # @matrix mcp-oauth : authorization validation loopback client-isolation
-def begin_authorization(parameters, *, now=None):
+def begin_authorization(parameters, *, now: datetime | None = None) -> str:
     config = settings()
     if (
         not redirect_allowed(
@@ -336,7 +340,7 @@ def begin_authorization(parameters, *, now=None):
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::consent
-def pending_authorization(pending, *, now=None):
+def pending_authorization(pending: str, *, now: datetime | None = None):
     row = store.read(_name(pending, "p"))
     if not _live(row, _now(now)) or row.get("consumed") or not _bound(row, settings()):
         raise OAuthError("invalid_request")
@@ -348,7 +352,7 @@ def pending_authorization(pending, *, now=None):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_code_is_single_use_and_refresh_replay_revokes_the_family
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_consent_deny_and_pending_replay_do_not_issue_tokens
 # @matrix mcp-oauth : consent transaction client-isolation
-def consent(pending, user, *, allow, now=None):
+def consent(pending: str, user: User, *, allow: bool, now: datetime | None = None):
     if not eligible_user(user):
         raise OAuthError("access_denied", 403)
     now = _now(now)
@@ -390,12 +394,12 @@ def consent(pending, user, *, allow, now=None):
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-def _grant_name(user, client_id=None):
+def _grant_name(user, client_id: str | None = None) -> str:
     # Preserve existing ChatGPT and Codex grants when adding independent client grants.
     suffix = {
         CODEX_CLIENT_ID: "-codex",
         ANTIGRAVITY_CLIENT_ID: "-antigravity",
-    }.get(client_id, "")
+    }.get(client_id or "", "")
     return "grant-" + credential_id(user) + suffix
 
 
@@ -404,7 +408,7 @@ def _grant_name(user, client_id=None):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_code_is_single_use_and_refresh_replay_revokes_the_family
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
 # @matrix mcp-oauth : token pkce refresh replay transaction
-def exchange_token(parameters, *, now=None):
+def exchange_token(parameters, *, now: datetime | None = None):
     config = settings()
     now = _now(now)
     if not client_allowed(parameters.get("client_id")):
@@ -520,7 +524,7 @@ def exchange_token(parameters, *, now=None):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
 # @matrix mcp-oauth : authentication expiry revocation user-binding site-policy existing-grants
-def authenticate_access(token, *, now=None):
+def authenticate_access(token: str, *, now: datetime | None = None):
     config, now = settings(), _now(now)
     row = store.read(_name(token, "a"))
     if not _live(row, now) or not _bound(row, config):
@@ -551,7 +555,7 @@ def authenticate_access(token, *, now=None):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_cached_certificates_still_verify_each_signature_and_user_grant
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_outcomes_log_only_closed_categories_after_workload_verification
 # @matrix mcp-oauth : oidc audience service-identity token-separation authentication revocation
-def authenticate_envelope(workload_token, user_token):
+def authenticate_envelope(workload_token: str, user_token: str):
     config = settings()
     if not isinstance(workload_token, str) or not 1 <= len(workload_token) <= 8192:
         raise OAuthError()
@@ -579,7 +583,7 @@ def authenticate_envelope(workload_token, user_token):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_revocation_is_private_and_reconnect_replaces_only_the_old_family
 # @matrix mcp-oauth : revocation reconnect privacy
-def revoke_token(token, client_id):
+def revoke_token(token: str, client_id: str) -> None:
     config = settings()
     if not client_allowed(client_id):
         raise OAuthError("invalid_client")
@@ -609,7 +613,7 @@ def revoke_token(token, client_id):
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
 # @tests tests_unit/test_034_remote_mcp_oauth.py::test_revocation_is_private_and_reconnect_replaces_only_the_old_family
 # @matrix mcp-oauth : revocation user-binding
-def connection_status(user, *, client_id=None, revoke=False, now=None):
+def connection_status(user: User, *, client_id: str | None = None, revoke: bool = False, now: datetime | None = None):
     config = settings()
     client_id = client_id or CLIENT_ID
     if not client_allowed(client_id):

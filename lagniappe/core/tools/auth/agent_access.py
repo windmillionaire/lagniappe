@@ -67,6 +67,7 @@ def get_or_create_user():
     else:
         user = Entities.USER.create({"email": email, "name": name})
 
+    assert user is not None
     _ensure_own_page_access(user)
     user.last_login = datetime.now(UTC)
     user.save()

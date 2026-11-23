@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING, Literal, Never, cast, overload
 
 from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities
 from ...exceptions import ValidationError
 from lagniappe.core.tools.database import get as database_get
+
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ...entities import Identifier
+    from ...entities.entity import Entity
+    from ...entities.user import User
 
 
 UNAVAILABLE_REFERENCE_ERROR = "One or more selected items are unavailable."
@@ -16,18 +25,18 @@ UNAVAILABLE_REFERENCE_ERROR = "One or more selected items are unavailable."
 # @testable false
 # @covered-by lagniappe/core/tools/auth/references.py::SubmittedReferenceResolver
 # @reason identifier normalization is exercised through the resolver boundary
-def _entity_key(value):
+def _entity_key(value: object) -> Key | None:
     if not value:
         return None
-    if getattr(value, "key", None):
-        return value.key
+    if key := getattr(value, "key", None):
+        return key
     return database_get.datastore_key(value)
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/auth/references.py::SubmittedReferenceResolver
 # @reason existing-relation normalization is exercised through the resolver boundary
-def _existing_keys(existing) -> set:
+def _existing_keys(existing: object) -> set[Key]:
     if not existing:
         return set()
     values = existing if isinstance(existing, (list, tuple, set)) else [existing]
@@ -41,7 +50,7 @@ def _existing_keys(existing) -> set:
 class SubmittedReferenceResolver:
     """Batch-load and authorize secondary entity keys from a request body."""
 
-    def __init__(self, actor, *identifiers):
+    def __init__(self, actor: User, *identifiers: Identifier) -> None:
         if actor is None:
             raise TypeError("SubmittedReferenceResolver requires an actor")
         self.actor = actor
@@ -59,20 +68,36 @@ class SubmittedReferenceResolver:
         )
 
     @staticmethod
-    def _reject():
+    def _reject() -> Never:
         raise ValidationError(UNAVAILABLE_REFERENCE_ERROR)
 
-    def one(
+    @overload
+    def one[T: Entity](
+        self, identifier: object, *, expected: type[T] | tuple[type[T], ...],
+        action: Action | None = Action.VIEW, existing: object = None,
+        predicate: Callable[[T], object] | None = None,
+        authorize: Callable[[T], object] | None = None, required: Literal[True],
+    ) -> T: ...
+
+    @overload
+    def one[T: Entity](
+        self, identifier: object, *, expected: type[T] | tuple[type[T], ...],
+        action: Action | None = Action.VIEW, existing: object = None,
+        predicate: Callable[[T], object] | None = None,
+        authorize: Callable[[T], object] | None = None, required: bool = False,
+    ) -> T | None: ...
+
+    def one[T: Entity](
         self,
-        identifier,
+        identifier: object,
         *,
-        expected,
+        expected: type[T] | tuple[type[T], ...],
         action: Action | None = Action.VIEW,
-        existing=None,
-        predicate: Callable | None = None,
-        authorize: Callable | None = None,
+        existing: object = None,
+        predicate: Callable[[T], object] | None = None,
+        authorize: Callable[[T], object] | None = None,
         required: bool = False,
-    ):
+    ) -> T | None:
         """Return one valid target, or raise the generic boundary error."""
         if not identifier:
             if required:
@@ -80,18 +105,19 @@ class SubmittedReferenceResolver:
             return None
 
         key = _entity_key(identifier)
-        entity = self._entities.get(key)
+        entity = self._entities.get(key) if key is not None else None
         expected_types = expected if isinstance(expected, tuple) else (expected,)
         if not key or not entity or not isinstance(entity, expected_types):
             self._reject()
 
+        target = cast("T", entity)
         try:
-            if predicate is not None and predicate(entity) is False:
+            if predicate is not None and predicate(target) is False:
                 self._reject()
 
             if key not in _existing_keys(existing):
                 if authorize is not None:
-                    allowed = authorize(entity)
+                    allowed = authorize(target)
                 elif action is not None:
                     allowed = entity.allowed(action, user=self.actor)
                 else:
@@ -103,18 +129,18 @@ class SubmittedReferenceResolver:
         except (AttributeError, TypeError, ValueError):
             self._reject()
 
-        return entity
+        return target
 
-    def many(
+    def many[T: Entity](
         self,
-        identifiers: Iterable,
+        identifiers: Iterable[object],
         *,
-        expected,
+        expected: type[T] | tuple[type[T], ...],
         action: Action | None = Action.VIEW,
-        existing=None,
-        predicate: Callable | None = None,
-        authorize: Callable | None = None,
-    ) -> list:
+        existing: object = None,
+        predicate: Callable[[T], object] | None = None,
+        authorize: Callable[[T], object] | None = None,
+    ) -> list[T]:
         """Return unique valid targets while preserving submitted order."""
         resolved = []
         seen = set()

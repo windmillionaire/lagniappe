@@ -108,8 +108,8 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
             exceptions.capture(e, context)
             raise exceptions.SiteImageError(f"Failed to convert image: {str(e)}") from e
 
-    pixels = list(source_image.getdata())
-    transparent_count = sum(1 for p in pixels if len(p) == 4 and p[3] < 255)
+    pixels = source_image.get_flattened_data()
+    transparent_count = sum(1 for p in pixels if isinstance(p, tuple) and len(p) == 4 and p[3] < 255)
     total_pixels = len(pixels)
     transparency_percent = (transparent_count / total_pixels) * 100
 
@@ -127,6 +127,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
             exceptions.capture(e, context)
 
     image_paths = {}
+    generated_images: dict[str, bytes] = {}
     try:
         generated_images = generate_site_images(source_image)
         image_generations = {}
@@ -149,7 +150,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
                 "operation": "generate_and_upload",
                 "filename": getattr(image, "filename", "unknown"),
                 "generated_count": (
-                    len(generated_images) if "generated_images" in locals() else 0
+                    len(generated_images)
                 ),
             },
         }
@@ -365,9 +366,9 @@ def create_splash_screen(
         splash.paste(logo_resized, (logo_x, logo_y))
 
     # Add app name below logo
+    font_size = width // 20
     try:
         # Try to use a nice font, fall back to default
-        font_size = width // 20  # Responsive font size
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
     except OSError:
         try:
