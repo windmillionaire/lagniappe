@@ -1,3 +1,11 @@
+from collections.abc import Mapping
+from datetime import datetime
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from ..entities.task import Task
+    from ..tools.ai.prompt import Prompt
+
 from ..tools import dates
 from ..tools.ai import dates as ai_dates
 from ..tools.tasks import scheduling
@@ -12,25 +20,26 @@ from .base_property import Property
 class ScheduleType(ProcessProperty):
     """Base class for all schedule types."""
 
+    section_id: str
     process_id = "schedule"
-    _mode = None
-    _prompt = None
-    _user_prompt = None
+    _mode: str | None = None
+    _prompt: Prompt | None = None
+    _user_prompt: str | None = None
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
     # @pair task-scheduling:ai-generation
     @property
-    def generate(self):
+    def generate(self) -> bool:
         return not (self.error or not self.prompt)
 
     @property
-    def prompt(self):
+    def prompt(self) -> Prompt | None:
         return self._prompt
 
     @prompt.setter
-    def prompt(self, value):
+    def prompt(self, value: str | None) -> None:
         mode = self._mode or self.mode
         if not mode:
             return
@@ -44,7 +53,7 @@ class ScheduleType(ProcessProperty):
     # @pair task-scheduling:ai-generation
     # @tests tests_unit/test_013a_task_scheduling.py::test_generated_schedule_prompt_survives_reload_and_avoids_regeneration
     # @matrix task-scheduling : periodic scheduled prompt-reuse
-    def create(self):
+    def create(self) -> None:
         if not self.prompt or self._user_prompt == self.user_prompt:
             return
 
@@ -79,9 +88,9 @@ class Recurring(ScheduleType):
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_recurring
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_recurring
     # @matrix task-scheduling : add recurring update validation
-    def update(self, form_data):
+    def update(self, form_data: Mapping[str, object]) -> None:
         try:
-            interval = int(form_data.get("interval"))
+            interval = int(cast("str | int", form_data.get("interval")))
         except ValueError:
             self.error = "Invalid interval"
             return
@@ -110,12 +119,12 @@ class Periodic(ScheduleType):
     section_id = "periodic"
     attributes = ("user_prompt", "description", "unit", "interval")
     _mode = "periodic"
-    _start_date = None
+    _start_date: datetime | None = None
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
     # @matrix task-scheduling : periodic update validation
-    def update(self, form_data):
+    def update(self, form_data: Mapping[str, object]) -> None:
         user_prompt = form_data.get("periodic-description")
         start_date = form_data.get("start-date")
         if not start_date:
@@ -125,7 +134,7 @@ class Periodic(ScheduleType):
         self._start_date = dates.user_date_string_to_utc_datetime(start_date)
 
         if user_prompt:
-            self.prompt = user_prompt
+            self.prompt = cast(str, user_prompt)
         elif not user_prompt and not self.description:
             self.error = "Please provide a description"
             return
@@ -133,7 +142,7 @@ class Periodic(ScheduleType):
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
     # @matrix task-scheduling : ai-generation periodic
-    def create(self):
+    def create(self) -> None:
         super().create()
         self.entity.due_date = self._start_date
 
@@ -168,7 +177,7 @@ class Scheduled(ScheduleType):
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_schedule
     # @matrix task-scheduling : add scheduled update validation
-    def update(self, form_data):
+    def update(self, form_data: Mapping[str, object]) -> None:
         self.mode = form_data.get("schedule-type")
 
         if self.mode == "daily":
@@ -183,7 +192,7 @@ class Scheduled(ScheduleType):
         )
 
         if user_prompt:
-            self.prompt = user_prompt
+            self.prompt = cast(str, user_prompt)
         elif not user_prompt and not self.description:
             self.error = "Please provide a description"
 
@@ -194,7 +203,7 @@ class Scheduled(ScheduleType):
 # @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.active
 # @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.skipped
 # @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.set_next_due_date
-class Schedule(Property):
+class Schedule(Property[dict[str, object], "Task"]):
     """Orchestrator for task scheduling (recurring, periodic, scheduled).
 
     Delegates to the active schedule type's ProcessProperty. Provides
@@ -216,9 +225,9 @@ class Schedule(Property):
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
     # @matrix task-scheduling : active-process coordinator
     @property
-    def value(self):
+    def value(self) -> dict[str, object]:  # pyright: ignore[reportIncompatibleMethodOverride] -- The coordinator exposes its live section read-only.
         if self.is_set:
-            return self._value
+            return cast("dict[str, object]", self._value)
 
         self._value = self.entity.get_process(self.id)
 
@@ -227,17 +236,17 @@ class Schedule(Property):
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
     # @matrix task-scheduling : active-process coordinator update
-    def update(self, form_data):
+    def update(self, form_data: Mapping[str, object]) -> ScheduleType | None:
         new_schedule = None
 
         active = self.active
 
         if form_data.get("recurring"):
-            new_schedule = self.entity.properties["recurring"]
+            new_schedule = self.entity.properties.recurring
         elif form_data.get("periodic"):
-            new_schedule = self.entity.properties["periodic"]
+            new_schedule = self.entity.properties.periodic
         elif form_data.get("scheduled"):
-            new_schedule = self.entity.properties["scheduled"]
+            new_schedule = self.entity.properties.scheduled
 
         if new_schedule:
             new_schedule.update(form_data)
@@ -255,14 +264,15 @@ class Schedule(Property):
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
     # @matrix task-scheduling : active-process coordinator
     @property
-    def active(self):
+    def active(self) -> ScheduleType | None:
         schedule = next(
             (s for s in self._types if s in self.value),
             None,
         )
 
         if schedule:
-            return self.entity.properties[schedule]
+            # Every validated name maps to a ScheduleType in the Task registry.
+            return cast(ScheduleType, self.entity.properties[schedule])
 
         return None
 
@@ -273,7 +283,7 @@ class Schedule(Property):
     # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_preserves_earliest_due_date_baseline
     # @matrix task-scheduling : periodic recurring scheduled skipped
     @property
-    def skipped(self):
+    def skipped(self) -> int:
         if not self.active:
             return 0
         elif self.active.section_id == "scheduled":
@@ -291,30 +301,36 @@ class Schedule(Property):
     # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_scheduled
     # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_periodic
     # @matrix task-scheduling : next-due-date periodic postponed recurring scheduled
-    def set_next_due_date(self):
+    def set_next_due_date(self) -> None:
+        task: Task = self.entity
         if not self.active:
             return
 
         if self.active.section_id == "recurring":
             next_due_date = scheduling.get_next_recurring_date(self.active.section)
         elif self.active.section_id == "scheduled":
-            starting_due_date = scheduling.get_starting_due_date(self.entity)
+            starting_due_date = scheduling.get_starting_due_date(task)
             next_due_date = scheduling.get_next_scheduled_date(
                 starting_due_date, self.active.section
             )
         elif self.active.section_id == "periodic":
-            starting_due_date = scheduling.get_starting_due_date(self.entity)
+            starting_due_date = scheduling.get_starting_due_date(task)
             next_due_date = scheduling.get_next_periodic_date(
                 starting_due_date, self.active.section
             )
 
-        self.entity.due_date = max(next_due_date, scheduling.user_today())
-        self.entity.db.pop("postponed_from", None)
+        else:
+            raise ValueError(f"Unknown schedule type: {self.active.section_id!r}")
+
+        if next_due_date is None:
+            raise TypeError("Schedule has no next due date")
+        task.due_date = max(next_due_date, scheduling.user_today())
+        task.db.pop("postponed_from", None)
 
     # @testable true
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_remove_schedule
     # @matrix task-scheduling : remove scheduled
-    def clear(self):
+    def clear(self) -> None:
         clear_pending = getattr(self.entity, "_clear_scheduled_uncomplete", None)
         if clear_pending:
             clear_pending()
