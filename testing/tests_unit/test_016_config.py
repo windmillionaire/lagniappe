@@ -100,8 +100,8 @@ def test_config_loads_flat_mcp_settings_and_ai_switches(monkeypatch, ai_enabled,
     spec.loader.exec_module(module)
     assert module.CONFIG.AI_ENABLED is ai_enabled
     assert module.CONFIG.EXTERNAL_AI_ENABLED is (ai_enabled and external_enabled)
-    assert module.CONFIG.MCP_RESOURCE == app_settings["MCP_RESOURCE"]
-    assert module.CONFIG.MCP_SERVICE_ACCOUNT == app_settings["MCP_SERVICE_ACCOUNT"]
+    assert app_settings["MCP_RESOURCE"] == module.CONFIG.MCP_RESOURCE
+    assert app_settings["MCP_SERVICE_ACCOUNT"] == module.CONFIG.MCP_SERVICE_ACCOUNT
     assert not hasattr(module.CONFIG, "REMOTE_MCP")
 
 
@@ -343,7 +343,7 @@ def test_config_keeps_sentry_browser_destination_independent(
     original_settings = copy.deepcopy(app_settings)
     config = lagniappe.Config(RuntimeSettings(FakeEnvironment.PRODUCTION, app_settings))
 
-    assert config.SENTRY_JS_DSN == expected
+    assert expected == config.SENTRY_JS_DSN
     assert config.SENTRY_DSN == "https://backend.example.test/1"
     assert config.capture_errors is True
     assert app_settings == original_settings

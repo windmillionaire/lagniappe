@@ -21,6 +21,7 @@ from lagniappe.core.mutations import plan_mutation
 from lagniappe.core.properties.schema import SCHEMA_FORMAT_VERSION
 from lagniappe.core.properties.form import FormGeneration, requires_submission_conversion
 from testing.utility.test_entities import TestEntities
+from datetime import UTC
 
 
 # @pair form-schema:cache
@@ -353,7 +354,7 @@ def test_form_save_refreshes_users_with_edited_form_schema(monkeypatch, kind):
     from google.cloud import datastore
     from lagniappe.core.tools.database.core import KINDS
 
-    modified = datetime(2026, 9, 10, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 10, tzinfo=UTC)
     form_key = datastore.Key(KINDS.models.value, "edited-form", project="form-reuse")
     project_key = datastore.Key(KINDS.models.value, "owner-project", project="form-reuse")
     owner_key = datastore.Key(KINDS.models.value, f"form-{kind}", project="form-reuse")

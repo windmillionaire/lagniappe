@@ -1,7 +1,7 @@
 """Restriction sources, minimal loading, migrations and queued cache updates."""
 from copy import deepcopy
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -274,7 +274,7 @@ def test_form_creation_and_content_edits_do_not_queue_reconciliation(monkeypatch
 
 # @matrix permissions cache : fingerprint modified form-version stable-order
 def test_restricted_fingerprints_share_the_entity_and_cache_formula():
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     base = base_fingerprint(modified)
     assert base == base_fingerprint(modified)
     assert base != base_fingerprint(modified + timedelta(seconds=1))
@@ -305,7 +305,7 @@ def test_restricted_fingerprints_share_the_entity_and_cache_formula():
 def test_user_page_cache_identity_preserves_permission_projection(monkeypatch):
     from lagniappe.core.tools.cache.details import identify_entity
 
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     page = TestEntities.get("PAGE", {
         "hash": "user-page", "modified": modified,
         "user": {"email": "cache-identity@example.com"},
@@ -480,7 +480,7 @@ def test_restrictions_migration_only_persists_local_sources():
 def test_reconcile_preserves_local_page_groups_and_removes_form_restrictions(monkeypatch, separate_batch):
     from google.cloud.datastore import Entity as DatastoreEntity, Key
     from lagniappe.core.tools.database.filter import Results
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     form = TestEntities.get("FORM", {"hash": "source-form", "restricted_to": ["new-group"], "version": "v2", "modified": modified})
     form.version = "v2"
     page = TestEntities.get("PAGE", {"hash": "inherited-page", "modified": modified})
@@ -750,7 +750,7 @@ def test_reconciliation_restarts_when_membership_changes_between_or_during_batch
 def test_reconciliation_verifies_repairs_and_retries(monkeypatch, change):
     from google.cloud.datastore import Entity as DatastoreEntity, Key
 
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     source_key = Key(KINDS.instances.value, "verification-page", project="permissions-unit")
     file_key = Key(KINDS.files.value, "verification-file", project="permissions-unit")
     owner_key = Key(KINDS.models.value, "verification-owner", project="permissions-unit")

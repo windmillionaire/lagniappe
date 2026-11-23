@@ -170,7 +170,7 @@ def install(*, experiments=False):
             ui.info(wrap_text("You can deploy the application manually when ready."))
         )
         print(wrap_text(ui.heading("Manual deployment steps:")))
-        print(wrap_text((f"{ui.literal('1.')} Review the generated YAML files")))
+        print(wrap_text(f"{ui.literal('1.')} Review the generated YAML files"))
         print(
             ui.value(
                 (f"{ui.literal('2.')} Select the project"),

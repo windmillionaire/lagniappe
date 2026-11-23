@@ -5,7 +5,7 @@ uniquely named, test-prefixed resources, clean them in ``finally`` blocks, and
 must remain sequential with every other E2E or managed-server session.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -170,11 +170,11 @@ def test_runtime_identity_platform_sign_in_reaches_hosted_home(get_user):
                 "admin": True,
             }
         )
-        local_user.last_login = datetime.now(timezone.utc)
+        local_user.last_login = datetime.now(UTC)
         local_user.save()
 
         owner = Users.OWNER.get(None)
-        owner.entity.last_login = datetime.now(timezone.utc)
+        owner.entity.last_login = datetime.now(UTC)
         owner.entity.save()
 
         anonymous = get_user(Users.ANONYMOUS)
@@ -262,7 +262,7 @@ def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
                     status=403,
                     code="SignatureDoesNotMatch",
                 )
-                issued_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+                issued_at = datetime.now(UTC) - timedelta(minutes=1)
                 request_timestamp = issued_at.strftime("%Y%m%dT%H%M%SZ")
                 datestamp = issued_at.strftime("%Y%m%d")
                 with monkeypatch.context() as controlled_clock:

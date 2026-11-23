@@ -228,9 +228,7 @@ class ProposalReferenceResolver:
             return None
         if isinstance(value, str) and value.startswith("$"):
             value = value[1:]
-        elif isinstance(value, str) and value.startswith("action:"):
-            value = value.split(":", 1)[1]
-        elif isinstance(value, str) and value.startswith("file:"):
+        elif isinstance(value, str) and value.startswith("action:") or isinstance(value, str) and value.startswith("file:"):
             value = value.split(":", 1)[1]
         resolved = action_labels.get(value) or file_labels.get(value)
         if resolved:

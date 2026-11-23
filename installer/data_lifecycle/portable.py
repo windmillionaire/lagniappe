@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, UTC
 import base64
 import hashlib
 import json
 import math
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any, Callable, Iterable
+from typing import Any
+from collections.abc import Callable, Iterable
 
 from .provider import DataLifecycleError
 
@@ -249,7 +250,7 @@ class ValueCodec:
         if isinstance(value, datetime):
             if value.tzinfo is None:
                 raise DataLifecycleError(f"Naive datetime is unsupported at {self._path(path)}")
-            normalized = value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            normalized = value.astimezone(UTC).isoformat().replace("+00:00", "Z")
             return {"$datetime": normalized}
         if isinstance(value, date):
             return {"$date": value.isoformat()}

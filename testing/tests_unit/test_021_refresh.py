@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -136,7 +136,7 @@ def test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change(mo
 # @matrix reconnect-refresh task-index : ordering root-depth
 @pytest.mark.unit
 def test_task_index_refresh_roots_uses_both_ordered_query_streams():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     dated = _task("Dated", "refresh-task-1", now, now + timedelta(days=1))
     undated = _task("Undated", "refresh-task-2", now - timedelta(days=1))
     parent = TaskIndex(user=_viewer())
@@ -178,7 +178,7 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
 def test_load_refresh_collection_allows_task_index_without_models_permission():
     viewer = _viewer()
     viewer.has_permission = lambda *_args: False
-    root = SimpleNamespace(urlsafe_key="own-task", modified=datetime.now(timezone.utc))
+    root = SimpleNamespace(urlsafe_key="own-task", modified=datetime.now(UTC))
     parent = SimpleNamespace(refresh_roots=lambda: [root])
 
     with patch(
@@ -291,7 +291,7 @@ def test_user_index_refresh_roots_preserves_regular_and_public_modes():
 # @matrix permissions reconnect-refresh : authorization direct-depth modified ordering removal
 @pytest.mark.unit
 def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_upsert():
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     unchanged = _task("Unchanged", "a", now)
     changed = _task("Changed", "b", now + timedelta(days=1))
     rejected = _task("Rejected", "c", now + timedelta(days=2))
@@ -320,7 +320,7 @@ def test_load_refresh_collection_resolves_component_from_view_entity():
         "PAGE", {"name": "Refresh Context", "hash": "refresh-context"}
     )
     page.allowed = lambda *_args, **_kwargs: True
-    roots = (SimpleNamespace(urlsafe_key="task", modified=datetime.now(timezone.utc)),)
+    roots = (SimpleNamespace(urlsafe_key="task", modified=datetime.now(UTC)),)
     view = {"key": page.urlsafe_key, "index": None}
     target = {"id": "tasks"}
 
@@ -373,7 +373,7 @@ def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query(
     task = _task(
         "Filtered Root",
         "filtered-root",
-        datetime.now(timezone.utc),
+        datetime.now(UTC),
     )
     filter_entity = Entities.FILTER(testing=True)
     filter_entity.db["hash"] = "saved-filter"
@@ -425,7 +425,7 @@ def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query(
 @pytest.mark.unit
 @pytest.mark.parametrize("cache_state", ["missing", "wrong-key", "wrong-kind", "stale-base", "restriction-change"])
 def test_refresh_cache_holes_and_changed_restrictions_require_authorization(monkeypatch, cache_state):
-    task = _task("Cached task", "cache-refresh", datetime(2026, 1, 1, tzinfo=timezone.utc))
+    task = _task("Cached task", "cache-refresh", datetime(2026, 1, 1, tzinfo=UTC))
     details = _cached_row(task)
     rows = [_manifest(task)]
     if cache_state == "missing":
@@ -452,7 +452,7 @@ def test_refresh_cache_holes_and_changed_restrictions_require_authorization(monk
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["task", "page", "user-page"])
 def test_warm_refresh_preserves_rows_without_expanding_relations(monkeypatch, kind):
-    modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    modified = datetime(2026, 1, 1, tzinfo=UTC)
     if kind == "task":
         entity = _task("Unchanged", "warm-refresh", modified)
     else:
@@ -495,7 +495,7 @@ def test_invalidated_owner_revision_requires_authorized_refresh(monkeypatch):
 @pytest.mark.unit
 @pytest.mark.parametrize("source_state", ["current", "missing", "legacy-pointer", "before-cache-write"])
 def test_form_version_refresh_batches_sources_without_expanding_unchanged_rows(monkeypatch, source_state):
-    modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    modified = datetime(2026, 1, 1, tzinfo=UTC)
     form = TestEntities.get("FORM", {"name": "Shared", "hash": "refresh-form"})
     form.version = "version-1"
     form.schema = [{"id": "note", "type": "input", "title": "Original"}]
@@ -568,7 +568,7 @@ def test_form_version_refresh_batches_sources_without_expanding_unchanged_rows(m
 @pytest.mark.unit
 @pytest.mark.parametrize("reserved", [False, True], ids=["no-form", "reserved-form"])
 def test_warm_refresh_needs_no_form_source_for_no_form_or_reserved_form(monkeypatch, reserved):
-    task = _task("Unchanged", "optional-form", datetime(2026, 1, 1, tzinfo=timezone.utc))
+    task = _task("Unchanged", "optional-form", datetime(2026, 1, 1, tzinfo=UTC))
     if reserved:
         form = TestEntities.get("FORM", {"name": "Installation Form", "hash": "reserved", "reserved": True})
         form.version = "reserved-version"
@@ -595,7 +595,7 @@ def test_warm_refresh_needs_no_form_source_for_no_form_or_reserved_form(monkeypa
 # @matrix reconnect-refresh : cached-fingerprint no-extra-read
 @pytest.mark.unit
 def test_legacy_empty_form_version_requires_one_authorized_refresh(monkeypatch):
-    task = _task("Legacy", "legacy-no-form", datetime(2026, 1, 1, tzinfo=timezone.utc))
+    task = _task("Legacy", "legacy-no-form", datetime(2026, 1, 1, tzinfo=UTC))
     task.allowed = lambda *_args, **_kwargs: True
     cached = _cached_row(task)
     cached.pop("form_hash")
@@ -679,7 +679,7 @@ def test_refresh_reuses_membership_only_while_all_parent_revisions_match(monkeyp
 # @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 def test_unchanged_parent_refresh_loads_only_rows_with_changed_cached_fingerprints(monkeypatch):
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     unchanged = _task("Unchanged", "same", now)
     changed = _task("Changed", "changed", now)
     hidden = _task("Newly hidden", "hidden", now)
@@ -724,7 +724,7 @@ def test_user_index_refresh_authorizes_page_projection_through_its_user(monkeypa
 # @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 def test_user_index_revision_refreshes_user_fields_with_unchanged_page_fingerprint(monkeypatch):
-    modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    modified = datetime(2026, 1, 1, tzinfo=UTC)
     page = TestEntities.get("PAGE", {
         "name": "User Page", "hash": "profile-page", "modified": modified,
         "user": {"name": "Member", "hash": "profile-user", "modified": modified},

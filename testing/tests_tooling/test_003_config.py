@@ -111,7 +111,7 @@ def test_settings_drafts_own_documents_and_preserve_internal_aliases(
     first.APP["NESTED"]["items"][0]["label"] = "changed"
     first.DEV_CONFIG["SERVER_PORT"] = "9000"
     first.GCLOUD_CONFIG["PROJECT"] = "changed-project"
-    assert second.APP == original
+    assert original == second.APP
     assert second.DEV_CONFIG["SERVER_PORT"] == "5050"
     assert second.GCLOUD_CONFIG["PROJECT"] == "project-1"
     for name in (
@@ -801,7 +801,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         from config import APP_DIR, Directory, Environment, File, SETTINGS, constants
 
         assert sys.modules["runner.testing"] is stale_testing
-        assert APP_DIR == app_dir
+        assert app_dir == APP_DIR
         assert Directory.CONFIG.value == config_files_dir
         assert Environment.TESTING.value == "testing"
         assert SETTINGS.APP["AI_ENABLED"] is True

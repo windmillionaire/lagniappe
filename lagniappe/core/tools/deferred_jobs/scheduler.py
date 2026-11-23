@@ -2,7 +2,7 @@
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from urllib.parse import quote
 
 from google.auth.transport.requests import AuthorizedSession
@@ -27,7 +27,7 @@ class DeferredJobSchedulerError(RuntimeError):
 # @testable infrastructure
 # @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
 def _utc():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # @testable true

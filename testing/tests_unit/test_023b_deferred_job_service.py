@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 from types import SimpleNamespace
 
@@ -161,7 +161,7 @@ def test_statuses_returns_only_jobs_visible_to_the_actor(monkeypatch):
     statuses = registry.statuses(
         [owner_job.key, other_job.key, owner_job.key, "missing-job"],
         actor,
-        now=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        now=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
     assert fetched == [[owner_job.key, other_job.key, "missing-job"]]
@@ -421,7 +421,7 @@ def test_start_rejects_operation_id_reuse_for_different_request(monkeypatch):
 
 # @matrix deferred-jobs : retention terminal-delivery
 def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypatch):
-    now = datetime(2026, 7, 20, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 20, tzinfo=UTC)
 
     class Record(dict):
         def __init__(self, key, **values):

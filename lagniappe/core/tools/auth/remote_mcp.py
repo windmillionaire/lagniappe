@@ -1,7 +1,7 @@
 """ChatGPT and Codex OAuth service, using opaque secrets and current User permissions."""
 
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import hmac
 import json
@@ -117,7 +117,7 @@ def settings():
 # @testable false
 # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _now(now=None):
-    return now or datetime.now(timezone.utc)
+    return now or datetime.now(UTC)
 
 
 # @testable false

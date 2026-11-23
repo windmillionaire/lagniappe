@@ -1,6 +1,6 @@
 """Shown-once bearer credentials for the external agent API."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import base64
 import hashlib
 import hmac
@@ -28,10 +28,10 @@ class AgentAPICredentialError(ValueError):
 # @covered-by lagniappe/core/tools/auth/agent_api.py::authenticate_credential
 # @reason timestamp normalization is exercised through credential expiry checks
 def _utc(value=None):
-    value = value or datetime.now(timezone.utc)
+    value = value or datetime.now(UTC)
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 # @testable false

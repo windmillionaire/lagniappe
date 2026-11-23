@@ -1,6 +1,6 @@
 """Document poll projection against Redis with counted durable asset reads."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from importlib import import_module
 import json
 from types import SimpleNamespace
@@ -44,7 +44,7 @@ def test_document_poll_loads_storage_only_on_cache_miss(
         # per-instance property memoization cannot hide an eager Storage read.
         entity = entity_type(testing=True)
         entity.db.update(hash=identity, assets=json.dumps(stored_assets))
-        entity.modified = datetime(2026, 9, 19, tzinfo=timezone.utc)
+        entity.modified = datetime(2026, 9, 19, tzinfo=UTC)
         entity.allowed = Mock(return_value=True)
         return entity
 

@@ -1,7 +1,7 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 import json
 from pathlib import Path
@@ -708,8 +708,8 @@ def test_hosted_manifest_records_exact_suite_window(monkeypatch):
     }
     for name, value in environment.items():
         monkeypatch.setenv(name, value)
-    started_at = datetime(2026, 8, 20, 1, 0, tzinfo=timezone.utc)
-    finished_at = datetime(2026, 8, 20, 1, 30, tzinfo=timezone.utc)
+    started_at = datetime(2026, 8, 20, 1, 0, tzinfo=UTC)
+    finished_at = datetime(2026, 8, 20, 1, 30, tzinfo=UTC)
 
     manifest = hosted_e2e_job._artifact_manifest(
         suite="all",

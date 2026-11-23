@@ -174,10 +174,10 @@ def setup_error_monitoring():
 
     print(
         wrap_text(
-            (
+
                 f"\nYou can disable this at any time by changing {ui.literal('CAPTURE_ERRORS')} "
                 f"to {ui.literal('False')} in your settings file."
-            )
+
         )
     )
 
@@ -386,10 +386,10 @@ def configure_ai_features():
             print(ui.value(label, SETTINGS.APP.get(key, default), column=11))
         print(
             wrap_text(
-                (
+
                     "You can change these in "
                     f"{ui.literal('Admin → Site Settings → AI Models')}."
-                )
+
             )
         )
         print(wrap_text(

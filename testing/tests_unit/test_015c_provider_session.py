@@ -1,6 +1,6 @@
 """Cancellable provider calls use one loop and the current conversation."""
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -72,7 +72,7 @@ def test_blocked_request_is_cancelled_and_closed(monkeypatch):
     ],
 )
 def test_execution_control_stops_blocked_provider_at_next_check(monkeypatch, stop, expected_error):
-    now = [datetime(2026, 9, 19, tzinfo=timezone.utc)]
+    now = [datetime(2026, 9, 19, tzinfo=UTC)]
     monkeypatch.setattr(control_module, "_utc", lambda: now[0])
     owned = [True]
     activity_reads = Mock(side_effect=lambda: owned[0])

@@ -27,11 +27,7 @@ def validate_schema(schema):
     if not isinstance(schema, list):
         raise exceptions.AIException("Generated schema is not a valid array")
     for element in schema:
-        if not isinstance(element, dict):
-            continue
-        elif not _valid_schema_attribute(element.get("type")):
-            continue
-        elif not _valid_schema_attribute(element.get("id")):
+        if not isinstance(element, dict) or not _valid_schema_attribute(element.get("type")) or not _valid_schema_attribute(element.get("id")):
             continue
         validated_schema.append(element)
     return validated_schema

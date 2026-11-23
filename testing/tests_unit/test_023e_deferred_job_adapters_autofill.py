@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 from types import SimpleNamespace
 
@@ -361,7 +361,7 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     monkeypatch.setattr(
         autofill_adapters.dates,
         "user_today",
-        lambda user: datetime(2026, 8, 21, tzinfo=timezone.utc),
+        lambda user: datetime(2026, 8, 21, tzinfo=UTC),
     )
     monkeypatch.setattr(
         autofill_adapters.ai_autofill,

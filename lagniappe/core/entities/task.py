@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from uuid import uuid4
 import json
 
@@ -67,7 +67,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     def scheduled_uncomplete_at(self):
         value = self.db.get("scheduled_uncomplete_at")
         if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=UTC)
         return value
 
     # @testable true
@@ -222,8 +222,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         return sorted(
             self.load_history(*database_get.task_history(self)),
             key=lambda h: (
-                h.completed_on or datetime.min.replace(tzinfo=timezone.utc),
-                h.created or datetime.min.replace(tzinfo=timezone.utc),
+                h.completed_on or datetime.min.replace(tzinfo=UTC),
+                h.created or datetime.min.replace(tzinfo=UTC),
             ),
             reverse=True,
         )
@@ -303,7 +303,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         capture_completed_submission(self)
         self.db.pop("pre_migration", None)
         self.completed = True
-        self.completed_on = datetime.now(timezone.utc)
+        self.completed_on = datetime.now(UTC)
         self.completed_by = user if user is not None else current_user
 
         if self.schedule:

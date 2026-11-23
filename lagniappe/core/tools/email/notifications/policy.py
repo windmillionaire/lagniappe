@@ -1,6 +1,6 @@
 """Recipient eligibility and delivery timing policy."""
 
-from datetime import datetime, time as datetime_time, timedelta, timezone
+from datetime import datetime, time as datetime_time, timedelta, timezone, UTC
 
 from ....definitions import NotificationEmailMode
 from ....entities import Entities
@@ -17,10 +17,10 @@ DELIVERY_LEASE_SECONDS = 5 * 60
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason clock normalization is exercised through capture and delivery
 def utc(now=None):
-    value = now or datetime.now(timezone.utc)
+    value = now or datetime.now(UTC)
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 # @testable false
@@ -66,4 +66,4 @@ def next_digest(user, now):
     )
     if due <= local_now:
         due += timedelta(days=1)
-    return due.astimezone(timezone.utc)
+    return due.astimezone(UTC)

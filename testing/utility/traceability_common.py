@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import ast
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 import json
 from pathlib import Path
 import re
 import subprocess
-from typing import Iterable
+from collections.abc import Iterable
 
 
 TRACEABILITY_SCHEMA_VERSION = 3
@@ -46,7 +46,7 @@ BEHAVIOR_EXCLUDED_PREFIXES = (
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _git(

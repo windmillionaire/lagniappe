@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 import logging
 from pathlib import Path
@@ -110,7 +110,7 @@ class BrowserFailureCollector:
         text_contains: str | None = None,
         failure: str | None = None,
         source_path: str | None = None,
-    ) -> "ExpectedBrowserFailure":
+    ) -> ExpectedBrowserFailure:
         """Return a scope that consumes an intentional failure pattern."""
         if count is not None and count < 0:
             raise ValueError("Expected browser failure count cannot be negative.")
@@ -146,7 +146,7 @@ class BrowserFailureCollector:
         path: str,
         count: int | None = None,
         max_count: int | None = None,
-    ) -> "ExpectedBrowserFailure":
+    ) -> ExpectedBrowserFailure:
         """Allow Chromium's optional diagnostic; callers assert the HTTP/UI result."""
         source_path = urlsplit(path).path
         return self.expect(
@@ -418,7 +418,7 @@ def write_diagnostic_report(
     """Write one ignored, machine-readable report for a diagnostic E2E session."""
     payload = {
         "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "tests": records,
     }
     path.parent.mkdir(parents=True, exist_ok=True)

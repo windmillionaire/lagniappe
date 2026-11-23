@@ -1,7 +1,7 @@
 """Atomic external Plan publication and replayable notification delivery."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 
 from google.cloud.datastore import Entity as DatastoreEntity
@@ -75,7 +75,7 @@ def publication_store(monkeypatch):
 def test_publication_notification_commits_with_plan_and_survives_replay(publication_store, tool):
     store = publication_store
     user = managed_user("creator", "Creator")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = DatastoreEntity(key=store.key("activity", "plan", parent=user.key))
     row.update({
         "type": "report", "origin": "api", "format_version": REPORT_FORMAT_VERSION,
@@ -167,7 +167,7 @@ def test_publication_delivery_retries_cache_and_email_without_recreating_dismiss
     publication_store, monkeypatch
 ):
     store = publication_store
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = user_row("creator", now)
     report_row = DatastoreEntity(key=store.key("activity", "plan"))
     report_row.update({"type": "report", "format_version": REPORT_FORMAT_VERSION, "name": "Published plan"})

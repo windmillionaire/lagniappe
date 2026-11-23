@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 from .portable import (
     TEXT_REFERENCE_PREFIX,

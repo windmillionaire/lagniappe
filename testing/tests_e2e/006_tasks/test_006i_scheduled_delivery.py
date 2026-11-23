@@ -1,7 +1,7 @@
 """Scheduled-delivery HTTP contracts with token verification and storage isolated."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.e2e
     "wrong-caller", "wrong-issuer", "invalid-payload",
 ])
 def test_scheduled_uncompletion_delivery_guards_and_preserves_due_date(monkeypatch, delivery):
-    due_date = datetime(2026, 9, 20, tzinfo=timezone.utc)
+    due_date = datetime(2026, 9, 20, tzinfo=UTC)
     stored = {
         "completed": delivery != "already-open",
         "active": delivery != "inactive",

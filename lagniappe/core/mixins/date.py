@@ -1,6 +1,6 @@
 """Date mixin for datetime property handling with timezone conversion."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import re
 
 from ..definitions import FieldType, FilterOptions, Ordering
@@ -54,18 +54,18 @@ class DateMixin:
         if isinstance(value, str):
             if OLD_FORMAT.match(value):
                 dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             else:
                 dt = datetime.fromisoformat(value)
             if not dt.tzinfo:
                 return dates.user_date_string_to_utc_datetime(value, user=self.user)
-            return dt.astimezone(timezone.utc)
+            return dt.astimezone(UTC)
         elif isinstance(value, datetime):
             if not value.tzinfo:
                 value = value.replace(tzinfo=dates.user_timezone(self.user))
-            return value.astimezone(timezone.utc)
+            return value.astimezone(UTC)
         elif isinstance(value, float):
-            return datetime.fromtimestamp(value, timezone.utc)
+            return datetime.fromtimestamp(value, UTC)
 
         return None
 

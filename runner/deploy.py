@@ -328,7 +328,7 @@ def update_package_lock_version(version, lock_path=None):
     if not path.exists():
         return False
 
-    with open(path, "r", encoding="utf-8", newline="") as f:
+    with open(path, encoding="utf-8", newline="") as f:
         package_lock = json.load(f)
 
     package_lock["version"] = version

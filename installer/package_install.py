@@ -126,7 +126,7 @@ def ensure_pip_is_available():
         )
         print(
             wrap_text(
-                (
+
                     "\nFor Windows (if the above fails or python is not in PATH):\n  - "
                     f"Search for '{ui.literal('Manage app execution aliases')}' in "
                     f"Windows settings.\n  - Ensure '{ui.literal('python.exe')}' and '"
@@ -137,7 +137,7 @@ def ensure_pip_is_available():
                     "Pythons):\n  - Use 'python3' or the specific Python executable "
                     "path.\n  - You might need to use 'sudo' if installing system-wide "
                     "(not recommended if using virtual environments):"
-                )
+
             ),
             file=sys.stderr,
         )

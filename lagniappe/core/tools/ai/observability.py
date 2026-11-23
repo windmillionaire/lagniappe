@@ -4,7 +4,7 @@ from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import json
 import logging
@@ -356,7 +356,7 @@ class GenerationObserver:
         correlation_id = str(uuid.uuid4())
         contract = getattr(prompt, "observability_contract", None) or {}
         execution = _EXECUTION_CONTEXT.get()
-        created = datetime.now(timezone.utc)
+        created = datetime.now(UTC)
         self.live = bool(self.active and execution.telemetry_id)
         self.summary = GenerationSummaryV1(
             correlation_id=correlation_id,
@@ -541,7 +541,7 @@ class GenerationObserver:
         if not self.active:
             return
         self.summary.duration_ms = max(int((time.monotonic() - self.started) * 1000), 0)
-        self.summary.updated = datetime.now(timezone.utc)
+        self.summary.updated = datetime.now(UTC)
         self.summary.state = "complete"
         self.summary.active_provider_stage = "complete"
         self.summary.success = error is None
@@ -560,7 +560,7 @@ class GenerationObserver:
     def _persist_live(self):
         if not self.live:
             return
-        self.summary.updated = datetime.now(timezone.utc)
+        self.summary.updated = datetime.now(UTC)
         self.summary.duration_ms = max(
             int((time.monotonic() - self.started) * 1000),
             0,
@@ -615,7 +615,7 @@ def _write_summary(summary):
 # @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
 # @pair datastore:retention-bound
 def prune_old_records(*, now=None, limit=PRUNE_LIMIT):
-    cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=RETENTION_DAYS)
+    cutoff = (now or datetime.now(UTC)) - timedelta(days=RETENTION_DAYS)
     return analytics_database.delete_ai_observability(
         before=cutoff,
         batch_size=min(int(limit), PRUNE_LIMIT),
@@ -738,7 +738,7 @@ def aggregate_records(records, *, query_limit=QUERY_LIMIT):
 # @matrix observability : in-flight deferred-context exception-transparency
 def reconcile_generation_records(records, operations, *, now=None):
     """Project orphaned report attempts as interrupted using durable job state."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     jobs = {item.get("telemetry_id"): item for item in operations if item.get("telemetry_id")}
     result = []
     for record in records:
@@ -747,7 +747,7 @@ def reconcile_generation_records(records, operations, *, now=None):
             job = jobs.get(item.get("telemetry_id"), {})
             created = item.get("created")
             if isinstance(created, datetime) and created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
+                created = created.replace(tzinfo=UTC)
             expired = isinstance(created, datetime) and now - created >= timedelta(minutes=10)
             stopped = job.get("status") in {"complete", "failed", "cancelled", "superseded"}
             replaced = int(job.get("attempt") or 0) > int(item.get("deferred_job_attempt") or 0)

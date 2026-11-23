@@ -6,7 +6,7 @@ from runner import presentation as ui
 from runner.presentation import output as print
 
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import json
 import os
@@ -268,7 +268,7 @@ def _print_plan(plan):
 # @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
 # @reason whole-minute safety selection is exercised by restore orchestration
 def _safety_snapshot_time(context):
-    now = context.now().astimezone(timezone.utc)
+    now = context.now().astimezone(UTC)
     target = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
     context.sleep(max(0.0, (target - now).total_seconds()) + 1.0)
     return target
@@ -376,7 +376,7 @@ def restore_generation_bound_assets(context, plan):
 # @matrix data-lifecycle disaster-recovery : queue-reconciliation scheduled-uncomplete
 def reconcile_scheduled_uncomplete_tasks(context, plan, *, now=None):
     """Backfill durable markers and recreate only scheduled uncompletion wake-ups."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise DataLifecycleError("Scheduled-task reconciliation requires UTC time.")
     client = context.datastore_client(DEFAULT_DATABASE)
@@ -451,7 +451,7 @@ def _completion_record(context, plan, checkpoint):
         "purged_tasks": checkpoint.payload["queue_snapshot"],
         "assets": checkpoint.payload.get("asset_result"),
         "scheduled_uncompletion": checkpoint.payload.get("scheduled_task_result"),
-        "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "completed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }
     blob = context.bucket.blob(object_name)
     if blob.exists():
@@ -569,7 +569,7 @@ def restore_backup(
             queue_snapshot=capture_queue_snapshot(context, plan),
         )
     if not checkpoint.payload.get("queue_purged"):
-        requested = datetime.now(timezone.utc)
+        requested = datetime.now(UTC)
         checkpoint.update(
             "queue-purge-started",
             purge_requested_at=requested.isoformat().replace("+00:00", "Z"),
@@ -695,11 +695,11 @@ def restore_backup(
         f"{plan['merge']['restored_missing']} missing keys restored.")
     )
     print(
-        (
+
             "Cache data was cleared. Sign in as the Owner, then open "
             f"{ui.literal('Admin → Site Settings → Maintenance')} and select "
             f"{ui.literal('Refresh Cache')}."
-        )
+
     )
     return plan
 

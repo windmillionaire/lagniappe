@@ -1,6 +1,6 @@
 """Basic form field submission paths (form, AI, import) via ``test_submission_values``."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -21,7 +21,7 @@ def fixed_date_clock(monkeypatch):
     class FixedDateTime(datetime):
         @classmethod
         def now(cls, tz=None):
-            instant = datetime(2026, 9, 19, 12, 34, 56, 123456, tzinfo=timezone.utc)
+            instant = datetime(2026, 9, 19, 12, 34, 56, 123456, tzinfo=UTC)
             return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
 
     monkeypatch.setattr(dates, "datetime", FixedDateTime)
@@ -82,7 +82,7 @@ def test_date_input_uses_explicit_actor_without_request(
     # Form dates preserve today's local clock; AI/import date-only values use midnight.
     stored_utc = form_utc if method == "validate_submission" else midnight_utc
     expected_utc = datetime.fromisoformat(stored_utc)
-    assert field.value.tzinfo == timezone.utc
+    assert field.value.tzinfo == UTC
     assert field.value == expected_utc
     assert field.value.astimezone(ZoneInfo(zone)).date().isoformat() == day
     assert field.db_value == stored_utc
@@ -107,7 +107,7 @@ def test_date_input_preserves_explicit_timezone_offset(monkeypatch):
         user=user,
     )
     field.validate_ai("2026-09-24T12:00:00+09:00")
-    assert field.value == datetime(2026, 9, 24, 3, tzinfo=timezone.utc)
+    assert field.value == datetime(2026, 9, 24, 3, tzinfo=UTC)
     assert field.ai_value == "2026-09-23"
 
 

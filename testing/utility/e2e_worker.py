@@ -37,7 +37,7 @@ def worker_runtime():
     )
 
     record = context()
-    if not CONFIG.testing or CONFIG.PREFIX != "test-" or CONFIG.BASE_URL != record["base_url"]:
+    if not CONFIG.testing or CONFIG.PREFIX != "test-" or record["base_url"] != CONFIG.BASE_URL:
         raise RuntimeError("E2E worker environment does not match its coordinator")
     assert_owner(record)
     stopped = threading.Event()

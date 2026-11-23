@@ -1,6 +1,6 @@
 """Focused contracts for AI-driven shared-cache workspace filters."""
 
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timezone, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -262,7 +262,7 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     monkeypatch.setattr(
         contract.dates,
         "user_timezone",
-        lambda _user=None: timezone.utc,
+        lambda _user=None: UTC,
     )
 
     definitions = ai_query.compile_filter_definitions(
@@ -302,7 +302,7 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     expected_end = datetime.combine(
         datetime(2026, 7, 31).date(),
         time.max,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     ).timestamp()
     assert definitions[1].comparator == Comparator.LESS_EQUAL
     assert definitions[1].value == expected_end
@@ -383,27 +383,27 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
         "task",
         "visible-task",
         "Visible",
-        modified=datetime(2026, 7, 10, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 10, tzinfo=UTC),
     )
     older = _Entity(
         "task",
         "older-task",
         "Older",
-        modified=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 1, tzinfo=UTC),
     )
     hidden = _Entity(
         "task",
         "hidden-task",
         "Hidden",
         allowed=False,
-        modified=datetime(2026, 7, 12, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 12, tzinfo=UTC),
     )
     inactive = _Entity(
         "task",
         "inactive-task",
         "Inactive",
         active=False,
-        modified=datetime(2026, 7, 11, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 11, tzinfo=UTC),
     )
     calls = {}
 

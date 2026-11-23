@@ -844,12 +844,12 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
 
     assert create_config.set_application_defaults()
     assert selections == [(recovered_project, "recovered-app")]
-    assert settings.GCLOUD_CONFIG == {
+    assert {
         "NAME": "recovered-app",
         "ACCOUNT": deployer,
         "PROJECT": recovered_project,
         "BILLING_ACCOUNT": "billing-1",
-    }
+    } == settings.GCLOUD_CONFIG
     assert settings.APP["GOOGLE_CLOUD_PROJECT"] == recovered_project
     assert settings.APP["ADMIN_EMAIL"] == owner
     assert settings.APP["INSTALLER_EMAIL"] == deployer

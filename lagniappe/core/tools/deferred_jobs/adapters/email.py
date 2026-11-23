@@ -91,7 +91,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
                     "Email attachment manifest is invalid."
                 )
             identity = hashlib.sha256(
-                f"{parameters.get('event_digest')}:{attachment['id']}".encode("utf-8")
+                f"{parameters.get('event_digest')}:{attachment['id']}".encode()
             ).hexdigest()
             file_key = database_utility.create_named_key("file", f"email-{identity}")
             file = attached.get(file_key) or Entities.fetch_one(

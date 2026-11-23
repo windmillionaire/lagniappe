@@ -1,6 +1,6 @@
 """Unit coverage for privacy-bounded AI generation observability."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 from types import SimpleNamespace
 import uuid
@@ -552,7 +552,7 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     identifier = str(uuid.uuid4())
     summary = observability.GenerationSummaryV1(
         correlation_id=identifier,
-        created=datetime.now(timezone.utc),
+        created=datetime.now(UTC),
         workflow="ask",
         stage="answer",
         prompt_contract_id="ask-report",
@@ -564,7 +564,7 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     assert record["correlation_id"] == identifier
     assert record.exclude_from_indexes == observability.EXCLUDE_FROM_INDEXES
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     assert observability.prune_old_records(now=now, limit=900) == 500
     assert len(datastore.deleted) == 500
     assert query.keys_only_called is True
@@ -660,7 +660,7 @@ def test_ai_observability_dashboard_aggregation():
 
 # @matrix ai-observability : job-correlation privacy
 def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
-    created = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
+    created = datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
     operation = {
         "key": "job-key",
         "telemetry_id": "telemetry-match",
@@ -709,7 +709,7 @@ def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
 
 # @matrix observability : in-flight deferred-context exception-transparency
 def test_report_telemetry_marks_lost_attempts_interrupted():
-    now = datetime(2026, 9, 17, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 17, tzinfo=UTC)
     base = {"state": "running", "deferred_job_type": "report-ai", "deferred_job_attempt": 1, "telemetry_id": "job", "created": now}
     assert observability.reconcile_generation_records([base], [{"telemetry_id": "job", "status": "running", "attempt": 1}], now=now) == [base]
     for job in [{"status": "cancelled"}, {"status": "failed"}, {"status": "complete"}, {"status": "running", "attempt": 2}]:

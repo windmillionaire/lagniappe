@@ -143,7 +143,7 @@ class File(Enum):
     # @covered-by config/__init__.py::File.load
     # @reason YAML parsing adapter is owned by the public file loader
     def _load_from_yaml(self):
-        with open(self.value, "r", encoding="utf-8", newline="") as f:
+        with open(self.value, encoding="utf-8", newline="") as f:
             data = yaml.safe_load(f) or {}
 
         if not self.convert:
@@ -180,7 +180,7 @@ class File(Enum):
     # @covered-by config/__init__.py::File.load
     # @reason JSON parsing adapter is owned by the public file loader
     def _load_from_json(self):
-        with open(self.value, "r", encoding="utf-8", newline="") as f:
+        with open(self.value, encoding="utf-8", newline="") as f:
             return json.load(f)
 
     # @testable false
@@ -524,7 +524,7 @@ def load_runtime_settings(environment):
 def read_saved_app_settings():
     """Read canonical persisted values for configuration display and recovery."""
     with open(
-        File.APP_SETTINGS_YAML.value, "r", encoding="utf-8", newline=""
+        File.APP_SETTINGS_YAML.value, encoding="utf-8", newline=""
     ) as stream:
         data = yaml.safe_load(stream) or {}
     data.pop("BUILD_ID", None)

@@ -160,9 +160,7 @@ class TextAsset(CacheMixin, AssetProperty):
             return self._value
 
         stored_asset = self.entity.get_asset(self.id)
-        if stored_asset:
-            self._value = True
-        elif self.is_text_file and self.entity.get_asset("file") and self.entity.encoding:
+        if stored_asset or self.is_text_file and self.entity.get_asset("file") and self.entity.encoding:
             self._value = True
         else:
             self._value = None

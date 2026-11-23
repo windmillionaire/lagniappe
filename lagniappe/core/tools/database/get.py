@@ -1,6 +1,6 @@
 """Datastore read queries for all entity types."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 
 from google.cloud.datastore import Entity, Key
 
@@ -416,7 +416,7 @@ def model_tasks(project):
 # --- Tasks ---
 
 # Lower bound so ``>=`` matches only instances that have ``due_date`` indexed.
-_TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=timezone.utc)
+_TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=UTC)
 
 
 # @testable true
@@ -594,7 +594,7 @@ def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
     if Restriction.is_denied(hashes) and assigned_to is None:
         return []
 
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     next_week = today + timedelta(days=7)
 
     f = _tasks_filter(

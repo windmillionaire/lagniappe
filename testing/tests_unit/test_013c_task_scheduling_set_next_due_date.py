@@ -1,4 +1,5 @@
 import pytest
+from datetime import UTC
 
 
 # @matrix task-scheduling : next-due-date recurring
@@ -43,7 +44,7 @@ def test_next_due_date_recurring(get_test_entities):
                 assert task.due_date is not None, (
                     f"Failed for '{task_name}': due_date is None"
                 )
-                assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
+                assert task.due_date.isoformat() == expected_date.astimezone(UTC).isoformat(), (
                     f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                 )
 
@@ -81,14 +82,14 @@ def test_next_due_date_scheduled(get_test_entities):
                 # Set due_date based on days_ago
                 days_ago = task.test_spec.get("days_ago", 0)
                 due_date_user_tz = mock_today - timedelta(days=days_ago)
-                due_date_utc = due_date_user_tz.astimezone(timezone.utc)
+                due_date_utc = due_date_user_tz.astimezone(UTC)
                 task.db["due_date"] = due_date_utc
 
                 # Set postponed_from if specified
                 if "postponed_from_days_ago" in task.test_spec:
                     postponed_days_ago = task.test_spec["postponed_from_days_ago"]
                     postponed_date = mock_today - timedelta(days=postponed_days_ago)
-                    task.db["postponed_from"] = postponed_date.astimezone(timezone.utc)
+                    task.db["postponed_from"] = postponed_date.astimezone(UTC)
 
                 # Set up the scheduled section
                 scheduled = task.properties.scheduled
@@ -108,14 +109,14 @@ def test_next_due_date_scheduled(get_test_entities):
                     expected_date = mock_today + timedelta(
                         days=expected["days_from_today"]
                     )
-                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
+                    assert task.due_date.isoformat() == expected_date.astimezone(UTC).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
                 elif "expected_date" in expected:
                     expected_date = datetime.strptime(
                         expected["expected_date"], "%Y-%m-%d"
                     ).replace(tzinfo=tz)
-                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
+                    assert task.due_date.isoformat() == expected_date.astimezone(UTC).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
 
@@ -166,14 +167,14 @@ def test_next_due_date_periodic(get_test_entities):
                 else:
                     due_date_user_tz = mock_today
 
-                due_date_utc = due_date_user_tz.astimezone(timezone.utc)
+                due_date_utc = due_date_user_tz.astimezone(UTC)
                 task.db["due_date"] = due_date_utc
 
                 # Set postponed_from if specified
                 if "postponed_from_days_ago" in task.test_spec:
                     postponed_days_ago = task.test_spec["postponed_from_days_ago"]
                     postponed_date = mock_today - timedelta(days=postponed_days_ago)
-                    task.db["postponed_from"] = postponed_date.astimezone(timezone.utc)
+                    task.db["postponed_from"] = postponed_date.astimezone(UTC)
 
                 # Set up the periodic section
                 periodic = task.properties.periodic
@@ -193,14 +194,14 @@ def test_next_due_date_periodic(get_test_entities):
                     expected_date = mock_today + timedelta(
                         days=expected["days_from_today"]
                     )
-                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
+                    assert task.due_date.isoformat() == expected_date.astimezone(UTC).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
                 elif "expected_date" in expected:
                     expected_date = datetime.strptime(
                         expected["expected_date"], "%Y-%m-%d"
                     ).replace(tzinfo=tz)
-                    assert task.due_date.isoformat() == expected_date.astimezone(timezone.utc).isoformat(), (
+                    assert task.due_date.isoformat() == expected_date.astimezone(UTC).isoformat(), (
                         f"Failed for '{task_name}': expected {expected_date}, got {task.due_date}"
                     )
 

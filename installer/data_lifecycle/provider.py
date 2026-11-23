@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 import json
 from pathlib import Path
 import re
 import tempfile
 import time
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 from urllib.parse import urlsplit
 
 from installer.errors import ProviderTimeout, ProviderTransientError, SetupError
@@ -185,7 +186,7 @@ class BackupManifest:
         expected_project: str | None = None,
         expected_backup_id: str | None = None,
         expected_bucket: str | None = None,
-    ) -> "BackupManifest":
+    ) -> BackupManifest:
         if not isinstance(payload, dict):
             raise DataLifecycleError("Backup manifest must be a JSON object.")
         try:
@@ -300,7 +301,7 @@ class ProviderContext:
     cloud_tasks_client: Any = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
-    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
+    now: Callable[[], datetime] = lambda: datetime.now(UTC)
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_provider_context_always_uses_default_database_and_recovery_bucket
@@ -377,7 +378,7 @@ class ProviderContext:
         ):
             raise DataLifecycleError("Point-in-time export requires a timezone-aware timestamp.")
         if snapshot_time is not None:
-            snapshot_time = snapshot_time.astimezone(timezone.utc).replace(microsecond=0)
+            snapshot_time = snapshot_time.astimezone(UTC).replace(microsecond=0)
         snapshot_argument = (
             [f"--snapshot-time={snapshot_time.isoformat().replace('+00:00', 'Z')}"]
             if snapshot_time is not None
@@ -454,7 +455,7 @@ class ProviderContext:
         )
         if not isinstance(snapshot_time, datetime) or snapshot_time.tzinfo is None:
             raise DataLifecycleError("Database clone time must include a timezone.")
-        snapshot_time = snapshot_time.astimezone(timezone.utc)
+        snapshot_time = snapshot_time.astimezone(UTC)
         if snapshot_time.second or snapshot_time.microsecond:
             raise DataLifecycleError("Database clone time must be a whole UTC minute.")
         payload = self.json_command(
@@ -768,7 +769,7 @@ class ProviderContext:
         self.cloud_tasks_client = client
         parent = client.queue_path(self.project_id, location, queue_name)
         identity = hashlib.sha256(
-            f"{entity_key}\0{token}".encode("utf-8")
+            f"{entity_key}\0{token}".encode()
         ).hexdigest()[:32]
         body = json.dumps(
             {"key": entity_key, "token": token},
@@ -776,7 +777,7 @@ class ProviderContext:
             separators=(",", ":"),
         ).encode("utf-8")
         timestamp = timestamp_pb2.Timestamp()
-        timestamp.FromDatetime(schedule_at.astimezone(timezone.utc))
+        timestamp.FromDatetime(schedule_at.astimezone(UTC))
         task = {
             "name": client.task_path(
                 self.project_id,
@@ -1146,7 +1147,7 @@ def operation_times(payload: dict[str, Any]) -> tuple[str, str]:
         or metadata.get("endTime")
         or metadata.get("end_time")
     )
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return str(start or now), str(end or now)
 
 

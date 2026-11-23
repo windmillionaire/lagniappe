@@ -1,6 +1,6 @@
 """Focused AI-report characterization coverage."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -38,7 +38,7 @@ def _completion_case(monkeypatch, *, completed=False, recurring=False):
     task.submission = {"notes": "Keep these values"}
     task.files = [_test_file("kept.pdf")]
     task.assigned_to = user
-    task.due_date = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    task.due_date = datetime(2026, 9, 1, tzinfo=UTC)
     if recurring:
         from lagniappe.core.tools.tasks import scheduling
         from lagniappe.core.tools.ai.reporting.schedules import apply_task_schedule

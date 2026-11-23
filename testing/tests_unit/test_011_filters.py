@@ -16,7 +16,7 @@ reading ``Filter.conditions``.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 import pytest
 
@@ -270,15 +270,15 @@ def test_filter_fingerprint_uses_loaded_parent_fingerprint():
         "PROJECT",
         {"name": "Fingerprint Parent", "hash": "parent_fingerprint"},
     )
-    filter_entity.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    filter_entity.modified = datetime(2026, 1, 1, tzinfo=UTC)
     filter_entity.parent = parent
 
     before = filter_entity.fingerprint
     assert filter_entity.fingerprint == before
-    parent.modified = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    parent.modified = datetime(2026, 1, 2, tzinfo=UTC)
     parent_changed = filter_entity.fingerprint
     assert parent_changed != before
-    filter_entity.modified = datetime(2026, 1, 3, tzinfo=timezone.utc)
+    filter_entity.modified = datetime(2026, 1, 3, tzinfo=UTC)
     assert filter_entity.fingerprint != parent_changed
 
 

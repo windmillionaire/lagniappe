@@ -1,6 +1,6 @@
 """Action identities, completion decisions, and committed result receipts."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -162,7 +162,7 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
         prepare_document_append(action, report, user, created, record)
         return
     if action.get("type") == "create_page" and _data(action).get("document"):
-        record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        record["document_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     # Only completion preparation needs a prior completion to decide whether
     # to create history. Ordinary writes commit their receipt with the batch;
     # they no longer need a second copy of the reviewed proposal/before-state.

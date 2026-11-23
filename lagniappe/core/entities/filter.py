@@ -37,7 +37,7 @@ class Filter(Entity):
         parent = self.parent
         parent_fingerprint = parent.fingerprint if parent else fingerprint
         return hashlib.md5(
-            f"{fingerprint}:{parent_fingerprint}".encode("utf-8")
+            f"{fingerprint}:{parent_fingerprint}".encode()
         ).hexdigest()
 
     @property

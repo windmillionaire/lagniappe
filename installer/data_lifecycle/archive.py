@@ -6,7 +6,7 @@ from runner import presentation as ui
 from runner.presentation import output as print
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 import json
 import os
@@ -65,7 +65,7 @@ def _progress(formatter, message):
 # @covered-by installer/data_lifecycle/archive.py::build_archive
 # @reason timestamp formatting is an internal archive-orchestration detail
 def _now():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 # @testable false

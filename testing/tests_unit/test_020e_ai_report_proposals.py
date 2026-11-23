@@ -1,7 +1,7 @@
 """Proposal validation and deterministic schema repair coverage."""
 
 import copy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 import pytest
 
@@ -327,7 +327,7 @@ def test_validate_proposal_rejects_future_completed_dates(monkeypatch):
     monkeypatch.setattr(
         proposal_validation.dates,
         "user_today",
-        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=UTC),
     )
     proposal = {
         "summary": "Record a completed inspection.",

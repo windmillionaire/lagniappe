@@ -10,7 +10,7 @@ class ModelTaskDefinition:
     name: str
     project: Projects
     description: str = ""
-    form: Optional[Forms] = None
+    form: Forms | None = None
 
 
 create_model_task = ModelTaskDefinition(

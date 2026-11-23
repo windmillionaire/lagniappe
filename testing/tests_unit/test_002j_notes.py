@@ -1,6 +1,6 @@
 """Unit coverage for note visibility, queries, and mutation ownership."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -35,7 +35,7 @@ def test_empty_notes_hint_is_bound_to_the_page_revision(monkeypatch):
     page.remember_empty_notes()
     assert saved == []
 
-    revision = datetime.now(timezone.utc)
+    revision = datetime.now(UTC)
     page.db["modified"] = revision
     page.remember_empty_notes()
     assert page.has_notes is False
@@ -329,7 +329,7 @@ def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
 
 # @matrix notes permissions : home ordering owner private shared
 def test_home_notes_return_only_visible_notes(monkeypatch):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     public = _RawActivity(
         "public",
         type="note",

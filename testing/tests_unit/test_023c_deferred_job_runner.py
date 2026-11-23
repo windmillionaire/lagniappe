@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import threading
 from types import SimpleNamespace
 
@@ -370,7 +370,7 @@ def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
 def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
     progress = []
     boundary_control = DeferredExecutionControl(
-        deadline_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+        deadline_at=datetime.now(UTC) + timedelta(minutes=1),
         active_check=lambda: True,
         progress_callback=progress.append,
     )
@@ -389,7 +389,7 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         _renew_claim=lambda _job, _token: renewed.set() and False,
     )
     control = DeferredExecutionControl(
-        deadline_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+        deadline_at=datetime.now(UTC) + timedelta(minutes=1),
         active_check=lambda: True,
         progress_callback=lambda _progress: None,
     )
@@ -410,7 +410,7 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         control.ensure_active()
 
     expired = DeferredExecutionControl(
-        deadline_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        deadline_at=datetime.now(UTC) - timedelta(seconds=1),
         active_check=lambda: True,
         progress_callback=lambda _progress: None,
     )
@@ -828,7 +828,7 @@ def test_runner_treats_deleted_active_job_as_cancellation(monkeypatch):
     (120, 1, {}, "complete"),
 ])
 def test_report_planning_lifetime_and_interrupted_recovery(monkeypatch, age, attempt, checkpoint, expected):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job = RunnerJob(attempt=attempt, checkpoint=checkpoint)
     job.created = now - timedelta(seconds=age)
     adapter = RecordingAdapter()

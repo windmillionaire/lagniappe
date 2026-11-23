@@ -184,10 +184,10 @@ def configure_ai():
             print(ui.success("AI access policy deployed"))
         else:
             print(
-                (
+
                     "Saved locally. Apply the policy with "
                     f"{ui.literal(setup_command('update'))}."
-                )
+
             )
         return 0
     print(wrap_text("\nThis will configure Vertex AI data retention settings."))

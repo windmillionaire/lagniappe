@@ -39,7 +39,7 @@ Form State Machine:
 
 import base64
 from contextlib import contextmanager, nullcontext
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import importlib
 import json
 import re
@@ -351,7 +351,7 @@ def _ensure_owner_initialized():
             }
         )
     )
-    owner.last_login = datetime.now(timezone.utc)
+    owner.last_login = datetime.now(UTC)
     owner.save()
 
 

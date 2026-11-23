@@ -1,6 +1,6 @@
 """Executable entity mutation contract and ordering regressions."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from copy import deepcopy
 
 from google.cloud import datastore
@@ -266,7 +266,7 @@ def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
         },
     )
     task.db["scheduled_uncomplete_token"] = "token"
-    task.db["scheduled_uncomplete_at"] = datetime(2026, 8, 25, tzinfo=timezone.utc)
+    task.db["scheduled_uncomplete_at"] = datetime(2026, 8, 25, tzinfo=UTC)
     task.add_mutation_intents(
         MutationIntent.dispatch_scheduled_uncomplete(
             task,
@@ -574,7 +574,7 @@ def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
 
 # @matrix notifications : cache-failure-isolation cache-isolation mutation personal-activity
 def test_notification_save_updates_projection_without_touching_user(monkeypatch):
-    modified = datetime(2026, 7, 30, tzinfo=timezone.utc)
+    modified = datetime(2026, 7, 30, tzinfo=UTC)
     user = User(testing=True)
     user._key = "notification-user"
     user._db = SaveDB(
@@ -650,7 +650,7 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
 
 # @matrix deferred-jobs : cache-isolation mutation redis-projection
 def test_job_save_updates_operation_projection_without_touching_relations(monkeypatch):
-    modified = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    modified = datetime(2026, 8, 5, tzinfo=UTC)
     user = User(testing=True)
     user._key = "operation-user"
     user._db = SaveDB(
@@ -903,7 +903,7 @@ def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
     history = Entities.TASK_HISTORY(testing=True)
     history._key = "attachment-history"
     history.kind = "task_history"
-    history.created = datetime.now(timezone.utc)
+    history.created = datetime.now(UTC)
     history.task = task
     history.page = page
     history.linked_pages = []

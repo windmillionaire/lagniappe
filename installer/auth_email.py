@@ -266,51 +266,51 @@ def _print_gmail_instructions():
     print(wrap_text(ui.heading("\nConfigure authentication email:")))
     print(
         wrap_text(
-            (
+
                 "Lagniappe can send verification and password-reset links through any Gmail "
                 f"or Google Workspace mailbox with {ui.literal('2-Step Verification')} and "
                 f"{ui.literal('App Passwords')} enabled. After adding a custom domain, "
                 f"{ui.literal(setup_command('email'))} can replace Gmail with any SMTP email "
                 "service."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 "Google warns about app passwords because they let an app sign in without the usual interactive Google prompt. "
                 "Lagniappe uses this one only to send email from the chosen mailbox on its owner's behalf, so people the owner invites can verify their email addresses and request password resets."
-            )
+
         )
     )
     print(
         wrap_text(
-            (f"\n{ui.literal('1.')} Choose the mailbox Lagniappe should send from.")
+            f"\n{ui.literal('1.')} Choose the mailbox Lagniappe should send from."
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('2.')} Enable {ui.literal('2-Step Verification')} if it is "
                 "not already enabled."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('3.')} In the {ui.literal('App name')} box, enter '"
                 f"{ui.literal('Lagniappe')}', then click {ui.literal('Create')}."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('4.')} Copy the 16-character password Google displays. "
                 "Setup will test it and store it in the private application settings "
                 "file."
-            )
+
         )
     )
     ready = input(
@@ -320,10 +320,10 @@ def _print_gmail_instructions():
         raise SetupCancelled("Installation cancelled before Google App Passwords.")
     print(
         wrap_text(
-            (
+
                 f"Opening a Google account picker for {ui.literal('App Passwords')}:\n  "
                 f"{ui.literal(GMAIL_APP_PASSWORDS_URL)}"
-            )
+
         )
     )
     try:
@@ -524,13 +524,13 @@ def _configure_dmarc_for_sender(sender_email):
     print(
         "\n"
         + wrap_text(
-            (
+
                 "DMARC ties the visible From domain to SPF or DKIM and tells receiving "
                 "mail systems how to handle messages that fail. Setup starts with the "
                 f"non-disruptive {ui.literal('p=none')} policy; it enables DMARC "
                 "authentication without asking receivers to quarantine or reject mail. "
                 "This step is recommended but optional."
-            )
+
         )
     )
 
@@ -610,13 +610,13 @@ def _setup_resend_auth_email(current, custom_domain):
     if cloudflare_configured:
         print(
             wrap_text(
-                (
+
                     "This installation already uses Cloudflare DNS. Resend can publish "
                     "its SPF, DKIM, and return-path records through the '"
                     f"{ui.literal('Sign in to Cloudflare')}' button. After the SMTP "
                     "test, setup will separately publish or verify the sender domain's "
                     "DMARC record."
-                )
+
             )
         )
     else:
@@ -690,12 +690,12 @@ def _setup_resend_auth_email(current, custom_domain):
         else:
             print(
                 wrap_text(
-                    (
+
                         f"\nCreate an API key named '{ui.literal('Lagniappe')}' with "
                         f"{ui.literal('Sending access')}. Restrict it to the verified "
                         "sending domain when Resend offers that choice. The key is shown "
                         "only once."
-                    )
+
                 )
             )
             print(
@@ -777,11 +777,11 @@ def _setup_resend_auth_email(current, custom_domain):
             print(
                 f.warning(
                     wrap_text(
-                        (
+
                             "The previous authentication-email settings remain active. "
                             "Confirm that Resend verified the domain and that the API "
                             f"key has {ui.literal('Sending access')} before retrying."
-                        )
+
                     )
                 )
             )

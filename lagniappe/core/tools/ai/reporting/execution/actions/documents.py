@@ -1,6 +1,6 @@
 """Reviewed Page document edits with durable recovery versions and receipts."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from html import escape
 
 from lagniappe.core import exceptions
@@ -49,7 +49,7 @@ def prepare_document_append(action, report, user, created, record):
         _first_data_reference(_data(action), "page"), created, expected=Entities.PAGE
     )
     record["before"] = {"entity": _entity_result(page)}
-    record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    record["document_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 # @testable true

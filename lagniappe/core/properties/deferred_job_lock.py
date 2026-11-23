@@ -50,4 +50,4 @@ class Scope(DBProperty):
         target_key = getattr(target, "urlsafe_key", target)
         if not target_key:
             return None
-        return hashlib.sha256(f"{scope}:{target_key}".encode("utf-8")).hexdigest()
+        return hashlib.sha256(f"{scope}:{target_key}".encode()).hexdigest()

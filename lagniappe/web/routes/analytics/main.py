@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone, UTC
 
 from flask import abort, g, render_template, request
 from flask_login import current_user
@@ -125,9 +125,9 @@ def _period(value):
 # @covered-by lagniappe/web/routes/analytics/main.py::index
 # @reason route-local analytics window helper
 def _period_start(period):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if period == "today":
-        return datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
+        return datetime.combine(now.date(), time.min, tzinfo=UTC)
     if period == "7d":
         return now - timedelta(days=7)
     if period == "30d":
@@ -242,7 +242,7 @@ def _save_event(data):
 
     return analytics_database.create_event(
         {
-            "created": datetime.now(timezone.utc),
+            "created": datetime.now(UTC),
             "action": data.get("action") or "view",
             "route_prefix": data.get("route_prefix") or _route_prefix(path),
             "path": path,
@@ -311,14 +311,14 @@ def _ai_records(period, limit=QUERY_LIMIT):
 def _inflight_ai_records(records, job_keys_by_telemetry=None):
     """Project privacy-bounded live generations without payload content."""
     rows = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job_keys_by_telemetry = job_keys_by_telemetry or {}
     for record in records:
         if record.get("state") != "running":
             continue
         updated = record.get("updated") or record.get("created")
         if updated and updated.tzinfo is None:
-            updated = updated.replace(tzinfo=timezone.utc)
+            updated = updated.replace(tzinfo=UTC)
         age = max(int((now - updated).total_seconds()), 0) if updated else 0
         rows.append(
             {
@@ -365,7 +365,7 @@ def _clear_cutoff(retention):
     if days is None:
         return None
 
-    return datetime.now(timezone.utc) - timedelta(days=days)
+    return datetime.now(UTC) - timedelta(days=days)
 
 
 # @testable false

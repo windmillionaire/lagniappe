@@ -3,7 +3,7 @@
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import io
 import json
@@ -24,7 +24,7 @@ from lagniappe.core.tools.database import remote_mcp as store
 
 
 pytestmark = pytest.mark.unit
-NOW = datetime(2026, 9, 5, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 5, tzinfo=UTC)
 VERIFIER = "v" * 43
 
 
@@ -530,7 +530,7 @@ def test_cached_certificates_still_verify_each_signature_and_user_grant(
 
     tokens = auth.exchange_token(_code(oauth))
     monkeypatch.setattr(auth, "fetch_user_content", fetch)
-    timestamp = int(datetime.now(timezone.utc).timestamp())
+    timestamp = int(datetime.now(UTC).timestamp())
     claims = {
         "iss": "https://accounts.google.com",
         "aud": oauth.config["issuer"] + "/api/v1",

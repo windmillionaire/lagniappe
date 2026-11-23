@@ -19,47 +19,47 @@ def confirm_domain_ownership(domain):
     print(wrap_text(f"\n{ui.heading('Verify domain ownership with Google')}"))
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('1.')} Use the Google account selected by this "
                 "installation:"
-            )
+
         )
     )
     print(f"   {ui.literal(account)}")
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('2.')} Open "
                 f"{ui.literal('https://search.google.com/search-console')} while signed "
                 "in to that exact account"
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('3.')} Add the registrable domain as a "
                 f"{ui.literal('Domain property')}"
-            )
+
         )
     )
     print(
         wrap_text(
-            (f"{ui.literal('4.')} Add the verification TXT record at your DNS provider")
+            f"{ui.literal('4.')} Add the verification TXT record at your DNS provider"
         )
     )
     print(
         wrap_text(
-            (f"{ui.literal('5.')} Wait for Google Search Console to confirm ownership")
+            f"{ui.literal('5.')} Wait for Google Search Console to confirm ownership"
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('6.')} In Search Console "
                 f"{ui.literal('Settings > Users and permissions')}, confirm that account "
                 f"is an {ui.literal('Owner')}"
-            )
+
         )
     )
     verified = input(

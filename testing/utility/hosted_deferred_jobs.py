@@ -1,6 +1,6 @@
 """Hosted E2E delivery helpers for real App Engine deferred jobs."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import math
 
 from lagniappe import CONFIG
@@ -152,7 +152,7 @@ def dispatch_hosted_deferred_job(
                     math.ceil(
                         (
                             current_job.next_attempt_at
-                            - datetime.now(timezone.utc)
+                            - datetime.now(UTC)
                         ).total_seconds()
                     ),
                     0,

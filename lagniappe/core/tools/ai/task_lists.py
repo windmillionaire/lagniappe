@@ -2,7 +2,7 @@
 
 import base64
 import binascii
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 import json
 
@@ -173,7 +173,7 @@ def _compact_task(task, user, tz):
         if value:
             if isinstance(value, datetime):
                 value = (
-                    (value if value.tzinfo else value.replace(tzinfo=timezone.utc))
+                    (value if value.tzinfo else value.replace(tzinfo=UTC))
                     .astimezone(tz)
                     .date()
                 )

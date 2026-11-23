@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 from io import BytesIO
 import json
@@ -157,7 +157,7 @@ def test_mcp_original_pdf_download_uses_existing_api_and_storage(
             past.setattr(
                 _signing,
                 "_NOW",
-                lambda _tz: datetime.now(timezone.utc) - timedelta(minutes=10),
+                lambda _tz: datetime.now(UTC) - timedelta(minutes=10),
             )
             expired = storage_assets.get_signed_url(
                 file.properties.file.value.path, expires_in=300

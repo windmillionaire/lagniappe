@@ -9,7 +9,7 @@ Out of scope here: ``PageIndex.pages`` (database + ``url_for``),
 other suites where those paths are mocked or exercised end-to-end.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -47,7 +47,7 @@ def test_category_filters(get_test_entities, get_schema):
 
     # set page properties and schemas on page forms
     for page in pages:
-        page.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        page.modified = datetime(2026, 1, 1, tzinfo=UTC)
         page.name = page.test_spec.get("name")
         page.description = page.test_spec.get("description")
         if "public" in page.test_spec:

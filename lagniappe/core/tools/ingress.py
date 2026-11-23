@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -53,10 +53,10 @@ ACTIVE_RUN_STATUSES = {
 
 # @testable infrastructure
 def _utc(value=None):
-    value = value or datetime.now(timezone.utc)
+    value = value or datetime.now(UTC)
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 # @testable infrastructure

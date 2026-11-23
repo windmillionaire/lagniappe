@@ -6,7 +6,7 @@ from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import json
 import secrets
@@ -62,7 +62,7 @@ def _progress(formatter, message):
 def _print_backup_summary(formatter, manifest):
     snapshot = datetime.fromisoformat(
         manifest.snapshot_time.replace("Z", "+00:00")
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     print(formatter.success(f"Backup {manifest.backup_id} is complete."))
     print(ui.value("  Snapshot", f"{snapshot:%d %b %Y at %H:%M UTC}", verbatim=True))
     print(ui.value("  Database records", f"{manifest.entity_count}", verbatim=True))
@@ -76,9 +76,9 @@ def _print_backup_summary(formatter, manifest):
 # @covered-by installer/data_lifecycle/backup.py::create_backup
 # @reason random ID generation is validated through the public backup operation
 def new_backup_id(now=None, token_hex=None):
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     token_hex = token_hex or secrets.token_hex
-    value = f"{now.astimezone(timezone.utc):%Y%m%dT%H%M%SZ}-{token_hex(4)}"
+    value = f"{now.astimezone(UTC):%Y%m%dT%H%M%SZ}-{token_hex(4)}"
     return validate_backup_id(value)
 
 
@@ -145,10 +145,10 @@ def load_backup(context: ProviderContext, backup_id: str) -> tuple[BackupManifes
 # @covered-by installer/data_lifecycle/backup.py::create_backup
 # @reason point-in-time normalization is enforced by the public backup workflow
 def _snapshot_time(value=None):
-    value = value or datetime.now(timezone.utc) - timedelta(minutes=1)
+    value = value or datetime.now(UTC) - timedelta(minutes=1)
     if not isinstance(value, datetime) or value.tzinfo is None:
         raise DataLifecycleError("Recovery snapshot time must include a timezone.")
-    return value.astimezone(timezone.utc).replace(second=0, microsecond=0)
+    return value.astimezone(UTC).replace(second=0, microsecond=0)
 
 
 # @testable false
@@ -191,7 +191,7 @@ def _refresh_runtime_catalog(context):
             {
                 "format": "lagniappe-runtime-recovery-catalog",
                 "schema_version": 1,
-                "updated_at": datetime.now(timezone.utc)
+                "updated_at": datetime.now(UTC)
                 .isoformat()
                 .replace("+00:00", "Z"),
                 "recovery_sets": entries,
@@ -270,7 +270,7 @@ def create_backup(
     else:
         backup_id = validate_backup_id(backup_id or new_backup_id())
         if snapshot_time is None:
-            snapshot_time = context.now().astimezone(timezone.utc) - timedelta(minutes=1)
+            snapshot_time = context.now().astimezone(UTC) - timedelta(minutes=1)
         selected_snapshot = _snapshot_time(snapshot_time)
         checkpoint.start(
             backup_id,
@@ -658,7 +658,7 @@ def prepare_automatic_backup(native_backup_id, context=None):
         try:
             snapshot_time = datetime.fromisoformat(
                 str(raw_snapshot).replace("Z", "+00:00")
-            ).astimezone(timezone.utc).replace(second=0, microsecond=0)
+            ).astimezone(UTC).replace(second=0, microsecond=0)
         except (AttributeError, ValueError) as error:
             raise DataLifecycleError("Native backup snapshot time is invalid.") from error
         backup_id = new_backup_id()

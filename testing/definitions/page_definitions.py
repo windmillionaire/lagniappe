@@ -21,8 +21,8 @@ class PageDefinition:
     name: str
     category: Categories
     description: str = ""
-    form: Optional[Forms] = None
-    submission: Optional[Submissions] = None
+    form: Forms | None = None
+    submission: Submissions | None = None
 
 
 create_page = PageDefinition(

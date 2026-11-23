@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 import time
 from uuid import uuid4
@@ -161,14 +161,14 @@ def _run_messaging_notification_migration(context):
                         "unread_message_count": 0,
                         "aggregate_revision": 0,
                         "aggregate_generation": str(uuid4()),
-                        "created": datetime.now(timezone.utc),
+                        "created": datetime.now(UTC),
                     }
                 )
             desired = ordinary_counts.get(user.key, 0)
             changed = created or aggregate.get("ordinary_count") != desired
             if changed:
                 aggregate["ordinary_count"] = desired
-                aggregate["modified"] = datetime.now(timezone.utc)
+                aggregate["modified"] = datetime.now(UTC)
                 aggregates.append((aggregate, ()))
             else:
                 result["skipped"] += 1
@@ -298,8 +298,8 @@ MIGRATION_CATALOG = (
 # @reason timestamp normalization is exercised through public status behavior
 def _utc(value):
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 # @testable false
@@ -676,7 +676,7 @@ def get_migration_status(
 
     catalog = validate_catalog(catalog)
     datastore = datastore or DATA.datastore
-    now_value = _utc((now or (lambda: datetime.now(timezone.utc)))())
+    now_value = _utc((now or (lambda: datetime.now(UTC)))())
     views, control = _load_views(datastore, catalog)
     _link_saved_file_failures(datastore, views)
     lease_active = _active_lease(control, now_value)
@@ -976,7 +976,7 @@ def run_data_migrations(
 
     catalog = validate_catalog(catalog)
     datastore = datastore or DATA.datastore
-    now = now or (lambda: datetime.now(timezone.utc))
+    now = now or (lambda: datetime.now(UTC))
     run_id_factory = run_id_factory or (lambda: str(uuid4()))
     initial = get_migration_status(datastore=datastore, catalog=catalog, now=now)
     if initial["status"] in {"current", "audit-error"}:
@@ -1055,7 +1055,7 @@ def initialize_fresh_install(
         return False
     catalog = validate_catalog(catalog)
     datastore = datastore or DATA.datastore
-    completed_at = _utc((now or (lambda: datetime.now(timezone.utc)))())
+    completed_at = _utc((now or (lambda: datetime.now(UTC)))())
     for definition in catalog:
         key = _migration_key(datastore, definition.id)
 

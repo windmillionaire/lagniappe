@@ -1,7 +1,7 @@
 """Task recurrence, postponement, and durable uncomplete scheduling."""
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, MO, rrule
 from dateutil.rrule import weekday as rrule_weekday
@@ -35,7 +35,7 @@ def scheduled_uncomplete_time():
     """Return the next user-local midnight as an absolute UTC timestamp."""
     now_user = datetime.now(user_timezone())
     tomorrow_user = beginning_of_day(now_user + timedelta(days=1))
-    return tomorrow_user.astimezone(timezone.utc)
+    return tomorrow_user.astimezone(UTC)
 
 
 # @testable true
@@ -270,7 +270,7 @@ def due_in_home_task_window(due_date):
     if not due_date:
         return False
 
-    next_week = datetime.now(timezone.utc) + timedelta(days=7)
+    next_week = datetime.now(UTC) + timedelta(days=7)
     return due_date <= next_week
 
 

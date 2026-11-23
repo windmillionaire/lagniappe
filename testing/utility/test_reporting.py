@@ -382,7 +382,7 @@ class TestResults:
         }
         self._finalized = False
 
-    def record(self, name: str, value: Any) -> "TestResults":
+    def record(self, name: str, value: Any) -> TestResults:
         """
         Record a named value for the test report.
 

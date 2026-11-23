@@ -1,7 +1,7 @@
 """Unit contracts for production AI email ingestion and report handoff."""
 
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import hmac
 from types import SimpleNamespace
@@ -50,7 +50,7 @@ def _config():
 
 def _signed_headers(raw_body, *, event_id="event-1", timestamp=None):
     timestamp = (
-        int(datetime.now(timezone.utc).timestamp())
+        int(datetime.now(UTC).timestamp())
         if timestamp is None
         else timestamp
     )
@@ -123,13 +123,13 @@ def test_svix_signature_verification_rejects_missing_or_malformed_authentication
             )
         )
     invalid_inputs.extend(
-        (
+
             (
                 {**signed_headers, "svix-signature": malformed},
                 "whsec_dGVzdC1zZWNyZXQ=",
             )
             for malformed in ("malformed", "v1,not-base64!", "v1,too,many")
-        )
+
     )
     invalid_inputs.append((signed_headers, "whsec_a"))
 
@@ -142,7 +142,7 @@ def test_svix_signature_verification_rejects_missing_or_malformed_authentication
 # @matrix ai-email webhook : future replay timestamp
 def test_svix_signature_verification_rejects_replayed_or_future_events():
     raw_body = b"{}"
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
 
     for timestamp in (now - 301, now + 301):
         with pytest.raises(AIEmailWebhookError) as invalid:
@@ -680,7 +680,7 @@ def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
     monkeypatch.setattr(email_database, "Entity", Record)
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     digest = "a" * 64
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     assert email_database.claim_ai_email_event(digest, "lease-one", now)["claimed"]
     active = email_database.claim_ai_email_event(

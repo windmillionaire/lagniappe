@@ -23,6 +23,7 @@ from lagniappe.core.tools.files import extract as file_extract
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.properties.file_assets import FileAsset
 from testing.utility.test_entities import TestEntities
+from datetime import UTC
 
 
 # @matrix file : display-name filename-fallback
@@ -1039,7 +1040,7 @@ def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch)
     first = TestEntities.get("PAGE", {"hash": "first-file-page", "restricted_to": ["a"]})
     destination = TestEntities.get("PAGE", {"hash": "next-file-page", "restricted_to": ["b"]})
     task = TestEntities.get("TASK", {"hash": "file-owner-task"}, page=first)
-    file = TestEntities.get("FILE", {"hash": "normalized-file", "modified": datetime(2026, 9, 9, tzinfo=timezone.utc)})
+    file = TestEntities.get("FILE", {"hash": "normalized-file", "modified": datetime(2026, 9, 9, tzinfo=UTC)})
     file.task = task
     before = file.fingerprint
     assert file.page is None and file.task_page is first and file.restricted_to == {"page": ["a"]}
@@ -1052,7 +1053,7 @@ def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch)
     assert file.db["task"] == task.key and file.db["task_page"] == destination.key
     assert not file.db.get("page")
     assert file.restricted_to == {"page": ["b"]} and file.fingerprint != before
-    assert file.modified == datetime(2026, 9, 9, tzinfo=timezone.utc)
+    assert file.modified == datetime(2026, 9, 9, tzinfo=UTC)
     assert any(effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity is file for effect in plan.effects)
 
 
@@ -1087,7 +1088,7 @@ def test_history_loading_resolves_moved_task_and_independently_moved_files(monke
 
     def record(kind, name, *, parent=None, **values):
         row = datastore.Entity(key=datastore.Key(kind.value, name, project="history-loading", parent=parent))
-        row.update(hash=name, modified=datetime(2026, 9, 9, tzinfo=timezone.utc), **values)
+        row.update(hash=name, modified=datetime(2026, 9, 9, tzinfo=UTC), **values)
         records[row.key] = row
         return row
 
@@ -1100,7 +1101,7 @@ def test_history_loading_resolves_moved_task_and_independently_moved_files(monke
     file_task = record(KINDS.instances, "file-task", type="task", page=file_page.key)
     file_row = record(KINDS.files, "moved-file", type="file", task=file_task.key, task_page=file_page.key)
     history = record(KINDS.history, "snapshot", parent=task_row.key, type="task_history",
-                     page=old_page.key, files=[file_row.key], created=datetime(2025, 1, 1, tzinfo=timezone.utc))
+                     page=old_page.key, files=[file_row.key], created=datetime(2025, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(database_get, "entities", lambda keys: [records[key] for key in keys if key in records])
     monkeypatch.setattr(database_get, "task_history", lambda _task: [history])
     task = Entities.TASK(task_row)

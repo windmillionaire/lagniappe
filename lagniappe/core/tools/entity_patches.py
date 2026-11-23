@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone as utc_timezone
+from datetime import date, datetime, time, timezone as utc_timezone, UTC
 
 from lagniappe.core.definitions import Action, Fetch, MutationIntent
 from lagniappe.core.entities import Entities
@@ -300,7 +300,7 @@ def _projection(entity):
         elif field == "categories":
             value = [{"id": item.urlsafe_key, "name": item.name} for item in value or []]
         elif isinstance(value, datetime):
-            value = value.astimezone(utc_timezone.utc).isoformat() if value.tzinfo else value.isoformat()
+            value = value.astimezone(UTC).isoformat() if value.tzinfo else value.isoformat()
         elif isinstance(value, date):
             value = value.isoformat()
         result[field] = deepcopy(value)

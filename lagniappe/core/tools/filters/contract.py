@@ -1,7 +1,7 @@
 """Versioned, authorized contracts for filter requests and saved filters."""
 
 from dataclasses import dataclass
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timezone, UTC
 import json
 from math import isfinite
 
@@ -521,7 +521,7 @@ def _timestamp_value(value, user, index):
     user_timezone = dates.user_timezone(user)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=user_timezone)
-    parsed = parsed.astimezone(timezone.utc)
+    parsed = parsed.astimezone(UTC)
     if not date_only:
         return {"instant": parsed.timestamp(), "date_only": False}
 
@@ -529,8 +529,8 @@ def _timestamp_value(value, user, index):
     start = datetime.combine(local_date, time.min, tzinfo=user_timezone)
     end = datetime.combine(local_date, time.max, tzinfo=user_timezone)
     return {
-        "start": start.astimezone(timezone.utc).timestamp(),
-        "end": end.astimezone(timezone.utc).timestamp(),
+        "start": start.astimezone(UTC).timestamp(),
+        "end": end.astimezone(UTC).timestamp(),
         "date_only": True,
     }
 

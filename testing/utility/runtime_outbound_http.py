@@ -29,9 +29,7 @@ def direct_http_imports(path: Path) -> frozenset[str]:
                 imports.add("requests")
             elif module == "httpx" or module.startswith("httpx."):
                 imports.add("httpx")
-            elif module == "urllib.request":
-                imports.add("urllib.request")
-            elif module == "urllib" and any(
+            elif module == "urllib.request" or module == "urllib" and any(
                 alias.name == "request" for alias in node.names
             ):
                 imports.add("urllib.request")

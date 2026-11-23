@@ -1,7 +1,7 @@
 """Cancellation reads and lease heartbeats remain independent and fenced."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -37,7 +37,7 @@ class CountingDatastore(KeyedDatastore):
 
 @pytest.fixture
 def claimed_job(monkeypatch):
-    now = [datetime(2026, 9, 19, tzinfo=timezone.utc)]
+    now = [datetime(2026, 9, 19, tzinfo=UTC)]
     key = Key("jobs", "claimed", project="test-project")
     row = KeyedEntity(
         key, status="running", lease_token="worker-one",

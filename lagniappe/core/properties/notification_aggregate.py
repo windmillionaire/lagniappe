@@ -1,6 +1,6 @@
 """Durable notification aggregate values and pure state projection."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import uuid
 
 from .base_db import DBProperty
@@ -13,7 +13,7 @@ AGGREGATE_ID = "message-aggregate"
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @pair notifications:aggregate-repair
 def initial_values(parent, *, ordinary_count=0, unread_message_count=0, now=None):
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     return {
         "type": "notification",
         "kind": "notification",
@@ -61,7 +61,7 @@ def apply_deltas(row, *, ordinary_delta=0, message_delta=0, now=None):
     if int(message_delta) > 0:
         row["message_revision"] = int(row.get("message_revision") or 0) + 1
     row["aggregate_generation"] = row.get("aggregate_generation") or str(uuid.uuid4())
-    row["modified"] = now or datetime.now(timezone.utc)
+    row["modified"] = now or datetime.now(UTC)
     return row
 
 

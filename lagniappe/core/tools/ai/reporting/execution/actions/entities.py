@@ -13,6 +13,7 @@ from .references import (
     _resolve_entity,
 )
 from .checkpoints import _prepared_output_key
+from datetime import UTC
 
 
 # @testable true
@@ -181,7 +182,7 @@ def _create_page(action, _report, user, created, context=None):
         _assign_preallocated_key(page, record, context or {})
         if context and context.get("batch"):
             context["batch"].add_document(page)
-        timestamp = record.get("document_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = record.get("document_at") or datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         html = document_source_quote(_report, timestamp) + data["document"]
         snapshot, _receipt = append_fragment(None, html, record.get("idempotency_key") or "creation")
         page.properties.document.save(html=html, ydoc=snapshot)

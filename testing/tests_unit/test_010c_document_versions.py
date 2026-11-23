@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -14,7 +14,7 @@ pytestmark = pytest.mark.unit
 def test_storage_backups_are_scoped_paginated_and_generation_bound(monkeypatch):
     entity = SimpleNamespace(hash="document-owner", urlsafe_key="page-key")
     other = SimpleNamespace(hash="other-owner", urlsafe_key="other-key")
-    now = datetime(2026, 9, 26, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 26, tzinfo=UTC)
     calls = []
     def blob(name, deleted=True):
         return SimpleNamespace(name=name, generation=1234, time_deleted=now if deleted else None, time_created=now)

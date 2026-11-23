@@ -1,6 +1,6 @@
 """Notification aggregate, ordinary-record, and query persistence."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from google.cloud.datastore import Entity as DatastoreEntity
 
@@ -138,7 +138,7 @@ def ordinary_notification_key(user, identifier):
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @matrix notifications : body html-stripping
 def prepare_ordinary_notification(key, user, *, body, target=None):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = DatastoreEntity(key=key, exclude_from_indexes=("body",))
     row.update(
         {

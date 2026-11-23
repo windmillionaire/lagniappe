@@ -6,7 +6,7 @@ from runner.presentation import read_input as input
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from google.cloud.datastore import Entity, Key
@@ -170,7 +170,7 @@ def _remote_journal_payload(context, checkpoint, filename):
             for key in sorted(RESTORE_JOURNAL_STATE_KEYS)
             if key in state
         },
-        "updated_at": datetime.now(timezone.utc)
+        "updated_at": datetime.now(UTC)
         .isoformat()
         .replace("+00:00", "Z"),
     }
@@ -409,10 +409,10 @@ def capture_queue_snapshot(
     if snapshot_blob.exists():
         payload, _blob = context.load_json_object(object_name)
         return _queue_snapshot_descriptor(context, plan, payload, object_name)
-    captured_at = captured_at or datetime.now(timezone.utc)
+    captured_at = captured_at or datetime.now(UTC)
     if not isinstance(captured_at, datetime) or captured_at.tzinfo is None:
         raise DataLifecycleError("Queue snapshot time must include a timezone.")
-    timestamp = captured_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    timestamp = captured_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
     tasks = sorted(
         context.list_queue_tasks(queue_name, location),
         key=lambda task: str(task.get("name") or ""),

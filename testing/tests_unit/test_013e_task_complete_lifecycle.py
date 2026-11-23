@@ -1,7 +1,7 @@
 """``Task.complete`` / ``Task.uncomplete`` and interaction with schedule queue."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -37,7 +37,7 @@ def test_task_complete_without_schedule(get_test_entities):
         },
     )
 
-    task.due_date = datetime(2025, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+    task.due_date = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
     assert task.properties.assigned_to.exists
 
     with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
@@ -268,7 +268,7 @@ def test_task_history_fingerprint_ignores_later_form_versions():
     )
     form.version = 1
     history = TaskHistory(testing=True)
-    history.created = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
+    history.created = datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
     history.form = form
 
     original = history.fingerprint
@@ -322,7 +322,7 @@ def test_task_history_create_snapshots_completed_task_state():
         },
         page=parent,
     )
-    completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=UTC)
     submission = {"notes": "done", "score": 5}
     signature_asset = SimpleNamespace(
         type="image",
@@ -395,11 +395,11 @@ def test_task_combine_selects_completed_then_modified_main():
     newer = TestEntities.get(
         "TASK", {"name": "Newer completion", "hash": "tskcmb3"}, page=page
     )
-    active.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    older.modified = datetime(2025, 6, 1, tzinfo=timezone.utc)
-    older.completed_on = datetime(2025, 5, 1, tzinfo=timezone.utc)
-    newer.modified = datetime(2024, 6, 1, tzinfo=timezone.utc)
-    newer.completed_on = datetime(2025, 7, 1, tzinfo=timezone.utc)
+    active.modified = datetime(2026, 1, 1, tzinfo=UTC)
+    older.modified = datetime(2025, 6, 1, tzinfo=UTC)
+    older.completed_on = datetime(2025, 5, 1, tzinfo=UTC)
+    newer.modified = datetime(2024, 6, 1, tzinfo=UTC)
+    newer.completed_on = datetime(2025, 7, 1, tzinfo=UTC)
 
     assert select_main_task((active, older, newer)) is newer
 
@@ -429,7 +429,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
     source = TestEntities.get(
         "TASK", {"name": "Source task", "hash": "tskcmb5"}, page=main_page
     )
-    completed_on = datetime(2025, 8, 1, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 8, 1, tzinfo=UTC)
     source.description = "Source description"
     source.form = form
     source.completed_on = completed_on
@@ -450,7 +450,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
         patch.object(TaskHistory, "copy_asset") as copy_asset,
     ):
         source_history = TaskHistory.create(source)
-        source_history.created = datetime(2024, 8, 1, tzinfo=timezone.utc)
+        source_history.created = datetime(2024, 8, 1, tzinfo=UTC)
         source_history.generation = 1
         form.generation = 3
         source_history._assets = {
@@ -619,11 +619,11 @@ def test_document_history_named_versions_order_and_delete_in_bounded_batches():
     )
 
     legacy = DocumentHistory(testing=True)
-    legacy.created = datetime(2025, 1, 3, tzinfo=timezone.utc)
+    legacy.created = datetime(2025, 1, 3, tzinfo=UTC)
     automatic = DocumentHistory(testing=True)
-    automatic.created = datetime(2025, 1, 4, tzinfo=timezone.utc)
-    first.created = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    second.created = datetime(2025, 1, 2, tzinfo=timezone.utc)
+    automatic.created = datetime(2025, 1, 4, tzinfo=UTC)
+    first.created = datetime(2025, 1, 1, tzinfo=UTC)
+    second.created = datetime(2025, 1, 2, tzinfo=UTC)
 
     assert legacy.name is None
     assert legacy.pinned is False
@@ -684,7 +684,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
     task.form = form
     task.description = "Current completion"
     task.completed = True
-    task.completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
+    task.completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=UTC)
     task.files = [live_file]
 
     with patch(
@@ -692,7 +692,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
         return_value="histth3",
     ):
         history = task.create_history_entry(
-            completed_on=datetime(2023, 6, 24, tzinfo=timezone.utc),
+            completed_on=datetime(2023, 6, 24, tzinfo=UTC),
             files=[event_file],
             submission={"input-textab12": "Older event"},
             name="Older inspection visit",
@@ -701,14 +701,14 @@ def test_task_create_history_entry_accepts_completion_overrides(
         )
 
     assert history.task is task
-    assert history.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert history.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert history.name == "Older inspection visit"
     assert history.description == "Older inspection"
     assert history.files == [event_file]
     assert history.form is form
     assert history.generation == 7
     assert history.submission == {"input-textab12": "Older event"}
-    assert task.completed_on == datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2025, 8, 5, 14, 30, tzinfo=UTC)
     assert task.name == "Inspection"
     assert task.description == "Current completion"
     assert task.files == [live_file]
@@ -763,7 +763,7 @@ def test_task_complete_with_schedule_queues_uncomplete():
     task.processes.pop("schedule", None)
     task.properties.schedule.unset()
 
-    task.due_date = datetime(2025, 6, 10, 12, 0, 0, tzinfo=timezone.utc)
+    task.due_date = datetime(2025, 6, 10, 12, 0, 0, tzinfo=UTC)
 
     mock_today = datetime(2025, 6, 15, 0, 0, 0, tzinfo=ZoneInfo("UTC"))
 
@@ -858,9 +858,9 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "page": {"name": "Parent Page", "hash": "pgtcl5"},
         },
     )
-    next_due = datetime(2025, 7, 1, 0, 0, 0, tzinfo=timezone.utc)
+    next_due = datetime(2025, 7, 1, 0, 0, 0, tzinfo=UTC)
     task.completed = True
-    task.completed_on = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+    task.completed_on = datetime(2025, 6, 15, 12, 0, 0, tzinfo=UTC)
     task.due_date = next_due
 
     with (
@@ -879,7 +879,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             return_value="queued-task",
         ) as create_task,
     ):
-        instant = datetime(2025, 6, 16, 4, 30, tzinfo=timezone.utc)
+        instant = datetime(2025, 6, 16, 4, 30, tzinfo=UTC)
         clock.now.side_effect = lambda tz=None: instant.astimezone(tz)
         token = dates.add_uncomplete_task_to_queue(task)
         create_task.assert_not_called()
@@ -889,7 +889,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     assert token
     assert any(intent.intent is MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH for intent in task.mutation_intents)
     assert task.scheduled_uncomplete_at == datetime(
-        2025, 6, 16, 5, tzinfo=timezone.utc
+        2025, 6, 16, 5, tzinfo=UTC
     )
     assert task_name == "queued-task"
     create_task.assert_called_once_with(
@@ -898,7 +898,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "key": task.urlsafe_key,
             "token": token,
         },
-        schedule_at=datetime(2025, 6, 16, 5, tzinfo=timezone.utc),
+        schedule_at=datetime(2025, 6, 16, 5, tzinfo=UTC),
         task_id=create_task.call_args.kwargs["task_id"],
     )
     assert create_task.call_args.kwargs["task_id"].startswith("task-uncomplete-")
@@ -927,8 +927,8 @@ def test_manual_uncomplete_clears_pending_scheduled_delivery():
         },
     )
     task.completed = True
-    task.due_date = datetime(2025, 7, 1, tzinfo=timezone.utc)
-    task._defer_scheduled_uncomplete(datetime(2025, 6, 16, tzinfo=timezone.utc))
+    task.due_date = datetime(2025, 7, 1, tzinfo=UTC)
+    task._defer_scheduled_uncomplete(datetime(2025, 6, 16, tzinfo=UTC))
 
     with patch.object(task, "create_history_entry"):
         task.uncomplete()

@@ -204,9 +204,7 @@ class PublicPermissionsMixin(PermissionsMixin):
         for section in General.public():
             config = section.config(self.entity.permissions)
             # Restrict available levels for public permissions
-            if section == General.MODELS:
-                config["levels"] = ["NONE", "VIEW"]
-            elif section == General.FORMS:
+            if section == General.MODELS or section == General.FORMS:
                 config["levels"] = ["NONE", "VIEW"]
             sections[section.value] = config
 

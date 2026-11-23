@@ -213,11 +213,11 @@ def update_json_index(entities):
     new_parents = {}
     for e in entities:
         project = getattr(e, "project", None)
-        if project and project.hash not in parents.keys():
+        if project and project.hash not in parents:
             new_parents.setdefault(e.project.hash, []).append(e.hash)
 
         categories = [c.hash for c in getattr(e, "categories", [])]
-        for h in [h for h in categories if h not in parents.keys()]:
+        for h in [h for h in categories if h not in parents]:
             new_parents.setdefault(h, []).append(e.hash)
 
     if not new_parents and not parents:

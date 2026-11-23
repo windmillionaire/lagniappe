@@ -1,6 +1,6 @@
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities
@@ -10,7 +10,7 @@ from lagniappe.core.tools.database import utility as database_utility
 from .ordering import page_task_roots
 
 
-_MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
+_MIN_DATETIME = datetime.min.replace(tzinfo=UTC)
 
 
 # @testable false

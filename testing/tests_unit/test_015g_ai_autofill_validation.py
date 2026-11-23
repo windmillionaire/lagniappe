@@ -1,7 +1,7 @@
 """Autofill uses exact schema IDs and validates before changing saved answers."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 from types import SimpleNamespace
 
@@ -136,7 +136,7 @@ def test_autofill_proposes_corrections_and_legacy_apply_preserves_answers(monkey
     page.ai_submission(validated, actor=actor, preserve_existing=True)
     assert {key: page.submission[key] for key in saved} == saved
     assert page.properties.submission.fields["input-release"].value == datetime(
-        2026, 9, 24, 7, tzinfo=timezone.utc
+        2026, 9, 24, 7, tzinfo=UTC
     )
 
 

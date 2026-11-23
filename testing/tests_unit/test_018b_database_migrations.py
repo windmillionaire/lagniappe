@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 from types import SimpleNamespace
 
@@ -117,7 +117,7 @@ def _entity(kind, identifier, data):
 
 class _Clock:
     def __init__(self):
-        self.value = datetime(2026, 7, 14, tzinfo=timezone.utc)
+        self.value = datetime(2026, 7, 14, tzinfo=UTC)
 
     def __call__(self):
         return self.value

@@ -16,7 +16,7 @@ Out of scope for this file: ``public_id``, ``ai_generated``, ``save`` /
 (covered elsewhere or in e2e).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from unittest.mock import patch
 
 from google.cloud import datastore
@@ -105,7 +105,7 @@ def test_project_document(get_test_entities):
 def test_project_document_state_uses_markup_when_no_ydoc():
     """Project document state falls back to saved HTML when no YDoc snapshot exists."""
     project = Project(testing=True)
-    project.modified = datetime(2026, 6, 30, tzinfo=timezone.utc)
+    project.modified = datetime(2026, 6, 30, tzinfo=UTC)
     project.allowed = lambda *_args, **_kwargs: True
     document = project.properties.document
     document._ydoc = None

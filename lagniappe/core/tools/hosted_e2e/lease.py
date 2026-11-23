@@ -210,7 +210,7 @@ def consume_e2e_bootstrap_token(
     if not e2e_lease_active(run_id, client=redis_client):
         return False
     exchange_digest = hashlib.sha256(
-        f"{run_id}\0{token_digest}".encode("utf-8")
+        f"{run_id}\0{token_digest}".encode()
     ).hexdigest()
     key = f"{e2e_lease_key()}:bootstrap:{exchange_digest}"
     return bool(redis_client.set(key, run_id, nx=True, ex=int(ttl)))

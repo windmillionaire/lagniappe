@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 from io import BytesIO
 import json
@@ -35,8 +35,8 @@ def memory_forms(monkeypatch):
         "type": "form", "hash": "draft-form", "name": "Instructions",
         "form_type": "task", "version": "legacy-version", "schema_format": 1,
         "schema": json.dumps([{"id": "notes", "type": "html", "title": "Notes"}]),
-        "created": datetime(2026, 9, 11, tzinfo=timezone.utc),
-        "modified": datetime(2026, 9, 11, tzinfo=timezone.utc),
+        "created": datetime(2026, 9, 11, tzinfo=UTC),
+        "modified": datetime(2026, 9, 11, tzinfo=UTC),
         "assets": json.dumps({"notes": {
             "type": "html", "path": "original.html", "generation": "1",
             "fingerprint": hashlib.md5(b"<p>Original</p>").hexdigest(),

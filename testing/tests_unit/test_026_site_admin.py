@@ -1,6 +1,6 @@
 """Unit contracts for runtime-safe site administration services."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Entity as DatastoreEntity, Key
@@ -546,7 +546,7 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
 
 
 def _stored_entity(entity_class, key, **values):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     entity = entity_class(testing=True)
     entity._key = key
     entity._db = {

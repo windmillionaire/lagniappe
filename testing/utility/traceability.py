@@ -24,7 +24,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 import yaml
 
@@ -673,11 +673,7 @@ def parse_metadata(text: str) -> Metadata:
                     metadata.matrices.append(clause)
                     add_unique(metadata.features, clause.features)
                     add_unique(metadata.dimensions, clause.dimensions)
-        elif tag in {"feature", "features"}:
-            metadata.issues.append(
-                f"@{tag} is no longer supported; use @matrix FEATURES : DIMENSIONS"
-            )
-        elif tag in {"dimension", "dimensions"}:
+        elif tag in {"feature", "features"} or tag in {"dimension", "dimensions"}:
             metadata.issues.append(
                 f"@{tag} is no longer supported; use @matrix FEATURES : DIMENSIONS"
             )

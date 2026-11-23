@@ -967,11 +967,11 @@ def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     assert optional.configure_development_error_monitoring()
-    assert settings.APP == {
+    assert {
         "CAPTURE_ERRORS": "True",
         "SENTRY_DSN": operator_dsn,
         "SENTRY_JS_DSN": operator_dsn,
-    }
+    } == settings.APP
     assert "That is the maintainer DSN" in capsys.readouterr().out
 
     settings.APP.update({"CAPTURE_ERRORS": "True", "SENTRY_DSN": constants.SENTRY_DSN})
@@ -3688,12 +3688,12 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
     formatter = setup_pkg.Formatter().initialize()
     formatter.initialize()
     with formatter.progress(text="Configuring service account") as active_spinner:
-        assert package_install._ACTIVE_SPINNERS == [active_spinner]
+        assert [active_spinner] == package_install._ACTIVE_SPINNERS
         active_spinner.ok("Service account configured")
     assert package_install._ACTIVE_SPINNERS == []
     output.tty = False
     with formatter.progress(text="Checking permissions") as progress:
-        assert package_install._ACTIVE_SPINNERS == [progress]
+        assert [progress] == package_install._ACTIVE_SPINNERS
         progress.fail("Permission check failed")
     assert package_install._ACTIVE_SPINNERS == []
     wrapped = setup_pkg.wrap_text(
@@ -3761,7 +3761,7 @@ def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
             "Google IAM Admin API",
             package_name="google-cloud-iam",
         )
-        assert package_install._ACTIVE_SPINNERS == [spinner]
+        assert [spinner] == package_install._ACTIVE_SPINNERS
     finally:
         package_install._ACTIVE_SPINNERS.clear()
     assert events == [
@@ -6104,7 +6104,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
 
     gcloud.create_ocr_processor()
 
-    assert settings.APP == {
+    assert {
         "APP_NAME": "Lagniappe",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": runtime_email,
         "APP_ENGINE_LOCATION": "us-central",
@@ -6114,7 +6114,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
         "TASK_QUEUE_NAME": "lagniappe-tasks",
         "OCR_PROCESSOR_ID": "projects/project-1/locations/us/processors/processor-1",
         "OCR_PROCESSOR": "lagniappe-document-processor",
-    }
+    } == settings.APP
     assert ocr_requests == [
         ("options", "us-documentai.googleapis.com"),
         ("list", "projects/project-1/locations/us"),

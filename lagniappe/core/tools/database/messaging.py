@@ -1,6 +1,6 @@
 """Direct-message Datastore transactions and indexed query recipes."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from ...definitions import MessageConflict, MessageRevisionConflict
 from ...properties import message as message_values
@@ -60,7 +60,7 @@ def send_message_record(
 
     current_conversation_key = conversation_key(actor, recipient)
     current_message_key = message_key(current_conversation_key, actor, operation_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with DATA.datastore.transaction() as transaction:
         existing_message = DATA.datastore.get(
             current_message_key, transaction=transaction
@@ -125,7 +125,7 @@ def mark_conversation_read(user, key, expected_revision=None):
         ) != int(expected_revision):
             raise MessageRevisionConflict(conversation)
         prior = conversation_values.apply_read(
-            conversation, user, datetime.now(timezone.utc)
+            conversation, user, datetime.now(UTC)
         )
         if not prior:
             return conversation, None
@@ -152,7 +152,7 @@ def hide_message_for_user(user, key):
             return conversation, None
         hidden.add(user.key)
         message["hidden_for"] = list(hidden)
-        message["modified"] = datetime.now(timezone.utc)
+        message["modified"] = datetime.now(UTC)
         aggregate = None
         if conversation_values.apply_hidden_message(conversation, message, user):
             aggregate = notifications.mutate_notification_aggregate(
@@ -172,7 +172,7 @@ def clear_message_conversation(user, key):
         conversation = DATA.datastore.get(key, transaction=transaction)
         require_participant(conversation, user)
         prior = conversation_values.apply_clear(
-            conversation, user, datetime.now(timezone.utc)
+            conversation, user, datetime.now(UTC)
         )
         aggregate = None
         if prior:

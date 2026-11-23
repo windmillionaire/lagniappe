@@ -1,7 +1,7 @@
 """Unit tests for User entity properties."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -66,7 +66,7 @@ def test_user_last_login(get_test_entities):
 
         with patch("lagniappe.core.tools.dates.user_timezone", return_value=test_tz):
             # Set a datetime in UTC
-            utc_dt = datetime(2024, 6, 15, 19, 30, 0, tzinfo=timezone.utc)
+            utc_dt = datetime(2024, 6, 15, 19, 30, 0, tzinfo=UTC)
             user.last_login = utc_dt
 
             # property value - stored in UTC

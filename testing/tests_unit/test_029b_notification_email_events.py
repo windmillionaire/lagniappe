@@ -1,6 +1,6 @@
 """Ordinary-notification, mention, and assignment email contracts."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 
 from flask import Flask, request
@@ -63,7 +63,7 @@ def test_managed_local_test_origin_ignores_request_host_headers(monkeypatch):
 
 # @matrix notification-email : html idempotency immediate notification pending-filter presence-suppression retry-release
 def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
-    now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     tasks = task_recorder(monkeypatch)
@@ -253,7 +253,7 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
 
 # @pair notification-email:document-mention
 def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
-    now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     task_recorder(monkeypatch)
@@ -325,7 +325,7 @@ def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
 
 # @pair notification-email:task-assignment
 def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
-    now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     task_recorder(monkeypatch)

@@ -106,11 +106,11 @@ def _authorize_project_billing(project_id):
     print(
         f.info(
             wrap_text(
-                (
+
                     f"In Google Cloud, select '{ui.literal('Link a billing account')}' and "
                     "choose your existing billing account for project '"
                     f"{ui.literal(project_id)}':\n  {ui.literal(url)}"
-                )
+
             )
         )
     )

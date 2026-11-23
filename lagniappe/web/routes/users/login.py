@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import secrets
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -321,7 +321,7 @@ def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
     else:
         user = Entities.USER(exists)
 
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.now(UTC)
     user.save()
 
     return user

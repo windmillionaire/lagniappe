@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 import re
 
@@ -33,7 +33,7 @@ def _timestamp(value):
 
     suffix = ""
     if moment.tzinfo is not None:
-        moment = moment.astimezone(timezone.utc)
+        moment = moment.astimezone(UTC)
         suffix = " UTC"
     time = moment.strftime("%I:%M %p").lstrip("0")
     return f"{time}, {moment.strftime('%d %b %Y')}{suffix}"

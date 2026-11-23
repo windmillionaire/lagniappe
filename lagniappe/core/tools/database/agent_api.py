@@ -1,7 +1,7 @@
 """Transactional credentials and Plan-operation claims for the external API."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import json
 import re
@@ -78,7 +78,7 @@ def upload_file_key(report_key, upload_batch_id, file_index):
     ):
         raise ValueError("Invalid external upload file identity")
     digest = hashlib.sha256(
-        f"{report_identity}\0{upload_batch_id}\0{file_index}".encode("utf-8")
+        f"{report_identity}\0{upload_batch_id}\0{file_index}".encode()
     ).hexdigest()
     return create_named_key("file", f"agent-upload-{digest}")
 
@@ -249,7 +249,7 @@ def claim_plan_operation(
         or not _PLAN_OPERATION_TOKEN_PATTERN.fullmatch(claim_token)
     ):
         raise ValueError("Invalid external Plan-operation claim")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("Plan-operation claim time must be timezone-aware")
 
@@ -318,7 +318,7 @@ def renew_plan_operation(
     now=None,
 ):
     """Renew only the owned Plan-operation claim; reject a replacement owner."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     key = plan_operation_claim_key(report_key)
     with DATA.datastore.transaction() as transaction:
         row = DATA.datastore.get(key, transaction=transaction)
@@ -367,7 +367,7 @@ def commit_plan_operation(
         or not isinstance(expected_report, dict)
     ):
         raise ValueError("Invalid external Plan-operation commit")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("Plan-operation commit time must be timezone-aware")
 
@@ -501,7 +501,7 @@ def commit_plan_mutation_if_idle(
     """
     if not isinstance(expected_report, dict):
         raise ValueError("Invalid idle Plan mutation snapshot")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("Idle Plan mutation time must be timezone-aware")
 

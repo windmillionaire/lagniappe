@@ -63,11 +63,11 @@ class DueDateScheduleDay(Enum):
 
 @dataclass
 class DueDateDefinition:
-    option: Optional[DueDateOptions] = None
-    due_date: Optional[str] = None
-    days_from_today: Optional[int] = None
-    unit: Optional[DueDateUnit] = None
-    interval: Optional[int] = None
-    schedule_type: Optional[DueDateScheduleType] = None
-    weekly_days: Optional[List[DueDateScheduleDay]] = field(default_factory=list)
-    description: Optional[str] = None
+    option: DueDateOptions | None = None
+    due_date: str | None = None
+    days_from_today: int | None = None
+    unit: DueDateUnit | None = None
+    interval: int | None = None
+    schedule_type: DueDateScheduleType | None = None
+    weekly_days: list[DueDateScheduleDay] | None = field(default_factory=list)
+    description: str | None = None

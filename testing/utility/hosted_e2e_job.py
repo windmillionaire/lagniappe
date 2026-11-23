@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 import os
 from pathlib import Path
@@ -202,9 +202,9 @@ def _artifact_manifest(
     manifest = {
         "schema_version": 1,
         "kind": "hosted-e2e-result",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "suite_started_at": started_at.astimezone(timezone.utc).isoformat(),
-        "suite_finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite_started_at": started_at.astimezone(UTC).isoformat(),
+        "suite_finished_at": finished_at.astimezone(UTC).isoformat(),
         "execution": execution,
         "job": job,
         "project": _required_environment("GOOGLE_CLOUD_PROJECT"),
@@ -318,7 +318,7 @@ def main(arguments=None) -> int:
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     if suite == "all":
         exit_status = _run_complete_suites(environment)
     else:
@@ -327,7 +327,7 @@ def main(arguments=None) -> int:
             cwd=REPOSITORY_ROOT,
         )
         exit_status = result.returncode
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
     manifest = _artifact_manifest(
         suite=suite,
         exit_status=exit_status,

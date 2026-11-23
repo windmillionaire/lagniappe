@@ -48,9 +48,7 @@ class ScheduleType(ProcessProperty):
     # @tests tests_unit/test_013a_task_scheduling.py::test_generated_schedule_prompt_survives_reload_and_avoids_regeneration
     # @matrix task-scheduling : periodic scheduled prompt-reuse
     def create(self):
-        if not self.prompt:
-            return
-        elif self._user_prompt == self.user_prompt:
+        if not self.prompt or self._user_prompt == self.user_prompt:
             return
 
         try:

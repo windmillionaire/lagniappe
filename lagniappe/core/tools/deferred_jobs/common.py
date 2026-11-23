@@ -1,7 +1,7 @@
 """Small shared helpers for deferred-job tool services."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
@@ -69,7 +69,7 @@ def _json_copy(value):
 
 # @testable infrastructure
 def _utc(value=None):
-    return value or datetime.now(timezone.utc)
+    return value or datetime.now(UTC)
 
 
 

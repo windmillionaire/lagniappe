@@ -1,6 +1,6 @@
 """Compact task discovery retains enough context for accurate follow-up reads."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -22,7 +22,7 @@ class Task:
         self.completed = completed
         self.visible = visible
         self.editable = editable
-        self.modified = datetime(2026, 9, 8, tzinfo=timezone.utc)
+        self.modified = datetime(2026, 9, 8, tzinfo=UTC)
         self.description = "Repair the page navigation."
         self.project = self.model = self.form = None
         self.due_date = self.completed_on = None
@@ -108,7 +108,7 @@ def test_compact_tasks_preserve_identity_scope_and_followup_references(task_page
         allowed=lambda *a, **kw: False, name="Hidden model"
     )
     page.tasks[0].description = "x" * 501
-    page.tasks[0].due_date = datetime(2026, 9, 9, 2, tzinfo=timezone.utc)
+    page.tasks[0].due_date = datetime(2026, 9, 9, 2, tzinfo=UTC)
     page.completed_tasks[0].completed_on = datetime(2026, 9, 8, 1)
     result = read_tasks(page, user)
     assert result["page"] == {"hash": f"hash:{page.hash}", "name": "Home"}
@@ -166,7 +166,7 @@ def test_compact_tasks_reject_stale_or_mismatched_cursors(task_page, change):
     page, user = task_page
     cursor = read_tasks(page, user, limit=1)["task_list"]["next_cursor"]
     if change == "revision":
-        page.tasks[0].modified = datetime(2026, 9, 9, tzinfo=timezone.utc)
+        page.tasks[0].modified = datetime(2026, 9, 9, tzinfo=UTC)
     elif change == "membership":
         page.tasks.append(Task(4))
     elif change == "permission":

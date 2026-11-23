@@ -92,7 +92,7 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
         "sha256": hashlib.sha256(font).hexdigest(),
     }
     payload = json.dumps(metadata, indent="\t")
-    outputs = ((font_path, font), (metadata_path, f"{payload}\n".encode("utf-8")))
+    outputs = ((font_path, font), (metadata_path, f"{payload}\n".encode()))
     directories = []
     prepared = []
     published = []

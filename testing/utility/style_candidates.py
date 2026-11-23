@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 from testing.utility.artifacts import (
     markdown_code,

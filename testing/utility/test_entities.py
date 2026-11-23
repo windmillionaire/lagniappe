@@ -11,7 +11,7 @@ Usage:
 
 import random
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from enum import Enum
 from types import SimpleNamespace
 
@@ -334,8 +334,8 @@ class TestEntityMixin:
         self.db["hash"] = test_spec.get("hash", _generate_hash())
         self.db["active"] = test_spec.get("active", True)
         self.db["requires"] = test_spec.get("requires", super().required)
-        self.db["created"] = test_spec.get("created", datetime.now(timezone.utc))
-        self.db["modified"] = test_spec.get("modified", datetime.now(timezone.utc))
+        self.db["created"] = test_spec.get("created", datetime.now(UTC))
+        self.db["modified"] = test_spec.get("modified", datetime.now(UTC))
 
         if self.entity_kind == "ingress":
             self.db["ingress_format"] = test_spec.get("ingress_format", 1)

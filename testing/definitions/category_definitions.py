@@ -7,7 +7,7 @@ from typing import Optional
 @dataclass
 class CategoryDefinition:
     name: str = ""
-    form: Optional[Forms] = None
+    form: Forms | None = None
     description_for_ai: str = ""
 
 

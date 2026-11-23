@@ -1,6 +1,6 @@
 """Focused AI-report characterization coverage."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 from zoneinfo import ZoneInfo
 
@@ -304,8 +304,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     live_attachment = _test_file("current-task-note.pdf", "application/pdf")
     task.files = [live_attachment]
     task.completed = True
-    task.completed_on = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    task.due_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    task.completed_on = datetime(2024, 1, 1, tzinfo=UTC)
+    task.due_date = datetime(2024, 1, 1, tzinfo=UTC)
     task.description = "Current registration details."
     page._completed = [task]
     file_one = _test_file("2023-06-24 jeep registration.pdf", "application/pdf")
@@ -386,8 +386,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     history = histories[0]
     assert history.task is task
     assert history.page is page
-    assert history.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
-    assert history.db["completed_on"] == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert history.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
+    assert history.db["completed_on"] == datetime(2023, 6, 24, tzinfo=UTC)
     assert "completed" not in history.db
     assert history.name == "Registration"
     assert history.description == "Archived registration renewal."
@@ -402,8 +402,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
         "input-textab12": "Registration renewed at DMV."
     }
     assert task.completed is True
-    assert task.completed_on == datetime(2024, 1, 1, tzinfo=timezone.utc)
-    assert task.due_date == datetime(2024, 1, 1, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2024, 1, 1, tzinfo=UTC)
+    assert task.due_date == datetime(2024, 1, 1, tzinfo=UTC)
     assert task.name == "Registration"
     assert task.description == "Current registration details."
     assert task.files == [live_attachment]
@@ -561,7 +561,7 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     task.description = "Previous registration details."
     task.ai_submission({"input-textab12": "Previous registration."})
     task.complete(user=user)
-    task.completed_on = datetime(2020, 6, 24, tzinfo=timezone.utc)
+    task.completed_on = datetime(2020, 6, 24, tzinfo=UTC)
     page._completed = [task]
     new_file = _test_file("2023-06-24 jeep registration.pdf", "application/pdf")
     report = TestEntities.get(
@@ -636,14 +636,14 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     assert len(histories) == 1
     history = histories[0]
     assert history.task is task
-    assert history.completed_on == datetime(2020, 6, 24, tzinfo=timezone.utc)
+    assert history.completed_on == datetime(2020, 6, 24, tzinfo=UTC)
     assert history.name == "Registration"
     assert history.description == "Previous registration details."
     assert history.files == [old_file]
     assert history.submission == {"input-textab12": "Previous registration."}
     assert old_file.db["task"] == task.key
     assert task.completed is True
-    assert task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert task.due_date is None
     assert task.files == [new_file]
     assert task.submission == {"input-textab12": "Registration renewed again."}
@@ -811,13 +811,13 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     assert tracker_task.completed is True
     assert tracker_task.completed_on == datetime(
         2023, 6, 24, tzinfo=ZoneInfo(actor_zone)
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     assert tracker_task.due_date is None
     assert tracker_task.files == [file_one]
     assert tracker_task.submission == {"input-textab12": "2023 event"}
     assert histories[0].completed_on == datetime(
         2018, 6, 7, tzinfo=ZoneInfo(actor_zone)
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     assert histories[0].name == "Registration"
     assert histories[0].description == "Vehicle registration renewal payment."
     assert histories[0].submission == {"input-textab12": "2018 event"}
@@ -1171,7 +1171,7 @@ def test_run_report_reuses_existing_task_for_completed_event(
     assert result["actions"][1]["target"]["id"] == "registration-task"
     assert len(histories) == 0
     assert task.completed is True
-    assert task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert task.files == [file]
     assert file.db["task"] == task.key
     assert file.task is task
@@ -1276,11 +1276,11 @@ def test_run_report_automatically_reuses_dated_completed_task_family(monkeypatch
     assert result["actions"][0]["target"]["id"] == task.urlsafe_key
     assert result["actions"][1]["target"]["id"] == task.urlsafe_key
     assert task.name == "Pay Property Tax"
-    assert task.completed_on == datetime(2026, 4, 1, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2026, 4, 1, tzinfo=UTC)
     assert len(histories) == 1
     assert histories[0].task is task
     assert histories[0].name == "Pay Property Tax"
-    assert histories[0].completed_on == datetime(2024, 7, 1, tzinfo=timezone.utc)
+    assert histories[0].completed_on == datetime(2024, 7, 1, tzinfo=UTC)
 
 
 
@@ -1741,7 +1741,7 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
     assert created_task.page is page
     assert created_task.name == "Registration"
     assert created_task.completed is True
-    assert created_task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert created_task.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert created_task.files == [file]
     assert file.db["task"] == created_task.key
     assert len(histories) == 0
@@ -1980,6 +1980,6 @@ def test_completed_event_dates_use_actor_timezone_without_request(date_text, utc
     actor = _test_user("date-actor")
     actor.db["timezone"] = "America/Los_Angeles"
     actual = _parse_completed_task_completed_on({"completed_on": date_text}, user=actor)
-    expected = datetime.fromisoformat(date_text).replace(hour=utc_hour, tzinfo=timezone.utc)
+    expected = datetime.fromisoformat(date_text).replace(hour=utc_hour, tzinfo=UTC)
     assert actual == expected
     assert actual.astimezone(ZoneInfo("America/Los_Angeles")).date().isoformat() == date_text

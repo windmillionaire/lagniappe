@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import fcntl
 import hashlib
 import json
@@ -15,7 +15,7 @@ import subprocess
 import sys
 import threading
 from time import monotonic, sleep
-from typing import Callable
+from collections.abc import Callable
 
 from config import APP_DIR, Directory, File, SETTINGS, _atomic_write_text
 from runner.context import format_command
@@ -73,7 +73,7 @@ class TestSessionStateError(TestSessionError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _state_paths():

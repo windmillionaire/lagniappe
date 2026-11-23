@@ -21,6 +21,7 @@ import pytest
 
 from lagniappe import CONFIG
 from testing.utility.test_entities import TestEntities, TestUser
+from datetime import UTC
 
 TEST_ENTITIES_DIR = Path(__file__).parent.parent / "files" / "test_entities"
 TEST_SCHEMAS_DIR = Path(__file__).parent.parent / "files" / "test_schemas"
@@ -337,7 +338,7 @@ def test_submission_values():
             assert field.value is not None, (
                 f"{entity.name}: {field_id}.value should not be None"
             )
-            assert field.value.tzinfo == timezone.utc, (
+            assert field.value.tzinfo == UTC, (
                 f"{entity.name}: {field_id}.value should be UTC, "
                 f"got {field.value.tzinfo}"
             )

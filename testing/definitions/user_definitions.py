@@ -34,11 +34,11 @@ class UserDefinition:
     """
 
     name: str = ""
-    email: Optional[str] = None
-    groups: Optional[list[Groups]] = field(default_factory=list)
-    user_page: Optional[Pages] = None
-    ai_access: Optional[AI] = None
-    admin: Optional[bool] = None
+    email: str | None = None
+    groups: list[Groups] | None = field(default_factory=list)
+    user_page: Pages | None = None
+    ai_access: AI | None = None
+    admin: bool | None = None
 
 
 owner = UserDefinition(

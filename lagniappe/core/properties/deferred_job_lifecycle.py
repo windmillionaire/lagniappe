@@ -1,6 +1,6 @@
 """Deferred-job lifecycle state and privacy-bounded projections."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lagniappe.core.definitions import (
     DEFERRED_JOB_HEARTBEAT_SECONDS,
@@ -80,13 +80,13 @@ class Delivery(JSONValue):
 # @pair deferred-jobs:timestamp-normalization
 def datetime_value(value):
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return None
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     return None
 
 

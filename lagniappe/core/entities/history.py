@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from copy import deepcopy
 
 from .entity import Entity, EntityProperties
@@ -292,7 +292,7 @@ class FormHistory(Entity, AssetMixin):
         history.schema = deepcopy(source.schema)
         history.schema_format = source.schema_format
         history.name = source.name
-        history.created = datetime.now(timezone.utc)
+        history.created = datetime.now(UTC)
         history.db["form_type"] = source.form_type
         if source.db.get("form_content_version") is not None:
             history.db["form_content_version"] = source.db["form_content_version"]
@@ -415,7 +415,7 @@ class DocumentHistory(AssetMixin, Entity):
     @classmethod
     def ordered(cls, histories):
         def newest(history):
-            return history.created or datetime.min.replace(tzinfo=timezone.utc)
+            return history.created or datetime.min.replace(tzinfo=UTC)
 
         pinned = sorted(
             (history for history in histories if history.pinned),

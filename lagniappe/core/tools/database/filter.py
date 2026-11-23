@@ -47,7 +47,8 @@ Example usage:
 
 from __future__ import annotations
 
-from typing import Any, Iterator, Optional, Union
+from typing import Any, Optional, Union
+from collections.abc import Iterator
 
 from google.cloud.datastore import Key, query as datastore_query
 
@@ -80,7 +81,7 @@ class Results:
 
     __slots__ = ("results", "next_cursor")
 
-    def __init__(self, results: list, next_cursor: Optional[str] = None):
+    def __init__(self, results: list, next_cursor: str | None = None):
         self.results = results
         self.next_cursor = next_cursor
 
@@ -100,7 +101,7 @@ class Results:
         """Allow indexing into results."""
         return self.results[index]
 
-    def first(self) -> Optional[Any]:
+    def first(self) -> Any | None:
         """Return the first result or None."""
         return self.results[0] if self.results else None
 
@@ -123,7 +124,7 @@ class Filter:
     def __init__(self):
         self._conditions: list[datastore_query.PropertyFilter] = []
         self._or_groups: list[Filter] = []
-        self._requires: Optional[list] = None
+        self._requires: list | None = None
 
     # --- Comparison Operators ---
 
@@ -212,7 +213,7 @@ class Filter:
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_database_filter_requires_rejects_invalid_hashes_type
     # @matrix database : filter validation
-    def requires(self, hashes: Optional[list]) -> Filter:
+    def requires(self, hashes: list | None) -> Filter:
         """
         Add a requires filter for permission-based access.
 
@@ -243,7 +244,7 @@ class Filter:
 
     # --- Build ---
 
-    def build(self) -> Optional[datastore_query.PropertyFilter]:
+    def build(self) -> datastore_query.PropertyFilter | None:
         """
         Build and return the final Datastore filter.
 
@@ -339,7 +340,7 @@ class Query:
         results = Query(KINDS.users).project("email", "name").fetch_all()
     """
 
-    def __init__(self, kind: Union[KINDS, str], ancestor: Optional[Key] = None):
+    def __init__(self, kind: KINDS | str, ancestor: Key | None = None):
         """
         Initialize a query for the given kind.
 
@@ -349,10 +350,10 @@ class Query:
         """
         self._kind = kind.value if isinstance(kind, KINDS) else kind
         self._ancestor = ancestor
-        self._filter: Optional[Filter] = None
+        self._filter: Filter | None = None
         self._order: list[str] = []
-        self._limit: Optional[int] = None
-        self._cursor: Optional[str] = None
+        self._limit: int | None = None
+        self._cursor: str | None = None
         self._projection: list[str] = []
         self._keys_only: bool = False
         self._distinct_on: list[str] = []
@@ -379,7 +380,7 @@ class Query:
         self._limit = n
         return self
 
-    def cursor(self, token: Optional[str]) -> Query:
+    def cursor(self, token: str | None) -> Query:
         """Set the start cursor for pagination."""
         self._cursor = token
         return self
@@ -419,7 +420,7 @@ class Query:
         self._ancestor = key
         return self
 
-    def _build_query(self) -> Optional[datastore_query.Query]:
+    def _build_query(self) -> datastore_query.Query | None:
         """Build the underlying Datastore query object."""
         built_filter = self._filter.build() if self._filter else None
         if built_filter is _DENY_ALL_FILTER:
@@ -473,7 +474,7 @@ class Query:
             return []
         return list(q.fetch())
 
-    def fetch_one(self) -> Optional[Any]:
+    def fetch_one(self) -> Any | None:
         """Execute the query and return the first result or None."""
         q = self._build_query()
         if q is None:

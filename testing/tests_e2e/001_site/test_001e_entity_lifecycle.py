@@ -141,7 +141,7 @@ def _save_private_text_asset(entity, label):
 
 
 def _save_public_image_asset(entity, label):
-    image = BytesIO(f"{label} public image".encode("utf-8"))
+    image = BytesIO(f"{label} public image".encode())
     asset = entity.save_asset(image, "public_image", "image", visibility="public")
     entity.save()
     return asset.definition

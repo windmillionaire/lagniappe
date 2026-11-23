@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from ..definitions import FieldType, FilterOptions, Ordering
 from ..definitions.identifiers import random_hash, short_hash, short_uuid
@@ -281,7 +281,7 @@ class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty):
         if super().value:
             return
 
-        DBProperty.value.fset(self, datetime.now(timezone.utc))
+        DBProperty.value.fset(self, datetime.now(UTC))
 
     # Column Attributes
     _ordering = Ordering.NUMERIC
@@ -310,7 +310,7 @@ class Modified(DateMixin, ColumnMixin, FilterMixin, DBProperty):
     _icon = "date"
 
     def update(self):
-        DBProperty.value.fset(self, datetime.now(timezone.utc))
+        DBProperty.value.fset(self, datetime.now(UTC))
 
     # Column Attributes
     _ordering = Ordering.NUMERIC

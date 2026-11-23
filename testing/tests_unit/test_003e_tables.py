@@ -14,6 +14,7 @@ from lagniappe.core.properties.row_submission import RowSubmission
 from lagniappe.core.properties.form_table import Table
 from testing.utility.mock_submission import WebFormSubmission
 from testing.utility.test_entities import TestEntities
+from datetime import UTC
 
 
 class _MinimalImportProcess:
@@ -47,7 +48,7 @@ def test_table_date_columns_keep_explicit_actor_timezone(monkeypatch, zone, day)
     table = Table(definition, entity=page, user=actor)
     table.validate_ai({"rows": [{"day": day}]})
 
-    expected = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(zone)).astimezone(timezone.utc)
+    expected = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(zone)).astimezone(UTC)
     assert table.rows[0].fields["day"].value == expected
     restored = Table(definition, entity=page, user=actor)
     restored.db_value = table.db_value

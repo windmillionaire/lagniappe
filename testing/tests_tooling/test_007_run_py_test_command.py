@@ -3160,8 +3160,8 @@ def test_run_py_version_rejects_invalid_values_before_mutation(
 
     assert error.value.code == 2
     assert "X.Y.Z" in capsys.readouterr().err
-    assert settings.NODE == original_node
-    assert settings.APP == original_app
+    assert original_node == settings.NODE
+    assert original_app == settings.APP
     assert not list(tmp_path.iterdir())
 
 

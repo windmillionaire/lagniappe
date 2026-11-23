@@ -1407,15 +1407,15 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     assert dev_config["gcloud_config"]["PROJECT"] == "my-project-1"
     assert dev_config["gcloud_config"]["ACCOUNT"] == "admin@example.com"
 
-    assert config.SETTINGS.INDEX == original_index
+    assert original_index == config.SETTINGS.INDEX
     config.SETTINGS.DEPLOY["handlers"][0]["http_headers"]["Cache-Control"] = (
         "changed after generation"
     )
     config.SETTINGS.INDEX["indexes"][0]["properties"][0]["name"] = (
         "changed after generation"
     )
-    assert constants.APP_HANDLERS == original_handlers
-    assert constants.INDEX_YAML == original_index
+    assert original_handlers == constants.APP_HANDLERS
+    assert original_index == constants.INDEX_YAML
 
 
 # @pair setup:config-files
@@ -1637,7 +1637,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     assert "ADC authentication: after project creation" not in output
     assert "Project state:" not in output
     assert " ".join(prompts[-1].split()) == "? Continue with installation [y/N]"
-    assert config.SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS == set()
+    assert set() == config.SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS
     assert cloud_boundary == [
         {
             "target": project_id,
@@ -2547,7 +2547,7 @@ def test_config_builders_preserve_inputs_and_generate_independent_documents(scal
     built_deploy["handlers"][0]["url"] = "changed"
     built_indexes["indexes"].append({"kind": "Changed"})
     built_manifest["icons"][0]["src"] = "changed"
-    assert (constants.APP_HANDLERS, constants.INDEX_YAML, constants.MANIFEST) == templates
+    assert templates == (constants.APP_HANDLERS, constants.INDEX_YAML, constants.MANIFEST)
     assert (app, gcloud, deployment, dev, test, indexes, manifest) == inputs
 
 

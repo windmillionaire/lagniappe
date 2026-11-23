@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 import os
 from pathlib import Path
@@ -135,7 +135,7 @@ class Checkpoint:
             "action": action,
             "id": uuid.uuid4().hex,
             "settings_version": receipt["version"],
-            "started": datetime.now(timezone.utc).isoformat(),
+            "started": datetime.now(UTC).isoformat(),
         }
         self.save()
         try:

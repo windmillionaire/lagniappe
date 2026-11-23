@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -163,7 +163,7 @@ def test_task_completed_on_stores_timestamp():
             "page": {"name": "Parent Page", "hash": "pgcpon1"},
         },
     )
-    completed_on = datetime(2025, 2, 3, 14, 30, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 2, 3, 14, 30, tzinfo=UTC)
 
     task.completed_on = completed_on
 
@@ -920,9 +920,9 @@ def test_task_update_rejects_assignee_without_restricted_task_access():
 def test_task_postpone_preserves_original_due_date_once():
     """Postponing preserves the original due date across later postponements."""
     task = Task(testing=True)
-    first_due = datetime(2025, 7, 1, 12, tzinfo=timezone.utc)
-    first_postponed = datetime(2025, 7, 3, 12, tzinfo=timezone.utc)
-    second_postponed = datetime(2025, 7, 5, 12, tzinfo=timezone.utc)
+    first_due = datetime(2025, 7, 1, 12, tzinfo=UTC)
+    first_postponed = datetime(2025, 7, 3, 12, tzinfo=UTC)
+    second_postponed = datetime(2025, 7, 5, 12, tzinfo=UTC)
     task.due_date = first_due
 
     with patch(
@@ -960,7 +960,7 @@ def test_task_update_tracks_project_model_and_uploaded_file():
             "page": other_page,
             "name": "Updated",
             "description": "New description",
-            "due_date": datetime(2025, 8, 1, tzinfo=timezone.utc),
+            "due_date": datetime(2025, 8, 1, tzinfo=UTC),
             "model": model,
             "asset_files": [file_entity],
         }
@@ -1070,7 +1070,7 @@ def test_task_entity_lifecycle_readonly_and_save_relations():
     ]
     form.schema = schema
     form.version = "schema-v1"
-    created_db = {"created": datetime(2025, 1, 1, tzinfo=timezone.utc)}
+    created_db = {"created": datetime(2025, 1, 1, tzinfo=UTC)}
 
     with patch(
         "lagniappe.core.entities.entity.database_utility.create_key",
@@ -1098,7 +1098,7 @@ def test_task_entity_lifecycle_readonly_and_save_relations():
         {
             "hash": "tsk015",
             "name": "Stateful",
-            "modified": datetime(2025, 1, 2, tzinfo=timezone.utc),
+            "modified": datetime(2025, 1, 2, tzinfo=UTC),
         }
     )
     task._key = "tsk015"
@@ -1117,7 +1117,7 @@ def test_task_entity_lifecycle_readonly_and_save_relations():
     assert task.readonly is False
 
     task.completed = True
-    task.completed_on = datetime(2025, 1, 3, tzinfo=timezone.utc)
+    task.completed_on = datetime(2025, 1, 3, tzinfo=UTC)
     task._readonly = None
 
     assert task.readonly is False

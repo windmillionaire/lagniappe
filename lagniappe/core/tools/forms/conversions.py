@@ -1,7 +1,7 @@
 """Provider-free form conversions. Classification reads schemas, never submissions."""
 
 from copy import deepcopy
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, UTC
 import json
 import math
 import re
@@ -254,7 +254,7 @@ def _text(value, source, zone):
     if kind == "date":
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         return (
-            parsed.replace(tzinfo=parsed.tzinfo or timezone.utc)
+            parsed.replace(tzinfo=parsed.tzinfo or UTC)
             .astimezone(ZoneInfo(zone))
             .date()
             .isoformat()
@@ -324,7 +324,7 @@ def _parse(text, target, zone):
         parsed = date.fromisoformat(value)
         return (
             datetime.combine(parsed, datetime.min.time(), ZoneInfo(zone))
-            .astimezone(timezone.utc)
+            .astimezone(UTC)
             .isoformat()
         )
     if kind == "time":

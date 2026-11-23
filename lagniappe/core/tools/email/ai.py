@@ -2,7 +2,7 @@
 
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from email import policy
 from email.parser import Parser
 from html import escape
@@ -1047,11 +1047,11 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
         return AIEmailSubmissionResult("ignored")
     digest = hmac.new(
         str(digest_secret).encode("utf-8"),
-        f"resend:{event_id}".encode("utf-8"),
+        f"resend:{event_id}".encode(),
         hashlib.sha256,
     ).hexdigest()
     lease_token = uuid.uuid4().hex
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claim = email_database.claim_ai_email_event(digest, lease_token, now)
     if not claim.get("claimed"):
         return AIEmailSubmissionResult("duplicate", code=claim.get("reason"))
@@ -1109,7 +1109,7 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
         return AIEmailSubmissionResult(terminal_state, code=rejection.code)
     except Exception:
         email_database.release_ai_email_event(
-            digest, lease_token, datetime.now(timezone.utc)
+            digest, lease_token, datetime.now(UTC)
         )
         raise
     finally:
@@ -1118,7 +1118,7 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
                 digest,
                 lease_token,
                 terminal_state,
-                datetime.now(timezone.utc),
+                datetime.now(UTC),
             )
 
 

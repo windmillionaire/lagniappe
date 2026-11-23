@@ -1,6 +1,6 @@
 """Cohesive patches validate selected changes and preserve omitted fields."""
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Key, Entity as DatastoreEntity
@@ -39,7 +39,7 @@ def case():
     task.form = form
     task.description = "Long original description"
     task.submission = {"answer": "old answer", "kept": "preserve me"}
-    task.due_date = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    task.due_date = datetime(2026, 10, 1, tzinfo=UTC)
     task.db["history"] = True
     task.db["scheduled_uncomplete_token"] = "keep-token"
     return actor, task, form, page
@@ -772,7 +772,7 @@ def test_update_recovery_accepts_later_completion_but_rejects_unrelated_drift(mo
     from lagniappe.core.tools.entity_patches import _projection
     actor, task, form, page = case()
     before = _projection(task)
-    task.due_date = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    task.due_date = datetime(2026, 11, 1, tzinfo=UTC)
     task.completed = True
     records = [
         {"id": "edit", "type": "update_task", "status": "complete", "entity": {"id": task.urlsafe_key}, "expected": {"entity": task.urlsafe_key, "entity_update_after": before}},

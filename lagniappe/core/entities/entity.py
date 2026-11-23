@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from google.cloud import datastore
 
@@ -157,7 +157,7 @@ class Entity:
     # @matrix cache permissions : fingerprint modified
     @property
     def fingerprint(self):
-        modified = self.modified or datetime.now(timezone.utc)
+        modified = self.modified or datetime.now(UTC)
         return base_fingerprint(modified)
 
     @property

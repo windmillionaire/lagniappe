@@ -14,7 +14,7 @@ not replace the behavior under test.
 import json
 import pytest
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 import lagniappe.core.entities.ingress as ingress_module
@@ -1155,8 +1155,8 @@ def test_importer_story_creates_tasks_for_matched_pages_and_records_history(
     monkeypatch,
 ):
     parsed_dates = {
-        "2026-01-06": datetime(2026, 1, 6, tzinfo=timezone.utc),
-        "2026-01-10": datetime(2026, 1, 10, tzinfo=timezone.utc),
+        "2026-01-06": datetime(2026, 1, 6, tzinfo=UTC),
+        "2026-01-10": datetime(2026, 1, 10, tzinfo=UTC),
     }
     page = SimpleNamespace(key="page-key", name="Target Page")
     project = SimpleNamespace(key="project-key")
@@ -1330,8 +1330,8 @@ def test_task_import_creates_distinct_tasks_per_row_with_same_row_completion_his
     monkeypatch,
 ):
     parsed_dates = {
-        "2026-01-06": datetime(2026, 1, 6, tzinfo=timezone.utc),
-        "2026-01-10": datetime(2026, 1, 10, tzinfo=timezone.utc),
+        "2026-01-06": datetime(2026, 1, 6, tzinfo=UTC),
+        "2026-01-10": datetime(2026, 1, 10, tzinfo=UTC),
     }
     model = SimpleNamespace(key="model-key")
     project = SimpleNamespace(key="project-key")
@@ -1529,7 +1529,7 @@ def test_importer_records_older_completion_snapshot_text():
     )
     entity = SimpleNamespace(form=form, get_process=lambda _process_id: {})
     importing = ingress_service.IngressMutationPlanner(entity)
-    completed_on = datetime(2025, 4, 3, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 4, 3, tzinfo=UTC)
     values = {
         "name": "Historical inspection",
         "description": "Imported historical details",

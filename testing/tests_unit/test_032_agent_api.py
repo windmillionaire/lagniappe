@@ -1,6 +1,6 @@
 """Provider-free external-agent API domain and credential coverage."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 import json
 import threading
@@ -384,7 +384,7 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         lambda _key: claim_key,
     )
     monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
-    now = datetime(2026, 9, 4, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 4, 12, tzinfo=UTC)
 
     def compete(calls):
         start = threading.Barrier(len(calls) + 1)
@@ -631,7 +631,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
             "phase": "create",
             "operation_id": "batch-aaaaaaaaaaaaaaaa",
             "claim_token": "a" * 32,
-            "expires_at": datetime(2026, 9, 4, 12, 5, tzinfo=timezone.utc),
+            "expires_at": datetime(2026, 9, 4, 12, 5, tzinfo=UTC),
         }
     )
     rows = {report_key: report_row, claim_key: claim_row}
@@ -682,7 +682,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
         "claim_token": "a" * 32,
         "expected_report": expected,
         "writes": [(entity, None)],
-        "now": datetime(2026, 9, 4, 12, 1, tzinfo=timezone.utc),
+        "now": datetime(2026, 9, 4, 12, 1, tzinfo=UTC),
     }
 
     # A lease takeover immediately before the guarded save replaces the exact
@@ -740,7 +740,7 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
         "operation",
         parent=report_key,
     )
-    now = datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
     report_row = DatastoreEntity(key=report_key)
     report_row.update(
         {
@@ -1048,7 +1048,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     monkeypatch.setattr(
         external_contracts.dates,
         "user_today",
-        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=UTC),
     )
 
     contract = external_api.plan_contract(
@@ -1947,7 +1947,7 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
     monkeypatch.setattr(
         external_contracts.dates,
         "user_today",
-        lambda _user=None: datetime(2026, 9, 2, tzinfo=timezone.utc),
+        lambda _user=None: datetime(2026, 9, 2, tzinfo=UTC),
     )
     report = SimpleNamespace(available=True, file_usage=[], instructions="File the uploads", input_files=files, upload_manifest=None)
     contract = external_api.plan_contract(
@@ -1970,7 +1970,7 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
 # @matrix agent-api : authentication expiry issue revoke shown-once
 @pytest.mark.unit
 def test_issue_authenticate_expire_and_revoke_credential(monkeypatch):
-    now = datetime(2026, 8, 31, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 31, 12, tzinfo=UTC)
     user = _test_user("credential-owner")
     rows = {}
 
@@ -2060,7 +2060,7 @@ def test_issue_authenticate_expire_and_revoke_credential(monkeypatch):
 # @matrix agent-api : authentication tamper user-binding
 @pytest.mark.unit
 def test_authenticate_rejects_tampered_and_mismatched_credentials(monkeypatch):
-    now = datetime(2026, 8, 31, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 31, 12, tzinfo=UTC)
     user = _test_user("credential-mismatch-owner")
     token = (
         f"lgn_{agent_auth.credential_id(user)}."
@@ -2115,7 +2115,7 @@ def test_credential_rotation_and_revocation_are_transactional(monkeypatch):
 
     monkeypatch.setattr(credential_store, "credential_key", lambda identifier: key)
     monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
-    now = datetime(2026, 8, 31, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 31, tzinfo=UTC)
 
     first = credential_store.rotate_credential(
         "credential",
@@ -2305,7 +2305,7 @@ def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
 def test_generation_publication_checks_job_in_report_transaction(monkeypatch, state, lease, expired, expected):
     report_key = Key("activity", "report", project="test-project")
     job_key = Key("jobs", "generation", project="test-project")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     original = {"type": "report", "process": "pending"}
     report = DatastoreEntity(key=report_key)
     report.update({**original, "process": "ready"})

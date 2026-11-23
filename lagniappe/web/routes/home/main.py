@@ -179,9 +179,7 @@ def delete_activity(key):
 
     if activity.kind == "note" and not activity.allowed(
         Action.DELETE, user=current_user
-    ):
-        abort(403)
-    elif (
+    ) or (
         activity.kind == "notification"
         and activity.properties.parent.key != current_user.key
     ):

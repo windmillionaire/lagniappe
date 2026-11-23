@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from io import BytesIO
 import json
 from types import SimpleNamespace
@@ -3168,7 +3168,7 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     recent.task = task
     recent.page = page
     recent.form = form
-    recent.completed_on = datetime(2024, 5, 1, 12, 0, tzinfo=timezone.utc)
+    recent.completed_on = datetime(2024, 5, 1, 12, 0, tzinfo=UTC)
     recent.name = "Oil change at Lakeside Service"
     recent.description = "Completed at the service shop."
     recent.submission = {"input-service-notes": "Synthetic oil"}
@@ -3179,7 +3179,7 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     older.kind = "task_history"
     older.task = task
     older.page = page
-    older.completed_on = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+    older.completed_on = datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
     assert older.name is None
 
     monkeypatch.setattr(

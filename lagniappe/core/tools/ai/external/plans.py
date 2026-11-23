@@ -2,7 +2,7 @@
 
 import uuid
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch
@@ -30,7 +30,7 @@ from .validation import submission_validation_errors, validate_external_proposal
 # @covered-by lagniappe/core/tools/ai/external/plans.py::create_plan
 # @reason timestamp helper is exercised through draft creation and submission
 def _utcnow():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # @testable false

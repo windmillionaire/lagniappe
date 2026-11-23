@@ -9,6 +9,7 @@ from lagniappe.core.tools.ai.guidelines.field_types import (
     schema_guidance,
     schema_type_guidance,
 )
+from datetime import UTC
 
 pytestmark = pytest.mark.unit
 
@@ -24,7 +25,7 @@ def test_committed_autofill_recovers_after_deadline_without_input_or_generation(
     from lagniappe.core.tools.deferred_jobs.adapters.autofill import AutofillAdapter
     from testing.utility.deferred_job_fakes import RecordingAdapter, RunnerJob, runner
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job = RunnerJob(attempt=2, checkpoint={"prepared": True})
     job.created = now - timedelta(seconds=age)
     saved_result = {"target_key": "deleted-task", "applied_fields": ["title"]}

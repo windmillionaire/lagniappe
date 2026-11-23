@@ -1,6 +1,6 @@
 """Atomic mention-marker, notification, and aggregate persistence."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from ...properties import mention
 from . import notifications
@@ -28,7 +28,7 @@ def create_mention_delivery(
     notification_key = notifications.ordinary_notification_key(
         recipient, f"document-mention-{identity}"
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with DATA.datastore.transaction() as transaction:
         marker = DATA.datastore.get(marker_key, transaction=transaction)
         if marker is not None:

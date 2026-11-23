@@ -1,6 +1,6 @@
 """Durable recovery membership and Cloud Scheduler convergence behavior."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Key
@@ -108,7 +108,7 @@ def _control():
 
 # @matrix cloud-scheduler deferred-jobs : desired-state durable-membership idempotency terminal-delivery transaction
 def test_tracking_membership_follows_recovery_required_state(scheduler_database):
-    now = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 5, tzinfo=UTC)
     job_key = _job_key()
     with scheduler_database.transaction() as transaction:
         added = deferred_database._update_deferred_job_scheduler_tracking(
@@ -156,7 +156,7 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
 
 # @matrix cloud-scheduler deferred-jobs : defaults drift-repair optimistic-concurrency state-read
 def test_scheduler_control_repair_is_revision_checked(scheduler_database):
-    now = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 5, tzinfo=UTC)
     job_key = _job_key()
     assert _control() == {
         "schema_version": 0,
@@ -234,7 +234,7 @@ def test_scheduler_provider_pause_and_resume_use_exact_job_resource():
 def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation(
     scheduler_database,
 ):
-    now = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 5, tzinfo=UTC)
     empty = deferred_database.repair_deferred_job_scheduler_control([], 0, now)
     assert empty["control"]["desired_state"] == "paused"
     job_key = _job_key()
@@ -283,7 +283,7 @@ def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 
 # @matrix cloud-scheduler deferred-jobs : distributed-lease provider-failure
 def test_scheduler_sync_releases_lease_after_provider_failure(scheduler_database):
-    now = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 5, tzinfo=UTC)
     deferred_database.repair_deferred_job_scheduler_control([], 0, now)
     config = SimpleNamespace(
         production=True,
@@ -390,7 +390,7 @@ def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
         "repair_deferred_job_scheduler_control",
         repair,
     )
-    now = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 5, tzinfo=UTC)
 
     assert registry._repair_reconciler_control(now) == []
     assert repaired == [([], 4, now)]

@@ -6,7 +6,7 @@ import argparse
 import copy
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hashlib
 import json
 from pathlib import Path
@@ -1023,7 +1023,7 @@ def setup(github_repository=None):
     payload = {
         "schema_version": STATE_SCHEMA_VERSION,
         "setup_contract": _setup_contract_fingerprint(),
-        "configured_at": datetime.now(timezone.utc).isoformat(),
+        "configured_at": datetime.now(UTC).isoformat(),
         "github_repository": github_repository,
         **asdict(infrastructure),
         "provider_resource": infrastructure.provider_resource,
@@ -1691,7 +1691,7 @@ def create(*, base_ref=None, environment="standard", experiments_workers=DEFAULT
         state = {
             "schema_version": STATE_SCHEMA_VERSION,
             "status": "creating",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "project": infrastructure.project,
             "region": infrastructure.region,
             "service": SERVICE,
@@ -1708,7 +1708,7 @@ def create(*, base_ref=None, environment="standard", experiments_workers=DEFAULT
         }
     else:
         state["status"] = "creating"
-        state["resumed_at"] = datetime.now(timezone.utc).isoformat()
+        state["resumed_at"] = datetime.now(UTC).isoformat()
         state.setdefault("image", f"{selected.image_base(infrastructure)}:{source}")
     STATE_ROOT.mkdir(parents=True, exist_ok=True)
     _write_json(state_path, state, owner_only=True)
@@ -2268,7 +2268,7 @@ def _latest_execution(infrastructure, *, environment="standard"):
         raise HostedE2EError("No hosted E2E result artifacts exist.")
     newest = max(
         manifests,
-        key=lambda blob: blob.updated or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda blob: blob.updated or datetime.min.replace(tzinfo=UTC),
     )
     return newest.name.split("/", 2)[1]
 
@@ -2728,7 +2728,7 @@ def teardown(*, force=False, environment="standard"):
     if base_url.startswith("https://"):
         _change_test_bucket_cors(infrastructure, base_url, present=False)
     state["status"] = "torn-down"
-    state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
+    state["torn_down_at"] = datetime.now(UTC).isoformat()
     _write_json(selected.state_path, state, owner_only=True)
     _clear_local_result_artifacts(environment=selected.name)
     return state

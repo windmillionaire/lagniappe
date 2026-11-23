@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import html as html_stdlib
 import json
 from pathlib import Path, PurePosixPath
@@ -666,7 +666,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
     @staticmethod
     def _datetime_text(value):
         try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc)
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(UTC)
         except (TypeError, ValueError):
             return str(value)
         clock = parsed.strftime("%I:%M %p").lstrip("0")

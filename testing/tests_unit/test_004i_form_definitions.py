@@ -1,7 +1,7 @@
 """Immutable completion definitions, compatibility checks and history reads."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 import json
@@ -126,7 +126,7 @@ def test_completed_task_without_an_attached_form_stays_empty():
 # @matrix tasks task-completion : history ordering schema-version
 @pytest.mark.unit
 def test_history_orders_same_day_completions_by_archive_time():
-    day = datetime(2026, 9, 12, tzinfo=timezone.utc)
+    day = datetime(2026, 9, 12, tzinfo=UTC)
     records = [_record(generation=generation) for generation in (0, 1, 0, 2)]
     for index, record in enumerate(records):
         record.completed_on = day

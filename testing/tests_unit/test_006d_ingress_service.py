@@ -2,7 +2,7 @@
 
 import json
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -389,7 +389,7 @@ def _database(monkeypatch, execution):
 
 # @matrix ingress : cursor duplicate-delivery
 def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
-    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 16, tzinfo=UTC)
     entity, datastore = _database(
         monkeypatch,
         {"status": "queued", "cursor": 0},
@@ -414,7 +414,7 @@ def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
 
 # @pair ingress:stop
 def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch):
-    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 16, tzinfo=UTC)
     entity, datastore = _database(
         monkeypatch,
         {
@@ -444,7 +444,7 @@ def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch)
 
 # @matrix ingress : compare-and-set cursor durable-commit property-mask
 def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypatch):
-    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 16, tzinfo=UTC)
     entity, datastore = _database(
         monkeypatch,
         {"status": "queued", "cursor": 2},
@@ -489,7 +489,7 @@ def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypat
 
 # @matrix ingress : compare-and-set cursor failure status stop
 def test_ingress_status_update_is_cursor_checked(monkeypatch):
-    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 16, tzinfo=UTC)
     _entity, datastore = _database(
         monkeypatch,
         {"status": "queued", "cursor": 1},

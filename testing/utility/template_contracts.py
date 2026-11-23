@@ -18,7 +18,7 @@ import json
 from pathlib import Path
 import re
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
@@ -1789,13 +1789,7 @@ def important_attr_labels(
             continue
         if attr.name in STRUCTURAL_LP_ATTRIBUTES:
             continue
-        if attr.name.startswith("lp-"):
-            labels.append(attr.label)
-        elif attr.name in {"data-widget", "data-mode"}:
-            labels.append(attr.label)
-        elif attr.name in STATEFUL_DATA_ATTRIBUTES:
-            labels.append(attr.label)
-        elif attr.name == "data-role" and attr.value in js_index.role_consumers:
+        if attr.name.startswith("lp-") or attr.name in {"data-widget", "data-mode"} or attr.name in STATEFUL_DATA_ATTRIBUTES or attr.name == "data-role" and attr.value in js_index.role_consumers:
             labels.append(attr.label)
     return unique(labels)
 

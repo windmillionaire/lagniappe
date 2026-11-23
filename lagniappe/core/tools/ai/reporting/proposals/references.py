@@ -31,9 +31,7 @@ def _referenced_action_ids(action):
 # @reason explicit dependency normalization is exercised through proposal validation
 def _explicit_dependency_ids(action):
     dependencies = action.get("depends_on") or []
-    if isinstance(dependencies, str):
-        dependencies = [dependencies]
-    elif not isinstance(dependencies, list):
+    if isinstance(dependencies, str) or not isinstance(dependencies, list):
         dependencies = [dependencies]
 
     for dependency in dependencies:
@@ -118,7 +116,5 @@ def _data_action_references(value, key=None):
         for child in value:
             yield from _data_action_references(child, key)
     elif isinstance(value, str):
-        if value.startswith("$") or value.startswith("action:"):
-            yield _strip_action_reference(value)
-        elif key and key.endswith("_action"):
+        if value.startswith("$") or value.startswith("action:") or key and key.endswith("_action"):
             yield _strip_action_reference(value)

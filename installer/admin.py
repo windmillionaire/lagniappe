@@ -72,58 +72,58 @@ def print_oauth_instructions():
     if account:
         print(
             wrap_text(
-                (
+
                     "\nBefore continuing, confirm the Google Cloud Console profile is '"
                     f"{ui.literal(account)}'. If Google says you need additional access, "
                     "switch the browser to this account and reload the page; setup already "
                     "verified this account's project permissions."
-                )
+
             )
         )
 
     print(
         wrap_text(
-            (
+
                 f"\n{ui.literal('1.')} If Google says the Auth Platform is not "
                 f"configured, click '{ui.literal('Get started')}':"
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"   - {ui.literal('App information')}: use '{ui.literal(app_name)}' and "
                 "select a support email"
-            )
+
         )
     )
-    print(wrap_text((f"   - Audience: choose '{ui.literal('External')}'")))
+    print(wrap_text(f"   - Audience: choose '{ui.literal('External')}'"))
     print(
         wrap_text(
-            (
+
                 f"   - {ui.literal('Contact information')}: enter your email and finish "
                 "registration"
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('2.')} For a new or replacement client, click '"
                 f"{ui.literal('Create client')}'. For secret rotation, open the existing "
                 f"{ui.literal('Web application')} client and create a new "
                 f"{ui.literal('Client secret')} instead."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('3.')} For a new client, choose '"
                 f"{ui.literal('Web application')}' and enter the values below. The "
                 f"client type must say '{ui.literal('Web application')}'; a 'Desktop "
                 "app' client will not work."
-            )
+
         )
     )
     print(ui.value("   Name", app_name, action=True, verbatim=True))
@@ -142,23 +142,23 @@ def print_oauth_instructions():
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('4.')} Click '{ui.literal('Create')}'. Under "
                 f"{ui.literal('Client secrets')}, click '{ui.literal('Download JSON')}'. "
                 "Move the downloaded file to the exact path below, renaming it '"
                 f"{ui.literal('google_oauth_credentials.json')}':"
-            )
+
         )
     )
     print(f"   {ui.literal(OAUTH_CLIENT_FILE)}")
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('5.')} Return to setup and press Enter. Setup will verify "
                 "the Web client type, project, JavaScript origin, and redirect URI from "
                 "that file before sending its client ID and secret to Identity Platform. "
                 "The secret will not be saved in Lagniappe settings.\n"
-            )
+
         )
     )
 
@@ -501,14 +501,14 @@ def _print_oauth_file_retention_message(credential_path=OAUTH_CLIENT_FILE):
     """Explain the local credential file's post-setup retention choices."""
     print(
         wrap_text(
-            (
+
                 "Identity Platform now stores the OAuth client secret. Lagniappe runtime "
                 f"does not need {ui.literal(credential_path)}. You may delete the local JSON "
                 "or move it to secure storage. The config/files path is excluded from Git "
                 "and App Engine uploads, but the JSON still contains a secret. To replace or "
                 "rotate Google OAuth later, place the new downloaded JSON at that path and "
                 f"run {ui.literal(setup_command('oauth'))}."
-            )
+
         )
     )
 

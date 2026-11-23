@@ -1,6 +1,6 @@
 """Deferred-job Datastore transactions and Scheduler control records."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 
 from google.cloud.datastore import Entity, Key
@@ -59,7 +59,7 @@ def recovery_records(*, limit):
     records = list({record.key: record for record in records}.values())
     records.sort(
         key=lambda record: (
-            _deferred_datetime(record.get("modified")) or datetime.now(timezone.utc)
+            _deferred_datetime(record.get("modified")) or datetime.now(UTC)
         )
     )
     if limit is not None:
@@ -461,7 +461,7 @@ def create_deferred_job_if_absent(job, notification=None, lock=None, *, writes=(
             key,
             None,
             job.db,
-            datetime.now(timezone.utc),
+            datetime.now(UTC),
         )
         if ordinary_notification:
             notification_database.mutate_notification_aggregate(
@@ -620,13 +620,13 @@ def update_claimed_deferred_job(
 # @reason recovery-only timestamp normalization is exercised through the transactional claim
 def _deferred_datetime(value):
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return None
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     return None
 
 

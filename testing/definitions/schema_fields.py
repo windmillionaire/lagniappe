@@ -48,7 +48,7 @@ class SchemaField:
         return base
 
     @classmethod
-    def from_dict(cls, data: dict) -> "SchemaField":
+    def from_dict(cls, data: dict) -> SchemaField:
         """Create a SchemaField subclass instance from a JSON schema dict."""
         field_type = data["type"]
         common = {

@@ -112,7 +112,7 @@ def test_value_layout_preserves_copyable_values(width, windows):
     )
     assert all(len(line) <= width for line in prose.splitlines())
     assert (
-        prose.split() == "Status: Review the saved settings before continuing.".split()
+        prose.split() == ["Status:", "Review", "the", "saved", "settings", "before", "continuing."]
     )
 
 

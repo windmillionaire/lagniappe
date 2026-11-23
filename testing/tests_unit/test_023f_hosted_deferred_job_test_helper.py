@@ -1,6 +1,6 @@
 """Deterministic coverage for hosted deferred-job test orchestration."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from types import SimpleNamespace
 
 from lagniappe.core.definitions import DeferredJobStatus
@@ -54,7 +54,7 @@ def test_hosted_transition_poll_starts_after_existing_revision():
 
 # @matrix deferred-jobs hosted-e2e : retry revision scheduling timing
 def test_hosted_retry_waits_for_new_revision_and_scheduled_delay(monkeypatch):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     retry_job = SimpleNamespace(
         urlsafe_key="retry-job",
         status=DeferredJobStatus.RETRY_WAIT.value,

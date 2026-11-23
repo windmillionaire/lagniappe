@@ -1,4 +1,5 @@
 import pytest
+from datetime import UTC
 
 
 # @matrix task-scheduling : periodic recurring skipped
@@ -33,7 +34,7 @@ def test_skipped_recurring(get_test_entities):
                 expected = task.test_spec["expected"]
                 task_name = task.test_spec["name"]
                 due = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
-                task.due_date = due.astimezone(timezone.utc)
+                task.due_date = due.astimezone(UTC)
 
                 # Set up the periodic section
                 periodic = task.properties.periodic
@@ -85,7 +86,7 @@ def test_skipped_scheduled(get_test_entities):
                 task_name = task.test_spec.get("name", "Unknown")
 
                 due_date_user_tz = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
-                task.due_date = due_date_user_tz.astimezone(timezone.utc)
+                task.due_date = due_date_user_tz.astimezone(UTC)
 
                 # Set up the scheduled section
                 scheduled = task.properties.scheduled
@@ -207,7 +208,7 @@ def test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today(
     monkeypatch.setattr(scheduling, "user_timezone", lambda: tz)
     monkeypatch.setattr(scheduling, "user_today", lambda: datetime.fromisoformat(today).replace(tzinfo=tz))
     task = TestEntities.get("TASK", {"name": "Missed occurrences"})
-    task.due_date = datetime.fromisoformat(start).replace(tzinfo=tz).astimezone(timezone.utc)
+    task.due_date = datetime.fromisoformat(start).replace(tzinfo=tz).astimezone(UTC)
     task.properties.scheduled.section.update(rule)
 
     assert task.properties.schedule.skipped == expected
@@ -227,8 +228,8 @@ def test_skipped_scheduled_preserves_earliest_due_date_baseline(monkeypatch, due
     monkeypatch.setattr(scheduling, "user_timezone", lambda: tz)
     monkeypatch.setattr(scheduling, "user_today", lambda: datetime(2025, 6, 18, tzinfo=tz))
     task = TestEntities.get("TASK", {"name": "Postponed occurrences"})
-    task.due_date = datetime.fromisoformat(due).replace(tzinfo=tz).astimezone(timezone.utc)
-    task.db["postponed_from"] = datetime.fromisoformat(postponed).replace(tzinfo=tz).astimezone(timezone.utc)
+    task.due_date = datetime.fromisoformat(due).replace(tzinfo=tz).astimezone(UTC)
+    task.db["postponed_from"] = datetime.fromisoformat(postponed).replace(tzinfo=tz).astimezone(UTC)
     task.properties.scheduled.section.update({"mode": "daily"})
 
     assert task.properties.schedule.skipped == 2  # June 16 and 17.

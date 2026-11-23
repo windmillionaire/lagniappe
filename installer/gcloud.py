@@ -65,32 +65,32 @@ def _guide_google_service_terms_acceptance(
         print()
         print(
             wrap_text(
-                (
+
                     "Google requires the active setup account '"
                     f"{ui.literal(selected_account)}' to complete the "
                     f"{ui.literal(agreement_name)}."
-                )
+
             )
         )
         if delegated_maps:
             print(
                 wrap_text(
-                    (
+
                         f"Permanent Owner '{ui.literal(permanent_owner)}' must first review "
                         "the Google Maps Platform agreement and authorize the temporary "
                         "installer to acknowledge it with the business-controlled installer "
                         "account. The Owner does not need to enable Places API manually; "
                         "setup will retry and enable it."
-                    )
+
                 )
             )
         print(
             wrap_text(
-                (
+
                     "The terms page may first show Google Cloud's welcome agreement. "
                     "Complete every agreement it presents, and confirm the browser profile "
                     f"is '{ui.literal(selected_account)}'."
-                )
+
             )
         )
         print(

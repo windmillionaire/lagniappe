@@ -354,9 +354,7 @@ def _clean_action_dependencies(proposal, action, seen_ids, action_label):
     valid = []
     invalid = []
     dependencies = action.get("depends_on") or []
-    if isinstance(dependencies, str):
-        dependencies = [dependencies]
-    elif not isinstance(dependencies, list):
+    if isinstance(dependencies, str) or not isinstance(dependencies, list):
         dependencies = [dependencies]
 
     for dependency in dependencies:

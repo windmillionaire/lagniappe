@@ -1,7 +1,7 @@
 """Durable form-change ownership, partial reads, and narrow submission writes."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 from types import SimpleNamespace
 
@@ -41,7 +41,7 @@ def record(kind, name, **data):
         type=kind,
         hash=name,
         name=name,
-        created=datetime(2026, 9, 11, tzinfo=timezone.utc),
+        created=datetime(2026, 9, 11, tzinfo=UTC),
         **data,
     )
     return getattr(Entities, kind.upper())(row)

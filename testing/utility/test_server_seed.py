@@ -9,12 +9,12 @@ be imported after ``FLASK_ENV=testing`` is set.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import importlib
 import json
 import os
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 from .artifacts import REPORTS_ROOT
 
@@ -600,7 +600,7 @@ def load_packs(pack_names: Iterable[str], authority) -> dict[str, object]:
             )
 
     summary = {
-        "loaded_at": datetime.now(timezone.utc).isoformat(),
+        "loaded_at": datetime.now(UTC).isoformat(),
         "packs": pack_names,
         "owner": {
             "name": owner.name,

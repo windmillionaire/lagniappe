@@ -1,6 +1,6 @@
 """Unit tests for base Entity properties shared across all entity types."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -946,7 +946,7 @@ def test_entity_modified(get_test_entities):
 
         with patch("lagniappe.core.tools.dates.user_timezone", return_value=test_tz):
             assert entity.modified == stored
-            assert entity.modified.tzinfo == timezone.utc
+            assert entity.modified.tzinfo == UTC
             assert entity.properties.modified.value == stored
             # Datetime equality alone accepts the right instant in the wrong zone.
             assert (
@@ -958,7 +958,7 @@ def test_entity_modified(get_test_entities):
             entity.modified = input_local
 
             assert entity.modified.isoformat() == entity.test_spec["expected_stored"]
-            assert entity.modified.tzinfo == timezone.utc
+            assert entity.modified.tzinfo == UTC
             assert (
                 entity.column("modified").column_value.isoformat()
                 == input_local.isoformat()
@@ -972,8 +972,8 @@ def test_entity_created_update_initializes_once():
         {"name": "Created Project", "hash": "created_project"},
     )
     entity.db.pop("created", None)
-    first_created = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
-    later_created = datetime(2024, 6, 7, 8, 9, 10, tzinfo=timezone.utc)
+    first_created = datetime(2024, 1, 2, 3, 4, 5, tzinfo=UTC)
+    later_created = datetime(2024, 6, 7, 8, 9, 10, tzinfo=UTC)
 
     with patch("lagniappe.core.properties.common_entity.datetime") as mock_datetime:
         mock_datetime.now.return_value = first_created

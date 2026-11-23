@@ -11,7 +11,7 @@ Related Files:
         - testing/resources/home.py: HomePage.directory (List helper)
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import json
 import re
 from urllib.parse import urlparse
@@ -183,10 +183,10 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
     owner = get_user(Users.OWNER)
     visitor = get_user(Users.admin, creator=owner)
     old_key = _save_analytics_event(
-        "Retention Old", datetime.now(timezone.utc) - timedelta(days=8)
+        "Retention Old", datetime.now(UTC) - timedelta(days=8)
     )
     recent_key = _save_analytics_event(
-        "Retention Recent", datetime.now(timezone.utc) - timedelta(days=1)
+        "Retention Recent", datetime.now(UTC) - timedelta(days=1)
     )
 
     # Activity details intentionally show only the four most active visitors.
@@ -336,8 +336,8 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
 ):
     owner = get_user(Users.OWNER)
     telemetry_id = f"analytics-{uuid4().hex}"
-    activity_key = _save_analytics_event("AI Clear Control", datetime.now(timezone.utc))
-    ai_key = _save_ai_record(telemetry_id, datetime.now(timezone.utc))
+    activity_key = _save_analytics_event("AI Clear Control", datetime.now(UTC))
+    ai_key = _save_ai_record(telemetry_id, datetime.now(UTC))
     report = Entities.REPORT.create(
         {"user": owner.entity, "tool": "organize", "name": "Analytics run review"}
     )

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import hmac
 
 from lagniappe import CONFIG
@@ -68,6 +68,6 @@ def get_or_create_user():
         user = Entities.USER.create({"email": email, "name": name})
 
     _ensure_own_page_access(user)
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.now(UTC)
     user.save()
     return user

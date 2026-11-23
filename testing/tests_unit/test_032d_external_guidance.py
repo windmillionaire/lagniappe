@@ -1,7 +1,7 @@
 """Trusted external guidance and schedule contracts without provider drift."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 from types import SimpleNamespace
 
@@ -576,7 +576,7 @@ def test_external_contract_reuses_known_guidance_and_exposes_canonical_schedulin
     monkeypatch.setattr(
         external_contracts.dates,
         "user_today",
-        lambda user: datetime(2026, 9, 4, tzinfo=timezone.utc),
+        lambda user: datetime(2026, 9, 4, tzinfo=UTC),
     )
     for instructions in ("Create a task", "Organize existing records"):
         contract = external_api.plan_contract(

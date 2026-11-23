@@ -1,6 +1,6 @@
 """Generic timezone conversion and date parsing utilities."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from zoneinfo import ZoneInfo
 
 from dateutil import parser as date_parser
@@ -35,7 +35,7 @@ def parse_imported_date_as_utc(date_string, *, user=None):
         date = date_parser.parse(date_string)
         if not date.tzinfo:
             date = date.replace(tzinfo=user_timezone(user))
-        return beginning_of_day(date).astimezone(timezone.utc)
+        return beginning_of_day(date).astimezone(UTC)
     except (ValueError, TypeError, date_parser.ParserError):
         return None
 
@@ -75,7 +75,7 @@ def utc_date_string_to_utc_datetime(value):
         parsed = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         parsed = datetime.strptime(value, "%Y-%m-%d")
-    return parsed.replace(tzinfo=timezone.utc)
+    return parsed.replace(tzinfo=UTC)
 
 
 # @testable false
@@ -105,7 +105,7 @@ def user_date_string_to_utc_datetime(date_string, *, user=None):
             microsecond=now_user.microsecond,
             tzinfo=user_tz,
         )
-        return value.astimezone(timezone.utc)
+        return value.astimezone(UTC)
     except (ValueError, TypeError):
         raise ValueError(f"Invalid date format: {date_string}") from None
 
@@ -117,7 +117,7 @@ def user_date_string_to_utc_datetime(date_string, *, user=None):
 def beginning_of_day(value):
     """Return midnight at the supplied datetime's timezone."""
     if not value.tzinfo:
-        value = value.replace(tzinfo=timezone.utc)
+        value = value.replace(tzinfo=UTC)
     return datetime.combine(value.date(), datetime.min.time(), tzinfo=value.tzinfo)
 
 

@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 import re
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from uuid import uuid4
 
 import pytest
@@ -318,7 +318,7 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_adm
             archived.key,
             request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
         )
-        completed_on = datetime.now(timezone.utc)
+        completed_on = datetime.now(UTC)
         later_histories = []
         for offset, generation, answer in (
             (1, 1, "Middle converted answer"),
@@ -1168,7 +1168,7 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get
         user,
         page,
         "Combine completed winner",
-        completed_on=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        completed_on=datetime(2026, 7, 1, tzinfo=UTC),
     )
 
     archived_attachment = Entities.FILE.create(
@@ -1187,7 +1187,7 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get
 
     source.entity.properties.files.add(archived_attachment)
     source.entity.complete(user=user.entity)
-    source.entity.completed_on = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    source.entity.completed_on = datetime(2026, 6, 1, tzinfo=UTC)
     source.entity.uncomplete()
     source.entity.name = "Combine source current"
     source.entity.submission = {"input-textab12": "Current source submission"}

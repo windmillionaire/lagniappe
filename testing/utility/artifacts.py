@@ -3,7 +3,8 @@
 from pathlib import Path
 import os
 import re
-from typing import Iterable, TypeVar
+from typing import TypeVar
+from collections.abc import Iterable
 
 
 REPORTS_ROOT = Path(os.environ.get("LAGNIAPPE_TEST_ARTIFACTS", "reports"))

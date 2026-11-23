@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -127,7 +127,7 @@ def test_task_index(get_test_entities):
         task.description = task.test_spec.get("description")
         if task.test_spec.get("completed"):
             task.completed = True
-            task.completed_on = datetime(2026, 9, 19, 12, tzinfo=timezone.utc)
+            task.completed_on = datetime(2026, 9, 19, 12, tzinfo=UTC)
 
     task_index = TaskIndex(user=index_user)
     task_index._tasks = tasks

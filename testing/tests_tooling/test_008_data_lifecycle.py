@@ -1,6 +1,6 @@
 """Provider-neutral contracts for setup-owned backup and portable archives."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, UTC
 import hashlib
 import json
 import os
@@ -406,7 +406,7 @@ def test_queue_snapshot_preserves_full_task_definitions():
     snapshot = restore_module.capture_queue_snapshot(
         context,
         plan,
-        captured_at=datetime(2026, 8, 23, 12, tzinfo=timezone.utc),
+        captured_at=datetime(2026, 8, 23, 12, tzinfo=UTC),
     )
 
     assert client.request["response_view"] == 2
@@ -422,7 +422,7 @@ def test_queue_snapshot_preserves_full_task_definitions():
     resumed = restore_module.capture_queue_snapshot(
         context,
         plan,
-        captured_at=datetime(2026, 8, 23, 12, 30, tzinfo=timezone.utc),
+        captured_at=datetime(2026, 8, 23, 12, 30, tzinfo=UTC),
     )
     assert resumed == snapshot
     assert client.calls == 1
@@ -588,7 +588,7 @@ def _backup_context():
         application_version="0.3.0",
         bucket=bucket,
         starts=0,
-        expected_snapshot=datetime(2026, 8, 23, 12, tzinfo=timezone.utc),
+        expected_snapshot=datetime(2026, 8, 23, 12, tzinfo=UTC),
         uploads=[],
         require_asset_generation_migration=lambda database: database == "(default)",
     )
@@ -653,7 +653,7 @@ def test_backup_resumes_provider_operation_and_publishes_manifest_last(tmp_path)
             context,
             backup_id=BACKUP_ID,
             checkpoint=checkpoint,
-            snapshot_time=datetime(2026, 8, 23, 12, tzinfo=timezone.utc),
+            snapshot_time=datetime(2026, 8, 23, 12, tzinfo=UTC),
         )
     assert context.starts == 1
     assert checkpoint.load()["provider_operation"] == OPERATION
@@ -675,9 +675,9 @@ def test_backup_resumes_provider_operation_and_publishes_manifest_last(tmp_path)
 # @matrix data-lifecycle : backup point-in-time framework-neutral
 def test_backup_selects_completed_whole_minute_without_runtime_action(tmp_path):
     context = _backup_context()
-    context.expected_snapshot = datetime(2026, 8, 23, 11, 59, tzinfo=timezone.utc)
+    context.expected_snapshot = datetime(2026, 8, 23, 11, 59, tzinfo=UTC)
     context.now = lambda: datetime(
-        2026, 8, 23, 12, 0, 20, tzinfo=timezone.utc
+        2026, 8, 23, 12, 0, 20, tzinfo=UTC
     )
     checkpoint = LifecycleCheckpoint(
         PROJECT_ID,
@@ -835,7 +835,7 @@ def test_value_codec_round_trips_every_supported_value():
         "bool": True,
         "integer": 1,
         "float": 1.5,
-        "datetime": datetime(2026, 8, 23, 12, tzinfo=timezone.utc),
+        "datetime": datetime(2026, 8, 23, 12, tzinfo=UTC),
         "date": date(2026, 8, 23),
         "bytes": b"\x00archive",
         "point": GeoPoint(1.25, -2.5),
@@ -945,7 +945,7 @@ class _ScanClient:
 
 # @matrix data-lifecycle disaster-recovery : asset-generation inventory point-in-time
 def test_recovery_inventory_uses_one_read_time_and_requires_asset_generations():
-    snapshot = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
+    snapshot = datetime(2026, 8, 24, 12, tzinfo=UTC)
     page = _entity(
         Key("instances", "page", project=PROJECT_ID),
         type="page",
@@ -974,7 +974,7 @@ def test_recovery_inventory_uses_one_read_time_and_requires_asset_generations():
 
 # @matrix data-lifecycle disaster-recovery file : asset-generation uploaded-file
 def test_recovery_inventory_includes_uploaded_file_asset_generations():
-    snapshot = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
+    snapshot = datetime(2026, 8, 24, 12, tzinfo=UTC)
     uploaded_file = _entity(
         Key("instances", "file", project=PROJECT_ID),
         type="file",
@@ -1074,13 +1074,13 @@ def test_restore_requeues_only_durable_scheduled_uncompletion():
             "app_url": "https://example.test",
             "runtime_service_account": f"runtime@{PROJECT_ID}.iam.gserviceaccount.com",
         },
-        now=datetime(2026, 8, 24, 12, tzinfo=timezone.utc),
+        now=datetime(2026, 8, 24, 12, tzinfo=UTC),
     )
     assert result == {"queued": 1, "backfilled": 1}
     assert len(queued) == 1
     assert queued[0][1]["token"] == task["scheduled_uncomplete_token"]
     assert task["scheduled_uncomplete_at"] == datetime(
-        2026, 8, 24, 12, tzinfo=timezone.utc
+        2026, 8, 24, 12, tzinfo=UTC
     )
 
 
@@ -2509,7 +2509,7 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     monkeypatch.setattr(
         restore_in_place,
         "_safety_snapshot_time",
-        lambda _context: datetime(2026, 8, 24, 12, tzinfo=timezone.utc),
+        lambda _context: datetime(2026, 8, 24, 12, tzinfo=UTC),
     )
     monkeypatch.setattr(
         restore_in_place,

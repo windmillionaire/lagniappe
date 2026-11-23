@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from google.cloud.datastore import Entity as DatastoreEntity
 
