@@ -20,7 +20,7 @@ type _User = User
 
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/file_related.py::AttachedPage
-class AttachedEntity[T: Entity](RelatedEntityMixin[T], DBProperty[T, _File]):
+class AttachedEntity[T: Entity](RelatedEntityMixin[T], DBProperty[T, _File, T | None]):
     """Typed File links invalidate the permissions derived from their owner."""
 
     @property
