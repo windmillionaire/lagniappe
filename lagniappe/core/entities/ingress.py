@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..definitions import (
     Fetch,
@@ -11,7 +11,13 @@ from .entity import Entity
 
 
 if TYPE_CHECKING:
+    from werkzeug.datastructures import FileStorage
+    from ..tools.database.assets import DirectUploadFile
     from . import property_types
+    from .category import Category
+    from .project import Project
+    from .form import Form
+    from .model_task import ModelTask
 
 
 # @testable true
@@ -21,17 +27,26 @@ if TYPE_CHECKING:
 # @matrix ingress : model parent related-entities
 class Ingress(AssetMixin, Entity):
     if TYPE_CHECKING:
+        form: Form | None
+        category: Category | None
+        project: Project | None
+        model: ModelTask | None
+        filename: str | None
+        encoding: str | None
+        results: list[dict[str, Any] | None]
+        mimetype: str | None
+
         @property
         def properties(self) -> property_types.IngressProperties: ...
 
     entity_kind = "ingress"
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset({"workflow", "execution", "assets"})
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         return [self.hash, "site"]
 
     # @testable true
@@ -67,15 +82,15 @@ class Ingress(AssetMixin, Entity):
         return properties
 
     @property
-    def parent(self):
+    def parent(self) -> Category | ModelTask | Project | None:
         return self.category or self.model or self.project
 
     @property
-    def entity_type(self):
+    def entity_type(self) -> str | None:
         return self.properties.choose_type.entity_type
 
     @parent.setter
-    def parent(self, parent):
+    def parent(self, parent: Category | ModelTask | Project | None) -> None:
         if not parent:
             self.category = None
             self.model = None
@@ -83,16 +98,16 @@ class Ingress(AssetMixin, Entity):
             self.form = None
             return
         if parent.kind == "project":
-            self.project = parent
+            self.project = cast("Project", parent)
         elif parent.kind == "category":
-            self.category = parent
-            self.form = parent.form
+            self.category = cast("Category", parent)
+            self.form = cast("ModelTask | Category", parent).form
         elif parent.kind == "model":
-            self.model = parent
-            self.project = parent.project
-            self.form = parent.form
+            self.model = cast("ModelTask", parent)
+            self.project = cast("ModelTask", parent).project
+            self.form = cast("ModelTask | Category", parent).form
 
-    def clear_form_stages(self):
+    def clear_form_stages(self) -> None:
         """Reset all stages after choose_form (when the form changes)."""
         self.properties.assign_columns.clear()
         self.properties.verify_import.clear()
@@ -113,16 +128,16 @@ class Ingress(AssetMixin, Entity):
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_results_remove_deleted_imported_entities
     # @matrix ingress : delete row-results
-    def remove_results_for_entities(self, *entity_ids):
-        entity_ids = {entity_id for entity_id in entity_ids if entity_id}
-        if not entity_ids:
+    def remove_results_for_entities(self, *entity_ids: str | None) -> int:
+        removed_ids = {entity_id for entity_id in entity_ids if entity_id}
+        if not removed_ids:
             return 0
 
         results = self.results
         kept = [
             result
             for result in results
-            if self._result_entity_id(result) not in entity_ids
+            if self._result_entity_id(result) not in removed_ids
         ]
         removed = len(results) - len(kept)
         if not removed:
@@ -135,7 +150,7 @@ class Ingress(AssetMixin, Entity):
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_results_prune_missing_entities
     # @matrix ingress : delete reload row-results
-    def prune_missing_results(self):
+    def prune_missing_results(self) -> int:
         result_ids = set(self._result_entity_ids())
         if not result_ids:
             return 0
@@ -151,7 +166,7 @@ class Ingress(AssetMixin, Entity):
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_delete_imported_entities_deletes_pages_and_tasks
     # @matrix ingress : bulk-delete delete row-results
-    def delete_imported_entities(self):
+    def delete_imported_entities(self) -> int:
         result_ids = self._result_entity_ids()
         if not result_ids:
             return 0
@@ -179,7 +194,7 @@ class Ingress(AssetMixin, Entity):
     # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns
     # @matrix ingress : rows size-limit
     @classmethod
-    def create(cls, upload):
+    def create(cls, upload: FileStorage | DirectUploadFile) -> Ingress:
         from ..tools.ingress import IngressService
 
         return IngressService.create(upload, entity_cls=cls)

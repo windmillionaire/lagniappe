@@ -109,11 +109,11 @@ def _mapping(user: User, page_key: str, revision: int) -> dict[FieldT, str]:
 # @matrix owner-projection : fail-closed revision
 def update_owner_projection(*users: Entity) -> OwnerProjection | None:
     """Publish an owner row only after its durable mutation has committed."""
-    owner = next((user for user in users if getattr(user, "is_owner", False)), None)
+    owner = next((cast("User", user) for user in users if getattr(user, "is_owner", False)), None)
     if not owner or not (page_key := owner.properties.page.key):
         return None
     current = _project(cache.redis.hgetall(Keys.OWNER_PROJECTION.value))
-    projection = _mapping(cast("User", owner), encode_urlsafe_key(page_key), (current["revision"] if current else 0) + 1)
+    projection = _mapping(owner, encode_urlsafe_key(page_key), (current["revision"] if current else 0) + 1)
     cache.redis.hset(Keys.OWNER_PROJECTION.value, mapping=projection)
     projected = _project(projection)
     _REQUEST_OWNER.set(projected)

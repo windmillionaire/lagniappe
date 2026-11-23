@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
+
 import hashlib
 import json
 from datetime import datetime, UTC
@@ -44,6 +47,57 @@ from lagniappe.core.tools.files import validate as file_validation
 from lagniappe.core.tools.database import ingress as ingress_database
 
 
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from werkzeug.datastructures import FileStorage
+    from ..definitions import MutationOutcome
+    from ..entities.entity import Entity
+    from ..entities.category import Category
+    from ..entities.project import Project
+    from ..entities.model_task import ModelTask
+    from ..entities.form import Form
+    from ..entities.ingress import Ingress
+    from ..properties.base_process import ProcessProperty
+    from ..properties.schema import SchemaField
+    from .database.assets import DirectUploadFile
+
+
+type CsvColumns = dict[str, file_validation.CSVColumn]
+type CsvRow = dict[str, str]
+# Form widgets and the CSV type inference code attach field-specific formatting metadata.
+type ImportField = dict[str, Any]
+type FieldsById = dict[str, ImportField]
+
+
+def _form_fields(form: Form | None) -> Mapping[str, SchemaField]:
+    if form is None:
+        raise ValidationError("Choose a form before mapping import fields.")
+    return form.fields or {}
+
+
+def _stored_rows(entity: Ingress) -> list[CsvRow]:
+    rows = entity.properties.rows.asset
+    if rows is None:
+        raise ValidationError("The parsed CSV rows are unavailable. Upload the file again.")
+    return rows
+
+
+class Workflow(TypedDict):
+    current: str
+    highest_completed: NotRequired[str]
+    configuration_revision: NotRequired[int]
+
+
+class Execution(TypedDict, total=False):
+    cursor: int
+    status: str
+    total_rows: int
+    dispatch_sequence: int
+    error: str
+    lease_token: str
+    lease_expires: str
+
+
 ACTIVE_RUN_STATUSES = {
     IngressRunStatus.QUEUED.value,
     IngressRunStatus.RUNNING.value,
@@ -75,11 +129,14 @@ class IngressParser:
 
     @staticmethod
     # @testable infrastructure
-    def parse_entity(entity):
+    def parse_entity(entity: Ingress) -> tuple[dict[str, Any], list[CsvRow]]:
         if entity.mimetype != "text/csv":
             raise ValidationError("File must be a CSV file.")
-        parsed = file_validation.process_csv(entity.properties.text.asset)
-        rows = parsed.pop("rows", [])
+        text = entity.properties.text.asset
+        if text is None:
+            raise ValidationError("The CSV file has no text to parse.")
+        parsed = dict(file_validation.process_csv(text))
+        rows = cast(list[CsvRow], parsed.pop("rows", []))
         return parsed, rows
 
 
@@ -94,7 +151,7 @@ class IngressMapping:
     """Canonical projection from stored ingress configuration to row mappings."""
 
     # @testable infrastructure
-    def __init__(self, entity):
+    def __init__(self, entity: Ingress) -> None:
         self.entity = entity
         self._fields = None
         self._column_map = None
@@ -105,17 +162,17 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def columns(self):
+    def columns(self) -> CsvColumns:
         return self.entity.properties.process_csv.columns or {}
 
     @property
     # @testable infrastructure
-    def entity_type(self):
+    def entity_type(self) -> str | None:
         return self.entity.properties.choose_type.entity_type
 
     @property
     # @testable infrastructure
-    def form(self):
+    def form(self) -> Form | None:
         return self.entity.form
 
     @staticmethod
@@ -136,7 +193,7 @@ class IngressMapping:
     # @testable infrastructure
     def _default_fields(self):
         fields = {}
-        if not self.form.fields.get("name"):
+        if not _form_fields(self.form).get("name"):
             fields["name"] = {
                 "label": "Page Name",
                 "id": "name",
@@ -144,7 +201,7 @@ class IngressMapping:
                 "icon": "text",
                 "type": "input",
             }
-        if not self.form.fields.get("description") and self.entity_type == "page":
+        if not _form_fields(self.form).get("description") and self.entity_type == "page":
             fields["description"] = {
                 "label": "Description",
                 "id": "description",
@@ -182,11 +239,11 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def fields(self):
+    def fields(self) -> FieldsById:
         if self._fields is not None:
             return self._fields
         self._fields = self._default_fields()
-        for field_id, field in self.form.fields.items():
+        for field_id, field in _form_fields(self.form).items():
             if isinstance(field, (Signature, HTML, Status)):
                 continue
             if isinstance(field, Table):
@@ -197,11 +254,11 @@ class IngressMapping:
         return self._fields
 
     # @testable infrastructure
-    def ignore(self, column_id):
+    def ignore(self, column_id: str) -> object:
         return self.entity.properties.assign_columns.section.get(f"ignore-{column_id}")
 
     # @testable infrastructure
-    def guess_field(self, column_id):
+    def guess_field(self, column_id: str) -> ImportField | None:
         column = self.columns.get(column_id) or {}
         if self.entity_type == "task" and column.get("label", "").strip().lower() == "name":
             return self.fields.get("name")
@@ -216,7 +273,7 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def column_map(self):
+    def column_map(self) -> FieldsById:
         if self._column_map is not None:
             return self._column_map
         section = self.entity.properties.assign_columns.section
@@ -224,7 +281,8 @@ class IngressMapping:
         for index, column_id in enumerate(self.columns):
             if self.ignore(column_id):
                 continue
-            field = self.fields.get(section.get(column_id))
+            field_id = section.get(column_id)
+            field = self.fields.get(field_id) if isinstance(field_id, str) else None
             if field:
                 mapped[column_id] = {**field, "index": index}
         self._column_map = mapped
@@ -232,7 +290,7 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def field_map(self):
+    def field_map(self) -> dict[str, list[str]]:
         if self._field_map is not None:
             return self._field_map
         mapped = {}
@@ -248,11 +306,10 @@ class IngressMapping:
         return mapped
 
     # @testable infrastructure
-    def field(self, field_id):
+    def field(self, field_id: str) -> ImportField | None:
         details = self.fields.get(field_id)
         column_ids = self.field_map.get(field_id)
-        if not details and isinstance(self.form.fields.get(field_id), Table):
-            field = self.form.fields.get(field_id)
+        if not details and isinstance(field := _form_fields(self.form).get(field_id), Table):
             labels = [
                 f"[ {', '.join(self.columns[cid].get('label', '') for cid in row if cid)} ]"
                 for row in column_ids or []
@@ -280,11 +337,11 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def verify_section(self):
+    def verify_section(self) -> dict[str, object]:
         return self.entity.properties.verify_import.section
 
     # @testable infrastructure
-    def fuzzy_match(self, field_id):
+    def fuzzy_match(self, field_id: str) -> bool:
         return bool(
             self.verify_section.get(f"fuzzy-{field_id}")
             or self.verify_section.get(f"fuzzy-{field_id.replace('_', '-')}")
@@ -292,7 +349,7 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def file_options(self):
+    def file_options(self) -> list[ImportField]:
         if self._file_options is not None:
             return self._file_options
         options = []
@@ -315,19 +372,20 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def page_form(self):
-        if self._page_form is None and self.verify_section.get("page-form-id"):
-            self._page_form = Entities.FORM(self.verify_section.get("page-form-id"))
+    def page_form(self) -> Form | None:
+        page_form_id = self.verify_section.get("page-form-id")
+        if self._page_form is None and isinstance(page_form_id, str) and page_form_id:
+            self._page_form = Entities.FORM(page_form_id)
         return self._page_form
 
     @property
     # @testable infrastructure
-    def page_options(self):
+    def page_options(self) -> list[ImportField]:
         if self._page_options is not None:
             return self._page_options
-        options = [{"id": "name", "label": "Name", "icon": "text", "kind": "page"}]
+        options: list[ImportField] = [{"id": "name", "label": "Name", "icon": "text", "kind": "page"}]
         if self.page_form:
-            for field in self.page_form.fields.values():
+            for field in _form_fields(self.page_form).values():
                 if field.get("type") == "input" and field.id != "name":
                     options.append(
                         {
@@ -342,7 +400,7 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def index_from_field(self):
+    def index_from_field(self) -> ImportField | None:
         index_from = self.verify_section.get("index-from")
         if index_from:
             return next(
@@ -360,7 +418,7 @@ class IngressMapping:
 
     @property
     # @testable infrastructure
-    def index_to_field(self):
+    def index_to_field(self) -> ImportField | None:
         index_to = self.verify_section.get("index-to")
         if index_to:
             return next(
@@ -390,7 +448,13 @@ class IngressMutationPlanner:
     files = files
 
     # @testable infrastructure
-    def __init__(self, entity, *, row_index=0, service=None):
+    def __init__(
+        self,
+        entity: Ingress,
+        *,
+        row_index: int = 0,
+        service: IngressService | None = None,
+    ) -> None:
         self.entity = entity
         self.row_index = row_index
         self.service = service
@@ -400,12 +464,12 @@ class IngressMutationPlanner:
 
     @property
     # @testable infrastructure
-    def columns(self):
+    def columns(self) -> CsvColumns | None:
         return self.entity.properties.process_csv.columns
 
     @property
     # @testable infrastructure
-    def field_map(self):
+    def field_map(self) -> dict[str, list[str]]:
         verify = self.entity.properties.verify_import
         return getattr(
             verify,
@@ -415,25 +479,25 @@ class IngressMutationPlanner:
 
     @property
     # @testable infrastructure
-    def entity_type(self):
+    def entity_type(self) -> str | None:
         return self.entity.properties.choose_type.entity_type
 
     @property
     # @testable infrastructure
-    def fuzzy_page_match(self):
+    def fuzzy_page_match(self) -> bool | None:
         return self.entity.properties.verify_import.fuzzy_page
 
     # @testable infrastructure
-    def fuzzy_match(self, field_id):
+    def fuzzy_match(self, field_id: str) -> bool:
         verify = self.entity.properties.verify_import
         method = getattr(verify, "fuzzy_match", None)
         return (
-            method(field_id) if callable(method) else self.mapping.fuzzy_match(field_id)
+            cast(bool, method(field_id)) if callable(method) else self.mapping.fuzzy_match(field_id)
         )
 
     @property
     # @testable infrastructure
-    def form(self):
+    def form(self) -> Form | None:
         return self.entity.form
 
     @staticmethod
@@ -467,13 +531,16 @@ class IngressMutationPlanner:
     # @tests tests_unit/test_006d_ingress_service.py::test_history_failure_after_task_allocation_does_not_commit_partial_row
     # @matrix ingress : row-results row-task task-import validation-errors
     # @matrix ingress : cursor-resume failure restart
-    def plan(self, row):
+    def plan(self, row: CsvRow) -> IngressMutationPlan:
+        columns = self.columns
+        if columns is None:
+            raise ValidationError("The CSV column mapping is missing.")
         values = {
-            self.columns[column_id]["label"]: value
+            columns[column_id]["label"]: value
             for column_id, value in row.items()
             if value
         }
-        result = {"row": json.dumps(values, sort_keys=True)}
+        result: dict[str, Any] = {"row": json.dumps(values, sort_keys=True)}
         try:
             to_validate = self._get_to_validate(row, result)
             if self.entity_type == "task":
@@ -497,7 +564,7 @@ class IngressMutationPlanner:
                 self._collect_submission_messages(result, created)
                 self.created_entities.append(created)
 
-            for field in self.form.fields.values():
+            for field in _form_fields(self.form).values():
                 self._extend_messages(result, "warnings", field.warnings)
                 self._extend_messages(result, "errors", field.errors)
         except ValidationError as error:
@@ -566,7 +633,7 @@ class IngressMutationPlanner:
                 return None
             return values[0]
 
-        for field_id, field in self.form.fields.items():
+        for field_id, field in _form_fields(self.form).items():
             column_ids = self.field_map.get(field_id)
             if isinstance(field, Table):
                 values = [
@@ -792,12 +859,17 @@ class IngressService:
     """Single durable owner for ingress transitions and row execution."""
 
     # @testable infrastructure
-    def __init__(self, entity):
+    def __init__(self, entity: Ingress) -> None:
         self.entity = entity
 
     @classmethod
     # @testable infrastructure
-    def create(cls, upload, *, entity_cls=None):
+    def create(
+        cls,
+        upload: FileStorage | DirectUploadFile,
+        *,
+        entity_cls: type[Ingress] | None = None,
+    ) -> Ingress:
         enforce_file_consumer(
             upload,
             FileConsumer.CSV_INGRESS,
@@ -835,16 +907,16 @@ class IngressService:
 
     @property
     # @testable infrastructure
-    def workflow(self):
-        return self.entity.get_process("workflow")
+    def workflow(self) -> Workflow:
+        return cast(Workflow, self.entity.get_process("workflow"))
 
     @property
     # @testable infrastructure
-    def execution(self):
-        return self.entity.get_process("execution")
+    def execution(self) -> Execution:
+        return cast(Execution, self.entity.get_process("execution"))
 
     # @testable infrastructure
-    def require_supported(self):
+    def require_supported(self) -> IngressService:
         if self.entity.db.get("ingress_format") != INGRESS_FORMAT_VERSION:
             raise IngressFormatError(
                 "This import was created by an unsupported ingress format. "
@@ -861,27 +933,27 @@ class IngressService:
 
     @property
     # @testable infrastructure
-    def stage(self):
+    def stage(self) -> IngressStage:
         self.require_supported()
         return IngressStage[self.workflow["current"]]
 
     @property
     # @testable infrastructure
-    def run_status(self):
+    def run_status(self) -> str:
         return self.execution.get("status", IngressRunStatus.IDLE.value)
 
     @property
     # @testable infrastructure
-    def cursor(self):
+    def cursor(self) -> int:
         return int(self.execution.get("cursor") or 0)
 
     @property
     # @testable infrastructure
-    def total(self):
+    def total(self) -> int:
         return int(self.execution.get("total_rows") or 0)
 
     # @testable infrastructure
-    def idempotency_key(self, role):
+    def idempotency_key(self, role: str) -> str:
         revision = int(self.workflow.get("configuration_revision") or 1)
         try:
             identifier = self.entity.urlsafe_key
@@ -891,18 +963,21 @@ class IngressService:
         return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
     # @testable infrastructure
-    def entity_key(self, kind, role, parent=None):
+    def entity_key(
+        self, kind: str, role: str, parent: Entity | Key | None = None
+    ) -> Key:
         identifier = self.idempotency_key(role)
         return database_utility.create_named_key(kind, identifier, parent=parent)
 
     # @testable infrastructure
-    def stage_status(self, stage):
+    def stage_status(self, stage: str | IngressStage) -> ProcessProperty[Ingress]:
         stage = self._coerce_stage(stage)
-        return self.entity.properties.get(stage.name.lower())
+        # Every supported stage maps to a registered process section on Ingress.
+        return cast("ProcessProperty[Ingress]", self.entity.properties.get(stage.name.lower()))
 
     @staticmethod
     # @testable infrastructure
-    def _coerce_stage(stage):
+    def _coerce_stage(stage: str | IngressStage) -> IngressStage:
         if isinstance(stage, IngressStage):
             return stage
         if not isinstance(stage, str):
@@ -913,7 +988,7 @@ class IngressService:
             raise ValueError(f"Invalid stage: {stage}") from error
 
     # @testable infrastructure
-    def can_navigate(self, target):
+    def can_navigate(self, target: str | IngressStage) -> bool:
         try:
             target = self._coerce_stage(target)
         except ValueError:
@@ -922,13 +997,17 @@ class IngressService:
             return False
         highest_name = self.workflow.get("highest_completed")
         try:
+            if highest_name is None:
+                return target == IngressStage.PROCESS_CSV
             highest = IngressStage[highest_name]
         except (KeyError, TypeError):
             return target == IngressStage.PROCESS_CSV
         return target.value <= min(highest.value + 1, IngressStage.VERIFY_IMPORT.value)
 
     # @testable infrastructure
-    def navigate(self, target, *, save=True):
+    def navigate(
+        self, target: str | IngressStage, *, save: bool = True
+    ) -> IngressProgress:
         self.require_supported()
         target = self._coerce_stage(target)
         if not self.can_navigate(target):
@@ -941,11 +1020,19 @@ class IngressService:
         return self.progress()
 
     # @testable infrastructure
-    def update_current(self, data, *, save=True):
+    def update_current(
+        self, data: Mapping[str, object], *, save: bool = True
+    ) -> dict[str, object]:
         return self.update_stage(self.stage, data, save=save)
 
     # @testable infrastructure
-    def update_stage(self, stage, data, *, save=True):
+    def update_stage(
+        self,
+        stage: str | IngressStage,
+        data: Mapping[str, object],
+        *,
+        save: bool = True,
+    ) -> dict[str, object]:
         self.require_supported()
         stage = self._coerce_stage(stage)
         if stage not in CONFIGURATION_STAGES:
@@ -998,7 +1085,7 @@ class IngressService:
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_finalize_sets_choose_type_complete
     # @matrix ingress : finalize process-complete stage
-    def finalize(self, data=None):
+    def finalize(self, data: Mapping[str, object] | None = None) -> bool:
         self.require_supported()
         stage = self.stage
         if stage not in CONFIGURATION_STAGES:
@@ -1038,9 +1125,9 @@ class IngressService:
         return True
 
     # @testable infrastructure
-    def advance(self, data=None):
+    def advance(self, data: Mapping[str, object] | None = None) -> IngressProgress:
         stage = self.stage
-        submitted_stage = data.get("stage") if hasattr(data, "get") else None
+        submitted_stage = data.get("stage") if data is not None and hasattr(data, "get") else None
         if submitted_stage and submitted_stage != stage.name:
             raise IngressTransitionError(
                 f"Expected {stage.name}, received {submitted_stage}."
@@ -1057,19 +1144,19 @@ class IngressService:
     # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_existing_model_parent_loads_project_for_required
     # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_reuses_or_creates_the_parent_before_form_mapping
     # @matrix ingress relations : choose-parent existing-parent form-reset model model-load parent required-validation
-    def _apply_parent_choice(self):
+    def _apply_parent_choice(self) -> list[Entity]:
         status = self.entity.properties.choose_parent
         entity_type = self.entity.properties.choose_type.entity_type
         if not status.parent_choice:
             raise ValidationError("Please choose an option")
         if status.parent_choice == "existing-parent" and not status.parent_id:
             raise ValidationError("Please select an existing option")
-        created = []
+        created: list[Entity] = []
         if status.parent_choice == "existing-parent":
             parent = Entities.fetch_one(status.parent_id, request=Fetch.direct())
             if parent is None:
                 raise ValidationError("The selected parent no longer exists.")
-            self.entity.parent = parent
+            self.entity.parent = cast("Category | ModelTask | Project", parent)
         elif entity_type == "task":
             data = {"name": status.parent_name or self.entity.name}
             if getattr(self.entity, "_testing", False):
@@ -1095,6 +1182,8 @@ class IngressService:
 
         if entity_type == "task" and status.create_model:
             project = self.entity.project
+            if project is None:
+                raise ValidationError("Choose a project before creating its model.")
             data = {"name": status.model_name or self.entity.name}
             if getattr(self.entity, "_testing", False):
                 model = Entities.MODEL_TASK.create(project, data)
@@ -1110,13 +1199,13 @@ class IngressService:
         return created
 
     # @testable infrastructure
-    def _apply_form_choice(self):
+    def _apply_form_choice(self) -> list[Entity]:
         status = self.entity.properties.choose_form
         if not status.form_choice:
             raise ValidationError("Please choose an option")
         if status.form_choice == "existing-form" and not status.form_id:
             raise ValidationError("Please select an existing form")
-        created = []
+        created: list[Entity] = []
         if status.form_choice == "existing-form":
             form = (
                 Entities.FORM(status.form_id)
@@ -1125,12 +1214,15 @@ class IngressService:
             )
             if form is None:
                 raise ValidationError("The selected form no longer exists.")
-            self.entity.form = form
+            self.entity.form = cast("Form", form)
         else:
+            form_type = self.entity.properties.choose_type.entity_type
+            if form_type is None:
+                raise ValidationError("Choose the imported entity type before creating a form.")
             schema, separator = file_validation.create_schema(
-                self.entity.properties.process_csv.columns,
-                self.entity.properties.rows.asset,
-                form_type=self.entity.properties.choose_type.entity_type,
+                self.entity.properties.process_csv.columns or {},
+                _stored_rows(self.entity),
+                form_type=form_type,
             )
             data = {
                 "name": status.form_name or f"{self.entity.name} Form",
@@ -1148,8 +1240,11 @@ class IngressService:
             self.entity.form = form
             created.append(form)
         if status.set_default_form:
-            self.entity.parent.form = self.entity.form
-            created.append(self.entity.parent)
+            parent = self.entity.parent
+            if parent is None:
+                raise ValidationError("Choose a parent before setting its default form.")
+            parent.form = self.entity.form
+            created.append(parent)
         return created
 
     # @testable infrastructure
@@ -1167,7 +1262,7 @@ class IngressService:
             raise ValidationError("Please set the page index field")
 
     # @testable infrastructure
-    def select_page_form(self, value):
+    def select_page_form(self, value: str | None) -> IngressMapping:
         self.require_supported()
         if self.stage != IngressStage.VERIFY_IMPORT:
             raise IngressTransitionError(
@@ -1188,7 +1283,7 @@ class IngressService:
         return IngressMapping(self.entity)
 
     # @testable infrastructure
-    def start(self, client_context=None):
+    def start(self, client_context: object = None) -> IngressProgress:
         self.require_supported()
         if self.stage == IngressStage.IMPORTING:
             if self.run_status in {
@@ -1212,7 +1307,7 @@ class IngressService:
             {
                 "status": IngressRunStatus.QUEUED.value,
                 "cursor": 0,
-                "total_rows": len(self.entity.properties.rows.asset),
+                "total_rows": len(_stored_rows(self.entity)),
                 "dispatch_sequence": int(self.execution.get("dispatch_sequence") or 0)
                 + 1,
             }
@@ -1225,7 +1320,7 @@ class IngressService:
         return self.progress()
 
     # @testable infrastructure
-    def restart(self, client_context=None):
+    def restart(self, client_context: object = None) -> IngressProgress:
         if self.stage != IngressStage.IMPORTING or self.run_status not in {
             IngressRunStatus.STOPPED.value,
             IngressRunStatus.FAILED.value,
@@ -1241,7 +1336,7 @@ class IngressService:
         return self.progress()
 
     # @testable infrastructure
-    def mark_dispatch_failed(self, error):
+    def mark_dispatch_failed(self, error: object) -> IngressProgress:
         self.execution["status"] = IngressRunStatus.FAILED.value
         self.execution["error"] = str(error)
         self.execution.pop("lease_token", None)
@@ -1250,7 +1345,7 @@ class IngressService:
         return self.progress()
 
     # @testable infrastructure
-    def stop(self, *, now=None):
+    def stop(self, *, now: datetime | None = None) -> IngressProgress:
         self.require_supported()
         if self.stage != IngressStage.IMPORTING:
             raise IngressTransitionError("Only an active import can be stopped.")
@@ -1281,7 +1376,9 @@ class IngressService:
         return replacement
 
     # @testable infrastructure
-    def run_batch(self, limit=INGRESS_BATCH_SIZE, *, now=None):
+    def run_batch(
+        self, limit: int = INGRESS_BATCH_SIZE, *, now: datetime | None = None
+    ) -> IngressBatchResult:
         self.require_supported()
         now = _utc(now)
         if self.run_status == IngressRunStatus.STOP_REQUESTED.value:
@@ -1314,7 +1411,7 @@ class IngressService:
                 failure_cursor = cursor
                 if cursor >= self.total:
                     break
-                row = self.entity.properties.rows.asset[cursor]
+                row = _stored_rows(self.entity)[cursor]
                 planner = IngressMutationPlanner(
                     self.entity,
                     row_index=cursor,
@@ -1344,7 +1441,10 @@ class IngressService:
                         reason=committed.get("reason"),
                     )
                 emitted.append(mutation.result)
-                self.execution.update(committed["execution"])
+                execution = committed.get("execution")
+                if execution is None:
+                    raise RuntimeError("Committed import row is missing its execution state.")
+                self.execution.update(cast(Execution, execution))
                 if committed.get("reason") == "stopped":
                     return IngressBatchResult(
                         state=IngressRunStatus.STOPPED.value,
@@ -1411,8 +1511,8 @@ class IngressService:
             ((effect.entity, effect.property_mask) for effect in writes),
             now,
         )
-        if not committed.get("committed") and committed.get("entity") is not None:
-            self._replace_from_raw(committed["entity"])
+        if not committed.get("committed") and (raw_entity := committed.get("entity")) is not None:
+            self._replace_from_raw(raw_entity)
         if committed.get("committed"):
             consume_mutation_intents(plan)
             try:
@@ -1443,7 +1543,13 @@ class IngressService:
         self.entity.properties.completed.complete = True
 
     # @testable infrastructure
-    def fail_run(self, error, *, expected_cursor=None, now=None):
+    def fail_run(
+        self,
+        error: object,
+        *,
+        expected_cursor: int | None = None,
+        now: datetime | None = None,
+    ) -> None:
         now = _utc(now)
         message = "Import failed while processing rows. Please try again."
         if getattr(self.entity, "_testing", False) or not self.entity.key:
@@ -1473,7 +1579,7 @@ class IngressService:
         )
 
     # @testable infrastructure
-    def progress(self):
+    def progress(self) -> IngressProgress:
         self.require_supported()
         status = self.run_status
         actions = []
@@ -1494,7 +1600,7 @@ class IngressService:
         current_error = None
         if self.stage in CONFIGURATION_STAGES:
             current_error = self.stage_status(self.stage).error
-        error = self.execution.get("error") or current_error
+        error = self.execution.get("error") or cast(str | None, current_error)
         return IngressProgress(
             stage=self.stage.name,
             run_status=status,
@@ -1507,11 +1613,11 @@ class IngressService:
         )
 
     # @testable infrastructure
-    def save(self, *entities):
+    def save(self, *entities: Entity | None) -> MutationOutcome | None:
         if getattr(self.entity, "_testing", False):
             return None
         return Entities.save(self.entity, *[entity for entity in entities if entity])
 
     # @testable infrastructure
-    def delete_imported(self):
+    def delete_imported(self) -> int:
         return self.entity.delete_imported_entities()

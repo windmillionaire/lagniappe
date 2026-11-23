@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..entities.entity import Entity
     from ..entities.user import User
+    from ..entities.page import Page
+    from ..entities.project import Project
 
 from typing import TypedDict
 
@@ -91,7 +93,7 @@ def read_backup(entity: Entity, token: str) -> str | None:
 # @tests tests_unit/test_010c_document_versions.py::test_recovery_pin_retry_is_scoped_and_keeps_empty_versions
 # @matrix document-history : recovery idempotency empty-content
 def recovery_pin(
-    entity: Entity, user: User, *, html: str, name: str, operation_id: str
+    entity: Page | Project, user: User, *, html: str, name: str, operation_id: str
 ) -> Entity:
     if not isinstance(operation_id, str) or not re.fullmatch(r"[a-f0-9]{64}", operation_id):
         raise ValidationError("Invalid recovery operation")

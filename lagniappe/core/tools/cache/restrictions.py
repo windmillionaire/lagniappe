@@ -1,10 +1,11 @@
 """Batched, retryable reconciliation of indexed inherited restrictions."""
 
 from collections.abc import Collection, Iterable
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 if TYPE_CHECKING:
     from ...entities.entity import Entity
+    from ...properties.common_entity import Kind
 
 import json
 from uuid import uuid4
@@ -96,7 +97,7 @@ def enqueue(payload: ReconcileTask) -> None:
             next_batch = reconcile_batch(**next_batch)
         return
     identity = task_queue.create_task(
-        url_for("process.reconcile_restrictions", _external=True), payload,
+        url_for("process.reconcile_restrictions", _external=True), dict(payload),
         task_id=f"restrictions-{uuid4().hex}", dispatch_deadline_seconds=300,
     )
     if not identity:
@@ -204,7 +205,13 @@ def _membership_revision():
 
     paths = ("/pages/index", "/tasks/index")
     revisions = database_utility.site_fingerprints(paths)
-    return ":".join(revisions[path] for path in paths)
+    values = []
+    for path in paths:
+        value = revisions[path]
+        if value is None:
+            raise ValueError(f"Missing site fingerprint for {path}")
+        values.append(value)
+    return ":".join(values)
 
 
 # @testable true
@@ -261,7 +268,11 @@ def reconcile_batch(
     rows = {doc.details_key: doc.id for doc in docs}
     # Task.requires omits its own hash. Roots also retain details when their
     # search row is absent, so always include roots explicitly.
-    rows.update((entity.hash, Search[entity.properties.kind.cache_value].key(entity)) for entity in roots)
+    for entity in roots:
+        cache_kind = cast("Kind", entity.properties.kind).cache_value
+        if cache_kind is None:
+            raise ValueError("Restriction reconciliation requires a stored entity kind.")
+        rows[entity.hash] = Search[cache_kind].key(entity)
     details = _load_cached_details(rows)
     projections = {
         entity_hash: _projection(

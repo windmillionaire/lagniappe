@@ -3,6 +3,8 @@
 from collections.abc import Callable, Iterable, Mapping
 import uuid
 
+from typing import TYPE_CHECKING, cast
+
 from redis import WatchError
 
 from .core import cache
@@ -24,7 +26,16 @@ from .notification_state import (
 
 
 NOTIFICATION_TTL_SECONDS = 30 * 60
+if TYPE_CHECKING:
+    from ...entities.user import User
+
+
 MAX_TRANSACTION_ATTEMPTS = 8
+
+
+def _aggregate_count(aggregate: Mapping[str, object], field: str) -> int:
+    # Datastore rows also contain keys, timestamps and unrelated metadata.
+    return int(cast(int | str, aggregate.get(field) or 0))
 
 
 # @testable true
@@ -58,7 +69,7 @@ def seed_notification_state(
     notification_keys: Iterable[object] | None = None,
     *,
     keys_loader: Callable[[object], Iterable[object]] | None = None,
-    aggregate_loader: Callable[[object], Mapping[str, int] | None] | None = None,
+    aggregate_loader: Callable[[object], Mapping[str, object] | None] | None = None,
     repair: bool = False,
 ) -> NotificationState:
     """Seed or repair notification membership under an epoch-guarded transaction."""
@@ -89,25 +100,25 @@ def seed_notification_state(
                     try:
                         from lagniappe.core.tools.database import notifications as database_notifications
 
-                        aggregate = database_notifications.get_notification_aggregate(user)
+                        aggregate = database_notifications.get_notification_aggregate(cast("User", user))
                         if aggregate is None:
                             aggregate = database_notifications.repair_notification_aggregate(
-                                user, ordinary_count=len(members)
+                                cast("User", user), ordinary_count=len(members)
                             )
                     except Exception:
                         aggregate = None
                 ordinary_count = (
-                    int(aggregate.get("ordinary_count") or 0)
+                    _aggregate_count(aggregate, "ordinary_count")
                     if aggregate is not None
                     else len(members)
                 )
                 unread_message_count = (
-                    int(aggregate.get("unread_message_count") or 0)
+                    _aggregate_count(aggregate, "unread_message_count")
                     if aggregate is not None
                     else 0
                 )
                 message_revision = (
-                    int(aggregate.get("message_revision") or 0)
+                    _aggregate_count(aggregate, "message_revision")
                     if aggregate is not None
                     else 0
                 )
@@ -157,7 +168,9 @@ def seed_notification_state(
 
 # @testable infrastructure
 def repair_notification_state(
-    user: object, notification_keys: Iterable[object], aggregate: Mapping[str, int] | None = None
+    user: object,
+    notification_keys: Iterable[object],
+    aggregate: Mapping[str, object] | None = None,
 ) -> NotificationState:
     """Repair projection membership from keys already fetched for the list."""
     return seed_notification_state(
@@ -174,7 +187,7 @@ def repair_notification_state(
 # @matrix notifications : cold-cache datastore-read-isolation idempotent-count mutation revision
 def update_notification_projection(
     *, upserts: Iterable[object] = (), deletes: Iterable[object] = (),
-    aggregates: Mapping[str, Mapping[str, int]] | None = None,
+    aggregates: Mapping[str, Mapping[str, object]] | None = None,
 ) -> dict[str, PublicNotificationState]:
     """Apply one logical committed mutation per affected user's projection."""
     results = {}
@@ -197,17 +210,17 @@ def update_notification_projection(
                         revision = current["revision"] + 1
                         aggregate = (aggregates or {}).get(user)
                         ordinary_count = (
-                            int(aggregate.get("ordinary_count") or 0)
+                            _aggregate_count(aggregate, "ordinary_count")
                             if aggregate is not None
                             else len(members)
                         )
                         unread_message_count = (
-                            int(aggregate.get("unread_message_count") or 0)
+                            _aggregate_count(aggregate, "unread_message_count")
                             if aggregate is not None
                             else current.get("unread_message_count", 0)
                         )
                         message_revision = (
-                            int(aggregate.get("message_revision") or 0)
+                            _aggregate_count(aggregate, "message_revision")
                             if aggregate is not None
                             else current.get("message_revision", 0)
                         )
@@ -248,7 +261,9 @@ def update_notification_projection(
 # @testable true
 # @tests tests_unit/test_025_notification_state.py::test_durable_aggregate_publish_preserves_members_and_exact_combined_count
 # @matrix notifications : aggregate-count redis-projection revision
-def publish_notification_aggregate(user: object, aggregate: Mapping[str, int]) -> NotificationState:
+def publish_notification_aggregate(
+    user: object, aggregate: Mapping[str, object]
+) -> NotificationState:
     """Mirror canonical durable counts without reading notification history."""
     identifier = _user_id(user)
     state_key, epoch_key = _redis_keys(identifier)
@@ -263,12 +278,12 @@ def publish_notification_aggregate(user: object, aggregate: Mapping[str, int]) -
                 generation = current.get("generation") if current else str(uuid.uuid4())
                 revision = max(
                     (current or {}).get("revision", 0) + 1,
-                    int(aggregate.get("aggregate_revision") or 0),
+                    _aggregate_count(aggregate, "aggregate_revision"),
                     epoch + 1,
                 )
-                ordinary_count = int(aggregate.get("ordinary_count") or 0)
-                unread_message_count = int(aggregate.get("unread_message_count") or 0)
-                message_revision = int(aggregate.get("message_revision") or 0)
+                ordinary_count = _aggregate_count(aggregate, "ordinary_count")
+                unread_message_count = _aggregate_count(aggregate, "unread_message_count")
+                message_revision = _aggregate_count(aggregate, "message_revision")
                 pipe.multi()
                 pipe.set(epoch_key, str(revision))
                 pipe.delete(state_key)
