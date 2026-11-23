@@ -268,3 +268,12 @@ def test_table_validate_submission_invalid_json(get_test_entities, get_schema):
         with pytest.raises(json.JSONDecodeError):
             table.validate_submission("{not valid json")
         assert table.db_value == original
+
+
+@pytest.mark.unit
+def test_empty_row_name_does_not_inherit_the_parent_entity_name():
+    table = Table(
+        {"id": "places", "columns": [{"id": "name", "input": "text"}]},
+        entity=TestEntities.get("PAGE", {"name": "Parent page", "hash": "row-name"}),
+    )
+    assert RowSubmission(table).form_value == {}
