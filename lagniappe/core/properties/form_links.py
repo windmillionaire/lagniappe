@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from ..entities.entity import Entity
     from ..entities.page import Page
     from ..entities.task import Task
-    from .common_entity import Name
 
 MAPS_SEARCH_URL = "https://www.google.com/maps/search/"
 
@@ -316,8 +315,7 @@ class Bookmark(Link):
                 cast("Page | Task", self.entity).save_asset(image, self.id, "image")
 
         if value.get("replace-name"):
-            # Legacy bookmarks may clear an absent metadata title.
-            cast("Name", self.entity.properties.name).value = metadata.get("name")
+            self.entity.name = metadata.get("name")
 
         if value.get("replace-description"):
             self.entity.description = metadata.get("description")
