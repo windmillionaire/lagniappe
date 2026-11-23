@@ -478,6 +478,11 @@ class IngressMutationPlanner:
         self._history_index = 0
 
     @property
+    def separator(self) -> str | None:
+        """Use the saved multi-value separator for categorical submission fields."""
+        return self.entity.properties.choose_form.separator
+
+    @property
     # @testable infrastructure
     def columns(self) -> CsvColumns | None:
         return self.entity.properties.process_csv.columns

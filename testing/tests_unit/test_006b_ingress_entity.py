@@ -1736,3 +1736,19 @@ def test_ingress_delete_imported_entities_deletes_pages_and_tasks(monkeypatch):
         {"entity": {"id": "form-1", "name": "Unrelated Form", "kind": "form"}},
         {"row": "{\"Name\": \"Bad\"}", "errors": ["Bad row"]},
     ]
+
+
+@pytest.mark.unit
+def test_csv_import_uses_saved_separator_for_multiple_choices(get_schema):
+    from lagniappe.core.tools.ingress import IngressMutationPlanner
+
+    ingress = TestEntities.get("INGRESS", {"name": "Colors", "hash": "importcolors"})
+    ingress.properties.choose_form.separator = "|"
+    form = TestEntities.get("FORM", {"name": "Colors", "hash": "colorform"})
+    form.schema = get_schema("select_only")
+    page = TestEntities.get("PAGE", {"name": "Colors", "hash": "colorpage"})
+    page.form = form
+
+    page.import_submission({"select-ab12": ["Red|Blue"]}, IngressMutationPlanner(ingress))
+
+    assert page.submission["select-ab12"] == ["red", "blue"]
