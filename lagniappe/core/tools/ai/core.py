@@ -136,7 +136,7 @@ def _finish_reason_name(reason: object) -> str | None:
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
 # @matrix ai : citations cleanup
-def clean_json_references(obj):
+def clean_json_references(obj: ModelValue) -> ModelValue:
     """Recursively remove numeric reference citations from JSON strings."""
     if isinstance(obj, dict):
         return {k: clean_json_references(v) for k, v in obj.items()}
@@ -218,7 +218,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
     # @matrix ai : citations cleanup
     @staticmethod
-    def cleanup(response_text: str, output_format: str | None):
+    def cleanup(response_text: str, output_format: str | None) -> ModelValue:
         """Strip code fences and numeric reference citations from model output.
 
         Args:
@@ -299,9 +299,7 @@ class GenAI:
             config["tools"] = [function_tool]
 
         if prompt.thinking_level is not None:
-            config["thinking_config"] = types.ThinkingConfig(
-                thinking_level=prompt.thinking_level
-            )
+            config["thinking_config"] = types.ThinkingConfig.model_validate({"thinking_level": prompt.thinking_level})
         elif prompt.thinking_budget is not None:
             config["thinking_config"] = types.ThinkingConfig(
                 thinking_budget=prompt.thinking_budget

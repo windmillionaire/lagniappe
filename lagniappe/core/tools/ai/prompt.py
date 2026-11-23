@@ -1,5 +1,15 @@
 """Structured prompt builder for Gemini content generation."""
 
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import BinaryIO
+    from werkzeug.datastructures import FileStorage
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.entities.file import File
+    from lagniappe.core.properties.file_assets import FilePart
+
 import json
 import re
 from typing import Self, TypedDict
@@ -45,6 +55,11 @@ TOOL_CALL_PLANNING = """
 """
 
 
+class InlinePart(TypedDict):
+    bytes: bytes
+    mime_type: str
+
+
 class OutputFormat(TypedDict):
     type: str
     description: str | None
@@ -62,15 +77,15 @@ class Prompt:
     report_file_refs: tuple[str, ...]
     require_organization: bool
 
-    def __init__(self, intro: str = "", user=None, type: str | None = None) -> None:
+    def __init__(self, intro: str = "", user: User | None = None, type: str | None = None) -> None:
         self.prompt_type = type
         self.intro = intro
         self.context_blocks = []
         self.instruction_blocks = []
         self.output_format: OutputFormat | None = None
         self.examples = []
-        self._bytes = []
-        self._files = []
+        self._bytes: list[InlinePart] = []
+        self._files: list[FilePart] = []
         self.search = False
         self._tools: list[str] | bool | None = None
         self._user = user
@@ -96,7 +111,7 @@ class Prompt:
         )
 
     @property
-    def observability_contract(self):
+    def observability_contract(self) -> dict[str, str | int]:
         return dict(self._observability_contract or {})
 
     def set_task(self, intro: str) -> Self:
@@ -123,7 +138,7 @@ class Prompt:
             return "\n".join(lines[1:]).strip()
         return text
 
-    def add_context(self, key, value, quote=True, role=None, unique=False):
+    def add_context(self, key: str, value: object, quote: bool = True, role: str | None = None, unique: bool = False) -> Self:
         """Add a labeled context block to the prompt.
 
         Args:
@@ -150,7 +165,7 @@ class Prompt:
             unique=unique,
         )
 
-    def add_workspace_concepts(self, concepts):
+    def add_workspace_concepts(self, concepts: str) -> Self:
         """Add one deduplicated workspace-concepts context block."""
         return self.add_context(
             "lagniappe_concepts",
@@ -162,11 +177,11 @@ class Prompt:
 
     def add_instructions(
         self,
-        instructions,
-        section_title=None,
-        role=None,
-        unique=False,
-    ):
+        instructions: str,
+        section_title: str | None = None,
+        role: str | None = None,
+        unique: bool = False,
+    ) -> Self:
         """Append an instruction block to the prompt."""
         block = {"title": section_title, "content": instructions.strip()}
         return self._replace_or_append(
@@ -176,11 +191,11 @@ class Prompt:
             unique=unique,
         )
 
-    def add_decision_policy(self, instructions):
+    def add_decision_policy(self, instructions: str) -> Self:
         """Append instructions that define decision boundaries."""
         return self.add_instructions(instructions, role="decision_policy")
 
-    def add_preflight_checks(self, instructions):
+    def add_preflight_checks(self, instructions: str) -> Self:
         """Append final self-check instructions."""
         return self.add_instructions(
             instructions,
@@ -190,10 +205,10 @@ class Prompt:
 
     def add_output_contract(
         self,
-        format_type,
-        description=None,
-        include_requirements=True,
-    ):
+        format_type: str,
+        description: str | None = None,
+        include_requirements: bool = True,
+    ) -> Self:
         """Alias for set_output_format, for prompt builders that use semantic roles."""
         return self.set_output_format(
             format_type,
@@ -222,71 +237,71 @@ class Prompt:
         return self
 
     @property
-    def response_schema(self):
+    def response_schema(self) -> dict[str, object] | None:
         return self._response_schema
 
-    def set_response_schema(self, schema):
+    def set_response_schema(self, schema: dict[str, object] | None) -> Self:
         """Set the provider-side schema for structured JSON responses."""
         self._response_schema = schema
         return self
 
-    def add_example(self, example, title=None):
+    def add_example(self, example: object, title: str | None = None) -> Self:
         """Add an example output to the prompt."""
         self.examples.append({"example": example, "title": title})
         return self
 
     @property
-    def thinking_budget(self):
+    def thinking_budget(self) -> int | None:
         return self._thinking_budget
 
-    def set_thinking_budget(self, budget):
+    def set_thinking_budget(self, budget: int | None) -> Self:
         """Set the thinking token budget (0 disables thinking, None uses model default)."""
         self._thinking_budget = budget
         self._thinking_level = None
         return self
 
     @property
-    def thinking_level(self):
+    def thinking_level(self) -> str | None:
         return self._thinking_level
 
-    def set_thinking_level(self, level):
+    def set_thinking_level(self, level: str | None) -> Self:
         """Set a model-supported thinking level instead of a token budget."""
         self._thinking_level = level
         self._thinking_budget = None
         return self
 
     @property
-    def max_tool_iterations(self):
+    def max_tool_iterations(self) -> int | None:
         return self._max_tool_iterations
 
-    def set_max_tool_iterations(self, iterations):
+    def set_max_tool_iterations(self, iterations: int) -> Self:
         """Set the maximum function-calling loop iterations for this prompt."""
         self._max_tool_iterations = iterations
         return self
 
     @property
-    def max_tool_file_parts_per_turn(self):
+    def max_tool_file_parts_per_turn(self) -> int | None:
         return self._max_tool_file_parts_per_turn
 
-    def set_max_tool_file_parts_per_turn(self, count):
+    def set_max_tool_file_parts_per_turn(self, count: int) -> Self:
         """Limit original file parts attached after one function-call turn."""
         self._max_tool_file_parts_per_turn = count
         return self
 
     @property
-    def allowed_actions(self):
+    def allowed_actions(self) -> tuple[str, ...] | None:
         return self._allowed_actions
 
-    def set_allowed_actions(self, actions):
+    def set_allowed_actions(self, actions: Iterable[str] | None) -> Self:
         """Set report action types allowed for prompts that return proposals."""
         self._allowed_actions = tuple(actions or [])
         return self
 
     @property
-    def model_tier(self):
+    def model_tier(self) -> str:
         return self._model_tier
 
-    def set_model_tier(self, tier):
+    def set_model_tier(self, tier: str) -> Self:
         """Select the configured primary or utility model for this prompt."""
         if tier not in ("primary", "utility"):
             raise ValueError("Model tier must be primary or utility.")
@@ -294,22 +309,22 @@ class Prompt:
         return self
 
     @property
-    def service_tier(self):
+    def service_tier(self) -> str | None:
         return self._service_tier
 
-    def set_service_tier(self, tier):
+    def set_service_tier(self, tier: str | None) -> Self:
         """Select an optional Gemini request service tier."""
         if tier is not None and tier not in ("standard", "priority", "flex"):
             raise ValueError("Service tier must be standard, priority, flex, or None.")
         self._service_tier = tier
         return self
 
-    def set_instructions_before_context(self, enabled=True):
+    def set_instructions_before_context(self, enabled: bool = True) -> Self:
         """Place stable instructions before request-specific context."""
         self._instructions_before_context = bool(enabled)
         return self
 
-    def enable_search(self):
+    def enable_search(self) -> Self:
         """Enable Google Search grounding for this prompt."""
         self.search = True
         return self
@@ -324,20 +339,20 @@ class Prompt:
         )
 
     @property
-    def tools(self):
+    def tools(self) -> list[str] | bool | None:
         if self._tools and not self._user:
             raise RuntimeError("Prompt.user must be set when tools are enabled")
         return self._tools
 
     @property
-    def user(self):
+    def user(self) -> User | None:
         return self._user
 
     @property
-    def bytes(self):
+    def bytes(self) -> list[InlinePart]:
         return self._bytes
 
-    def add_bytes(self, file, mime_type):
+    def add_bytes(self, file: BinaryIO | FileStorage, mime_type: str | None) -> Self | None:
         """Attach inline file bytes to the prompt.
 
         Args:
@@ -360,10 +375,10 @@ class Prompt:
         return self
 
     @property
-    def files(self):
+    def files(self) -> list[FilePart]:
         return self._files
 
-    def add_file(self, file, user=None):
+    def add_file(self, file: File, user: User | None = None) -> Self:
         """Attach a Cloud Storage file reference to the prompt."""
         file_part = file.properties.file.uri_to_ai
         if file_part:
@@ -416,7 +431,7 @@ class Prompt:
 
         return "\n".join(sections).replace("\n\n\n", "\n\n").strip()
 
-    def preview(self):
+    def preview(self) -> str:
         """Build a human-readable prompt preview including the system instruction."""
         sections = []
 
@@ -429,7 +444,7 @@ class Prompt:
 
         return "\n\n".join(sections).strip()
 
-    def audit(self):
+    def audit(self) -> dict[str, object]:
         """Return lightweight prompt composition diagnostics."""
         headings = {}
         for match in HEADING_RE.finditer(self.preview()):
