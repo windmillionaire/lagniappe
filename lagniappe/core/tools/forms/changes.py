@@ -111,6 +111,7 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
         if report is not None:
             from ...properties.ai_report_proposal import proposal_fingerprint
 
+            assert schema_action is not None
             change["report"] = report.urlsafe_key
             change["report_fingerprint"] = proposal_fingerprint(report.proposal)
             change["action_id"] = schema_action["id"]

@@ -183,6 +183,7 @@ def classify_changes(previous, proposed, mappings=None):
             )
         if (
             rule == "ai"
+            and target is not None
             and field_kind(target) == "table"
             and (
                 not target.get("columns")

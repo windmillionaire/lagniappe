@@ -3,6 +3,13 @@
 from copy import deepcopy
 from dataclasses import dataclass
 import json
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities.form import Form
+    from lagniappe.core.entities.history import FormHistory
 
 from ...definitions import Fetch
 from ...exceptions import ValidationError
@@ -11,6 +18,9 @@ from ..database.filter import Filter, Query
 from ..database import get as database_get
 from ..files.html import sanitize_form_content_html
 from .contracts import PENDING, json_value
+
+
+type CompletionGuard = tuple[Key, Mapping[str, object] | None]
 
 
 _ORIGINAL_UNAVAILABLE = (
@@ -30,10 +40,10 @@ _COMPLETION_STATUS_FIELDS = (
 # @matrix submission task-completion : schema-version missing-schema
 @dataclass(frozen=True)
 class SubmissionDefinition:
-    source: object = None
+    source: Form | FormHistory | None = None
     generation: int = 0
     immutable: bool = False
-    error: str = None
+    error: str | None = None
 
     @property
     def schema(self):
@@ -131,7 +141,7 @@ def _historical_definition(entity, identity):
 # @matrix submission task-completion : schema-version missing-schema live-metadata
 # @matrix task-completion : deleted-form generation raw-values active-form empty-submission
 # @pairs task-completion:current-definition task-completion:no-extra-read
-def definition_for(entity, *, archived=False):
+def definition_for(entity, *, archived: bool = False) -> SubmissionDefinition:
     """Use live fields unless history or an archived completion is explicitly requested."""
     if entity.entity_kind == "task_history" or (
         archived and entity.entity_kind == "task" and entity.completed and entity.form is None
@@ -199,12 +209,12 @@ def _completion_projection(raw):
 # @tests tests_unit/test_004i_form_definitions.py::test_completion_write_rejects_raw_changes_and_stages_original_guards
 # @tests tests_unit/test_004i_form_definitions.py::test_envelope_write_guard_rejects_raw_mutation_and_stale_active_overwrite
 # @matrix task-completion mutations : immutable-submission concurrency
-def validate_completion_write(entity, persisted):
+def validate_completion_write(entity, persisted: dict | None) -> None:
     """Validate original answers at a write boundary with a fresh persisted row."""
     raw = entity.db
     transition = getattr(entity, "_completion_transition", None)
     action = transition.get("action") if transition else None
-    guards = list(getattr(entity, "_completion_write_guards", ()))
+    guards: list[CompletionGuard] = list(getattr(entity, "_completion_write_guards", ()))
     current = _completion_projection(persisted)
     previous = next((expected for key, expected in guards if key == entity.key), current)
     if previous != current:
@@ -216,6 +226,7 @@ def validate_completion_write(entity, persisted):
         ):
             raise ValidationError("Original completed answers cannot be changed.")
     elif action == "complete":
+        assert transition is not None
         if not raw.get("completed") or raw.get("completed_submission") != transition["envelope"]:
             raise ValidationError("Completed answers and their original form cannot be changed.")
     elif action == "reopen":
@@ -236,9 +247,9 @@ def validate_completion_write(entity, persisted):
 # @testable true
 # @tests tests_unit/test_004i_form_definitions.py::test_completion_write_rejects_raw_changes_and_stages_original_guards
 # @matrix task-completion mutations : immutable-submission concurrency
-def stage_completion_guards(task, *, transition=None):
+def stage_completion_guards(task, *, transition: str | None = None) -> None:
     """Capture concurrency expectations only when completing or reopening a task."""
-    guards = list(getattr(task, "_completion_write_guards", ()))
+    guards: list[CompletionGuard] = list(getattr(task, "_completion_write_guards", ()))
     prior_transition = getattr(task, "_completion_transition", None)
     if (
         prior_transition
@@ -488,6 +499,7 @@ def rendered_html_fields(entity, *, original=False, definition=None, only_field_
             result[field_id] = "<p>Original static content is unavailable. Saved answers are preserved.</p>"
             continue
         source = definition.source
+        assert source is not None
         html = sanitize_form_content_html(source.get_html_field(field_id) or "", source, field_id)
         if definition.immutable:
             for name, asset_definition in source.assets.items():
@@ -548,7 +560,7 @@ def _stored_generation(form_key, generation):
     ).fetch_all()
     if not rows:
         return None
-    return Entities.fetch_one(rows[0], request=Fetch.root())
+    return cast("FormHistory | None", Entities.fetch_one(rows[0], request=Fetch.root()))
 
 
 # @testable true
@@ -564,7 +576,7 @@ def resolve_form_generation(form_or_key, generation):
     if not key:
         return None
     if form is None:
-        form = Entities.fetch_one(key, request=Fetch.root())
+        form = cast("Form | None", Entities.fetch_one(key, request=Fetch.root()))
     if form is not None and form.generation == generation:
         return form
     return _stored_generation(key, generation)

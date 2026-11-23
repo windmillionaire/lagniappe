@@ -219,6 +219,7 @@ def inspect_scope(form, changes, actor, *, include_values=False, ensure_active=N
                     continue
                 before = values[change["id"]]
                 ai = change["rule"] == "ai" and needs_ai_value(before)
+                after = conversions.MISSING
                 if change["rule"] != "ai":
                     after, reason = conversions.convert_value(
                         before,

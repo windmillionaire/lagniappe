@@ -3,6 +3,7 @@
 from copy import deepcopy
 import hashlib
 import json
+from typing import cast
 import re
 from uuid import uuid4
 
@@ -44,6 +45,11 @@ def _digest(value):
     ).encode()).hexdigest()
 
 
+def _field_records(field: dict[str, object], name: str) -> list[dict[str, object]]:
+    """Options and conditions have already passed canonical schema validation."""
+    return cast(list[dict[str, object]], field.get(name) or [])
+
+
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_draft_schema_rejects_collisions_and_broken_conditions
 # @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
@@ -66,10 +72,10 @@ def validate_draft_schema(schema, form_type):
                 expected == "input" and field.get("input", "text") != "text"
             ):
                 raise exceptions.ValidationError("Reserved Page field identity cannot be changed.")
-        values = [option["value"] for option in field.get("options", [])]
+        values = [option["value"] for option in _field_records(field, "options")]
         if len(values) != len(set(values)):
             raise exceptions.ValidationError("Option values must be unique within their field.")
-        for condition in [*(field.get("visibility") or []), *(field.get("status") or [])]:
+        for condition in [*_field_records(field, "visibility"), *_field_records(field, "status")]:
             target = fields.get(condition.get("id"))
             if target is None or target["id"] == field["id"]:
                 raise exceptions.ValidationError("A condition references an unavailable field.")
@@ -80,7 +86,7 @@ def validate_draft_schema(schema, form_type):
             ):
                 raise exceptions.ValidationError("Checkbox conditions require a Boolean value.")
             if target["type"] in {"radio", "select"}:
-                allowed = {option["value"] for option in target.get("options", [])}
+                allowed = {option["value"] for option in _field_records(target, "options")}
                 selected = condition.get("value", condition.get("checked"))
                 selected = selected if isinstance(selected, list) else [selected]
                 if any(value not in allowed for value in selected):
@@ -284,7 +290,7 @@ def _validate_content(schema, html, images):
     for field_id, content in html.items():
         for image in BeautifulSoup(content, "html.parser").find_all("img"):
             source = image.get("src", "")
-            if source.startswith("draft-image:"):
+            if isinstance(source, str) and source.startswith("draft-image:"):
                 image_id = source.removeprefix("draft-image:")
                 if not IMAGE_ID.fullmatch(image_id) or image_id not in images or images[image_id].get("field_id") != field_id:
                     raise exceptions.ValidationError("A draft image is missing or belongs to another field.")
@@ -450,7 +456,10 @@ def copy_form_draft(source, draft, baseline, save_id, actor, *, images=None):
     digest = _digest(draft)
     existing = Entities.fetch_one(key, request=Fetch.direct())
     if existing is not None:
-        receipt = json.loads(existing.db.get("form_draft_receipt") or "{}")
+        encoded = existing.db.get("form_draft_receipt") or "{}"
+        if not isinstance(encoded, str):
+            raise FormDraftConflict("The saved copy receipt is invalid.")
+        receipt = json.loads(encoded)
         if receipt.get("id") != save_id or receipt.get("digest") != digest or receipt.get("baseline") != builder_draft(existing)["baseline"]:
             raise FormDraftConflict("This copied Form changed after the original Copy request.")
         return {**_saved_response(existing, receipt.get("image_urls") or {}), "form_key": existing.urlsafe_key}
