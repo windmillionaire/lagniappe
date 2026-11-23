@@ -17,6 +17,7 @@ class CachedDetail(TypedDict, total=False):
     parent_key: str
     form_hash: str | None
     parent: CachedDetail
+    requires: list[str]
     restricted_to: dict[str, list[str]]
     form_version: str
     modified: str
