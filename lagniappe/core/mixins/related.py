@@ -202,7 +202,7 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
 
     # AI Attributes
     @property
-    def ai_value(self) -> list[dict[str, object]]:
+    def ai_value(self) -> list[dict[str, object]] | None:
         return [
             _ai_entity_reference(e)
             for e in self.value
