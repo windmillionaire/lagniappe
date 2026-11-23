@@ -13,7 +13,7 @@ qualifications below; **02, 08 and 13 remain incomplete against their evidence
 requirements**. Acceptance validates a proposal's contract, not its factual
 completeness. No proposal execution is recorded during these measured tasks.
 The operator's separate execution/undo observations are summarized in the
-[implementation overview](../../documentation/EXTERNAL_AI_IMPLEMENTATION.md).
+[implementation overview](../../../documentation/EXTERNAL_AI_IMPLEMENTATION.md).
 
 **Operator disposition after review:** defer 02 and accept 08/13 as broadly
 useful results with room for improvement. Their recorded evidence omissions

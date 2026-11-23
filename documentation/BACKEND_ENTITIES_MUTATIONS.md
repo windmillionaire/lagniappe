@@ -72,7 +72,7 @@ job rather than publishing the schema immediately. The executor fences affected
 writes and deletes using the current pending marker and generation. Migration
 application uses explicit, lease-guarded answer masks and normal projection/cache
 effects; successful publication uses the same archive and exact-source guards
-above. See [BACKEND_JOBS.md](BACKEND_JOBS.md#deterministic-form-changes).
+above. See [BACKEND_JOBS.md](BACKEND_JOBS.md#form-changes).
 
 ## Property masks
 
