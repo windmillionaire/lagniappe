@@ -218,16 +218,18 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
 
     def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
-        if len(condition.value_list) > 1:
+        # Entity-valued conditions store hashes in their value list.
+        hashes = cast("list[str]", condition.value_list)
+        if len(hashes) > 1:
             details["text"] = "is any of"
             details["or"] = [
                 condition.entity_map[h].reference_details
-                for h in condition.value_list
+                for h in hashes
             ]
-        elif len(condition.value_list) == 1:
+        elif len(hashes) == 1:
             details["text"] = "is"
             details["entity"] = condition.entity_map[
-                condition.value_list[0]
+                hashes[0]
             ].reference_details
         return details
 
@@ -437,16 +439,18 @@ class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
 
     def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
-        if len(condition.value_list) > 1:
+        # Entity-valued conditions store hashes in their value list.
+        hashes = cast("list[str]", condition.value_list)
+        if len(hashes) > 1:
             details["text"] = "is one of"
             details["or"] = [
                 condition.entity_map[h].reference_details
-                for h in condition.value_list
+                for h in hashes
             ]
-        elif len(condition.value_list) == 1:
+        elif len(hashes) == 1:
             details["text"] = "is"
             details["entity"] = condition.entity_map[
-                condition.value_list[0]
+                hashes[0]
             ].reference_details
         return details
 
