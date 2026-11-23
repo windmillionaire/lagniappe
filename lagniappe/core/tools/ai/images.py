@@ -41,6 +41,8 @@ def _choose_aspect_ratio(prompt):
 
     try:
         result = ai_model.generate_content(ratio_prompt)
+        if not isinstance(result, str):
+            return None
         ratio = result.strip().strip('"').strip("'")
         if ratio in VALID_ASPECT_RATIOS:
             return ratio

@@ -2,6 +2,7 @@
 
 import json
 import re
+from typing import Self, TypedDict
 
 from lagniappe.core.definitions import FileConsumer, enforce_file_consumer
 
@@ -44,6 +45,12 @@ TOOL_CALL_PLANNING = """
 """
 
 
+class OutputFormat(TypedDict):
+    type: str
+    description: str | None
+    requirements: str | None
+
+
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_tracks_context_output_examples_and_attachments
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_rejects_oversized_inline_file_before_read
@@ -55,17 +62,17 @@ class Prompt:
     report_file_refs: tuple[str, ...]
     require_organization: bool
 
-    def __init__(self, intro="", user=None, type=None):
+    def __init__(self, intro: str = "", user=None, type: str | None = None) -> None:
         self.prompt_type = type
         self.intro = intro
         self.context_blocks = []
         self.instruction_blocks = []
-        self.output_format = None
+        self.output_format: OutputFormat | None = None
         self.examples = []
         self._bytes = []
         self._files = []
         self.search = False
-        self._tools = None
+        self._tools: list[str] | bool | None = None
         self._user = user
         self._thinking_budget = None
         self._thinking_level = None
@@ -92,7 +99,7 @@ class Prompt:
     def observability_contract(self):
         return dict(self._observability_contract or {})
 
-    def set_task(self, intro):
+    def set_task(self, intro: str) -> Self:
         """Set the system instruction / high-level task for the prompt."""
         self.intro = intro
         return self
@@ -194,7 +201,7 @@ class Prompt:
             include_requirements=include_requirements,
         )
 
-    def set_output_format(self, format_type, description=None, include_requirements=True):
+    def set_output_format(self, format_type: str, description: str | None = None, include_requirements: bool = True) -> Self:
         """Set the expected output format (JSON, MARKDOWN, IMAGE, or TEXT)."""
         self.output_format = {
             "type": format_type,
@@ -307,7 +314,7 @@ class Prompt:
         self.search = True
         return self
 
-    def enable_tools(self, *tool_names):
+    def enable_tools(self, *tool_names: str) -> Self:
         """Enable function-calling tools, optionally limited to specific names."""
         self._tools = list(tool_names) if tool_names else True
         return self.add_instructions(
@@ -363,7 +370,7 @@ class Prompt:
             self._files.append(file_part)
         return self
 
-    def build(self):
+    def build(self) -> str:
         """Assemble all sections into the final prompt string."""
         sections = []
 

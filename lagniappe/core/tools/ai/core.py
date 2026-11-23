@@ -3,7 +3,10 @@
 from io import BytesIO
 import json
 import re
-from typing import Never
+from typing import TYPE_CHECKING, Never, Unpack
+
+if TYPE_CHECKING:
+    from .prompt import Prompt
 
 from google import genai
 from google.genai import types
@@ -11,7 +14,7 @@ from google.genai import types
 from lagniappe import CONFIG
 
 from ... import exceptions
-from .settings import runtime_ai_settings
+from .settings import RuntimeAISettings, runtime_ai_settings
 from .provider_policy import (
     is_provider_quota_error as is_provider_quota_error,
     is_provider_transient_error as is_provider_transient_error,
@@ -19,7 +22,7 @@ from .provider_policy import (
     provider_error_message as provider_error_message,
     retry_http_options as retry_http_options,
 )
-from .provider_session import ProviderSession, current_session
+from .provider_session import ContentRequest, ProviderSession, current_session
 from .functions import (
     FUNCTION_TOOL,
     MAX_TOOL_ITERATIONS,
@@ -103,14 +106,14 @@ def _raise_provider_error(error: Exception) -> Never:
 # @testable false
 # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
 # @reason private model-routing branch for image provider selection
-def _is_imagen_model(model):
+def _is_imagen_model(model: str) -> bool:
     return str(model or "").startswith("imagen-")
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/core.py::GenAI._generate_imagen_image
 # @reason private prompt adapter for Imagen's text-only request shape
-def _image_prompt_text(prompt):
+def _image_prompt_text(prompt: Prompt) -> str:
     return "\n\n".join(part for part in (prompt.intro, prompt.build()) if part)
 
 
@@ -118,7 +121,7 @@ def _image_prompt_text(prompt):
 # @covered-by lagniappe/core/tools/ai/core.py::GenAI._extract_text
 # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
 # @reason provider enum normalization is asserted through text and image extraction
-def _finish_reason_name(reason):
+def _finish_reason_name(reason: object) -> str | None:
     """Normalize SDK enum and string finish reasons to their provider value."""
     if reason is None:
         return None
@@ -143,7 +146,7 @@ def clean_json_references(obj):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
 # @matrix ai : cleanup json-extraction
-def extract_first_json_value(response_text):
+def extract_first_json_value(response_text: str) -> str | None:
     """Return the first balanced JSON object or array from model output."""
     start = next(
         (index for index, char in enumerate(response_text) if char in "{["),
@@ -194,7 +197,7 @@ class GenAI:
 
     # @testable infrastructure
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         """Initialize the GenAI client if not already connected."""
         if cls._client:
             return
@@ -211,7 +214,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
     # @matrix ai : citations cleanup
     @staticmethod
-    def cleanup(response_text, output_format):
+    def cleanup(response_text: str, output_format: str | None):
         """Strip code fences and numeric reference citations from model output.
 
         Args:
@@ -248,7 +251,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
     # @matrix ai : config output-format retry-config retry-ownership search service-tier thinking tools
     @staticmethod
-    def create_config(prompt, **overrides):
+    def create_config(prompt: Prompt, **overrides: object) -> types.GenerateContentConfig:
         """Build a GenerateContentConfig from a Prompt's settings."""
         execution_control = current_execution_control()
         service_tier_headers = (
@@ -259,7 +262,7 @@ class GenAI:
             if prompt.service_tier in {"priority", "flex"}
             else None
         )
-        config = {
+        config: dict[str, object] = {
             "http_options": retry_http_options(
                 attempts=(DEFERRED_AI_RETRY_ATTEMPTS if execution_control else None),
                 headers=service_tier_headers,
@@ -307,14 +310,14 @@ class GenAI:
                 config["response_schema"] = prompt.response_schema
 
         config.update(overrides)
-        return types.GenerateContentConfig(**config)
+        return types.GenerateContentConfig.model_validate(config)
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
     # @matrix ai : model-routing request-pinning runtime-settings
     @staticmethod
-    def _model_for_prompt(prompt, settings=None):
+    def _model_for_prompt(prompt: Prompt, settings: RuntimeAISettings | None = None) -> str:
         """Choose the configured text model for a prompt's requested tier."""
         settings = settings or runtime_ai_settings()
         if prompt.model_tier == "utility":
@@ -324,8 +327,8 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_tracks_context_output_examples_and_attachments
     # @matrix ai : attachments prompt
-    def _build_contents(self, prompt):
-        contents = [prompt.build()]
+    def _build_contents(self, prompt: Prompt) -> list[types.ContentUnionDict]:
+        contents: list[types.ContentUnionDict] = [prompt.build()]
         for data in prompt.bytes:
             contents.append(
                 types.Part.from_bytes(data=data["bytes"], mime_type=data["mime_type"])
@@ -341,7 +344,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
     # @matrix ai : empty-json response-extraction safety
     @staticmethod
-    def _extract_text(response, output_format):
+    def _extract_text(response: types.GenerateContentResponse, output_format: str | None):
         if response.candidates:
             candidate = response.candidates[0]
 
@@ -380,7 +383,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
     # @matrix ai : output-format provider-errors quota search tool-loop
     # @matrix ai : empty-response-retry model-routing site-policy provider-boundary
-    def generate_content(self, prompt, *, validator=None, validation_retries=0):
+    def generate_content(self, prompt: Prompt, *, validator=None, validation_retries: int = 0):
         """Generate and optionally validate text under one observable call boundary."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -448,7 +451,7 @@ class GenAI:
 
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
-    def _request_content(self, **kwargs):
+    def _request_content(self, **kwargs: Unpack[ContentRequest]) -> types.GenerateContentResponse:
         session = current_session.get()
         if session is not None:
             return session.request(**kwargs)
@@ -459,9 +462,10 @@ class GenAI:
     # @covered-by lagniappe/core/tools/ai/category.py::generate_category
     # @covered-by lagniappe/core/tools/ai/project.py::generate_project
     # @reason single-attempt provider flow is exercised through the public retry wrapper and downstream generators
-    def _generate_content_once(self, prompt, model, validator=None, validation_retries=0):
+    def _generate_content_once(self, prompt: Prompt, model: str, validator=None, validation_retries: int = 0):
         """Generate text content from a Prompt, including optional tool-call loops."""
         contents = self._build_contents(prompt)
+        assert prompt.output_format is not None
         output_format = prompt.output_format.get("type")
         if validator is not None and prompt.response_schema:
             # Keep the contract visible when provider-side schema constraints are
@@ -582,11 +586,11 @@ class GenAI:
     # @matrix ai : error-context tool-dispatch trace validation repair
     def _tool_loop(
         self,
-        response,
-        contents,
-        config,
-        prompt,
-        output_format,
+        response: types.GenerateContentResponse,
+        contents: list[types.ContentUnionDict],
+        config: types.GenerateContentConfig,
+        prompt: Prompt,
+        output_format: str | None,
         final_config=None,
         model=None,
         validator=None,
@@ -664,7 +668,7 @@ class GenAI:
 
                 if debug_enabled():
                     debug_log(f"[ai:tool-loop] Iteration {iteration + 1}/{max_iterations}")
-                assert response.candidates
+                assert response.candidates and response.candidates[0].content
                 contents.append(response.candidates[0].content)
 
                 try:
@@ -882,7 +886,7 @@ class GenAI:
     # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
     # @matrix ai pages : image-generate site-policy provider-boundary
-    def generate_image(self, prompt, aspect_ratio: str | None = None) -> GeneratedImage:
+    def generate_image(self, prompt: Prompt, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image from a Prompt and return a BytesIO buffer."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -931,12 +935,11 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
     # @matrix ai : config image-generate imagen
-    def _generate_imagen_image(self, prompt, model: str, aspect_ratio: str | None = None) -> GeneratedImage:
+    def _generate_imagen_image(self, prompt: Prompt, model: str, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image through Imagen's generate_images endpoint."""
-        config_data: types.GenerateImagesConfigDict = {"number_of_images": 1}
+        config = types.GenerateImagesConfig(number_of_images=1)
         if aspect_ratio:
-            config_data["aspect_ratio"] = aspect_ratio
-        config = types.GenerateImagesConfig.model_validate(config_data)
+            config.aspect_ratio = aspect_ratio
 
         execution_control = current_execution_control()
         if execution_control is not None:

@@ -2,7 +2,7 @@
 
 import asyncio
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 if TYPE_CHECKING:
     from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
@@ -13,6 +13,14 @@ from google.genai import types
 from lagniappe import CONFIG
 
 from .provider_policy import is_provider_transient_error, retry_http_options
+
+
+class ContentRequest(TypedDict):
+    """Exactly the request fields shared by sync and cancellable generation."""
+
+    model: str
+    contents: types.ContentListUnionDict
+    config: types.GenerateContentConfig
 
 
 current_session: ContextVar[ProviderSession | None] = ContextVar("ai_provider_session", default=None)
@@ -32,10 +40,10 @@ class ProviderSession:
         self.runner = asyncio.Runner()
         self.client: genai.Client | None = None
 
-    def request(self, **kwargs):
+    def request(self, **kwargs: Unpack[ContentRequest]) -> types.GenerateContentResponse:
         return self.runner.run(self._request(kwargs))
 
-    async def _request(self, kwargs):
+    async def _request(self, kwargs: ContentRequest) -> types.GenerateContentResponse:
         self.control.ensure_active()
         if self.client is None:
             self.client = genai.Client(
@@ -54,7 +62,7 @@ class ProviderSession:
             config.http_options = retry_http_options(attempts=1, headers=headers)
             config.http_options.timeout = max(1, int(self.control.remaining_seconds * 1000))
             task = asyncio.create_task(self.client.aio.models.generate_content(
-                **{**kwargs, "config": config}
+                model=kwargs["model"], contents=kwargs["contents"], config=config,
             ))
             try:
                 while not task.done():

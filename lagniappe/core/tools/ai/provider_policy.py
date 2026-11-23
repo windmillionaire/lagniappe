@@ -1,5 +1,8 @@
 """Shared provider retry options and error classification."""
 
+from collections.abc import Mapping
+from typing import TypedDict
+
 from google.genai import types
 import httpx
 
@@ -14,10 +17,21 @@ from config.ai_models import (
 )
 
 
+class ProviderErrorDetails(TypedDict):
+    code: object
+    status: object
+    message: str | None
+    raw: str
+
+
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
 # @pair ai:retry-config
-def retry_http_options(api_version=None, attempts=None, headers=None):
+def retry_http_options(
+    api_version: str | None = None,
+    attempts: int | None = None,
+    headers: Mapping[str, str] | None = None,
+) -> types.HttpOptions:
     """Build request-level retry settings and optional routing headers."""
     retry_options = types.HttpRetryOptions(
         attempts=attempts or AI_RETRY_ATTEMPTS,
@@ -27,7 +41,7 @@ def retry_http_options(api_version=None, attempts=None, headers=None):
         jitter=AI_RETRY_JITTER,
         http_status_codes=AI_RETRY_STATUS_CODES,
     )
-    options = {
+    options: dict[str, object] = {
         "retry_options": retry_options,
         "timeout": AI_REQUEST_TIMEOUT_MS,
     }
@@ -35,17 +49,17 @@ def retry_http_options(api_version=None, attempts=None, headers=None):
         options["api_version"] = api_version
     if headers:
         options["headers"] = dict(headers)
-    return types.HttpOptions(**options)
+    return types.HttpOptions.model_validate(options)
 
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
 # @tests tests_unit/test_015_ai_tools.py::test_generate_ai_image_returns_clean_provider_message
 # @matrix ai : config image-generate provider-errors user-message
-def provider_error_message(error):
+def provider_error_message(error: BaseException) -> str:
     """Extract the concise provider message from a GenAI exception."""
     details = provider_error_details(error)
-    if details.get("message"):
+    if details["message"]:
         return details["message"]
 
     return str(error).strip() or "The image provider did not return details."
@@ -54,7 +68,7 @@ def provider_error_message(error):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_text_generation
 # @matrix ai : provider-errors quota
-def provider_error_details(error):
+def provider_error_details(error: BaseException) -> ProviderErrorDetails:
     """Extract structured details from a GenAI provider exception."""
     message = getattr(error, "message", None)
     code = getattr(error, "code", None)
@@ -79,7 +93,7 @@ def provider_error_details(error):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_text_generation
 # @matrix ai : provider-errors quota
-def is_provider_quota_error(error):
+def is_provider_quota_error(error: BaseException) -> bool:
     """Return whether a provider exception represents retryable quota pressure."""
     details = provider_error_details(error)
     code = details.get("code")
@@ -95,7 +109,7 @@ def is_provider_quota_error(error):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_transient_error_classification
 # @matrix ai deferred-jobs : provider-errors retry-classification
-def is_provider_transient_error(error):
+def is_provider_transient_error(error: BaseException) -> bool:
     """Return whether a provider error is safe for a deferred retry."""
     if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
         return True
