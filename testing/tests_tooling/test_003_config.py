@@ -1151,6 +1151,37 @@ def test_runtime_upload_boundary_has_no_local_orchestration_imports(settings_con
 
     assert runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT) == []
 
+def test_offline_mutation_contracts_check_the_real_registry(monkeypatch):
+    root = runner_context.REPOSITORY_ROOT
+    monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(root / "testing/fixtures/offline-runtime"))
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+    cli = ["run.py", "mutation-contracts", "--check", "--json"]
+    result = subprocess.run([sys.executable, *cli], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert json.loads(result.stdout)["errors"] == []
+
+    # Remove a real persisted relation while leaving the entity class intact.
+    # Run the same CLI in the process containing the altered contract registry.
+    drift = """
+from dataclasses import replace
+import runpy
+import sys
+
+from lagniappe.core.definitions.mutation_contracts import ENTITY_MUTATION_CONTRACTS
+
+user = ENTITY_MUTATION_CONTRACTS["user"]
+ENTITY_MUTATION_CONTRACTS["user"] = replace(
+    user, relations=tuple(relation for relation in user.relations if relation.name != "groups")
+)
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name="__main__")
+"""
+    result = subprocess.run([sys.executable, "-c", drift, *cli], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 1, result.stderr or result.stdout
+    assert "user is missing persisted relations: groups" in json.loads(result.stdout)["errors"]
+
+
 
 def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch):
     recovery = _load_recovery_module(monkeypatch)

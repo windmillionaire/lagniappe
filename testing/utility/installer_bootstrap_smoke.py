@@ -1,6 +1,9 @@
 """Exercise setup-time configuration imports without credentials or provider calls."""
 
+from pathlib import Path
 from unittest.mock import patch
+
+import yaml
 
 
 def check_bootstrap() -> None:
@@ -11,17 +14,13 @@ def check_bootstrap() -> None:
 
     assert callable(discover_model_options)
     assert callable(configure_storage_bucket)
-    settings = RuntimeSettings(Environment.TESTING, {
-        "CONFIG_KIND": "lagniappe-settings",
-        "CONFIG_SCHEMA_VERSION": 3,
-        "GOOGLE_CLOUD_PROJECT": "project-1",
-        "VERSION": "1.0",
-        "GIBBERISH": "bucket-seed",
-        "RUNTIME_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
-        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": "runtime@project-1.iam.gserviceaccount.com",
-        "APP_ENGINE_LOCATION": "us-central",
-        "RESOURCE_REGION": "us-central1",
-    })
+    fixture = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures/offline-runtime/config/files/lagniappe_settings.yaml"
+    )
+    settings = RuntimeSettings(
+        Environment.TESTING, yaml.safe_load(fixture.read_text(encoding="utf-8"))
+    )
     with patch("config.load_runtime_settings", return_value=settings):
         from lagniappe.core.exceptions import AISettingsError
 
