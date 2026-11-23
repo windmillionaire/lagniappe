@@ -529,7 +529,10 @@ def authenticate_access(token: str, *, now: datetime | None = None):
     row = store.read(_name(token, "a"))
     if not _live(row, now) or not _bound(row, config):
         raise OAuthError()
-    grant = store.read(row.get("grant"))
+    grant_name = row.get("grant")
+    if not isinstance(grant_name, str):
+        raise OAuthError()
+    grant = store.read(grant_name)
     if (
         not _live(grant, now)
         or not _bound(grant, config)

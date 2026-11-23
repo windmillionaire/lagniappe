@@ -500,6 +500,8 @@ def rendered_html_fields(entity, *, original=False, definition=None, only_field_
             continue
         source = definition.source
         assert source is not None
+        if not isinstance(field_id, str):
+            raise ValueError("Static Form HTML requires a text field ID.")
         html = sanitize_form_content_html(source.get_html_field(field_id) or "", source, field_id)
         if definition.immutable:
             for name, asset_definition in source.assets.items():

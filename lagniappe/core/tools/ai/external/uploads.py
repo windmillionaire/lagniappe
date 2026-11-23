@@ -114,11 +114,15 @@ def finalize_uploads(
         record = getattr(upload, "record", None)
         if not isinstance(record, dict):
             raise exceptions.ValidationError("The upload manifest identity is invalid.")
+        batch_id = record.get("upload_batch_id")
+        file_index = record.get("file_index")
+        if not isinstance(batch_id, str) or not isinstance(file_index, int):
+            raise exceptions.ValidationError("The upload manifest identity is invalid.")
         file_key = database_get.datastore_key(record.get("file_key"))
         expected_key = agent_api_store.upload_file_key(
             report.key,
-            record.get("upload_batch_id"),
-            record.get("file_index"),
+            batch_id,
+            file_index,
         )
         if file_key != expected_key:
             raise exceptions.ValidationError("The upload manifest identity is invalid.")

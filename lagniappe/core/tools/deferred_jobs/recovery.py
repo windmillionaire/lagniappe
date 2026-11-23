@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from google.cloud.datastore import Key
     # Dispatch, recovery, and execution are composed by the same service.
     from .service import DeferredJobService
 
@@ -43,7 +44,7 @@ class DeferredJobRecovery:
             snapshot = database_deferred_jobs.get_deferred_job_scheduler_control()
             jobs = self._reconcile_candidates(limit=None)
             repair = database_deferred_jobs.repair_deferred_job_scheduler_control(
-                [job.key for job in jobs],
+                [cast("Key", job.key) for job in jobs],
                 snapshot["generation"],
                 now,
             )

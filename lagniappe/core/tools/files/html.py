@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lagniappe.core.entities.form import Form
+    from lagniappe.core.entities.history import FormHistory
 import re
 import textwrap
 from urllib.parse import urlsplit
@@ -542,7 +543,7 @@ def sanitize_html(content: object) -> SafeHTML:
 # @tests tests_unit/test_014_security.py::test_form_content_policy_keeps_only_owned_images
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
 # @matrix form-html security : html-sanitization inner-html owned-image
-def sanitize_form_content_html(content: object, form: Form, field_id: str) -> SafeHTML:
+def sanitize_form_content_html(content: object, form: Form | FormHistory, field_id: str) -> SafeHTML:
     """Apply the form-content policy and retain only this field's owned images."""
     if not isinstance(content, str) or not content:
         return _stamp_safe_html("")

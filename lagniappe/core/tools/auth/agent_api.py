@@ -97,7 +97,7 @@ def _public_metadata(row, *, now=None):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
 # @matrix agent-api : authentication expiry issue shown-once
-def issue_credential(user: User, *, now: datetime | None = None):
+def issue_credential(user: User, *, now: datetime | None = None) -> tuple[str, dict[str, object]]:
     """Rotate the user's credential and return the secret exactly once."""
     if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
         raise AgentAPICredentialError("External AI access is disabled.")
@@ -105,6 +105,8 @@ def issue_credential(user: User, *, now: datetime | None = None):
     identifier = credential_id(user)
     secret = secrets.token_urlsafe(32)
     token = f"{TOKEN_PREFIX}{identifier}.{secret}"
+    if user.key is None:
+        raise AgentAPICredentialError("External AI access requires a saved user.")
     row = credential_store.rotate_credential(
         identifier,
         user.key,
@@ -119,7 +121,9 @@ def issue_credential(user: User, *, now: datetime | None = None):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
 # @matrix agent-api : authentication expiry revoke
-def revoke_credential(user: User, *, now: datetime | None = None):
+def revoke_credential(user: User, *, now: datetime | None = None) -> dict[str, object]:
+    if user.key is None:
+        raise AgentAPICredentialError("External AI access requires a saved user.")
     row = credential_store.revoke_credential(
         credential_id(user),
         user.key,
@@ -131,7 +135,7 @@ def revoke_credential(user: User, *, now: datetime | None = None):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
 # @matrix agent-api : authentication expiry
-def credential_status(user: User, *, now: datetime | None = None):
+def credential_status(user: User, *, now: datetime | None = None) -> dict[str, object]:
     row = credential_store.get_credential(credential_id(user))
     if row is not None and row.get("user") != user.key:
         row = None

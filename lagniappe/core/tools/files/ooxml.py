@@ -272,7 +272,7 @@ def is_supported_ooxml(filename: str | None = None, mimetype: str | None = None)
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_forbidden_or_malformed_xml
 # @matrix files : bounded-resources docx ooxml partial-result xlsx
 def extract_ooxml(
-    content: bytes | bytearray | memoryview | BinaryReader,
+    content: bytes | bytearray | memoryview | BinaryReader | None,
     filename: str | None = None, mimetype: str | None = None, *, max_characters: int | None = None,
 ) -> OOXMLExtractionResult | None:
     """Extract bounded rough text and partial-result metadata from DOCX/XLSX."""
@@ -336,7 +336,7 @@ def extract_ooxml(
 # @matrix ai files : compatibility docx ooxml rows shared-strings summary-fallback tabs xlsx
 # @pair ai:ooxml
 def extract_ooxml_text(
-    content: bytes | bytearray | memoryview | BinaryReader,
+    content: bytes | bytearray | memoryview | BinaryReader | None,
     filename: str | None = None, mimetype: str | None = None,
 ) -> str | None:
     """Compatibility wrapper returning only bounded extracted text."""

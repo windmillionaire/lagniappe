@@ -20,7 +20,7 @@ class CacheRebuildResult:
     """Outcome of a migration-gated cache rebuild."""
 
     rebuilt: bool
-    migration_status: dict
+    migration_status: database_migrations.MigrationStatus
     cache_status: dict | None = None
 
 
@@ -33,7 +33,7 @@ class CacheRebuildResult:
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_reports_bad_records_and_continues
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_does_not_hide_provider_failures
 # @matrix cache : failure-isolation actionable-links
-def rebuild_application_cache(*, chunk_size=100):
+def rebuild_application_cache(*, chunk_size: int = 100) -> CacheRebuildResult:
     """Rebuild cached entities only when migration state allows it."""
     migration_status = database_migrations.get_migration_status()
     if not migration_status["cache_refresh_allowed"]:
