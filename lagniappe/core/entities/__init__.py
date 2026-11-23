@@ -165,9 +165,11 @@ class EntityRegistry:
 
         entities = {key: value for key, value in pending.items() if value}
 
+        # Unsaved explicit roots remain in the result but cannot identify a relation.
+        keyed_entities = {key: entity for key, entity in entities.items() if key is not None}
         resolved_keys = {*secondary_keys, *related_keys}
         for entity in entities.values():
-            entity.attach(entities, resolved_keys=resolved_keys)
+            entity.attach(keyed_entities, resolved_keys=resolved_keys)
 
         primary_entities = {
             key: entities[key] for key in primary_keys if key in entities
