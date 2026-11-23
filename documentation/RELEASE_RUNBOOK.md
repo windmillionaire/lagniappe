@@ -136,6 +136,14 @@ building changed service inputs and activating them after App Engine; see
 Skip the commit if the canonical builds are already committed and the tree is
 clean.
 
+For a mechanical change recorded in `.git-blame-ignore-revs`, check whether
+each listed commit is already an ancestor of the release base before carrying
+its entry through a squash. For example, run
+`git merge-base --is-ancestor "$strip_sha" origin/main`. A successful result
+means Git can find that revision in the future main history. Keep branch-only
+entries on their integration branch. The release squash also contains behavior
+changes that must remain attributable in blame.
+
 ### 4. Run the offline gates
 
 ```bash
