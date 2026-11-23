@@ -1,10 +1,11 @@
 """Provider-free form conversions. Classification reads schemas, never submissions."""
-
-from copy import deepcopy
-from datetime import date, datetime, UTC
 import json
 import math
 import re
+from collections.abc import Iterable, Mapping
+from copy import deepcopy
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,9 @@ import phonenumbers
 
 from ...exceptions import ValidationError
 from .contracts import needs_ai_value
+
+if TYPE_CHECKING:
+    from ...properties.base_schema import FieldDefinition
 
 
 VERSION = 2
@@ -51,15 +55,46 @@ TRUE = frozenset({"true", "yes", "1", "on"})
 FALSE = frozenset({"false", "no", "0", "off"})
 
 
+type Rule = Literal["scalar", "delete", "table", "text", "ai"]
+type OptionMap = dict[str, str | bool | None]
+
+
+class FieldChange(TypedDict):
+    id: str
+    source: FieldDefinition
+    target: FieldDefinition | None
+    rule: Rule
+    version: int
+    map: OptionMap
+
+
+class NoticeEntry(TypedDict):
+    schema: FieldDefinition
+    value: object
+    generation: int
+    reason: NotRequired[str]
+
+
+type MigrationNotice = dict[str, NoticeEntry]
+
+
+def _options(field: Mapping[str, object]) -> list[dict[str, str]]:
+    return cast(list[dict[str, str]], field.get("options", []))
+
+
+def _columns(field: Mapping[str, object]) -> list[FieldDefinition]:
+    return cast("list[FieldDefinition]", field.get("columns", []))
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/forms/conversions.py::classify_changes
 # @reason effective kinds are shared by schema classification and pure conversion
-def field_kind(field):
-    kind = field.get("type")
+def field_kind(field: Mapping[str, object]) -> str | None:
+    kind = cast(str | None, field.get("type"))
     if kind == "input":
-        return field.get("input", "text")
+        return cast(str, field.get("input", "text"))
     if kind == "link":
-        return field.get("location", "out")
+        return cast(str, field.get("location", "out"))
     if kind == "select" and field.get("multiple"):
         return "multiple"
     return kind
@@ -68,7 +103,9 @@ def field_kind(field):
 # @testable true
 # @tests tests_unit/test_004j_form_conversions.py::test_capabilities_are_schema_only
 # @matrix form-migration : capabilities no-submission-read
-def conversion_rule(source, target):
+def conversion_rule(
+    source: FieldDefinition, target: FieldDefinition | None
+) -> Rule | None:
     """Return an executable rule, an AI placeholder, or an unsupported result."""
     before, after = field_kind(source), field_kind(target) if target else "delete"
     if after == "delete":
@@ -95,11 +132,11 @@ def conversion_rule(source, target):
 # @testable true
 # @tests tests_unit/test_004j_form_conversions.py::test_capabilities_are_schema_only
 # @matrix form-migration : capabilities no-submission-read
-def conversion_catalog():
+def conversion_catalog() -> dict[str, object]:
     """Project the same code-owned capabilities to the builder without I/O."""
 
     # @testable infrastructure
-    def schema(kind):
+    def schema(kind: str) -> FieldDefinition:
         if kind in {"text", "email", "tel", "number", "date", "time"}:
             return {"type": "input", "input": kind}
         if kind in {"in", "out"}:
@@ -127,12 +164,12 @@ def conversion_catalog():
 # @testable false
 # @covered-by lagniappe/core/tools/forms/conversions.py::classify_changes
 # @reason fingerprints exclude presentation and only identify representation changes
-def representation(field):
+def representation(field: Mapping[str, object]) -> dict[str, object]:
     return {
         "kind": field_kind(field),
-        "options": sorted(option["value"] for option in field.get("options", [])),
+        "options": sorted(option["value"] for option in _options(field)),
         "columns": {
-            column["id"]: representation(column) for column in field.get("columns", [])
+            column["id"]: representation(column) for column in _columns(field)
         },
     }
 
@@ -140,15 +177,19 @@ def representation(field):
 # @testable true
 # @tests tests_unit/test_004j_form_conversions.py::test_schema_diff_preserves_ids_and_rejects_unsupported_changes
 # @matrix form-migration : schema-diff identity validation
-def classify_changes(previous, proposed, mappings=None):
+def classify_changes(
+    previous: Iterable[FieldDefinition],
+    proposed: Iterable[FieldDefinition],
+    mappings: Mapping[str, OptionMap] | None = None,
+) -> list[FieldChange]:
     """Derive actual answer changes; caller-owned labels never classify a diff."""
     mappings = mappings or {}
     if not isinstance(mappings, dict):
         raise ValidationError("Invalid form conversion mappings.")
     targets = {field["id"]: field for field in proposed}
-    changes = []
+    changes: list[FieldChange] = []
     for source in previous:
-        field_id = source["id"]
+        field_id = cast(str, source["id"])
         target = targets.get(field_id)
         if target and representation(source) == representation(target):
             continue
@@ -157,12 +198,12 @@ def classify_changes(previous, proposed, mappings=None):
             and field_kind(source) in CHOICE
             and field_kind(source) == field_kind(target)
         ):
-            old_values = {option["value"] for option in source.get("options", [])}
-            if old_values <= {option["value"] for option in target.get("options", [])}:
+            old_values = {option["value"] for option in _options(source)}
+            if old_values <= {option["value"] for option in _options(target)}:
                 continue
         if target and field_kind(source) == field_kind(target) == "table":
             columns = classify_changes(
-                source.get("columns", []), target.get("columns", [])
+                _columns(source), _columns(target)
             )
             if not columns:
                 continue
@@ -189,7 +230,7 @@ def classify_changes(previous, proposed, mappings=None):
                 not target.get("columns")
                 or any(
                     field_kind(column) not in INPUTS | {"checkbox", "out", "bookmark"}
-                    for column in target["columns"]
+                    for column in _columns(target)
                 )
             )
         ):
@@ -227,11 +268,11 @@ def classify_changes(previous, proposed, mappings=None):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/conversions.py::convert_value
 # @reason text extraction is a provider-free part of the conversion contract
-def _text(value, source, zone):
+def _text(value: object, source: FieldDefinition, zone: str) -> str:
     kind = field_kind(source)
     if kind in CHOICE:
-        labels = {
-            option["value"]: option["label"] for option in source.get("options", [])
+        labels: dict[object, str] = {
+            option["value"]: option["label"] for option in _options(source)
         }
         values = value if isinstance(value, list) else [value]
         return "\n".join(str(labels.get(item, item)) for item in values)
@@ -262,10 +303,10 @@ def _text(value, source, zone):
     if kind == "todo":
         return "\n".join(
             f"- [{'x' if item.get('checked') else ' '}] {item['text']}"
-            for item in value["items"]
+            for item in cast(dict[str, list[dict[str, object]]], value)["items"]
         )
     if kind == "table":
-        columns = source.get("columns", [])
+        columns = _columns(source)
 
         def cell(text):
             return text.replace("|", "\\|").replace("\n", "<br>")
@@ -282,7 +323,7 @@ def _text(value, source, zone):
                 else ""
                 for column in columns
             )
-            for row in rows
+            for row in cast(list[dict[object, object]], rows)
         )
         return "\n".join(f"| {row} |" for row in output)
     return str(value)
@@ -291,7 +332,7 @@ def _text(value, source, zone):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/conversions.py::convert_value
 # @reason destination parsing is deliberately separate from coercing AI/import validators
-def _parse(text, target, zone):
+def _parse(text: str, target: FieldDefinition, zone: str) -> object:
     kind = field_kind(target)
     value = text.strip()
     if kind == "textarea":
@@ -360,7 +401,14 @@ def _parse(text, target, zone):
 # @tests tests_unit/test_004j_form_conversions.py::test_scalar_conversions_and_invalid_values
 # @tests tests_unit/test_004j_form_conversions.py::test_table_and_collection_conversions
 # @matrix form-migration : conversion invalid-value presence nested-columns provider-free
-def convert_value(value, source, target, *, mapping=None, zone="UTC"):
+def convert_value(
+    value: object,
+    source: FieldDefinition,
+    target: FieldDefinition | None,
+    *,
+    mapping: OptionMap | None = None,
+    zone: str = "UTC",
+) -> tuple[object, str]:
     """Return (value or MISSING, reason); malformed answers clear deterministically."""
     if target is None:
         return MISSING, "removed"
@@ -375,7 +423,7 @@ def convert_value(value, source, target, *, mapping=None, zone="UTC"):
             ):
                 return MISSING, "invalid"
             changes = classify_changes(
-                source.get("columns", []), target.get("columns", [])
+                _columns(source), _columns(target)
             )
             converted = []
             for row in rows:
@@ -398,7 +446,7 @@ def convert_value(value, source, target, *, mapping=None, zone="UTC"):
         if before in CHOICE or after in CHOICE:
             values = value if isinstance(value, list) else [value]
             if after in CHOICE:
-                allowed = {option["value"] for option in target.get("options", [])}
+                allowed = {option["value"] for option in _options(target)}
                 converted = []
                 for item in values:
                     token = str(item).lower() if isinstance(item, bool) else str(item)
@@ -407,7 +455,7 @@ def convert_value(value, source, target, *, mapping=None, zone="UTC"):
                         label = _text(item, source, zone).strip().casefold()
                         matches = [
                             option["value"]
-                            for option in target.get("options", [])
+                            for option in _options(target)
                             if option["label"].strip().casefold() == label
                         ]
                         mapped = (
@@ -452,8 +500,14 @@ def convert_value(value, source, target, *, mapping=None, zone="UTC"):
 # @tests tests_unit/test_004j_form_conversions.py::test_submission_notice_preserves_first_values_and_unrelated_answers
 # @matrix form-migration : notice preservation presence repeated-change
 def convert_submission(
-    values, changes, *, previous_notice=None, generation=0, zone="UTC", ai_values=None
-):
+    values: dict[str, object],
+    changes: Iterable[FieldChange],
+    *,
+    previous_notice: MigrationNotice | None = None,
+    generation: int = 0,
+    zone: str = "UTC",
+    ai_values: Mapping[str, object] | None = None,
+) -> tuple[dict[str, object], MigrationNotice]:
     """Patch planned paths and retain one cumulative informational before-state."""
     result = deepcopy(values)
     notice = deepcopy(previous_notice or {})
@@ -505,7 +559,7 @@ def convert_submission(
 # @testable true
 # @tests tests_unit/test_004l_form_schema_updates.py::test_ai_candidates_validate_exact_shapes_without_truthiness_coercion
 # @matrix form-migration : ai-value strict-validation table todo
-def validate_ai_candidate(candidate, target):
+def validate_ai_candidate(candidate: object, target: FieldDefinition | None) -> object:
     """Accept exact destination values or an explicit unresolved outcome."""
     if not isinstance(candidate, dict):
         raise ValidationError("AI conversion must return an object.")
@@ -523,10 +577,12 @@ def validate_ai_candidate(candidate, target):
         raise ValidationError(
             "AI conversion must use the destination collection envelope."
         )
+    if target is None:
+        raise ValidationError("Unsupported AI conversion destination.")
     if field_kind(target) == "todo":
         if set(value) != {"items"} or not isinstance(value["items"], list):
             raise ValidationError("Todo conversion requires an items array.")
-        for item in value["items"]:
+        for item in cast(dict[str, list[dict[str, object]]], value)["items"]:
             if (
                 not isinstance(item, dict)
                 or set(item) != {"text", "checked"}
@@ -540,7 +596,7 @@ def validate_ai_candidate(candidate, target):
     elif field_kind(target) == "table":
         if set(value) != {"rows"} or not isinstance(value["rows"], list):
             raise ValidationError("Table conversion requires a rows array.")
-        columns = {column["id"]: column for column in target.get("columns", [])}
+        columns = {column["id"]: column for column in _columns(target)}
         if not columns:
             raise ValidationError("AI table conversion requires destination columns.")
         for row_number, row in enumerate(value["rows"], start=1):
@@ -597,7 +653,7 @@ def validate_ai_candidate(candidate, target):
                         "tel": "a phone number",
                         "out": "a web link",
                         "bookmark": "a web link",
-                    }.get(kind, "text")
+                    }.get(kind or "", "text")
                     raise ValidationError(
                         f'“{title}”, row {row_number}: the converted value must be {expected}.'
                     )

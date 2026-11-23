@@ -1,7 +1,7 @@
 """Persisted Form-change vocabulary and value helpers shared below workflows."""
-
-from copy import deepcopy
 import json
+from collections.abc import Mapping
+from copy import deepcopy
 
 from ...exceptions import ValidationError
 
@@ -22,7 +22,7 @@ ANSWER_FIELDS = (
 # @covered-by lagniappe/core/tools/forms/changes.py::start_change
 # @covered-by lagniappe/core/tools/forms/changes.py::apply_target
 # @reason persisted JSON is read explicitly at job, mutation, and projection boundaries
-def json_value(raw, name):
+def json_value(raw: Mapping[str, object], name: str) -> dict[str, object]:
     value = raw.get(name)
     value = json.loads(value) if isinstance(value, str) else deepcopy(value)
     if value is not None and not isinstance(value, dict):
@@ -33,7 +33,7 @@ def json_value(raw, name):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/changes.py::apply_target
 # @reason bounded records are checked before any live answer is changed
-def check_size(raw):
+def check_size(raw: Mapping[str, object]) -> None:
     if (
         len(json.dumps(dict(raw), default=str, ensure_ascii=False).encode())
         > 900 * 1024
@@ -46,7 +46,7 @@ def check_size(raw):
 # @testable false
 # @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
 # @reason blank collection envelopes should never require a provider call
-def needs_ai_value(value):
+def needs_ai_value(value: object) -> bool:
     if value is None or value == "" or value == [] or value == {}:
         return False
     return not (isinstance(value, dict) and (value == {"rows": []} or value == {"items": []}))

@@ -1,11 +1,8 @@
 """Snapshot, merge, and review contracts for concurrently editable autofill."""
-
-from copy import deepcopy
 import json
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from google.cloud.datastore import Key
+from collections.abc import Collection, Iterable, Mapping
+from copy import deepcopy
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from ...definitions import Action, Fetch
 from ...entities import Entities
@@ -14,14 +11,34 @@ from ..ai import autofill
 from ..database.utility import ExactEntityState
 from .contracts import check_size, json_value
 
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ...entities.deferred_job import DeferredJob
+    from ...entities.page import Page
+    from ...entities.task import Task
+    from ...entities.user import User
+    from ...properties.base_schema import FieldDefinition
+
 
 REVIEWS = "autofill_reviews"
 RECEIPT = "autofill_receipt"
 
 
+class Proposal(TypedDict):
+    answers: dict[str, object]
+    values: dict[str, object]
+
+
 # @testable true
 # @pair ai:autofill
-def merge_proposal(baseline, current, proposed, *, review_only=False):
+def merge_proposal(
+    baseline: Mapping[str, object],
+    current: dict[str, object],
+    proposed: Mapping[str, object],
+    *,
+    review_only: bool = False,
+) -> tuple[dict[str, object], dict[str, object], list[str]]:
     """Merge whole-field updates; never infer identities for rows or checklist items."""
     merged, conflicts, applied = deepcopy(current), {}, []
     for field_id, value in proposed.items():
@@ -41,7 +58,16 @@ def merge_proposal(baseline, current, proposed, *, review_only=False):
 
 # @testable true
 # @pair ai:autofill
-def launch_snapshot(target, actor, *, instructions=None, submission=None, prompt_submission=None, target_context=None, review_context=None):
+def launch_snapshot(
+    target: Page | Task,
+    actor: User,
+    *,
+    instructions: str | None = None,
+    submission: dict[str, object] | None = None,
+    prompt_submission: dict[str, object] | None = None,
+    target_context: dict[str, object] | None = None,
+    review_context: dict[str, object] | None = None,
+) -> dict[str, object]:
     """Seal the form and the initial AI input before the worker can reload them."""
     prompt = autofill.autofill_prompt_data(target, actor, user_context=instructions)
     prompt.pop("user", None)
@@ -70,18 +96,23 @@ def launch_snapshot(target, actor, *, instructions=None, submission=None, prompt
 
 # @testable true
 # @pair ai:autofill
-def snapshot_matches_form(snapshot, target):
+def snapshot_matches_form(snapshot: Mapping[str, object], target: Page | Task) -> bool:
     """Answer drift can be reviewed; a different form definition needs a fresh run."""
     return bool(snapshot) and (
         snapshot.get("form") == getattr(target.form, "urlsafe_key", None)
         and snapshot.get("generation") == target.generation
-        and snapshot.get("prompt", {}).get("schema") == target.submission_schema
+        and cast(Mapping[str, object], snapshot.get("prompt", {})).get("schema") == target.submission_schema
     )
 
 
 # @testable true
 # @pair ai:autofill
-def prepare_proposal(schema, submission, target, actor):
+def prepare_proposal(
+    schema: Iterable[FieldDefinition],
+    submission: Mapping[str, object],
+    target: Page | Task,
+    actor: User,
+) -> Proposal:
     """Validate against the launch schema and retain both stored and browser values."""
     submission = autofill.validate_submission(submission, entity=target, user=actor, schema=schema)
     fields = {field["id"]: field for field in schema}
@@ -95,29 +126,35 @@ def prepare_proposal(schema, submission, target, actor):
 
 # @testable true
 # @pair ai:autofill
-def stage_submission_guard(target, submitted):
+def stage_submission_guard(
+    target: Page | Task, submitted: Mapping[str, object]
+) -> bool:
     """Check a browser baseline and fence the eventual write, not just the read."""
     expected = submitted.get("form-revision")
     if expected != target.autofill_revision:
         return False
     guards: list[tuple[Key, ExactEntityState]] = list(getattr(target, "_form_additional_guards", ()))
+    if target.key is None:
+        return False
     guards.append((target.key, ExactEntityState(deepcopy(dict(target.db)))))
     target._form_additional_guards = guards
     return True
 
 
 # @testable infrastructure
-def review_slot(actor=None):
+def review_slot(actor: User | None = None) -> str | None:
     return actor.urlsafe_key if actor is not None else "shared"
 
 
 # @testable infrastructure
-def review_references(target):
-    return json_value(target.db, REVIEWS)
+def review_references(target: Page | Task) -> dict[str | None, str | None]:
+    return cast(dict[str | None, str | None], json_value(target.db, REVIEWS))
 
 
 # @testable infrastructure
-def remember_review(target, job, *, private=False):
+def remember_review(
+    target: Page | Task, job: DeferredJob, *, private: bool = False
+) -> None:
     refs = review_references(target)
     refs[review_slot(job.actor if private else None)] = job.urlsafe_key
     target.db[REVIEWS] = json.dumps(refs)
@@ -126,7 +163,7 @@ def remember_review(target, job, *, private=False):
 
 # @testable true
 # @pair ai:autofill
-def review_projection(target, actor):
+def review_projection(target: Page | Task, actor: User) -> list[dict[str, object]]:
     """Project only saved shared proposals and this editor's private refinement."""
     if not target.allowed(Action.EDIT, user=actor):
         return []
@@ -162,7 +199,9 @@ def review_projection(target, actor):
 
 # @testable true
 # @pair ai:autofill
-def acknowledge_reviews(target, actor, operations):
+def acknowledge_reviews(
+    target: Page | Task, actor: User, operations: Collection[str]
+) -> None:
     """Only a successful ordinary save consumes explicitly reviewed references."""
     refs = review_references(target)
     for slot in ("shared", review_slot(actor)):
