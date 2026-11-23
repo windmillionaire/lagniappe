@@ -469,6 +469,14 @@ def _run_create_preflight(source, *, base_ref=None):
         ("Python source", [python, "-m", "ruff", "check", "."]),
         ("Python type checking", [python, "-m", "basedpyright", "--warnings"]),
         (
+            "locked MCP environment",
+            [python, "-c", "from runner.mcp_environment import prepare_environment; prepare_environment()"],
+        ),
+        (
+            "MCP type checking",
+            [python, "-m", "basedpyright", "--warnings", "--project", "mcp/pyrightconfig.json"],
+        ),
+        (
             "tooling tests",
             [python, run_py, "test", "--no-test-evidence", "tooling"],
         ),

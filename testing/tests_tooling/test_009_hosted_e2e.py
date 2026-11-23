@@ -384,21 +384,27 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     assert command_arguments[0] == ["npm", "run", "check"]
     assert command_arguments[1][1:] == ["-m", "ruff", "check", "."]
     assert command_arguments[2][1:] == ["-m", "basedpyright", "--warnings"]
-    assert command_arguments[3][2:] == [
+    assert command_arguments[3][1:] == [
+        "-c", "from runner.mcp_environment import prepare_environment; prepare_environment()",
+    ]
+    assert command_arguments[4][1:] == [
+        "-m", "basedpyright", "--warnings", "--project", "mcp/pyrightconfig.json",
+    ]
+    assert command_arguments[5][2:] == [
         "test",
         "--no-test-evidence",
         "tooling",
     ]
-    assert command_arguments[4][2:] == [
+    assert command_arguments[6][2:] == [
         "template-contracts",
         "--check",
         "--no-report",
     ]
-    assert command_arguments[5][2:] == [
+    assert command_arguments[7][2:] == [
         "style-contracts", "--check", "--no-report", "--no-manifest",
     ]
-    assert command_arguments[6][2:] == ["mutation-contracts", "--check"]
-    assert command_arguments[7][2:] == [
+    assert command_arguments[8][2:] == ["mutation-contracts", "--check"]
+    assert command_arguments[9][2:] == [
         "release-check",
         "--base",
         revision,
@@ -1832,6 +1838,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "npm run check" in quality_text
     assert "ruff check ." in quality_text
     assert "basedpyright --warnings" in quality_text
+    assert "--project mcp/pyrightconfig.json" in quality_text
     assert "run.py traceability" not in quality_text
     assert "release-check --base" in quality_text
     assert "gcloud" not in quality_text

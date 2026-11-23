@@ -536,6 +536,12 @@ jobs:
       - name: Check Python types
         run: venv/bin/python -m basedpyright --warnings
 
+      - name: Check Python types in the locked MCP environment
+        run: |
+          venv/bin/python -m runner.uv_bootstrap install --non-interactive
+          venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
+          venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+
       - name: Check complete release tree
         env:
           RELEASE_BASE_REF: ${{ steps.context.outputs.base_sha }}
