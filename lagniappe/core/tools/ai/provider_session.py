@@ -2,6 +2,10 @@
 
 import asyncio
 from contextvars import ContextVar
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
 
 from google import genai
 from google.genai import types
@@ -11,7 +15,7 @@ from lagniappe import CONFIG
 from .provider_policy import is_provider_transient_error, retry_http_options
 
 
-current_session = ContextVar("ai_provider_session", default=None)
+current_session: ContextVar[ProviderSession | None] = ContextVar("ai_provider_session", default=None)
 MIN_PROVIDER_RETRY_SECONDS = 30
 
 
@@ -23,10 +27,10 @@ MIN_PROVIDER_RETRY_SECONDS = 30
 class ProviderSession:
     """Own the client and loop; never leave a blocked request in a worker thread."""
 
-    def __init__(self, control):
+    def __init__(self, control: DeferredExecutionControl) -> None:
         self.control = control
         self.runner = asyncio.Runner()
-        self.client = None
+        self.client: genai.Client | None = None
 
     def request(self, **kwargs):
         return self.runner.run(self._request(kwargs))
@@ -80,5 +84,6 @@ class ProviderSession:
         finally:
             self.runner.close()
 
-    async def _close_client(self):
-        await asyncio.wait_for(self.client.aio.aclose(), timeout=2)
+    async def _close_client(self) -> None:
+        if self.client is not None:
+            await asyncio.wait_for(self.client.aio.aclose(), timeout=2)

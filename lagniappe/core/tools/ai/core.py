@@ -3,6 +3,7 @@
 from io import BytesIO
 import json
 import re
+from typing import Never
 
 from google import genai
 from google.genai import types
@@ -81,7 +82,7 @@ DEFERRED_AI_RETRY_ATTEMPTS = 2
 # @testable false
 # @covered-by lagniappe/core/tools/ai/provider_policy.py::is_provider_quota_error
 # @reason wrapper message is exercised through provider quota tests
-def _raise_provider_error(error):
+def _raise_provider_error(error: Exception) -> Never:
     if is_provider_quota_error(error):
         details = provider_error_details(error)
         context = {
@@ -182,12 +183,13 @@ def extract_first_json_value(response_text):
 class GenAI:
     """Singleton wrapper around the Google GenAI client for Vertex AI."""
 
-    _client = None
+    _client: genai.Client | None = None
 
     @property
-    def client(self):
+    def client(self) -> genai.Client:
         if not self._client:
             self.initialize()
+        assert self._client is not None
         return self._client
 
     # @testable infrastructure
@@ -197,15 +199,13 @@ class GenAI:
         if cls._client:
             return
 
-        client_kwargs = {
-            "project": CONFIG.GOOGLE_CLOUD_PROJECT,
-            "location": CONFIG.AI_LOCATION,
-            "vertexai": True,
-            "http_options": retry_http_options(api_version="v1"),
-        }
-        client_kwargs["credentials"] = CONFIG.google_credentials
-
-        cls._client = genai.Client(**client_kwargs)
+        cls._client = genai.Client(
+            project=CONFIG.GOOGLE_CLOUD_PROJECT,
+            location=CONFIG.AI_LOCATION,
+            vertexai=True,
+            http_options=retry_http_options(api_version="v1"),
+            credentials=CONFIG.google_credentials,
+        )
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
@@ -388,7 +388,7 @@ class GenAI:
         token = observer.install()
         terminal_error = None
         control = current_execution_control()
-        session = ProviderSession(control) if (
+        session = ProviderSession(control) if control is not None and (
             getattr(control, "report_planning", False)
             or getattr(control, "cancellable_provider", False)
         ) else None
@@ -487,9 +487,9 @@ class GenAI:
                     prompt,
                     tools=list(GOOGLE_SEARCH_TOOL) if prompt.search else None,
                 )
+        observer = current_observer()
+        execution_control = current_execution_control()
         try:
-            observer = current_observer()
-            execution_control = current_execution_control()
             if execution_control is not None:
                 execution_control.before_provider("initial")
             if observer is not None:
@@ -664,6 +664,7 @@ class GenAI:
 
                 if debug_enabled():
                     debug_log(f"[ai:tool-loop] Iteration {iteration + 1}/{max_iterations}")
+                assert response.candidates
                 contents.append(response.candidates[0].content)
 
                 try:
@@ -717,7 +718,7 @@ class GenAI:
                     ]
                     contents.append(types.Content(role="user", parts=uri_parts))
 
-            if getattr(execution_control, "report_planning", False) and (
+            if execution_control is not None and getattr(execution_control, "report_planning", False) and (
                 len(tool_trace) >= min(16, max_iterations)
                 or execution_control.remaining_seconds <= 180
             ):
@@ -764,13 +765,11 @@ class GenAI:
                         quota=is_provider_quota_error(e),
                     )
                 if is_provider_quota_error(e):
-                    quota_error = None
                     try:
                         _raise_provider_error(e)
-                    except exceptions.AIQuotaError as caught:
-                        quota_error = caught
-                    quota_error.context.update(context)
-                    raise quota_error from e
+                    except exceptions.AIQuotaError as quota_error:
+                        quota_error.context.update(context)
+                        raise quota_error from e
                 raise
             if execution_control is not None:
                 execution_control.after_provider(provider_stage)
@@ -834,9 +833,9 @@ class GenAI:
                 ],
             )
         )
+        observer = current_observer()
+        execution_control = current_execution_control()
         try:
-            observer = current_observer()
-            execution_control = current_execution_control()
             if execution_control is not None:
                 execution_control.before_provider("structured_final")
             if observer is not None:
@@ -856,19 +855,17 @@ class GenAI:
                     quota=is_provider_quota_error(e),
                 )
             if tool_trace and is_provider_quota_error(e):
-                quota_error = None
                 try:
                     _raise_provider_error(e)
-                except exceptions.AIQuotaError as caught:
-                    quota_error = caught
-                quota_error.context["ai_tool_loop"] = {
-                    "prompt_type": prompt.prompt_type,
-                    "search_enabled": prompt.search,
-                    "tools_enabled": prompt.tools,
-                    "final_response": True,
-                    "trace": tool_trace,
-                }
-                raise quota_error from e
+                except exceptions.AIQuotaError as quota_error:
+                    quota_error.context["ai_tool_loop"] = {
+                        "prompt_type": prompt.prompt_type,
+                        "search_enabled": prompt.search,
+                        "tools_enabled": prompt.tools,
+                        "final_response": True,
+                        "trace": tool_trace,
+                    }
+                    raise quota_error from e
             _raise_provider_error(e)
         if execution_control is not None:
             execution_control.after_provider("structured_final")
@@ -885,7 +882,7 @@ class GenAI:
     # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
     # @matrix ai pages : image-generate site-policy provider-boundary
-    def generate_image(self, prompt, aspect_ratio=None):
+    def generate_image(self, prompt, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image from a Prompt and return a BytesIO buffer."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -894,7 +891,7 @@ class GenAI:
             return self._generate_imagen_image(prompt, model, aspect_ratio=aspect_ratio)
 
         contents = self._build_contents(prompt)
-        overrides = {"response_modalities": IMAGE_RESPONSE_MODALITIES}
+        overrides: dict[str, object] = {"response_modalities": IMAGE_RESPONSE_MODALITIES}
         if aspect_ratio:
             overrides["image_config"] = types.ImageConfig(aspect_ratio=aspect_ratio)
         config = GenAI.create_config(prompt, **overrides)
@@ -924,7 +921,7 @@ class GenAI:
         if candidate.content and candidate.content.parts:
             for part in candidate.content.parts:
                 if part.inline_data and part.inline_data.data:
-                    output = BytesIO(part.inline_data.data)
+                    output = GeneratedImage(part.inline_data.data)
                     output.seek(0)
                     output.content_type = part.inline_data.mime_type or "image/png"
                     return output
@@ -934,12 +931,12 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
     # @matrix ai : config image-generate imagen
-    def _generate_imagen_image(self, prompt, model, aspect_ratio=None):
+    def _generate_imagen_image(self, prompt, model: str, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image through Imagen's generate_images endpoint."""
-        config_data = {"number_of_images": 1}
+        config_data: types.GenerateImagesConfigDict = {"number_of_images": 1}
         if aspect_ratio:
             config_data["aspect_ratio"] = aspect_ratio
-        config = types.GenerateImagesConfig(**config_data)
+        config = types.GenerateImagesConfig.model_validate(config_data)
 
         execution_control = current_execution_control()
         if execution_control is not None:
@@ -960,7 +957,7 @@ class GenAI:
         for generated in response.generated_images or []:
             image = getattr(generated, "image", None)
             if image and image.image_bytes:
-                output = BytesIO(image.image_bytes)
+                output = GeneratedImage(image.image_bytes)
                 output.seek(0)
                 output.content_type = image.mime_type or "image/png"
                 return output
@@ -977,6 +974,12 @@ class GenAI:
             raise exceptions.AIException(f"Image generation blocked: {filtered}")
 
         raise exceptions.AIException("No image data in response")
+
+
+class GeneratedImage(BytesIO):
+    """Image data and the corresponding MIME type returned by the provider."""
+
+    content_type: str
 
 
 ai_model = GenAI()

@@ -83,8 +83,8 @@ def page_image_generation_prompt(**kwargs):
 
     if kwargs.get("user_prompt"):
         prompt.add_context("user_request", kwargs.get("user_prompt"))
-    if kwargs.get("page_details"):
-        for key, value in kwargs.get("page_details").items():
+    if page_details := kwargs.get("page_details"):
+        for key, value in page_details.items():
             if value:
                 prompt.add_context(key, value)
 

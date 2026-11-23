@@ -1,6 +1,7 @@
 """Runtime resolution for application AI settings."""
 
 import logging
+from typing import Literal, TypedDict
 
 from config import constants
 from lagniappe import CONFIG
@@ -9,7 +10,18 @@ from ..database import site as site_database
 
 
 LOGGER = logging.getLogger(__name__)
-RUNTIME_AI_SETTING_KEYS = (
+type ModelSetting = Literal["AI_MODEL", "AI_UTILITY_MODEL", "AI_IMAGE_MODEL", "AI_LOCATION"]
+
+
+class RuntimeAISettings(TypedDict):
+    AI_MODEL: str
+    AI_UTILITY_MODEL: str
+    AI_IMAGE_MODEL: str
+    AI_LOCATION: str
+    AI_AUTO_EXECUTE: bool
+
+
+RUNTIME_AI_SETTING_KEYS: tuple[ModelSetting, ...] = (
     "AI_MODEL",
     "AI_UTILITY_MODEL",
     "AI_IMAGE_MODEL",
@@ -20,9 +32,9 @@ RUNTIME_AI_SETTING_KEYS = (
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_runtime_settings_override_deployment_defaults
 # @matrix ai : deployment-fallback model-routing runtime-settings
-def runtime_ai_settings(config=CONFIG):
+def runtime_ai_settings(config=CONFIG) -> RuntimeAISettings:
     """Return live site AI settings over deployment-configured fallbacks."""
-    settings: dict[str, object] = {
+    settings: RuntimeAISettings = {
         "AI_MODEL": getattr(config, "AI_MODEL", constants.DEFAULT_AI_MODEL),
         "AI_UTILITY_MODEL": getattr(
             config,
@@ -51,13 +63,9 @@ def runtime_ai_settings(config=CONFIG):
         return settings
 
     if persisted:
-        settings.update(
-            {
-                key: persisted[key]
-                for key in RUNTIME_AI_SETTING_KEYS
-                if persisted.get(key)
-            }
-        )
+        for key in RUNTIME_AI_SETTING_KEYS:
+            if persisted.get(key):
+                settings[key] = persisted[key]
         if "AI_AUTO_EXECUTE" in persisted:
             settings["AI_AUTO_EXECUTE"] = bool(persisted.get("AI_AUTO_EXECUTE"))
     return settings

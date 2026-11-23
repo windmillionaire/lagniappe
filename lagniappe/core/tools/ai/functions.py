@@ -248,9 +248,9 @@ def _result_summary(result):
     if isinstance(result, list):
         summary = {"type": "list", "count": len(result)}
         kinds = [
-            item.get("kind")
+            kind
             for item in result
-            if isinstance(item, dict) and item.get("kind")
+            if isinstance(item, dict) and (kind := item.get("kind"))
         ]
         if kinds:
             summary["kinds"] = sorted(set(kinds))[:TRACE_LIST_LIMIT]

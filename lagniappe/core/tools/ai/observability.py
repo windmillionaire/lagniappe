@@ -10,6 +10,10 @@ import json
 import logging
 import time
 import uuid
+from typing import TYPE_CHECKING, overload
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
 
 from lagniappe import CONFIG
 from lagniappe.core.tools.database import analytics as analytics_database
@@ -107,12 +111,12 @@ class AIExecutionContext:
     attempt: int | None = None
     contract_version: int | None = None
     telemetry_id: str | None = field(default=None, repr=False, compare=False)
-    execution_control: object | None = field(default=None, repr=False, compare=False)
+    execution_control: DeferredExecutionControl | None = field(default=None, repr=False, compare=False)
 
 
 _EMPTY_CONTEXT = AIExecutionContext()
 _EXECUTION_CONTEXT = ContextVar("ai_execution_context", default=_EMPTY_CONTEXT)
-_CURRENT_OBSERVER = ContextVar("ai_generation_observer", default=None)
+_CURRENT_OBSERVER: ContextVar[GenerationObserver | None] = ContextVar("ai_generation_observer", default=None)
 
 
 # @testable true
@@ -262,7 +266,13 @@ def enabled(config=CONFIG):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
 # @reason bounded dimensions are exercised through persisted generation summaries
-def _bounded_contract(value, fallback="unknown"):
+@overload
+def _bounded_contract(value: object, fallback: str = "unknown") -> str: ...
+@overload
+def _bounded_contract(value: object, fallback: None) -> str | None: ...
+
+
+def _bounded_contract(value: object, fallback: str | None = "unknown") -> str | None:
     value = str(value or "").strip().lower().replace("_", "-")
     if not value or len(value) > 80:
         return fallback
@@ -373,14 +383,11 @@ class GenerationObserver:
                 str(execution.telemetry_id) if execution.telemetry_id else None
             ),
             model_tier=(
-                getattr(prompt, "model_tier", None)
-                if getattr(prompt, "model_tier", None) in {"primary", "utility"}
+                tier if (tier := getattr(prompt, "model_tier", None)) in {"primary", "utility"}
                 else "primary"
             ),
             service_tier=(
-                getattr(prompt, "service_tier", None)
-                if getattr(prompt, "service_tier", None)
-                in {"standard", "priority", "flex"}
+                tier if (tier := getattr(prompt, "service_tier", None)) in {"standard", "priority", "flex"}
                 else "standard"
             ),
             original_file_count=(

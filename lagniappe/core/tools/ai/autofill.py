@@ -272,12 +272,9 @@ def form_autofill_prompt(**kwargs):
     prompt.set_thinking_level("LOW")
     prompt.enable_search()
 
-    form_name = (
-        kwargs.get("form").name if kwargs.get("form") else kwargs.get("form_name")
-    )
-    form_schema = (
-        kwargs.get("form").schema if kwargs.get("form") else kwargs.get("schema")
-    )
+    form = kwargs.get("form")
+    form_name = form.name if form else kwargs.get("form_name")
+    form_schema = form.schema if form else kwargs.get("schema")
     file = kwargs.get("file")
     original_files = tuple(kwargs.get("original_files") or ())
     original_file_parts = tuple(kwargs.get("original_file_parts") or ())

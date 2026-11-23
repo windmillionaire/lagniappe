@@ -51,6 +51,10 @@ TOOL_CALL_PLANNING = """
 class Prompt:
     """Composable prompt that assembles context, instructions, and output format into a single request."""
 
+    mode: str | None
+    report_file_refs: tuple[str, ...]
+    require_organization: bool
+
     def __init__(self, intro="", user=None, type=None):
         self.prompt_type = type
         self.intro = intro
@@ -72,7 +76,7 @@ class Prompt:
         self._service_tier = None
         self._response_schema = None
         self._instructions_before_context = False
-        contract = PROMPT_OBSERVABILITY_CONTRACTS.get(type)
+        contract = PROMPT_OBSERVABILITY_CONTRACTS.get(type) if type is not None else None
         self._observability_contract = (
             {
                 "workflow": contract[0],
