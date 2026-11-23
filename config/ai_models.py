@@ -317,7 +317,7 @@ def _options_response(
     # @testable false
     # @covered-by config/ai_models.py::discover_model_options
     # @reason per-kind limit and current selection preservation use public coverage
-    def limited_options(kind, current_ids):
+    def limited_options(kind: str, current_ids: tuple[object, ...]) -> list[ModelOption]:
         kind_options = [option for option in options if option["kind"] == kind]
         available_ids = {option["id"] for option in kind_options}
         selected_ids = {

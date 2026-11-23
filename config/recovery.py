@@ -163,7 +163,7 @@ def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, obj
     # @testable false
     # @covered-by config/recovery.py::redact_settings_for_display
     # @reason nested key classifier exercised through the public redaction helper
-    def secret_key(key):
+    def secret_key(key: object) -> bool:
         normalized = re.sub(r"[^A-Z0-9]+", "_", str(key).upper()).strip("_")
         compact = normalized.replace("_", "")
         return normalized == REDIS_CA_PEM or any(
@@ -173,7 +173,7 @@ def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, obj
     # @testable false
     # @covered-by config/recovery.py::redact_settings_for_display
     # @reason recursive implementation exercised through the public redaction helper
-    def redact(value, key=""):
+    def redact(value: object, key: object = "") -> object:
         if secret_key(key):
             return REDACTED_VALUE
         if isinstance(value, Mapping):
