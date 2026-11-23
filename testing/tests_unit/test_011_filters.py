@@ -16,7 +16,7 @@ reading ``Filter.conditions``.
 
 import json
 import re
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 import pytest
 

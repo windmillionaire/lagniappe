@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (

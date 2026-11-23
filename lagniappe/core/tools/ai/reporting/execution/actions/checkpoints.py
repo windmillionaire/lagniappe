@@ -1,6 +1,6 @@
 """Action identities, completion decisions, and committed result receipts."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get

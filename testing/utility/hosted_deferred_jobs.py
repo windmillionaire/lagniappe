@@ -1,6 +1,6 @@
 """Hosted E2E delivery helpers for real App Engine deferred jobs."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import math
 
 from lagniappe import CONFIG

@@ -10,7 +10,7 @@ def test_skipped_recurring(get_test_entities):
     Tests calculate_skipped_recurring_tasks which counts how many
     intervals have passed between starting_due_date and today.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import patch
 
     from zoneinfo import ZoneInfo
@@ -63,7 +63,7 @@ def test_skipped_scheduled(get_test_entities):
     - monthly: count monthly occurrences
     - yearly: count yearly occurrences
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import patch
 
     from zoneinfo import ZoneInfo
@@ -202,7 +202,7 @@ def test_skipped_scheduled_calendar_boundaries():
 def test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today(
     monkeypatch, rule, start, today, expected
 ):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     from lagniappe.core.tools.tasks import scheduling
@@ -222,7 +222,7 @@ def test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today(
 @pytest.mark.unit
 @pytest.mark.parametrize("due, postponed", [("2025-06-17", "2025-06-15"), ("2025-06-15", "2025-06-17")])
 def test_skipped_scheduled_preserves_earliest_due_date_baseline(monkeypatch, due, postponed):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     from lagniappe.core.tools.tasks import scheduling

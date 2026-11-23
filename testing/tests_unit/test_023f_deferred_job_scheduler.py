@@ -1,6 +1,6 @@
 """Durable recovery membership and Cloud Scheduler convergence behavior."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Key

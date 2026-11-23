@@ -1,6 +1,6 @@
 """Cancellable provider calls use one loop and the current conversation."""
 import asyncio
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 

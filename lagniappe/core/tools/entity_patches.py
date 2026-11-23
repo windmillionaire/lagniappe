@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone as utc_timezone, UTC
+from datetime import date, datetime, time, UTC
 
 from lagniappe.core.definitions import Action, Fetch, MutationIntent
 from lagniappe.core.entities import Entities

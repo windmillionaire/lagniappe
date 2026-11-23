@@ -1,6 +1,6 @@
 """Unit tests for base Entity properties shared across all entity types."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 from zoneinfo import ZoneInfo

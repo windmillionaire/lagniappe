@@ -1028,7 +1028,7 @@ def test_file_reverse_task_links_drive_permissions_and_references():
 # @matrix files : ownership parent-key fingerprint restrictions
 @pytest.mark.unit
 def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from lagniappe.core.definitions import MutationEffectType, MutationOperation
     from lagniappe.core.entities import Entities
     from lagniappe.core.mutations import plan_mutation
@@ -1077,7 +1077,7 @@ def test_unattached_upload_is_private_to_its_uploader_and_admin():
 # @pair tasks:single-batch
 @pytest.mark.unit
 def test_history_loading_resolves_moved_task_and_independently_moved_files(monkeypatch):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from google.cloud import datastore
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools.database import get as database_get

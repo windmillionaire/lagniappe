@@ -1,7 +1,7 @@
 """Task recurrence, postponement, and durable uncomplete scheduling."""
 
 import hashlib
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, MO, rrule
 from dateutil.rrule import weekday as rrule_weekday

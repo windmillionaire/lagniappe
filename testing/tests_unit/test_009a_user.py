@@ -1,7 +1,7 @@
 """Unit tests for User entity properties."""
 
 import json
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo

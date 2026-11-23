@@ -1,6 +1,6 @@
 """Deterministic coverage for hosted deferred-job test orchestration."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 
 from lagniappe.core.definitions import DeferredJobStatus

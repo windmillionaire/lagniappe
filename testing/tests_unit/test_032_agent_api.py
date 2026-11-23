@@ -1,6 +1,6 @@
 """Provider-free external-agent API domain and credential coverage."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 import json
 import threading

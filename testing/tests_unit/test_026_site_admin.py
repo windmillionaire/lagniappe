@@ -1,6 +1,6 @@
 """Unit contracts for runtime-safe site administration services."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Entity as DatastoreEntity, Key

@@ -1,6 +1,6 @@
 """Ordinary-notification, mention, and assignment email contracts."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 
 from flask import Flask, request

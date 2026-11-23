@@ -1,7 +1,7 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
 from copy import deepcopy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import hashlib
 import json
 from pathlib import Path

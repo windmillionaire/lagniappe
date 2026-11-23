@@ -1,6 +1,6 @@
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities

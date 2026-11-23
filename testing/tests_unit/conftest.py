@@ -332,7 +332,7 @@ def test_submission_values():
 
     def _check_value(entity, field, field_id, expected):
         """Check exact stored values; DateMixin also retains its UTC contract."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         if isinstance(field, mixins.DateMixin):
             assert field.value is not None, (

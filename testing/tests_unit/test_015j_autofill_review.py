@@ -20,7 +20,7 @@ pytestmark = pytest.mark.unit
 # @pair ai:autofill
 @pytest.mark.parametrize("age,committed", [(121, True), (10801, True), (121, False)])
 def test_committed_autofill_recovers_after_deadline_without_input_or_generation(monkeypatch, age, committed):
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from lagniappe.core import exceptions
     from lagniappe.core.tools.deferred_jobs.adapters.autofill import AutofillAdapter
     from testing.utility.deferred_job_fakes import RecordingAdapter, RunnerJob, runner

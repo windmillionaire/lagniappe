@@ -350,7 +350,7 @@ def test_form_save_refreshes_content_version_without_archiving_compatible_edits(
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["category", "model"])
 def test_form_save_refreshes_users_with_edited_form_schema(monkeypatch, kind):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from google.cloud import datastore
     from lagniappe.core.tools.database.core import KINDS
 

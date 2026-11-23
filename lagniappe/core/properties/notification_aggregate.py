@@ -1,6 +1,6 @@
 """Durable notification aggregate values and pure state projection."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import uuid
 
 from .base_db import DBProperty

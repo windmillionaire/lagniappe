@@ -1,6 +1,6 @@
 """Datastore read queries for all entity types."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 
 from google.cloud.datastore import Entity, Key
 

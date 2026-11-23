@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import json
 from types import SimpleNamespace
 

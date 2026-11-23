@@ -9,7 +9,7 @@ be imported after ``FLASK_ENV=testing`` is set.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import importlib
 import json
 import os

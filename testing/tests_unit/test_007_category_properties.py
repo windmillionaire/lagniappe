@@ -9,7 +9,7 @@ Out of scope here: ``PageIndex.pages`` (database + ``url_for``),
 other suites where those paths are mocked or exercised end-to-end.
 """
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 

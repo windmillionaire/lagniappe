@@ -6,7 +6,7 @@ from runner import presentation as ui
 from runner.presentation import output as print
 
 from contextlib import contextmanager
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import hashlib
 import json
 import os

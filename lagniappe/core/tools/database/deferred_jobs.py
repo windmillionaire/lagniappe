@@ -1,7 +1,7 @@
 """Deferred-job Datastore transactions and Scheduler control records."""
 
 from contextlib import suppress
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import json
 
 from google.cloud.datastore import Entity, Key

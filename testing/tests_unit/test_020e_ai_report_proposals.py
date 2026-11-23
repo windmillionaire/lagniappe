@@ -1,7 +1,7 @@
 """Proposal validation and deterministic schema repair coverage."""
 
 import copy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 import pytest
 

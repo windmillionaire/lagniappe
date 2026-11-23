@@ -1,6 +1,6 @@
 """Focused contracts for AI-driven shared-cache workspace filters."""
 
-from datetime import datetime, time, timezone, UTC
+from datetime import datetime, time, UTC
 from types import SimpleNamespace
 
 import pytest

@@ -1,7 +1,7 @@
 """Immutable completion definitions, compatibility checks and history reads."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 import json

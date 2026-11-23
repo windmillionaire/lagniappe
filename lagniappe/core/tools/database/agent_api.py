@@ -1,7 +1,7 @@
 """Transactional credentials and Plan-operation claims for the external API."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import hashlib
 import json
 import re

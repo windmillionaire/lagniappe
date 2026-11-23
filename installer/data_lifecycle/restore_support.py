@@ -6,7 +6,7 @@ from runner.presentation import read_input as input
 
 import hashlib
 import json
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from pathlib import Path
 
 from google.cloud.datastore import Entity, Key

@@ -1,7 +1,7 @@
 """Reviewed schema updates, strict AI values and resumable mixed conversion."""
 
 from copy import deepcopy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import json
 from types import SimpleNamespace
 

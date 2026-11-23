@@ -1,6 +1,6 @@
 """Date mixin for datetime property handling with timezone conversion."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import re
 
 from ..definitions import FieldType, FilterOptions, Ordering

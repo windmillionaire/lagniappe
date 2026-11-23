@@ -1,6 +1,6 @@
 """Document poll projection against Redis with counted durable asset reads."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from importlib import import_module
 import json
 from types import SimpleNamespace

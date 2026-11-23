@@ -47,7 +47,7 @@ Example usage:
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import Any
 from collections.abc import Iterator
 
 from google.cloud.datastore import Key, query as datastore_query

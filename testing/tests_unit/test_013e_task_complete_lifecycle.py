@@ -1,7 +1,7 @@
 """``Task.complete`` / ``Task.uncomplete`` and interaction with schedule queue."""
 
 import json
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo

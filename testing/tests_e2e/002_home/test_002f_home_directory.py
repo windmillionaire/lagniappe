@@ -11,7 +11,7 @@ Related Files:
         - testing/resources/home.py: HomePage.directory (List helper)
 """
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import json
 import re
 from urllib.parse import urlparse

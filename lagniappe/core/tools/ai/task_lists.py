@@ -2,7 +2,7 @@
 
 import base64
 import binascii
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import hashlib
 import json
 

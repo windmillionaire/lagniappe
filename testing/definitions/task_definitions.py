@@ -11,7 +11,7 @@ Maps to:
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 from .due_date import DueDates
 from .files import Files

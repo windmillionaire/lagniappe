@@ -11,7 +11,6 @@ Related Files:
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from config import SETTINGS
 from lagniappe.core.definitions import AI

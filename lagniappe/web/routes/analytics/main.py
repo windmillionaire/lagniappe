@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-from datetime import datetime, time, timedelta, timezone, UTC
+from datetime import datetime, time, timedelta, UTC
 
 from flask import abort, g, render_template, request
 from flask_login import current_user

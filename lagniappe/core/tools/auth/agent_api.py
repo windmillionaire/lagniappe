@@ -1,6 +1,6 @@
 """Shown-once bearer credentials for the external agent API."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import base64
 import hashlib
 import hmac

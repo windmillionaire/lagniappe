@@ -1,7 +1,7 @@
 """Small shared helpers for deferred-job tool services."""
 
 import json
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason

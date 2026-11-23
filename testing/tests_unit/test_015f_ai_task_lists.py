@@ -1,6 +1,6 @@
 """Compact task discovery retains enough context for accurate follow-up reads."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 import pytest

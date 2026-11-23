@@ -1,6 +1,6 @@
 """Basic form field submission paths (form, AI, import) via ``test_submission_values``."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from zoneinfo import ZoneInfo
 
 import pytest

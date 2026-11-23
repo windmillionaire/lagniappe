@@ -9,7 +9,6 @@ Maps to:
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .categories import Categories
 from .forms import Forms

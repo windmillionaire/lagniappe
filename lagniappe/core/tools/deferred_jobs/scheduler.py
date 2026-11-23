@@ -2,7 +2,7 @@
 
 import time
 import uuid
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from urllib.parse import quote
 
 from google.auth.transport.requests import AuthorizedSession

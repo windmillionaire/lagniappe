@@ -1,6 +1,6 @@
 """Cohesive patches validate selected changes and preserve omitted fields."""
 from copy import deepcopy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Key, Entity as DatastoreEntity

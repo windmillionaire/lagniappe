@@ -33,7 +33,7 @@ class _MinimalImportProcess:
     ("Asia/Tokyo", "2026-09-24"),
 ])
 def test_table_date_columns_keep_explicit_actor_timezone(monkeypatch, zone, day):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
     from lagniappe import CONFIG
     from testing.utility.ai_report_fakes import _test_user

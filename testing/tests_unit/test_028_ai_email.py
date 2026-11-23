@@ -1,7 +1,7 @@
 """Unit contracts for production AI email ingestion and report handoff."""
 
 import base64
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import hashlib
 import hmac
 from types import SimpleNamespace

@@ -1,6 +1,6 @@
 """Atomic mention-marker, notification, and aggregate persistence."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from ...properties import mention
 from . import notifications

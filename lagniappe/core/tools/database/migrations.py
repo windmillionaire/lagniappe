@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import json
 import time
 from uuid import uuid4

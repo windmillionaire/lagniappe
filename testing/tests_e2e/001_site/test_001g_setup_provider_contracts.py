@@ -5,7 +5,7 @@ uniquely named, test-prefixed resources, clean them in ``finally`` blocks, and
 must remain sequential with every other E2E or managed-server session.
 """
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4

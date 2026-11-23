@@ -1,6 +1,6 @@
 """Unit coverage for note visibility, queries, and mutation ownership."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 
 import pytest

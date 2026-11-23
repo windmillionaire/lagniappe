@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone, UTC
+from datetime import date, datetime, UTC
 import base64
 import hashlib
 import json

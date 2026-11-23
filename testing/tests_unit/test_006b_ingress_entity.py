@@ -14,7 +14,7 @@ not replace the behavior under test.
 import json
 import pytest
 from pathlib import Path
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 import lagniappe.core.entities.ingress as ingress_module

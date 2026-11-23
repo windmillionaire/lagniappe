@@ -1,6 +1,6 @@
 """Recipient eligibility and delivery timing policy."""
 
-from datetime import datetime, time as datetime_time, timedelta, timezone, UTC
+from datetime import datetime, time as datetime_time, timedelta, UTC
 
 from ....definitions import NotificationEmailMode
 from ....entities import Entities

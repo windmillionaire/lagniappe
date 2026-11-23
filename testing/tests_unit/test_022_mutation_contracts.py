@@ -1,6 +1,6 @@
 """Executable entity mutation contract and ordering regressions."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from copy import deepcopy
 
 from google.cloud import datastore

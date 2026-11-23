@@ -1,6 +1,6 @@
 """Focused AI-report characterization coverage."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 import pytest

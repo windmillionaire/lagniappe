@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import html as html_stdlib
 import json
 from pathlib import Path, PurePosixPath

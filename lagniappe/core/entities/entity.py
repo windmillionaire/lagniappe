@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from google.cloud import datastore
 

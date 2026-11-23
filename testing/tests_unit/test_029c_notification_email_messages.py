@@ -1,6 +1,6 @@
 """Direct-message notification-email quiet-window contracts."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 
 from google.cloud.datastore import Entity as DatastoreEntity
 import pytest

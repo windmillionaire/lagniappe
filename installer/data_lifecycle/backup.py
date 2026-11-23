@@ -6,7 +6,7 @@ from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
 from contextlib import contextmanager, suppress
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import hashlib
 import json
 import secrets

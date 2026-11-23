@@ -1,7 +1,7 @@
 """Cancellation reads and lease heartbeats remain independent and fenced."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 

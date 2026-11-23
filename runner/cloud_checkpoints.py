@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import json
 import os
 from pathlib import Path

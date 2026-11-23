@@ -1,7 +1,7 @@
 """Restriction sources, minimal loading, migrations and queued cache updates."""
 from copy import deepcopy
 import json
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 

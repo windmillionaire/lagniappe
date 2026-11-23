@@ -1,7 +1,7 @@
 """ChatGPT and Codex OAuth service, using opaque secrets and current User permissions."""
 
 import base64
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import hashlib
 import hmac
 import json

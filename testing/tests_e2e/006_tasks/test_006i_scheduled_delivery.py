@@ -1,7 +1,7 @@
 """Scheduled-delivery HTTP contracts with token verification and storage isolated."""
 
 from copy import deepcopy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 

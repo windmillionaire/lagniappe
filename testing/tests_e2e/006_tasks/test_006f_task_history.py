@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 import re
 import json
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 import pytest

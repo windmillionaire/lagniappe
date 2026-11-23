@@ -1,6 +1,6 @@
 """Provider-neutral contracts for setup-owned backup and portable archives."""
 
-from datetime import date, datetime, timezone, UTC
+from datetime import date, datetime, UTC
 import hashlib
 import json
 import os

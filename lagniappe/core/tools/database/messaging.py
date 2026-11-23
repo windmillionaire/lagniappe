@@ -1,6 +1,6 @@
 """Direct-message Datastore transactions and indexed query recipes."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from ...definitions import MessageConflict, MessageRevisionConflict
 from ...properties import message as message_values

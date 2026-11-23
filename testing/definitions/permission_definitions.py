@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Union
 from lagniappe.core.definitions import General, Levels
 
 from . import Pages, Categories, Projects, Groups

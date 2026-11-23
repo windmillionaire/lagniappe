@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from .forms import Forms
-from typing import Optional
 
 
 @dataclass

@@ -1,6 +1,6 @@
 """Reviewed Page document edits with durable recovery versions and receipts."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from html import escape
 
 from lagniappe.core import exceptions

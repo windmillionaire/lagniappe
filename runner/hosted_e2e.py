@@ -6,7 +6,7 @@ import argparse
 import copy
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import hashlib
 import json
 from pathlib import Path

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import json
 import os
 from pathlib import Path

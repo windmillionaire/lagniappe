@@ -1,6 +1,6 @@
 """Default schema and seed data for reserved user entities."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import json
 
 

@@ -1,6 +1,6 @@
 """Generic timezone conversion and date parsing utilities."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from zoneinfo import ZoneInfo
 
 from dateutil import parser as date_parser

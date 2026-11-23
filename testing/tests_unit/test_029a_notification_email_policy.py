@@ -1,6 +1,6 @@
 """Notification-email eligibility, timing, and presence contracts."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 
 import pytest
 

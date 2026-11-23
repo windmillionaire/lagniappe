@@ -173,7 +173,7 @@ def _create_page(action, _report, user, created, context=None):
     if page_form is not None and "submission" in data:
         page.ai_submission(data.get("submission") or {})
     if data.get("document"):
-        from datetime import datetime, timezone
+        from datetime import datetime
         from lagniappe.core.tools.document_crdt import append_fragment
         from .documents import document_source_quote
 

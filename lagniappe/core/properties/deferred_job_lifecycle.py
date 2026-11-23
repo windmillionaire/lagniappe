@@ -1,6 +1,6 @@
 """Deferred-job lifecycle state and privacy-bounded projections."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from lagniappe.core.definitions import (
     DEFERRED_JOB_HEARTBEAT_SECONDS,

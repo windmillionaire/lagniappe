@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from ..definitions import FieldType, FilterOptions, Ordering
 from ..definitions.identifiers import random_hash, short_hash, short_uuid

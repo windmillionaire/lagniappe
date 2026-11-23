@@ -1,6 +1,6 @@
 """Notification aggregate, ordinary-record, and query persistence."""
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
 from google.cloud.datastore import Entity as DatastoreEntity
 

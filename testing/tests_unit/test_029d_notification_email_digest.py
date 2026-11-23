@@ -1,6 +1,6 @@
 """Notification-email digest query, grouping, and delivery contracts."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Entity as DatastoreEntity

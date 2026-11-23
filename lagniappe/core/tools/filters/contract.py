@@ -1,7 +1,7 @@
 """Versioned, authorized contracts for filter requests and saved filters."""
 
 from dataclasses import dataclass
-from datetime import datetime, time, timezone, UTC
+from datetime import datetime, time, UTC
 import json
 from math import isfinite
 

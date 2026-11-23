@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import secrets
 from urllib.parse import urlencode, urlsplit, urlunsplit
 

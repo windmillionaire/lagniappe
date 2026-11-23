@@ -2,7 +2,7 @@
 
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from email import policy
 from email.parser import Parser
 from html import escape

@@ -11,7 +11,7 @@ Usage:
 
 import random
 import string
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from enum import Enum
 from types import SimpleNamespace
 

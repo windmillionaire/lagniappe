@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch

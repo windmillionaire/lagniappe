@@ -1,6 +1,6 @@
 """Unit coverage for privacy-bounded AI generation observability."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import json
 from types import SimpleNamespace
 import uuid

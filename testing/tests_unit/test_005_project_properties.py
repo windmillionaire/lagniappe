@@ -16,7 +16,7 @@ Out of scope for this file: ``public_id``, ``ai_generated``, ``save`` /
 (covered elsewhere or in e2e).
 """
 
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from unittest.mock import patch
 
 from google.cloud import datastore

@@ -10,7 +10,7 @@ def test_next_due_date_recurring(get_test_entities):
     Recurring schedules calculate next due date from user_today()
     by adding the interval (days/weeks/months/years).
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import patch
 
     from zoneinfo import ZoneInfo
@@ -59,7 +59,7 @@ def test_next_due_date_scheduled(get_test_entities):
     Scheduled schedules calculate next due date from the original due_date
     (or min(postponed_from, due_date)) and find the next occurrence after today.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from unittest.mock import patch
 
     from zoneinfo import ZoneInfo
@@ -138,7 +138,7 @@ def test_next_due_date_periodic(get_test_entities):
     Periodic schedules calculate next due date from the original due_date
     (or min(postponed_from, due_date)) and add intervals until after today.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from unittest.mock import patch
 
     from dateutil.relativedelta import relativedelta

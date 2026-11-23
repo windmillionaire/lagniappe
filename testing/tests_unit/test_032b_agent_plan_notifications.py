@@ -1,7 +1,7 @@
 """Atomic external Plan publication and replayable notification delivery."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import json
 
 from google.cloud.datastore import Entity as DatastoreEntity

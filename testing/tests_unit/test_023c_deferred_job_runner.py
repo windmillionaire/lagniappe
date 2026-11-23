@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import datetime, timedelta, UTC
 import threading
 from types import SimpleNamespace
 

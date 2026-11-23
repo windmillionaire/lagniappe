@@ -1,7 +1,7 @@
 """Autofill uses exact schema IDs and validates before changing saved answers."""
 
 from copy import deepcopy
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 import json
 from types import SimpleNamespace
 
