@@ -104,7 +104,7 @@ def completed_envelope(entity: FormRecord) -> CompletionEnvelope | None:
 # @testable false
 # @covered-by lagniappe/core/tools/forms/definitions.py::require_mutable_submission
 # @reason ordinary edit paths require reopening even though current values are separate from original answers
-def immutable_submission(entity: FormRecord) -> bool:
+def immutable_submission(entity: Entity) -> bool:
     return entity.entity_kind == "task_history" or (
         entity.entity_kind == "task" and (
             bool(entity.db.get("completed_submission")) or cast("Task", entity).completed
