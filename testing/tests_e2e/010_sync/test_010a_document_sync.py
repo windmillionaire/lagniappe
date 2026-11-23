@@ -101,7 +101,7 @@ def test_document_presence_appears_and_clears(get_admin, get_user, browser_failu
             f'"closed_documents":["{document_sync_id}"]'
         ),
     ):
-        Tabs(owner).info
+        _ = Tabs(owner).info
 
     with expect_poll_result(
         collaborator.page,

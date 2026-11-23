@@ -483,7 +483,7 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
             actions.append({"id": f"model{i}", "type": "update_model_task", "data": {"entity": models[i].urlsafe_key, "changes": {"name": label, "form": f"$form{i}"}}})
             model_refs.append(models[i].urlsafe_key)
     actions.append({"id": "order", "type": "update_project", "data": {"entity": project.urlsafe_key, "changes": {"name": "Promotion workflow", "description": "Reusable promotion process", "model_tasks": model_refs}}})
-    for index, (task, stage) in enumerate(zip(tasks, [0, 1, 1, 2, 2, 2, 3, 3])):
+    for index, (task, stage) in enumerate(zip(tasks, [0, 1, 1, 2, 2, 2, 3, 3], strict=True)):
         actions.append({"id": f"task{index}", "type": "update_task", "data": {"entity": task.urlsafe_key, "changes": {"model": model_refs[stage], "form": f"$form{stage}", "submission": {"notes": task.description, "steps": {"items": [{"text": "Follow up", "checked": False}]}}, "description": labels[stage]}}})
     report.proposal = {"summary": "Generalize Promotion", "confidence": 1, "actions": actions}
     prepare_entity_updates(report.proposal, actor)

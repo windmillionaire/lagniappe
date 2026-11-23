@@ -567,10 +567,14 @@ def run_managed_keeper() -> int:
             state = load_session_state()
         except TestSessionError:
             state = None
-        if state and state["nonce"] == nonce and state.get("keeper"):
-            if state["keeper"]["pid"] == os.getpid():
-                identity = state["keeper"]
-                break
+        if (
+            state
+            and state["nonce"] == nonce
+            and state.get("keeper")
+            and state["keeper"]["pid"] == os.getpid()
+        ):
+            identity = state["keeper"]
+            break
         sleep(0.05)
     if identity is None or inspect_process_identity(identity) != "match":
         print("Managed test-session keeper was not registered.", file=sys.stderr)

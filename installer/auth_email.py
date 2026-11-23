@@ -1,5 +1,6 @@
 """Configure SMTP delivery for authentication action links."""
 
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -326,10 +327,8 @@ def _print_gmail_instructions():
 
         )
     )
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(GMAIL_APP_PASSWORDS_URL)
-    except webbrowser.Error:
-        pass
 
 
 # @testable false
@@ -627,10 +626,8 @@ def _setup_resend_auth_email(current, custom_domain):
             )
         )
     print(wrap_text(f"Opening Resend domains:\n  {ui.literal(RESEND_DOMAINS_URL)}"))
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(RESEND_DOMAINS_URL)
-    except webbrowser.Error:
-        pass
     domain_ready = input(
         format_prompt("Wait until Resend shows the sending domain as verified", hint="Enter to continue; x to exit")
     ).strip()
@@ -703,10 +700,8 @@ def _setup_resend_auth_email(current, custom_domain):
                     f"Opening Resend API keys:\n  {ui.literal(RESEND_API_KEYS_URL)}"
                 )
             )
-            try:
+            with suppress(webbrowser.Error):
                 webbrowser.open_new_tab(RESEND_API_KEYS_URL)
-            except webbrowser.Error:
-                pass
             api_key = _prompt("Resend API key (input is visible)")
         default_sender = (
             current_sender

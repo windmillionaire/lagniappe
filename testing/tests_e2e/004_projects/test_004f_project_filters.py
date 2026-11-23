@@ -378,7 +378,7 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
 
     if permission_source == "page":
         owner.go(page_resource)
-        Tabs(owner).info
+        _ = Tabs(owner).info
         owner.locate(Page.PAGE_PERMISSIONS_TOGGLE).click()
         restriction = owner.locate(Page.PAGE_PERMISSIONS_FORM).locator(Page.PAGE_RESTRICT_OWNER)
     else:

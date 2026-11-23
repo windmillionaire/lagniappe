@@ -57,7 +57,7 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
         existing = [g.key for g in RelatedEntityListMixin.value.fget(self)]
         new = [g.key for g in value]
 
-        if not set(existing) == set(new):
+        if set(existing) != set(new):
             RelatedEntityListMixin.value.fset(self, value)
             self.entity.properties.permissions.create()
 

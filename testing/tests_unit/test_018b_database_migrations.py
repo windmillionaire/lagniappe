@@ -156,7 +156,7 @@ class _Datastore:
     def get_multi(self, keys, missing=None):
         records = [self.get(key) for key in keys]
         if missing is not None:
-            missing.extend(key for key, record in zip(keys, records) if record is None)
+            missing.extend(key for key, record in zip(keys, records, strict=True) if record is None)
         return [record for record in records if record is not None]
 
     def entity(self, *, key, exclude_from_indexes=()):

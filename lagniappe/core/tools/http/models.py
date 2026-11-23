@@ -15,7 +15,7 @@ _TRANSIENT_RETRY_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
 # @testable true
 # @tests tests_unit/test_032_outbound_http.py::test_outbound_result_repr_and_diagnostic_never_expose_url_or_body
 # @matrix outbound-http : privacy typed-outcome
-class OutboundStatus(str, Enum):
+class OutboundStatus(str, Enum):  # noqa: UP042 -- preserve qualified enum string representations.
     """Privacy-safe outcomes shared by outbound HTTP callers."""
 
     OK = "ok"

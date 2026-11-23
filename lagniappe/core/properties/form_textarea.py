@@ -27,7 +27,7 @@ class Textarea(ColumnMixin, AIMixin, FilterMixin, SearchMixin, SchemaProperty):
 
     @property
     def sort_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
     # Ingress Attributes
     def validate_import(self, value):

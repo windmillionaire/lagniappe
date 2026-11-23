@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 import json
 import os
 from pathlib import Path
@@ -177,10 +178,8 @@ def run_case(
                 check=False,
             )
         else:
-            try:
+            with suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
         stdout, stderr = process.communicate()
         if isinstance(error, subprocess.TimeoutExpired):
             raise JavaScriptFailure(

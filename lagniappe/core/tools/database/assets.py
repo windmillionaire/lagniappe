@@ -1,5 +1,6 @@
 """Cloud Storage file upload, download, and deletion helpers."""
 
+from contextlib import suppress
 import base64
 from copy import deepcopy
 import datetime
@@ -49,13 +50,11 @@ def cleanup_rejected_attempt(owner):
     for definition in getattr(owner, "_form_attempt_assets", None) or []:
         if not definition.get("generation"):
             continue
-        try:
+        # A cleanup failure never authorizes deletion without its generation.
+        with suppress(Exception):
             delete_file_generation(
                 definition["path"], definition.get("visibility", "private"), definition["generation"],
             )
-        except Exception:
-            # A cleanup failure never authorizes deletion without its generation.
-            pass
     owner._form_attempt_assets = []
 
 
@@ -381,11 +380,9 @@ def copy_direct_upload_file(
         )
         copied.patch(**patch_options)
     if delete_source:
-        try:
+        # An absent source needs no cleanup; a replacement is not ours to delete.
+        with suppress(google_exceptions.NotFound, google_exceptions.PreconditionFailed):
             upload.blob.delete(if_generation_match=source_generation)
-        except (google_exceptions.NotFound, google_exceptions.PreconditionFailed):
-            # An absent source needs no cleanup; a replacement is not ours to delete.
-            pass
     return copied
 
 
@@ -600,10 +597,8 @@ def delete_file(path, visibility):
     """Delete a blob from the specified bucket."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
-    try:
+    with suppress(google_exceptions.NotFound):
         blob.delete()
-    except google_exceptions.NotFound:
-        pass
 
 
 # @testable true

@@ -430,11 +430,14 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
         raise CloudSettingsError(
             "This checkout's developer settings belong to another project."
         )
-    if any(_read(root, path) is not None for path in (APP, DEV, CA)):
-        if _snapshot(root) != receipt.get("fingerprint") and not replace:
-            raise CloudSettingsError(
-                "Local settings have unrecorded edits. Publish them or explicitly --replace after review."
-            )
+    if (
+        any(_read(root, path) is not None for path in (APP, DEV, CA))
+        and _snapshot(root) != receipt.get("fingerprint")
+        and not replace
+    ):
+        raise CloudSettingsError(
+            "Local settings have unrecorded edits. Publish them or explicitly --replace after review."
+        )
     extra = {}
     app_text = bundle["app"]
     if operator:

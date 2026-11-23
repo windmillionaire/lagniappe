@@ -254,9 +254,11 @@ def test_checkpoint_resumes_and_excludes_competing_writers():
     receipt = {"version": "7", "source": SOURCE}
     a.paths = {Path("state.json"): "state"}
     with a.operation("create", receipt):
-        with pytest.raises(RuntimeError, match="holds checkpoint"):
-            with b.operation("teardown", receipt):
-                pytest.fail("concurrent teardown entered")
+        with (
+            pytest.raises(RuntimeError, match="holds checkpoint"),
+            b.operation("teardown", receipt),
+        ):
+            pytest.fail("concurrent teardown entered")
         a.write(
             Path("state.json"),
             {
@@ -266,9 +268,11 @@ def test_checkpoint_resumes_and_excludes_competing_writers():
                 "status": "ready",
             },
         )
-    with pytest.raises(RuntimeError, match="numeric settings version"):
-        with b.operation("teardown", dict(receipt, version="6")):
-            pytest.fail("wrong settings version")
+    with (
+        pytest.raises(RuntimeError, match="numeric settings version"),
+        b.operation("teardown", dict(receipt, version="6")),
+    ):
+        pytest.fail("wrong settings version")
     with b.operation("teardown", receipt):
         assert (
             b.doc["state"]["source"] == SOURCE
@@ -278,9 +282,11 @@ def test_checkpoint_resumes_and_excludes_competing_writers():
     a.load()
     a.doc["operation"] = {"action": "execute"}
     a.save()
-    with pytest.raises(RuntimeError):
-        with b.operation("teardown", receipt, a.generation - 1):
-            pytest.fail("stale generation")
+    with (
+        pytest.raises(RuntimeError),
+        b.operation("teardown", receipt, a.generation - 1),
+    ):
+        pytest.fail("stale generation")
     with b.operation("teardown", receipt, a.generation):
         assert b.doc["operation"]["action"] == "teardown"
 
@@ -313,9 +319,11 @@ def test_checkpoint_is_opt_in(monkeypatch, tmp_path):
     with checkpoints.lifecycle(None, args):
         assert checkpoints.ACTIVE.get() is None
     monkeypatch.setenv("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT", PROJECT)
-    with pytest.raises(RuntimeError, match="Restore"):
-        with checkpoints.lifecycle(SimpleNamespace(APP_DIR=tmp_path), args):
-            pytest.fail("unconfigured checkout took remote lock")
+    with (
+        pytest.raises(RuntimeError, match="Restore"),
+        checkpoints.lifecycle(SimpleNamespace(APP_DIR=tmp_path), args),
+    ):
+        pytest.fail("unconfigured checkout took remote lock")
     args.action = "validate-release-evidence"
     with checkpoints.lifecycle(None, args):
         assert checkpoints.ACTIVE.get() is None

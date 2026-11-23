@@ -469,7 +469,7 @@ def test_submission_values():
                 )
         else:
             field_filter_key = getattr(field, "filter_key", field.id)
-            assert field_filter_key not in to_filter_index.keys(), (
+            assert field_filter_key not in to_filter_index, (
                 f"{entity.name}: non-FilterMixin field '{field_filter_key}' "
                 f"in to_filter_index"
             )

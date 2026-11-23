@@ -279,9 +279,11 @@ def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, resu
             lambda prompt, *, entity, user, schema: prompts.append(prompt)
             or {"input-textab12": expected_text},
         )
-        with user.page.expect_response("**/pages/*/info/replace"):
-            with web_app.test_request_context("/"):
-                result = DeferredJobs.run(job.urlsafe_key)
+        with (
+            user.page.expect_response("**/pages/*/info/replace"),
+            web_app.test_request_context("/"),
+        ):
+            result = DeferredJobs.run(job.urlsafe_key)
         assert result.success is True
         preview = prompts[0].preview()
         assert page_name in preview

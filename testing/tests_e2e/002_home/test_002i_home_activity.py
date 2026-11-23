@@ -358,17 +358,17 @@ def test_home_note_visibility_across_users(get_user):
     _save_note(author, private_body, visibility="private")
 
     viewer_home = viewer.go(SitePages.HOME)
-    viewer_home.activity_list
+    _ = viewer_home.activity_list
     expect(_activity_item(viewer_home, shared_body)).to_be_visible()
     expect(_activity_item(viewer_home, private_body)).not_to_be_attached()
 
     author_home = author.go(SitePages.HOME)
-    author_home.activity_list
+    _ = author_home.activity_list
     expect(_activity_item(author_home, shared_body)).to_be_visible()
     expect(_activity_item(author_home, private_body)).to_be_visible()
 
     owner_home = owner.go(SitePages.HOME)
-    owner_home.activity_list
+    _ = owner_home.activity_list
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
@@ -606,10 +606,10 @@ def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user,
         )
     # The queue clears before replay refreshes Home's prefetched lists.
     wait_for_connectivity_replay(user)
-    home.activity_list
+    _ = home.activity_list
     expect(_activity_item(home, note_body)).to_be_visible()
     expect(_task_item(home, task_name)).to_be_attached()
-    home.task_list
+    _ = home.task_list
     expect(_task_item(home, task_name)).to_be_visible()
 
 
@@ -625,7 +625,7 @@ def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user,
 
     home = user.go(SitePages.HOME)
     home = home.reload()
-    home.task_list
+    _ = home.task_list
     task_item = _task_item(home, task_name)
     expect(task_item).to_be_visible()
 
@@ -726,7 +726,7 @@ def test_offline_task_complete_replays_after_reload(get_admin, get_user, browser
 
     home = user.go(SitePages.HOME)
     home = home.reload()
-    home.task_list
+    _ = home.task_list
     task_item = _task_item(home, task_name)
     expect(task_item).to_have_attribute("data-due-date", expected_due_date)
 

@@ -1,3 +1,4 @@
+from contextlib import suppress
 from pathlib import Path
 import traceback
 from flask import g, has_request_context, request
@@ -63,10 +64,8 @@ def _trace_labels(items):
 # @reason caller formatting is request-local diagnostic plumbing
 def _trace_frame_location(frame):
     path = Path(frame.filename).resolve()
-    try:
+    with suppress(ValueError):
         path = path.relative_to(PROJECT_ROOT)
-    except ValueError:
-        pass
     return f"{path}:{frame.lineno} {frame.name}"
 
 

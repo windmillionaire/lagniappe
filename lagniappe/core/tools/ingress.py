@@ -576,7 +576,7 @@ class IngressMutationPlanner:
                     ]
                     for sub_field_id in field.fields
                 ]
-                table_rows = [list(value) for value in zip(*values)] if values else []
+                table_rows = [list(value) for value in zip(*values, strict=False)] if values else []
                 to_validate[field_id] = [value for value in table_rows if any(value)]
             elif column_ids:
                 to_validate[field_id] = import_value(

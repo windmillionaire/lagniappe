@@ -47,7 +47,7 @@ def test_user_email(get_test_entities):
         assert user.column("email").column_value == test_value
 
         # sort_value is True if email exists, False otherwise
-        expected_sort = True if test_value else False
+        expected_sort = bool(test_value)
         assert user.properties.email.sort_value == expected_sort
 
 
@@ -789,28 +789,34 @@ def test_user_starred_key_removal_preserves_order():
 @pytest.mark.unit
 def test_user_entity_create_save_load_owner_page_and_groups():
     """User create/save/load handles owner, page, groups, photo import, and reuse."""
-    with patch("lagniappe.core.entities.user.database_get.user") as get_user:
-        with pytest.raises(ValueError, match="name is required"):
-            User.create({"email": "missing-name@example.com"})
+    with (
+        patch("lagniappe.core.entities.user.database_get.user") as get_user,
+        pytest.raises(ValueError, match="name is required"),
+    ):
+        User.create({"email": "missing-name@example.com"})
     get_user.assert_not_called()
 
-    with patch("lagniappe.core.entities.user.database_get.user") as get_user:
-        with pytest.raises(ValueError, match="email is required"):
-            User.create({"name": "Missing Email"})
+    with (
+        patch("lagniappe.core.entities.user.database_get.user") as get_user,
+        pytest.raises(ValueError, match="email is required"),
+    ):
+        User.create({"name": "Missing Email"})
     get_user.assert_not_called()
 
     existing_key = Key("users", "existing", project="test")
     existing = Entity(existing_key)
     existing.update({"type": "user", "email": "exists@example.com", "page": "pg009c"})
 
-    with patch(
-        "lagniappe.core.entities.user.database_get.user",
-        return_value=existing,
+    with (
+        patch(
+            "lagniappe.core.entities.user.database_get.user",
+            return_value=existing,
+        ),
+        patch("lagniappe.core.entities.entity.database_utility.create_key") as create_key,
     ):
-        with patch("lagniappe.core.entities.entity.database_utility.create_key") as create_key:
-            reused = User.create(
-                {"name": "Existing User", "email": "exists@example.com"}
-            )
+        reused = User.create(
+            {"name": "Existing User", "email": "exists@example.com"}
+        )
 
     create_key.assert_not_called()
     assert isinstance(reused, User)
@@ -832,44 +838,46 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     new_key = Key("users", "new", project="test")
     new_entity = Entity(new_key)
 
-    with patch(
-        "lagniappe.core.entities.user.CONFIG",
-        SimpleNamespace(ADMIN_EMAIL="admin@example.com"),
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.entities.user.CONFIG",
+            SimpleNamespace(ADMIN_EMAIL="admin@example.com"),
+        ),
+        patch(
             "lagniappe.core.entities.user.database_get.user",
             return_value=None,
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_key",
-                return_value=new_key,
-            ):
-                with patch(
-                    "lagniappe.core.entities.entity.database_get.entity",
-                    return_value=None,
-                ):
-                    with patch(
-                        "lagniappe.core.entities.entity.database_utility.create_entity",
-                        return_value=new_entity,
-                    ):
-                        with patch(
-                            "lagniappe.core.properties.user_permissions.UserPermissions.create"
-                        ) as create_permissions:
-                            with patch(
-                                "lagniappe.core.properties.user_related.Entities.USERS.get",
-                                return_value=users_model,
-                            ):
-                                created = User.create(
-                                    {
-                                        "name": "Admin User",
-                                        "email": "admin@example.com",
-                                        "page": page,
-                                        "picture": "https://example.test/photo.jpg",
-                                        "groups": [group],
-                                        "is_public": False,
-                                        "test_user": True,
-                                    }
-                                )
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_key",
+            return_value=new_key,
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_get.entity",
+            return_value=None,
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_entity",
+            return_value=new_entity,
+        ),
+        patch(
+            "lagniappe.core.properties.user_permissions.UserPermissions.create"
+        ) as create_permissions,
+        patch(
+            "lagniappe.core.properties.user_related.Entities.USERS.get",
+            return_value=users_model,
+        ),
+    ):
+        created = User.create(
+            {
+                "name": "Admin User",
+                "email": "admin@example.com",
+                "page": page,
+                "picture": "https://example.test/photo.jpg",
+                "groups": [group],
+                "is_public": False,
+                "test_user": True,
+            }
+        )
 
     assert created.kind == "user"
     assert created.name == "Admin User"
@@ -999,47 +1007,49 @@ def test_user_create_public_user_assigns_public_group():
     new_key = Key("users", "public-new", project="test")
     new_entity = Entity(new_key)
 
-    with patch(
-        "lagniappe.core.entities.user.database_get.user",
-        return_value=None,
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.entities.user.database_get.user",
+            return_value=None,
+        ),
+        patch(
             "lagniappe.core.entities.entity.database_utility.create_key",
             return_value=new_key,
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_get.entity",
-                return_value=None,
-            ):
-                with patch(
-                    "lagniappe.core.entities.entity.database_utility.create_entity",
-                    return_value=new_entity,
-                ):
-                    with patch(
-                        "lagniappe.core.entities.user.Entities.PUBLIC_GROUP.get",
-                        return_value=public_group,
-                    ):
-                        with patch(
-                            "lagniappe.core.properties.user_related.Entities.PUBLIC_GROUP.get",
-                            return_value=public_group,
-                        ):
-                            with patch(
-                                "lagniappe.core.properties.user_permissions.UserPermissions.create"
-                            ) as create_permissions:
-                                with patch(
-                                    "lagniappe.core.properties.user_related.Entities.USERS.get",
-                                    return_value=users_model,
-                                ):
-                                    created = User.create(
-                                        {
-                                            "name": "Public User",
-                                            "email": "public@example.com",
-                                            "page": page,
-                                            "groups": [normal_group],
-                                            "is_public": True,
-                                            "test_user": True,
-                                        }
-                                    )
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_get.entity",
+            return_value=None,
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_entity",
+            return_value=new_entity,
+        ),
+        patch(
+            "lagniappe.core.entities.user.Entities.PUBLIC_GROUP.get",
+            return_value=public_group,
+        ),
+        patch(
+            "lagniappe.core.properties.user_related.Entities.PUBLIC_GROUP.get",
+            return_value=public_group,
+        ),
+        patch(
+            "lagniappe.core.properties.user_permissions.UserPermissions.create"
+        ) as create_permissions,
+        patch(
+            "lagniappe.core.properties.user_related.Entities.USERS.get",
+            return_value=users_model,
+        ),
+    ):
+        created = User.create(
+            {
+                "name": "Public User",
+                "email": "public@example.com",
+                "page": page,
+                "groups": [normal_group],
+                "is_public": True,
+                "test_user": True,
+            }
+        )
 
     assert created.is_public is True
     assert created.ai_access == "NONE"

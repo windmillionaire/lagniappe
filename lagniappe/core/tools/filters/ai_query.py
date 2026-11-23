@@ -1,5 +1,6 @@
 """Validated, read-only filter queries for AI workspace tools."""
 
+from contextlib import suppress
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
@@ -99,7 +100,9 @@ def query_workspace_filter(
         # Task AI output includes direct Task relations such as completed_by and
         # categories derived through the parent Page. The filter UI needs only
         # row projections, but this AI boundary serializes that two-hop graph.
-        try:
+        # Serialization below isolates affected rows and returns a bounded
+        # corrective result instead of promoting legacy data to an API 500.
+        with suppress(RECOVERABLE_RESULT_ERRORS):
             Entities.fetch(
                 *selected,
                 *task_pages,
@@ -107,10 +110,6 @@ def query_workspace_filter(
                     because=FetchReason.AI_FILTER_RESULT_SERIALIZATION
                 ),
             )
-        except RECOVERABLE_RESULT_ERRORS:
-            # Serialization below isolates affected rows and returns a bounded
-            # corrective result instead of promoting legacy data to an API 500.
-            pass
     serialized, serialization_errors = _serialize_results(selected, user)
     return {
         "parent": _entity_reference(parent),

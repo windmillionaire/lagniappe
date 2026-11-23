@@ -188,9 +188,11 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
             "generate_autofilled_submission",
             lambda prompt, **kwargs: {FIELD_ID: EXPECTED_VALUE},
         )
-        with user.page.expect_response("**/pages/*/info/replace"):
-            with web_app.test_request_context("/"):
-                result = DeferredJobs.run(job.urlsafe_key)
+        with (
+            user.page.expect_response("**/pages/*/info/replace"),
+            web_app.test_request_context("/"),
+        ):
+            result = DeferredJobs.run(job.urlsafe_key)
         assert result.success is True
 
     expect(form.locator("[data-role='edited-message']")).to_contain_text("Autofill is complete")

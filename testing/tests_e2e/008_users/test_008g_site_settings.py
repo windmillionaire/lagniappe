@@ -154,9 +154,11 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     ).to_be_visible()
     expect(modal.element).to_contain_text(recovery.REDACTED_VALUE)
     download_link = modal.element.get_by_role("link", name="Download Settings File")
-    with owner.page.expect_response("**/reference/download-settings") as response_info:
-        with owner.page.expect_download() as download_info:
-            download_link.click()
+    with (
+        owner.page.expect_response("**/reference/download-settings") as response_info,
+        owner.page.expect_download() as download_info,
+    ):
+        download_link.click()
     response = response_info.value
     download = download_info.value
     downloaded = yaml.safe_load(Path(download.path()).read_text())

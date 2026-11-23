@@ -17,7 +17,7 @@ pytestmark = pytest.mark.e2e
 
 def _open_page_permissions(user, page):
     user.go(page)
-    Tabs(user).info
+    _ = Tabs(user).info
     toggle = user.locate(Page.PAGE_PERMISSIONS_TOGGLE)
     expect(toggle).to_be_visible()
     toggle.click()
@@ -226,7 +226,7 @@ def test_page_restrictions_save_drafts_and_show_each_source(get_user):
         )
         task.entity.save()
         owner.go(task)
-        Tabs(owner).info
+        _ = Tabs(owner).info
         owner.locate(Page.PAGE_PERMISSIONS_TOGGLE).click()
         expect(page_summary.locator("[data-role='badges']")).to_contain_text(page_group.definition.name)
         expect(form_summary.locator("[data-role='badges']")).to_contain_text(form_group.definition.name)

@@ -215,10 +215,7 @@ def _confirm_project_candidate(project_id, state, formatter):
         )
         return False
 
-    if state["state"] == "available":
-        action = "Use the existing"
-    else:
-        action = "Create a new"
+    action = "Use the existing" if state["state"] == "available" else "Create a new"
     answer = input(
         format_prompt(f"{action} project '{project_id}'? [y/N]: ")
     ).strip()

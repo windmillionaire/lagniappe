@@ -397,12 +397,19 @@ def _validate_action_data_shape(
 
     if action_type == "create_form":
         _validate_create_form_action_data(data, action_label)
-    if action_type in {"append_page_document", "replace_page_document"}:
-        if not _first_data_reference(data, "page") or not _proposal_string(data.get("document")):
-            raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
-    if action_type == "attach_file":
-        if set(data) - {"entity", "entity_action", "entity_name", "file", "display_name"}:
-            raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
+    if action_type in {"append_page_document", "replace_page_document"} and (
+        not _first_data_reference(data, "page")
+        or not _proposal_string(data.get("document"))
+    ):
+        raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
+    if action_type == "attach_file" and set(data) - {
+        "entity",
+        "entity_action",
+        "entity_name",
+        "file",
+        "display_name",
+    }:
+        raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
     if action_type == "update_form_schema":
         _validate_update_form_schema_action_data(data, action_label)
     if action_type == "create_page" and not _proposal_string(data.get("name")):

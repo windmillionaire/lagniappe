@@ -1,5 +1,6 @@
 """Deferred-job Datastore transactions and Scheduler control records."""
 
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone, UTC
 import json
 
@@ -174,12 +175,10 @@ def _deferred_job_scheduler_control(transaction):
     if control is None:
         control = Entity(key=key, exclude_from_indexes=("tracked_jobs",))
     else:
-        try:
+        with suppress(AttributeError):
             control.exclude_from_indexes = frozenset(
                 {*control.exclude_from_indexes, "tracked_jobs"}
             )
-        except AttributeError:
-            pass
     return control
 
 
@@ -409,10 +408,8 @@ def create_deferred_job_if_absent(job, notification=None, lock=None, *, writes=(
                 prop = properties.get(name)
                 if prop is not None:
                     prop.update()
-        try:
+        with suppress(AttributeError):
             entity.db.exclude_from_indexes = entity.exclude_from_index
-        except AttributeError:
-            pass
 
     with DATA.datastore.transaction() as transaction:
         existing = DATA.datastore.get(key, transaction=transaction)

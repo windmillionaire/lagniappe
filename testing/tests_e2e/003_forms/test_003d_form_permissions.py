@@ -59,7 +59,7 @@ def test_form_builder_hides_edit_affordances_without_forms_edit(get_admin, get_u
 
     viewer = get_user(Users.general_forms_view_only)
     form.user = viewer
-    form.builder
+    _ = form.builder
 
     expect(viewer.locate(Builder.FORM_NAME)).to_be_visible()
     readonly_notice = viewer.locate(Builder.READONLY_NOTICE)
@@ -82,7 +82,7 @@ def test_form_builder_shows_edit_affordances_with_forms_edit(get_admin, get_user
 
     user = get_user(Users.admin)
     form.user = user
-    form.builder
+    _ = form.builder
 
     expect(user.locate(Builder.READONLY_NOTICE)).not_to_be_attached()
     expect(user.locate(Builder.SAVE_BUTTON)).to_be_attached()
@@ -99,11 +99,11 @@ def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
 
     admin = get_user(Users.admin)
     form.user = admin
-    form.builder
+    _ = form.builder
     expect(admin.locate("[data-role='restrict-access']")).not_to_be_attached()
 
     form.user = owner
-    form.builder
+    _ = form.builder
     restrictions = owner.locate("[data-role='restrict-access']")
     expect(restrictions).to_be_visible()
     save = restrictions.get_by_role("button", name="Save Restrictions", exact=True)

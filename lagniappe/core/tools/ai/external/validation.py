@@ -178,16 +178,19 @@ def submission_validation_errors(data, report, user):
             }
         )
     confidence = proposal.get("confidence")
-    if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
-        if not 0 <= confidence <= 1:
-            errors.append(
-                {
-                    "code": "range",
-                    "path": "$.proposal.confidence",
-                    "message": "confidence must be from 0 to 1.",
-                    "expected": {"minimum": 0, "maximum": 1},
-                }
-            )
+    if (
+        isinstance(confidence, (int, float))
+        and not isinstance(confidence, bool)
+        and not 0 <= confidence <= 1
+    ):
+        errors.append(
+            {
+                "code": "range",
+                "path": "$.proposal.confidence",
+                "message": "confidence must be from 0 to 1.",
+                "expected": {"minimum": 0, "maximum": 1},
+            }
+        )
     return _bounded_validation_errors(errors)
 
 

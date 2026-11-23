@@ -220,18 +220,20 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
     )
     _FakeQuery.instances = []
 
-    with patch("lagniappe.core.tools.filters.cache.Filter", _FakeFilter):
-        with patch("lagniappe.core.tools.filters.cache.Query", _FakeQuery):
-            with patch(
-                "lagniappe.core.tools.filters.cache.database_get.datastore_key",
-                return_value=parent.key,
-            ) as datastore_key:
-                with patch(
-                    "lagniappe.core.tools.filters.cache.Entities.fetch",
-                    return_value=[active, task],
-                ) as load:
-                    cache = FilterCache(parent, user=_user(task=["restricted"]))
-                    cache._load_project_tasks()
+    with (
+        patch("lagniappe.core.tools.filters.cache.Filter", _FakeFilter),
+        patch("lagniappe.core.tools.filters.cache.Query", _FakeQuery),
+        patch(
+            "lagniappe.core.tools.filters.cache.database_get.datastore_key",
+            return_value=parent.key,
+        ) as datastore_key,
+        patch(
+            "lagniappe.core.tools.filters.cache.Entities.fetch",
+            return_value=[active, task],
+        ) as load,
+    ):
+        cache = FilterCache(parent, user=_user(task=["restricted"]))
+        cache._load_project_tasks()
 
     datastore_key.assert_called_once_with(parent)
     load.assert_called_once_with(

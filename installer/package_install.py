@@ -274,7 +274,7 @@ def ensure_setup_dependencies():
                     "Setup needs to install or correct these Python dependencies:"
                 )
             )
-            for _import_name, package_name, explanation, requirement, detail in pending:
+            for _import_name, _package_name, explanation, requirement, detail in pending:
                 print(f"  {requirement} — {explanation} ({detail})")
             if compatibility_error:
                 print(

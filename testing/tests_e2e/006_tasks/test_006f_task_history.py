@@ -202,7 +202,7 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_adm
             save_mutations([(live.entity, ("submission", "generation"))])
             live.entity.save()
 
-        for live, choice in zip(live_completions, ("unopened", "original", "modified")):
+        for live, choice in zip(live_completions, ("unopened", "original", "modified"), strict=True):
             completion_path = f"/tasks/{live.key}/completion-details"
             completion_requests = []
 
@@ -1137,7 +1137,7 @@ def test_combine_task_form_filters_compatible_tasks(get_admin, get_user):
     )
 
     user.go(linked_page)
-    linked_page.task_list
+    _ = linked_page.task_list
     combine_form = _open_combine_form(user, linked_source)
     expect(
         combine_form.get_by_role("checkbox", name=linked_page_peer.entity.name)
@@ -1230,7 +1230,7 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get
     expect(user.locate(f"[data-key='{secondary.key}']")).not_to_be_attached()
     expect(user.locate(f"li[data-key='{concurrent.key}']")).to_be_visible()
 
-    fixture.definition.origin.get(user).completed_task_list
+    _ = fixture.definition.origin.get(user).completed_task_list
     expect(winner_row).to_be_visible()
     winner.element = winner_row
     history = _open_history(winner)

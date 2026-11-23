@@ -1,3 +1,4 @@
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 import json
@@ -64,10 +65,8 @@ def print_oauth_instructions():
                 "  Required browser account", f"{ui.literal(account)}", verbatim=True
             )
         )
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(clients_url)
-    except webbrowser.Error:
-        pass
 
     if account:
         print(

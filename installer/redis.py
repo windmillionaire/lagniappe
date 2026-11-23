@@ -1,3 +1,4 @@
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 from pathlib import Path
@@ -168,10 +169,8 @@ def redis_cloud_instructions():
         )
     )
     print(wrap_text(f"Opening Redis Cloud:\n  {ui.literal(REDIS_CLOUD_CONSOLE_URL)}"))
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(REDIS_CLOUD_CONSOLE_URL)
-    except webbrowser.Error:
-        pass
 
     print(
         wrap_text(

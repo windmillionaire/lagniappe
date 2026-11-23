@@ -503,10 +503,7 @@ def export(args: argparse.Namespace) -> tuple[Path, Path, TranscriptStats]:
             os.close(summary_fd)
         for temporary in (archive_temp, summary_temp):
             if temporary is not None:
-                try:
-                    temporary.unlink()
-                except FileNotFoundError:
-                    pass
+                temporary.unlink(missing_ok=True)
 
     return archive_path, summary_path, stats
 

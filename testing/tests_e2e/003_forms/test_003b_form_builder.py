@@ -568,7 +568,7 @@ def test_html_field(get_admin, get_user):
     task_entity.save()
 
     user.go(page)
-    page.task_list
+    _ = page.task_list
     task = TaskResource(user=user)
     task.entity = task_entity
     with user.page.expect_response(

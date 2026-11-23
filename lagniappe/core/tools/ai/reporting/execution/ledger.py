@@ -68,7 +68,7 @@ def _validate_report_ledger(proposal, result):
     records = result.get("actions") or []
     if len(actions) != len(records):
         raise exceptions.ValidationError("Stored report recovery ledger is invalid.")
-    for action, record in zip(actions, records):
+    for action, record in zip(actions, records, strict=True):
         if (
             record.get("id") != action.get("id")
             or record.get("type") != action.get("type")

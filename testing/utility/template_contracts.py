@@ -9,6 +9,7 @@ against JavaScript classes/handlers and test selector usage.
 
 from __future__ import annotations
 
+from contextlib import suppress
 import argparse
 import ast
 from collections import Counter, defaultdict
@@ -319,10 +320,8 @@ def normalize_template_target(target: str | None, repo_root: Path) -> str | None
     if clean.startswith("./"):
         clean = clean[2:]
     if clean.startswith("/"):
-        try:
+        with suppress(ValueError):
             clean = relpath(Path(clean), repo_root)
-        except ValueError:
-            pass
 
     template_root = TEMPLATE_ROOT.as_posix()
     prefixes = [
@@ -547,7 +546,7 @@ def substitute_macro_args(
     kwargs: dict[str, ArgValue] | None = None,
 ) -> str:
     values = dict(macro.defaults)
-    for name, value in zip(macro.params, args):
+    for name, value in zip(macro.params, args, strict=False):
         values[name] = value
     values.update(kwargs or {})
 

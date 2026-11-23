@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import yaml
 
 os.environ["GRPC_VERBOSITY"] = "ERROR"
-os.environ["GLOG_minloglevel"] = "2"
+os.environ["GLOG_minloglevel"] = "2"  # noqa: SIM112 -- glog requires this case-sensitive name.
 
 
 APP_DIR = Path(
@@ -319,10 +319,7 @@ def _atomic_write_text(path, content, *, owner_only=False):
     finally:
         if descriptor is not None:
             os.close(descriptor)
-        try:
-            temporary_path.unlink()
-        except FileNotFoundError:
-            pass
+        temporary_path.unlink(missing_ok=True)
 
 
 # @testable false

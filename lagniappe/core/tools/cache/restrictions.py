@@ -41,7 +41,7 @@ def prepare_changes(entities):
         previous = pipe.execute()
     changes = []
     with cache.pipeline() as pipe:
-        for entity, old, pending in zip(sources, previous[::2], previous[1::2]):
+        for entity, old, pending in zip(sources, previous[::2], previous[1::2], strict=True):
             before = normalize_restrictions(json.loads(old).get("restricted_to")) if old else {}
             # Forms also compare their durable source during Save. A missing
             # cache row is not a restriction change for a newly created Form.
@@ -130,7 +130,7 @@ def _write_projections(details, rows, projections):
             pipe.exists(key)
         indexed = pipe.execute()
     with cache.pipeline() as pipe:
-        for (entity_hash, key), exists in zip(rows.items(), indexed):
+        for (entity_hash, key), exists in zip(rows.items(), indexed, strict=True):
             patch = projections[entity_hash]
             current = {**details[entity_hash], **patch}
             if not current["restricted_to"]:

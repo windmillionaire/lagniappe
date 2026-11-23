@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 import importlib
 import os
@@ -128,10 +129,8 @@ def pytest_configure(config) -> None:
 # @covered-by runner/pytest_routing.py::normalize_pytest_invocation
 def _consume_runner_separator(arguments: list[str]) -> list[str]:
     routed = list(arguments)
-    try:
+    with suppress(ValueError):
         routed.remove("--")
-    except ValueError:
-        pass
     return routed
 
 

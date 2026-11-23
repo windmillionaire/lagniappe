@@ -199,7 +199,7 @@ def _normalize_task_lists(content):
             continue
 
         groups = []
-        for item, is_task in zip(items, kinds):
+        for item, is_task in zip(items, kinds, strict=True):
             if not groups or groups[-1][0] != is_task:
                 groups.append((is_task, []))
             groups[-1][1].append(item)

@@ -727,7 +727,7 @@ def test_stale_save_preserves_local_draft_after_another_editor_saves(get_admin, 
 def test_builder_publication_rejects_incompatible_payload_and_reuses_receipt(get_admin, get_user):
     user = get_admin()
     form, _ = _form(user, "BSU publication contract")
-    form.builder
+    _ = form.builder
     bootstrap = json.loads(user.locate("#builder-draft").text_content())
     request = {**bootstrap, "save_id": uuid4().hex, "image_manifest": []}
     incompatible = deepcopy(request)

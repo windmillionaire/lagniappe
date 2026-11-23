@@ -130,10 +130,7 @@ class Prompt:
         if isinstance(value, (dict, list)):
             value = json.dumps(value, indent=2, ensure_ascii=False)
 
-        if quote:
-            value = f"```\n{value}\n```"
-        else:
-            value = str(value)
+        value = f"```\n{value}\n```" if quote else str(value)
 
         return self._replace_or_append(
             self.context_blocks,
@@ -317,9 +314,8 @@ class Prompt:
 
     @property
     def tools(self):
-        if self._tools:
-            if not self._user:
-                raise RuntimeError("Prompt.user must be set when tools are enabled")
+        if self._tools and not self._user:
+            raise RuntimeError("Prompt.user must be set when tools are enabled")
         return self._tools
 
     @property

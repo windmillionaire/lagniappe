@@ -712,7 +712,7 @@ def visibility(key, **kwargs):
         except ValidationError as error:
             return responses.error(error)
     if page.is_public:
-        page.public_id
+        _ = page.public_id
     Entities.save(page)
 
     return responses.page_document_settings(page)

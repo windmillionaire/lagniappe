@@ -1,5 +1,6 @@
 """Execute authoritative mutation effects in durable-first order."""
 
+from contextlib import suppress
 import json
 from lagniappe.core.tools.measurements import timed
 
@@ -41,10 +42,8 @@ def _prepare_write(effect):
         for key, updates in processes.items():
             entity.db[key] = json.dumps(updates)
 
-    try:
+    with suppress(AttributeError):
         entity.db.exclude_from_indexes = entity.exclude_from_index
-    except AttributeError:
-        pass
 
 
 # @testable true

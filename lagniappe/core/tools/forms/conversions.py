@@ -83,9 +83,8 @@ def conversion_rule(source, target):
         # Typed values cannot meaningfully be parsed as unrelated input types.
         if after in {"text", "textarea"} or (before == "text" and after in INPUTS):
             return "scalar"
-    elif before == "bookmark":
-        if after in {"text", "textarea", "out", *CHOICE}:
-            return "scalar"
+    elif before == "bookmark" and after in {"text", "textarea", "out", *CHOICE}:
+        return "scalar"
     if before in {"table", "todo"} and after == "textarea":
         return "text"
     if before in {"textarea", "table", "todo"} and after in {"table", "todo"}:

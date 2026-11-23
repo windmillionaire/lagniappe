@@ -1,3 +1,4 @@
+from contextlib import suppress
 import os
 import signal
 import subprocess
@@ -11,10 +12,8 @@ from runner.gcloud import activate_repository_gcloud
 # @covered-by runner/development.py::run_dev_server
 # @reason signal forwarding is exercised through the foreground dev-server owner
 def _forward_signal_to_process_group(process, signum):
-    try:
+    with suppress(ProcessLookupError):
         os.killpg(process.pid, signum)
-    except ProcessLookupError:
-        pass
 
 
 # @testable false

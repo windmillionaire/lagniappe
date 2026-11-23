@@ -102,7 +102,7 @@ def extract_local_variables(tb, max_frames=10):
         if frame["auth_entity"]:
             var_name, entity_obj = frame["auth_entity"]
 
-            if i == first_entity_idx or i == last_entity_idx:
+            if i in (first_entity_idx, last_entity_idx):
                 # Show full entity in first and last frames
                 if first_entity_idx == last_entity_idx:
                     label = ""

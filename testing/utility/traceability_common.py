@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 import ast
 from datetime import datetime, timezone, UTC
 import hashlib
@@ -271,10 +272,8 @@ def behavior_file_fingerprint(path: Path) -> str:
             )
         content = _python_behavior_bytes(content)
     elif path.suffix in {".js", ".mjs"}:
-        try:
+        with suppress(UnicodeDecodeError):
             content = _javascript_without_comments(content.decode("utf-8")).encode()
-        except UnicodeDecodeError:
-            pass
     return hashlib.sha256(content).hexdigest()
 
 

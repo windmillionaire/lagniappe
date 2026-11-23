@@ -1,3 +1,4 @@
+from contextlib import suppress
 import copy
 import hashlib
 import json
@@ -703,10 +704,8 @@ def start_managed_test_server(load_packs=()):
             "seed_summary": summary,
         }
     except BaseException:
-        try:
+        with suppress(Exception):
             authority.update(phase="stopping")
-        except Exception:
-            pass
         if process is not None:
             if keeper is None and process.poll() is None:
                 authority.mark_recovery_required()
@@ -827,10 +826,8 @@ def teardown_managed_test_server():
         remove_session_state(state["nonce"])
         return state["server"]["pid"]
     except BaseException:
-        try:
+        with suppress(Exception):
             update_state_for_nonce(state["nonce"], phase="recovery-required")
-        except Exception:
-            pass
         raise
     finally:
         adopter.__exit__(None, None, None)
@@ -843,12 +840,10 @@ def test_server_status():
     state = load_session_state()
     if state is None:
         legacy_pid = None
-        try:
+        with suppress(FileNotFoundError, ValueError):
             legacy_pid = int(
                 File.MANAGED_TEST_SERVER_PID.value.read_text(encoding="utf-8").strip()
             )
-        except (FileNotFoundError, ValueError):
-            pass
         try:
             port_occupied = _server_port_in_use(SETTINGS.test_config["BASE_URL"])
             port_error = None
@@ -1050,10 +1045,8 @@ def recover_managed_test_server():
         File.MANAGED_TEST_SERVER_PID.value.unlink(missing_ok=True)
         return {"recovered": True, "cleaned": True, "detail": "Recovery complete."}
     except BaseException:
-        try:
+        with suppress(Exception):
             update_state_for_nonce(state["nonce"], phase="recovery-required")
-        except Exception:
-            pass
         raise
     finally:
         lease.__exit__(None, None, None)

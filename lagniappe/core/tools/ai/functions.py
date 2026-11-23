@@ -333,11 +333,12 @@ def execute_function_calls(
                     function_calls,
                     raw_args,
                     normalized_args,
+                    strict=True,
                 )
             ],
         )
 
-    for fc, raw_args_item, args in zip(function_calls, raw_args, normalized_args):
+    for fc, raw_args_item, args in zip(function_calls, raw_args, normalized_args, strict=True):
         if execution_control is not None:
             execution_control.before_tool(fc.name)
         cache_key = (fc.name, json.dumps(args, sort_keys=True))

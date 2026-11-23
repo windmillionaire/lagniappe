@@ -69,7 +69,7 @@ def test_page_task_add_due_date(get_admin, get_user):
 
     assigned_user = get_user(Users.create_user)
     assigned_home = assigned_user.go(SitePages.HOME)
-    assigned_home.task_list
+    _ = assigned_home.task_list
     expect(assigned_user.locate(f"[data-key='{task.key}']")).to_be_visible()
 
 

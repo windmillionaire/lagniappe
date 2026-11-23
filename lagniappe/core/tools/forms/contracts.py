@@ -49,6 +49,4 @@ def check_size(raw):
 def needs_ai_value(value):
     if value is None or value == "" or value == [] or value == {}:
         return False
-    if isinstance(value, dict) and (value == {"rows": []} or value == {"items": []}):
-        return False
-    return True
+    return not (isinstance(value, dict) and (value == {"rows": []} or value == {"items": []}))

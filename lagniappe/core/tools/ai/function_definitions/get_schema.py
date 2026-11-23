@@ -173,10 +173,7 @@ def _attached_form(entity):
         )
         return loaded
 
-    if loaded:
-        loaded_context = _entity_result(loaded)
-    else:
-        loaded_context = None
+    loaded_context = _entity_result(loaded) if loaded else None
 
     if loaded_context:
         message = "AI get_schema loaded a stored form key that was not a form."

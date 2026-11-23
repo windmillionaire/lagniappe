@@ -175,9 +175,7 @@ def _include_instance(entity, user, kinds, task_completed):
     if isinstance(entity, Entities.TASK):
         if "task" not in kinds or not entity.allowed(Action.VIEW, user=user):
             return False
-        if task_completed is not None and bool(entity.completed) is not task_completed:
-            return False
-        return True
+        return not (task_completed is not None and bool(entity.completed) is not task_completed)
     return False
 
 

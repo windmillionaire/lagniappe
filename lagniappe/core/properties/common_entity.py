@@ -214,7 +214,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
 
     @property
     def sort_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
     @property
     def filter_kind(self):
@@ -637,7 +637,7 @@ class IsPublic(FilterMixin, DBProperty):
     # @matrix page project : filter-value
     @property
     def filter_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
     @property
     def filter_key(self):

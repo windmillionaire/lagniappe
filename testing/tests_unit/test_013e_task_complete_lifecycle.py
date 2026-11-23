@@ -40,9 +40,11 @@ def test_task_complete_without_schedule(get_test_entities):
     task.due_date = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
     assert task.properties.assigned_to.exists
 
-    with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-        with patch("lagniappe.core.entities.task.current_user", completer):
-            task.complete()
+    with (
+        patch(_USER_TZ, return_value=ZoneInfo("UTC")),
+        patch("lagniappe.core.entities.task.current_user", completer),
+    ):
+        task.complete()
 
     assert task.completed is True
     assert task.completed_on is not None
@@ -76,11 +78,13 @@ def test_task_complete_raises_when_required_submission_missing():
     )
     missing = SimpleNamespace(label="Required Field")
 
-    with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-        with patch.object(Task, "_check_required", return_value=[missing]):
-            with patch("lagniappe.core.entities.task.current_user", completer):
-                with pytest.raises(TaskCompletionError, match="Required Field"):
-                    task.complete()
+    with (
+        patch(_USER_TZ, return_value=ZoneInfo("UTC")),
+        patch.object(Task, "_check_required", return_value=[missing]),
+        patch("lagniappe.core.entities.task.current_user", completer),
+        pytest.raises(TaskCompletionError, match="Required Field"),
+    ):
+        task.complete()
     assert task.completed is False
     assert task.completed_on is None
     assert "completed_submission" not in task.db
@@ -170,9 +174,11 @@ def test_task_uncomplete_after_complete(get_test_entities):
         "task-signature-field": {"type": "image", "path": "signature.png"}
     }
 
-    with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-        with patch("lagniappe.core.entities.task.current_user", completer):
-            task.complete()
+    with (
+        patch(_USER_TZ, return_value=ZoneInfo("UTC")),
+        patch("lagniappe.core.entities.task.current_user", completer),
+    ):
+        task.complete()
 
     assert task.completed is True
     assert task.completed_on is not None

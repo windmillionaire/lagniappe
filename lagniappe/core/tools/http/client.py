@@ -1,5 +1,6 @@
 """Bounded outbound HTTP clients for user URLs and fixed providers."""
 
+from contextlib import suppress
 from dataclasses import dataclass
 from io import BytesIO
 from ipaddress import ip_address
@@ -318,15 +319,11 @@ def _result(
 def _close_response_session(response, session) -> None:
     """Attempt both cleanup operations without leaking transport exceptions."""
     if response is not None:
-        try:
+        with suppress(Exception):
             response.close()
-        except Exception:
-            pass
     if session is not None:
-        try:
+        with suppress(Exception):
             session.close()
-        except Exception:
-            pass
 
 
 # @testable false

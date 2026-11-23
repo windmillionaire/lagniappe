@@ -324,9 +324,12 @@ def validate_archive(path) -> dict:
             media_type = str(descriptor.get("media_type") or "")
             if media_type.startswith(TEXT_MEDIA_PREFIXES) or media_type in TEXT_MEDIA_TYPES:
                 _key_audit(file_path, payload)
-            if file_path.startswith("site/") and file_path.endswith((".html", ".js")):
-                if OUTBOUND_PATTERN.search(payload):
-                    raise DataLifecycleError(f"Offline site contains an outbound or active URL: {file_path}")
+            if (
+                file_path.startswith("site/")
+                and file_path.endswith((".html", ".js"))
+                and OUTBOUND_PATTERN.search(payload)
+            ):
+                raise DataLifecycleError(f"Offline site contains an outbound or active URL: {file_path}")
         _validate_html_links(reader, actual_paths)
         _key_audit("manifest.json", reader.read("manifest.json"))
 
@@ -537,9 +540,8 @@ def validate_archive(path) -> dict:
         }
         if len(warning_ids) != len(catalog_warnings) or len(manifest_warning_ids) != len(manifest_warnings):
             raise DataLifecycleError("Portable warning inventories contain duplicates or malformed rows.")
-        if not warning_ids or "" in warning_ids:
-            if catalog.get("warnings"):
-                raise DataLifecycleError("Portable warnings are malformed.")
+        if (not warning_ids or "" in warning_ids) and catalog.get("warnings"):
+            raise DataLifecycleError("Portable warnings are malformed.")
         if warning_ids != manifest_warning_ids:
             raise DataLifecycleError("Archive warning inventories disagree.")
         if not missing_reference_warnings.issubset(warning_ids):

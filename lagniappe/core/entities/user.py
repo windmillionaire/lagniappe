@@ -112,7 +112,7 @@ class User(AssetMixin, UserMixin, Entity):
 
     @property
     def is_authenticated(self):
-        return True if self._db else False
+        return bool(self._db)
 
     @property
     def is_anonymous(self):

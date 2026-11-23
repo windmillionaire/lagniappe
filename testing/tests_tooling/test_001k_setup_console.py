@@ -405,9 +405,11 @@ def test_progress_output_and_input(monkeypatch):
     transcript = unstyle(stream.getvalue())
     assert " ".join(transcript.split()).count("Configuration verified") == 1
     assert "Normal [literal] detail." in transcript
-    with pytest.raises(RuntimeError, match="provider failed"):
-        with ui.Progress("Failing operation"):
-            raise RuntimeError("provider failed")
+    with (
+        pytest.raises(RuntimeError, match="provider failed"),
+        ui.Progress("Failing operation"),
+    ):
+        raise RuntimeError("provider failed")
     assert ui.ACTIVE_PROGRESS == []
     assert "✓ Failing operation" not in unstyle(stream.getvalue())
     monkeypatch.setenv("COLUMNS", "80")

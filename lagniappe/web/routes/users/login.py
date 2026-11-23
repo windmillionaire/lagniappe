@@ -496,13 +496,13 @@ def login_google():
             not registered
             and google_email != owner_email
             and not _bootstrap_admin_allowed(google_email)
+            and not Entities.PUBLIC_GROUP.enabled()
         ):
-            if not Entities.PUBLIC_GROUP.enabled():
-                query = {"authError": "google-not-registered"}
-                safe_state = _safe_redirect_target(request.values.get("state"))
-                if safe_state:
-                    query["next"] = safe_state
-                return redirect(url_for("users.login", **query))
+            query = {"authError": "google-not-registered"}
+            safe_state = _safe_redirect_target(request.values.get("state"))
+            if safe_state:
+                query["next"] = safe_state
+            return redirect(url_for("users.login", **query))
 
         google_login = urlsplit(CONFIG.GOOGLE_LOGIN_URI)
         identity_request_uri = urlunsplit(

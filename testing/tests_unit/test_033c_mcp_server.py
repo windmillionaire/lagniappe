@@ -815,37 +815,39 @@ def test_hosted_original_download_preserves_capability_but_rejects_credentials(v
         app = hosted.create_app(CONFIG, adapter_factory=lambda token: _adapter(
             token, requests, revoked, override=override, proof=proof,
         ))
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin) as client:
-                async def read(arguments):
-                    response = await _rpc(client, "tools/call", params={"name": "get_file", "arguments": arguments}, version=version)
-                    assert response.status_code == 200
-                    assert response.headers["cache-control"] == "no-store"
-                    assert TOKEN_A not in response.text and proof not in response.text
-                    return response.json()["result"]
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin) as client,
+        ):
+            async def read(arguments):
+                response = await _rpc(client, "tools/call", params={"name": "get_file", "arguments": arguments}, version=version)
+                assert response.status_code == 200
+                assert response.headers["cache-control"] == "no-store"
+                assert TOKEN_A not in response.text and proof not in response.text
+                return response.json()["result"]
 
-                metadata = await read({"id": "hash:permitted123"})
-                assert metadata["isError"] is False
-                assert metadata["structuredContent"]["delivery"] == {"kind": "none"}
-                assert signed not in json.dumps(metadata)
-                args = {"id": "hash:permitted123", "include_original": True}
-                original = await read(args)
-                assert original["isError"] is False
-                value = original["structuredContent"]
-                assert value["delivery"] == {"kind": "download", "mime_type": "application/pdf"}
-                assert value["original_file"] == {"supported": True, "attached": False, "download_url": signed, "expires_in": 300}
-                assert "content" not in value
-                assert json.loads(original["content"][0]["text"]) == value
-                denied = await read({**args, "id": "hash:deniedfile12"})
-                assert denied["isError"] is True
-                assert signed not in json.dumps(denied)
-                for secret in (TOKEN_A, proof):
-                    for field in ("url", "encoded_url", "summary"):
-                        reflected.update(secret=secret, field=field)
-                        result = await read(args)
-                        assert result["isError"] is True
-                        assert "storage.googleapis.com" not in json.dumps(result)
-                assert not any(path == "/api/v1/plans" for _, path in requests)
+            metadata = await read({"id": "hash:permitted123"})
+            assert metadata["isError"] is False
+            assert metadata["structuredContent"]["delivery"] == {"kind": "none"}
+            assert signed not in json.dumps(metadata)
+            args = {"id": "hash:permitted123", "include_original": True}
+            original = await read(args)
+            assert original["isError"] is False
+            value = original["structuredContent"]
+            assert value["delivery"] == {"kind": "download", "mime_type": "application/pdf"}
+            assert value["original_file"] == {"supported": True, "attached": False, "download_url": signed, "expires_in": 300}
+            assert "content" not in value
+            assert json.loads(original["content"][0]["text"]) == value
+            denied = await read({**args, "id": "hash:deniedfile12"})
+            assert denied["isError"] is True
+            assert signed not in json.dumps(denied)
+            for secret in (TOKEN_A, proof):
+                for field in ("url", "encoded_url", "summary"):
+                    reflected.update(secret=secret, field=field)
+                    result = await read(args)
+                    assert result["isError"] is True
+                    assert "storage.googleapis.com" not in json.dumps(result)
+            assert not any(path == "/api/v1/plans" for _, path in requests)
 
     asyncio.run(scenario())
 

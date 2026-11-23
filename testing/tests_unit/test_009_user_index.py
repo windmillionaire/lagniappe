@@ -127,44 +127,46 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
         pieces.extend(f"{key}={value}" for key, value in sorted(kwargs.items()))
         return "/" + "&".join(pieces)
 
-    with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
-        with patch(
+    with (
+        patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for),
+        patch(
             "lagniappe.core.entities.index.database_get.users",
             return_value=SimpleNamespace(
                 results=["usr-key-1", "usr-key-2"], next_cursor="next-users"
             ),
-        ) as user_query:
-            with patch(
-                "lagniappe.core.entities.index.database_get.groups",
-                return_value=["grp-key-1", "grp-key-2"],
-            ) as group_query:
-                with patch(
-                    "lagniappe.core.entities.index.cache.get_details_by_hash",
-                    return_value={
-                        "grp001": {"kind": "group", "id": "grp-key-1"},
-                        "usr001": {"kind": "user", "id": "usr-key-1"},
-                    },
-                ) as details:
-                    with patch(
-                        "lagniappe.core.entities.index.Entities.fetch",
-                        side_effect=[
-                            [visible_user, hidden_user],
-                            [allowed_group, denied_group],
-                        ],
-                    ) as load:
-                        with patch(
-                            "lagniappe.core.entities.index.Entities.PUBLIC_GROUP.get",
-                            return_value=public_group,
-                        ) as get_public_group:
-                            index = UserIndex(
-                                cursor="users-cursor",
-                                limit=5,
-                                user=index_user,
-                            )
+        ) as user_query,
+        patch(
+            "lagniappe.core.entities.index.database_get.groups",
+            return_value=["grp-key-1", "grp-key-2"],
+        ) as group_query,
+        patch(
+            "lagniappe.core.entities.index.cache.get_details_by_hash",
+            return_value={
+                "grp001": {"kind": "group", "id": "grp-key-1"},
+                "usr001": {"kind": "user", "id": "usr-key-1"},
+            },
+        ) as details,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            side_effect=[
+                [visible_user, hidden_user],
+                [allowed_group, denied_group],
+            ],
+        ) as load,
+        patch(
+            "lagniappe.core.entities.index.Entities.PUBLIC_GROUP.get",
+            return_value=public_group,
+        ) as get_public_group,
+    ):
+        index = UserIndex(
+            cursor="users-cursor",
+            limit=5,
+            user=index_user,
+        )
 
-                            users = index.users
-                            groups = index.groups
-                            public = index.public_group
+        users = index.users
+        groups = index.groups
+        public = index.public_group
 
     user_query.assert_called_once_with(
         start_cursor="users-cursor",
@@ -226,19 +228,21 @@ def test_user_index_regular_mode_excludes_public_users():
         pieces.extend(f"{key}={value}" for key, value in sorted(kwargs.items()))
         return "/" + "&".join(pieces)
 
-    with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
-        with patch(
+    with (
+        patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for),
+        patch(
             "lagniappe.core.entities.index.database_get.users",
             return_value=SimpleNamespace(
                 results=["usr-key-3", "usr-key-4"], next_cursor="next-regular"
             ),
-        ) as user_query:
-            with patch(
-                "lagniappe.core.entities.index.Entities.fetch",
-                return_value=[regular_user, public_user],
-            ):
-                index = UserIndex(user=index_user)
-                users = index.users
+        ) as user_query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            return_value=[regular_user, public_user],
+        ),
+    ):
+        index = UserIndex(user=index_user)
+        users = index.users
 
     user_query.assert_called_once_with(
         start_cursor=None,
@@ -300,33 +304,35 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
         pieces.extend(f"{key}={value}" for key, value in sorted(kwargs.items()))
         return "/" + "&".join(pieces)
 
-    with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
-        with patch(
+    with (
+        patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for),
+        patch(
             "lagniappe.core.entities.index.Entities.PUBLIC_GROUP.enabled",
             return_value=True,
-        ) as enabled:
-            with patch(
-                "lagniappe.core.entities.index.Entities.PUBLIC_GROUP.get",
-                return_value=public_group,
-            ) as get_public_group:
-                with patch(
-                    "lagniappe.core.entities.index.database_get.users",
-                    return_value=SimpleNamespace(
-                        results=["usr-key-5", "usr-key-6", "usr-key-7"],
-                        next_cursor="next-public",
-                    ),
-                ) as user_query:
-                    with patch(
-                        "lagniappe.core.entities.index.Entities.fetch",
-                        return_value=[public_user, regular_user, hidden_public_user],
-                    ) as load:
-                        index = UserIndex(
-                            mode="public",
-                            cursor="public-cursor",
-                            limit=5,
-                            user=index_user,
-                        )
-                        users = index.users
+        ) as enabled,
+        patch(
+            "lagniappe.core.entities.index.Entities.PUBLIC_GROUP.get",
+            return_value=public_group,
+        ) as get_public_group,
+        patch(
+            "lagniappe.core.entities.index.database_get.users",
+            return_value=SimpleNamespace(
+                results=["usr-key-5", "usr-key-6", "usr-key-7"],
+                next_cursor="next-public",
+            ),
+        ) as user_query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            return_value=[public_user, regular_user, hidden_public_user],
+        ) as load,
+    ):
+        index = UserIndex(
+            mode="public",
+            cursor="public-cursor",
+            limit=5,
+            user=index_user,
+        )
+        users = index.users
 
     enabled.assert_called_once_with()
     get_public_group.assert_called_once_with()

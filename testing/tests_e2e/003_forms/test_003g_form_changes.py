@@ -198,7 +198,7 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
     assert len(published) == 1
     assert max(len(keys) for _, _, keys in batches) == 2
     assert any(cursor for cursor, _, _ in batches[2:])
-    for task, value in zip(tasks, (7, 8, 9)):
+    for task, value in zip(tasks, (7, 8, 9), strict=True):
         stored = Entities.fetch_one(task.key, request=Fetch.direct())
         assert stored.generation == 1
         assert stored.properties.submission.value == {"quantity": value}
@@ -614,10 +614,12 @@ def test_builder_observes_migration_completion_without_leaving(get_admin, get_us
     # A quiet scheduled poll must keep checking while this page stays focused.
     with expect_poll_result(user.page, subscription_id=subscription, status="unchanged"):
         pass
-    with expect_poll_result(user.page, subscription_id=subscription, status=None):
-        with web_app.test_request_context("/"):
-            login_user(user.entity)
-            result = DeferredJobs.run(operation)
+    with (
+        expect_poll_result(user.page, subscription_id=subscription, status=None),
+        web_app.test_request_context("/"),
+    ):
+        login_user(user.entity)
+        result = DeferredJobs.run(operation)
     assert result.success is True
     expect(status).to_be_hidden(timeout=30000)
     expect(user.locate("#notification")).to_have_text("Form update finished.")
@@ -666,7 +668,7 @@ def test_completion_during_migration_returns_inline_error_without_saving(
         tasks.append(task)
 
     user.go(parent, query_params={"tab": "tasks"})
-    parent.completed_task_list
+    _ = parent.completed_task_list
     expect(tasks[1].task_form).to_be_visible()
     tasks[1]._close_task()
     original_url = user.page.url
@@ -683,7 +685,7 @@ def test_completion_during_migration_returns_inline_error_without_saving(
             change = form_changes.start_change(form.entity, draft, str(uuid4()), user.entity)
 
     message = "This Form is being updated. These changes were not saved; try again when the update finishes."
-    for task, completed in zip(tasks, (False, True)):
+    for task, completed in zip(tasks, (False, True), strict=True):
         row = task.element
         expect(row).to_have_attribute("data-open", "false")
         path = f"/tasks/{task.key}/update"

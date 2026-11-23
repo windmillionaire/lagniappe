@@ -23,30 +23,32 @@ def test_skipped_recurring(get_test_entities):
     tasks = get_test_entities()
     assert tasks
 
-    with patch(
-        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+        ),
+        patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
-        ):
-            for task in tasks:
-                schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec["expected"]
-                task_name = task.test_spec["name"]
-                due = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
-                task.due_date = due.astimezone(UTC)
+        ),
+    ):
+        for task in tasks:
+            schedule_data = task.test_spec.get("schedule", {})
+            expected = task.test_spec["expected"]
+            task_name = task.test_spec["name"]
+            due = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
+            task.due_date = due.astimezone(UTC)
 
-                # Set up the periodic section
-                periodic = task.properties.periodic
-                periodic.section.update(schedule_data)
+            # Set up the periodic section
+            periodic = task.properties.periodic
+            periodic.section.update(schedule_data)
 
-                # Calculate skipped through schedule property
-                schedule = task.properties.schedule
-                skipped = schedule.skipped
+            # Calculate skipped through schedule property
+            schedule = task.properties.schedule
+            skipped = schedule.skipped
 
-                assert skipped == expected["skipped"], (
-                    f"Failed for '{task_name}': expected {expected['skipped']}, got {skipped}"
-                )
+            assert skipped == expected["skipped"], (
+                f"Failed for '{task_name}': expected {expected['skipped']}, got {skipped}"
+            )
 
 
 # @matrix task-scheduling : scheduled skipped
@@ -74,32 +76,34 @@ def test_skipped_scheduled(get_test_entities):
     tasks = get_test_entities()
     assert tasks
 
-    with patch(
-        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+        ),
+        patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
-        ):
-            for task in tasks:
-                schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec.get("expected", {})
-                task_name = task.test_spec.get("name", "Unknown")
+        ),
+    ):
+        for task in tasks:
+            schedule_data = task.test_spec.get("schedule", {})
+            expected = task.test_spec.get("expected", {})
+            task_name = task.test_spec.get("name", "Unknown")
 
-                due_date_user_tz = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
-                task.due_date = due_date_user_tz.astimezone(UTC)
+            due_date_user_tz = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
+            task.due_date = due_date_user_tz.astimezone(UTC)
 
-                # Set up the scheduled section
-                scheduled = task.properties.scheduled
-                scheduled.section.update(schedule_data)
+            # Set up the scheduled section
+            scheduled = task.properties.scheduled
+            scheduled.section.update(schedule_data)
 
-                # Calculate skipped through schedule property
-                schedule = task.properties.schedule
-                skipped = schedule.skipped
+            # Calculate skipped through schedule property
+            schedule = task.properties.schedule
+            skipped = schedule.skipped
 
-                assert skipped == expected["skipped"], (
-                    f"Failed for '{task_name}': due={due_date_user_tz}, today={mock_today}, "
-                    f"expected {expected['skipped']}, got {skipped}"
-                )
+            assert skipped == expected["skipped"], (
+                f"Failed for '{task_name}': due={due_date_user_tz}, today={mock_today}, "
+                f"expected {expected['skipped']}, got {skipped}"
+            )
 
 
 # @matrix task-scheduling : scheduled skipped

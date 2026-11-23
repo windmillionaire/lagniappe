@@ -232,7 +232,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
 
     @property
     def sort_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
@@ -255,7 +255,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         # returns a dict with the field ids as keys and a list of filter values for each row
         filter_values = {
             field_id: [r.fields[field_id].filter_value for r in self.rows]
-            for field_id in self.fields.keys()
+            for field_id in self.fields
         }
         return {k: v for k, v in filter_values.items() if v}
 

@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import datetime
 import math
 import re
@@ -411,10 +412,8 @@ class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     def validate_ai(self, value):
         """Parse and normalize AI-submitted phone number to E.164 format."""
         if value:
-            try:
+            with suppress(ValidationError):
                 self.value = self._format_phone(value)
-            except ValidationError:
-                pass
         else:
             self.value = None
 
@@ -427,10 +426,8 @@ class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
 
     def validate_submission(self, value):
         if value:
-            try:
+            with suppress(ValidationError):
                 self.value = self._format_phone(value)
-            except ValidationError:
-                pass
         else:
             self.value = None
 

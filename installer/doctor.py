@@ -84,8 +84,10 @@ def _local_state(root):
         )
         source_checksum = hashlib.sha256(source_content).hexdigest()
 
-    if source_checksum and manifest:
-        if (
+    if (
+        source_checksum
+        and manifest
+        and (
             manifest.get("schema") != 2
             or manifest.get("source")
             != {
@@ -93,10 +95,11 @@ def _local_state(root):
                 "sha256": source_checksum,
             }
             or manifest.get("generation") != source_checksum
-        ):
-            issues.append(
-                "generated files do not match the current constants generation"
-            )
+        )
+    ):
+        issues.append(
+            "generated files do not match the current constants generation"
+        )
 
     if os.name != "nt":
         for relative in SECRET_FILES:

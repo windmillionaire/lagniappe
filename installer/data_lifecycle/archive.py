@@ -91,9 +91,10 @@ def _output_path(path, *, zip_output):
 # @reason overwrite protection is part of the public archive workflow
 def _validate_output(path, *, zip_output):
     path = _output_path(path, zip_output=zip_output)
-    if path.exists():
-        if path.is_symlink() or zip_output or not path.is_dir() or any(path.iterdir()):
-            raise DataLifecycleError(f"Refusing to overwrite existing archive output: {path}")
+    if path.exists() and (
+        path.is_symlink() or zip_output or not path.is_dir() or any(path.iterdir())
+    ):
+        raise DataLifecycleError(f"Refusing to overwrite existing archive output: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

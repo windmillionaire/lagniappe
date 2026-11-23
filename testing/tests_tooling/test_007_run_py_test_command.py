@@ -1302,9 +1302,11 @@ def test_partition_junit_reports_preserves_single_run_and_rejects_missing_result
     partitions = pytest_routing.PytestPartitions(
         (f"--junitxml={target}",), (f"--junitxml={target}",)
     )
-    with pytest.raises(RuntimeError, match="Missing or invalid partition JUnit"):
-        with partition_junit_reports(partitions):
-            pass
+    with (
+        pytest.raises(RuntimeError, match="Missing or invalid partition JUnit"),
+        partition_junit_reports(partitions),
+    ):
+        pass
     assert not target.exists()
 
 

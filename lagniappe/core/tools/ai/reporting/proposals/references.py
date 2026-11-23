@@ -115,6 +115,10 @@ def _data_action_references(value, key=None):
     elif isinstance(value, list):
         for child in value:
             yield from _data_action_references(child, key)
-    elif isinstance(value, str):
-        if value.startswith("$") or value.startswith("action:") or key and key.endswith("_action"):
-            yield _strip_action_reference(value)
+    elif isinstance(value, str) and (
+        value.startswith("$")
+        or value.startswith("action:")
+        or key
+        and key.endswith("_action")
+    ):
+        yield _strip_action_reference(value)

@@ -249,13 +249,11 @@ def _format_result(doc, snippets=False):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_snippets
 # @matrix search : form-value highlighted-text html-escaping malformed-cache pipe-escaping snippets
 def _add_snippet(result, doc):
-    if hasattr(doc, "desc"):
-        if _split_first_highlight(doc.desc):
-            result["text"] = _highlighted_html(doc.desc)
+    if hasattr(doc, "desc") and _split_first_highlight(doc.desc):
+        result["text"] = _highlighted_html(doc.desc)
 
-    if hasattr(doc, "doc") and not result.get("text"):
-        if _split_first_highlight(doc.doc):
-            result["text"] = _highlighted_html(doc.doc)
+    if hasattr(doc, "doc") and not result.get("text") and _split_first_highlight(doc.doc):
+        result["text"] = _highlighted_html(doc.doc)
 
     if result.get("text") or not hasattr(doc, "values"):
         return

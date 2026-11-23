@@ -1564,7 +1564,7 @@ def test_related_value_strict_mode_raises_after_reporting(monkeypatch):
     prop = _TraceSingleRelation(entity=entity)
 
     with pytest.raises(UnloadedRelationError, match="category.owner"):
-        prop.value
+        _ = prop.value
 
     assert len(captured) == 1
     error, context, level = captured[0]

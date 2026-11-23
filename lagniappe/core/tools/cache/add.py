@@ -229,7 +229,7 @@ def update_json_index(entities):
         parent_ops["update"].extend(new_parents[parent_hash])
 
     with cache.pipeline() as pipe:
-        for parent_hash, parent_ops in parents.items():
+        for parent_ops in parents.values():
             for h in parent_ops["update"]:
                 pipe.json().set(
                     parent_ops["cache_key"],

@@ -293,35 +293,37 @@ def test_offline_scope_rejects_ping_counts_above_the_bound():
     collector.monitor_context(context, label="Owner")
     page = context.new_page()
 
-    with pytest.raises(AssertionError, match="between 2 and 3 browser failure"):
-        with collector.expect_offline(
+    with (
+        pytest.raises(AssertionError, match="between 2 and 3 browser failure"),
+        collector.expect_offline(
             _user(page),
             ping_count=2,
             max_ping_count=3,
-        ):
-            for _ in range(4):
-                page.emit(
-                    "requestfailed",
-                    SimpleNamespace(
-                        method="HEAD",
-                        url="http://test.local/l/ping",
-                        failure="net::ERR_INTERNET_DISCONNECTED",
+        ),
+    ):
+        for _ in range(4):
+            page.emit(
+                "requestfailed",
+                SimpleNamespace(
+                    method="HEAD",
+                    url="http://test.local/l/ping",
+                    failure="net::ERR_INTERNET_DISCONNECTED",
+                ),
+            )
+            page.emit(
+                "console",
+                SimpleNamespace(
+                    type="error",
+                    text=(
+                        "Failed to load resource: "
+                        "net::ERR_INTERNET_DISCONNECTED"
                     ),
-                )
-                page.emit(
-                    "console",
-                    SimpleNamespace(
-                        type="error",
-                        text=(
-                            "Failed to load resource: "
-                            "net::ERR_INTERNET_DISCONNECTED"
-                        ),
-                        location={
-                            "url": "http://test.local/l/ping",
-                            "lineNumber": 0,
-                        },
-                    ),
-                )
+                    location={
+                        "url": "http://test.local/l/ping",
+                        "lineNumber": 0,
+                    },
+                ),
+            )
 
 
 @pytest.mark.parametrize("count", [0, 2])
@@ -429,10 +431,12 @@ def test_expected_scope_fails_when_failure_count_is_not_exact(count):
     collector.monitor_context(context, label="Owner")
     page = context.new_page()
 
-    with pytest.raises(AssertionError, match="Expected 1 browser failure"):
-        with collector.expect(_user(page), kind="pageerror", message="sentinel"):
-            for _ in range(count):
-                page.emit("pageerror", RuntimeError("sentinel"))
+    with (
+        pytest.raises(AssertionError, match="Expected 1 browser failure"),
+        collector.expect(_user(page), kind="pageerror", message="sentinel"),
+    ):
+        for _ in range(count):
+            page.emit("pageerror", RuntimeError("sentinel"))
 
     collector.assert_clean()
 

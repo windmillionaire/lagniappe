@@ -153,34 +153,37 @@ def test_offline_poll_recovers_without_online_event(get_admin, browser_failures)
         failed_pings.append(route.request)
         route.abort("connectionfailed")
 
-    with expect_successful_response(
-        user.page,
-        method="HEAD",
-        path="/l/ping",
-        timeout=8000,
-    ), scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
-        with browser_failures.expect(
+    with (
+        expect_successful_response(
+            user.page,
+            method="HEAD",
+            path="/l/ping",
+            timeout=8000,
+        ),
+        scoped_browser_route(user.page.context, "**/l/ping", fail_ping),
+        browser_failures.expect(
             user,
             kind="requestfailed",
             method="HEAD",
             path="/l/ping",
             failure="net::ERR_CONNECTION_FAILED",
+        ),
+        browser_failures.expect(
+            user,
+            kind="console",
+            console_type="error",
+            text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+            source_path="/l/ping",
+        ),
+    ):
+        with user.page.expect_event(
+            "requestfailed",
+            predicate=lambda request: request.method == "HEAD"
+            and request.url.endswith("/l/ping"),
         ):
-            with browser_failures.expect(
-                user,
-                kind="console",
-                console_type="error",
-                text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-                source_path="/l/ping",
-            ):
-                with user.page.expect_event(
-                    "requestfailed",
-                    predicate=lambda request: request.method == "HEAD"
-                    and request.url.endswith("/l/ping"),
-                ):
-                    user.offline = False
-                expect(indicator).to_be_visible()
-                assert user.page.evaluate("navigator.onLine") is True
+            user.offline = False
+        expect(indicator).to_be_visible()
+        assert user.page.evaluate("navigator.onLine") is True
 
     assert len(failed_pings) == 1
     expect(indicator).to_be_hidden()

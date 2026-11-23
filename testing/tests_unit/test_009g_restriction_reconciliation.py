@@ -443,7 +443,8 @@ def test_file_migration_normalizes_history_and_preserves_conflicts():
     assert len(outcome["errors"]) == 3
     for detail, affected, label in zip(
         outcome["errors"], (conflict, missing_owner, same_page_conflict),
-        ("Conflicting attachment", "scan.pdf", "Separate legacy attachments")
+        ("Conflicting attachment", "scan.pdf", "Separate legacy attachments"),
+        strict=True,
     ):
         assert detail["url"] == f"/files/{migrations.encode_urlsafe_key(affected.key)}"
         assert detail["link_label"] == label

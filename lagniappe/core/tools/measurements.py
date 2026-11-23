@@ -278,7 +278,7 @@ def instrument_redis(client):
             ]
             with span("redis", "pipeline", count=len(commands)) as counts:
                 result = run(*args, **kwargs)
-                for command, value in zip(commands, result):
+                for command, value in zip(commands, result, strict=False):
                     if command in {"GET", "HGET", "JSON.GET"} and not isinstance(
                         value, Exception
                     ):

@@ -209,11 +209,19 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             return False
         if action.value > Action.VIEW.value:
             target_user = self.user
-            if target_user and target_user.is_admin and user and not user.is_owner:
-                # Personal workspace content is separate from account management.
-                # Keep privileged account deletion and permissions Owner-only.
-                if target_user.key != user.key or action not in {Action.EDIT, Action.CREATE}:
-                    return False
+            # Personal workspace content is separate from account management.
+            # Keep privileged account deletion and permissions Owner-only.
+            if (
+                target_user
+                and target_user.is_admin
+                and user
+                and not user.is_owner
+                and (
+                    target_user.key != user.key
+                    or action not in {Action.EDIT, Action.CREATE}
+                )
+            ):
+                return False
         return super().allowed(action, user=user)
 
     # @testable true

@@ -194,7 +194,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     batches = [Batch(case, "testing/" + record["nodeid"].removeprefix("testing/"),
                      frozenset({"shared-page"}) if case.startswith("shared") else frozenset(),
                      exclusive=case == "exclusive")
-               for case, record in zip(CASES, protocol)]
+               for case, record in zip(CASES, protocol, strict=True)]
     story_records = resolve_pilot_targets(records, STORY_TARGETS) if scope == "pilot" else [
         record for record in records
         if not record["nodeid"].removeprefix("testing/").startswith(PILOT_FILE.removeprefix("testing/") + "::")

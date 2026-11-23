@@ -73,7 +73,7 @@ def _allocate_action_output_key(action, created, context):
     if not group:
         return database_utility.create_key(*spec)
     keys = database_utility.create_keys(kind, parent, len(group))
-    prepared.update(zip(group, keys))
+    prepared.update(zip(group, keys, strict=True))
     return prepared[identity]
 
 

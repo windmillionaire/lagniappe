@@ -1,3 +1,4 @@
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 import re
@@ -102,10 +103,8 @@ def _guide_google_service_terms_acceptance(
                 standalone=True,
             )
         )
-        try:
+        with suppress(webbrowser.Error):
             webbrowser.open_new_tab(terms_error.terms_url)
-        except webbrowser.Error:
-            pass
         answer = input(
             format_prompt("Complete the agreement", hint="Enter to retry API activation; x to cancel")
         )

@@ -243,7 +243,7 @@ class SubmissionBookmark(SubmissionField):
 
         if "choices" in self.submission_value:
             choices = self.element.locator("[data-element='choices'] label").all()
-            for choice, setting in zip(choices, self.submission_value["choices"]):
+            for choice, setting in zip(choices, self.submission_value["choices"], strict=False):
                 if not setting:
                     choice.click()
 

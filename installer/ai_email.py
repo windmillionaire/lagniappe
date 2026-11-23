@@ -1,5 +1,6 @@
 """Provision the Resend transport used by production AI email submissions."""
 
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -208,10 +209,8 @@ def _prompt_secret(label, existing=None):
 # @reason browser launch behavior is exercised through the public instruction helpers
 def _open_resend_page(label, url):
     print(wrap_text(f"Opening {label}:\n  {ui.literal(url)}"))
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(url)
-    except webbrowser.Error:
-        pass
 
 
 # @testable true

@@ -536,9 +536,11 @@ def test_completion_write_rejects_raw_changes_and_stages_original_guards():
     task.db["completed_submission"] = persisted["completed_submission"].replace("Original", "Changed")
     with pytest.raises(ValidationError, match="cannot be changed"):
         definitions.validate_completion_write(task, persisted)
-    with patch.object(definitions.database_get, "entity", return_value=persisted):
-        with pytest.raises(ValidationError, match="cannot be changed"):
-            task.uncomplete()
+    with (
+        patch.object(definitions.database_get, "entity", return_value=persisted),
+        pytest.raises(ValidationError, match="cannot be changed"),
+    ):
+        task.uncomplete()
 
 
 # @matrix task-completion submission : schema-version incompatible-value preservation

@@ -50,7 +50,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
     info_form = page.info_form
     expect(_main_submit(info_form)).to_contain_text("Update Page")
 
-    page.document_tab
+    _ = page.document_tab
     owner.locate(Page.DOCUMENT_SETTINGS_TOGGLE).click()
     document_settings = owner.locate(Page.DOCUMENT_SETTINGS_FORM)
     expect(document_settings).to_be_visible()
@@ -65,7 +65,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
         expect(blocked_submit.locator("[data-icon='offline']")).to_be_visible()
         expect(blocked_submit).to_have_class(re.compile("opacity-75"))
 
-        Tabs(owner).info
+        _ = Tabs(owner).info
         info_form = page.info_form
         _fill_form_element(info_form, Page.INFO_NAME, updated_name)
         owner.page.keyboard.press("Tab")

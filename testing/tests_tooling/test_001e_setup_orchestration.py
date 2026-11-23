@@ -1502,9 +1502,11 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     lock_path = tmp_path / "installer.lock"
     journal_path = tmp_path / "operation.json"
 
-    with SetupProcessLock(lock_path):
-        with pytest.raises(SetupError, match="already running"):
-            SetupProcessLock(lock_path).acquire()
+    with (
+        SetupProcessLock(lock_path),
+        pytest.raises(SetupError, match="already running"),
+    ):
+        SetupProcessLock(lock_path).acquire()
     assert not lock_path.exists()
 
     with pytest.raises(SetupError, match="interrupted"), setup_operation(

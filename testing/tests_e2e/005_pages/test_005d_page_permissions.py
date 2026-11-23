@@ -104,7 +104,7 @@ def test_owner_can_open_page_permissions_panel(get_user):
     owner = get_user(Users.OWNER)
     owner.go(Pages.test_create_page)
 
-    Tabs(owner).info
+    _ = Tabs(owner).info
     permissions_toggle = owner.locate(Page.PAGE_PERMISSIONS_TOGGLE)
     expect(permissions_toggle).to_be_visible()
     permissions_toggle.click()

@@ -87,7 +87,7 @@ def test_untouched_document_does_not_save_or_touch_project(get_admin, get_user):
             f'"closed_documents":["{document_sync_id}"]'
         ),
     ):
-        Tabs(user).info
+        _ = Tabs(user).info
 
     after = Entities.fetch_one(project.key, request=Fetch.direct()).modified
     assert after == before

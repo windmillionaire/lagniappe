@@ -41,7 +41,7 @@ def test_group_restricted_form_opens_for_group_member_only(
 
     member = get_user(Users.general_forms_view_only)
     form.user = member
-    form.builder
+    _ = form.builder
     expect(member.locate(Builder.FORM_NAME)).to_have_text(form.definition.name)
 
     outsider = get_user(Users.admin)

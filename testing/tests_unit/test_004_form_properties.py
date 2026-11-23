@@ -433,7 +433,7 @@ def test_form_schema(get_test_entities, get_schema):
     forms = get_test_entities()
     schemas = [get_schema(f.test_spec["schema"]) for f in forms]
 
-    for form, schema in zip(forms, schemas):
+    for form, schema in zip(forms, schemas, strict=True):
         form.schema = schema
 
         assert form.schema == schema

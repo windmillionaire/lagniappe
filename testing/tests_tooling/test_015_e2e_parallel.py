@@ -107,7 +107,7 @@ def test_reset(): pass
                for name in "abcd"]
     records.append({"nodeid": "tests_e2e/test_story.py::test_reset", "fixtures": [],
                     "serial": True, "serial_phase": "before"})
-    durations = {f"tests_e2e/test_story.py::test_{name}": value for name, value in zip("abc", (8, 5, 3))}
+    durations = {f"tests_e2e/test_story.py::test_{name}": value for name, value in zip("abc", (8, 5, 3), strict=True)}
     batches, inventory = story_batches(tmp_path, records, workers=2, durations=durations)
     assert len(batches) == 4
     assert batches[0].exclusive and batches[0].nodeid.endswith("test_reset")
@@ -229,15 +229,21 @@ def test_case_claims_stop_waiting_on_timeout_or_lost_authority(tmp_path):
         raise RuntimeError("lease lost")
 
     with reserve_resources(tmp_path, ["shared"], lambda: None):
-        with pytest.raises(RuntimeError, match="Timed out"):
-            with reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0):
-                pytest.fail("A conflicting claim was admitted")
-        with pytest.raises(RuntimeError, match="lease lost"):
-            with reserve_resources(tmp_path, ["shared"], lost):
-                pytest.fail("Lost authority was ignored")
-    with pytest.raises(ValueError):
-        with reserve_resources(tmp_path, ["shared"], lambda: None):
-            raise ValueError("fixture failed")
+        with (
+            pytest.raises(RuntimeError, match="Timed out"),
+            reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0),
+        ):
+            pytest.fail("A conflicting claim was admitted")
+        with (
+            pytest.raises(RuntimeError, match="lease lost"),
+            reserve_resources(tmp_path, ["shared"], lost),
+        ):
+            pytest.fail("Lost authority was ignored")
+    with (
+        pytest.raises(ValueError),
+        reserve_resources(tmp_path, ["shared"], lambda: None),
+    ):
+        raise ValueError("fixture failed")
     with reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0):
         pass
 

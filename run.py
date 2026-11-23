@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from contextlib import suppress
 import argparse
 import ast
 import json
@@ -94,10 +95,8 @@ def pytest_command(pytest_args: list[str]) -> list[str]:
 
 
 def _forward_signal_to_process_group(process: subprocess.Popen, signum: int) -> None:
-    try:
+    with suppress(ProcessLookupError):
         os.killpg(process.pid, signum)
-    except ProcessLookupError:
-        pass
 
 
 def _run_pytest_subprocess(command: list[str]) -> int:
@@ -1075,12 +1074,11 @@ def release_readiness_issues(
             RELEASE_SERVICE_WORKER_PATH,
             issues,
         )
-        if service_worker is not None:
-            if build_id not in service_worker:
-                issues.append(
-                    f"{RELEASE_SERVICE_WORKER_PATH} does not contain "
-                    f"the current build ID {build_id}."
-                )
+        if service_worker is not None and build_id not in service_worker:
+            issues.append(
+                f"{RELEASE_SERVICE_WORKER_PATH} does not contain "
+                f"the current build ID {build_id}."
+            )
 
     return merge_base, issues
 

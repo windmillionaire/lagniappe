@@ -66,7 +66,7 @@ class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty
 
     @property
     def sort_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
     # AI Attributes
     @property
@@ -79,7 +79,7 @@ class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty
 
     @property
     def filter_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
 
 # @testable true
@@ -142,7 +142,7 @@ class HTML(AssetProperty, SchemaProperty):
 
     @property
     def sort_value(self):
-        return True if self.entity.assets.get(self.id) else False
+        return bool(self.entity.assets.get(self.id))
 
     # Asset Attributes
     def add_image(self, image, visibility="private"):

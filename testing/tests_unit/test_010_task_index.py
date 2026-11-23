@@ -424,25 +424,27 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
         pieces.extend(f"{key}={value}" for key, value in sorted(kwargs.items()))
         return "/" + "&".join(pieces)
 
-    with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
-        with patch(
+    with (
+        patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for),
+        patch(
             "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=["dated-key"], next_cursor=None),
-        ) as dated_query:
-            with patch(
-                "lagniappe.core.entities.index.database_get.tasks_without_due_dates"
-            ) as undated_query:
-                with patch(
-                    "lagniappe.core.entities.index.Entities.fetch",
-                    return_value=[dated_task],
-                ) as load:
-                    index = TaskIndex(
-                        cursor="cursor-1",
-                        limit=2,
-                        user=user,
-                        entity=project,
-                    )
-                    tasks = index.tasks
+        ) as dated_query,
+        patch(
+            "lagniappe.core.entities.index.database_get.tasks_without_due_dates"
+        ) as undated_query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            return_value=[dated_task],
+        ) as load,
+    ):
+        index = TaskIndex(
+            cursor="cursor-1",
+            limit=2,
+            user=user,
+            entity=project,
+        )
+        tasks = index.tasks
 
     dated_query.assert_called_once_with(
         start_cursor="cursor-1",
@@ -460,28 +462,30 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
     assert index.append == "/tasks.rows&undated=1"
     assert index.tasks is tasks
 
-    with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
-        with patch(
+    with (
+        patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for),
+        patch(
             "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=[], next_cursor="ignored"),
-        ) as dated_query:
-            with patch(
-                "lagniappe.core.entities.index.database_get.tasks_without_due_dates",
-                return_value=SimpleNamespace(
-                    results=["undated-key"], next_cursor="cursor-2"
-                ),
-            ) as undated_query:
-                with patch(
-                    "lagniappe.core.entities.index.Entities.fetch",
-                    return_value=[undated_task],
-                ) as load:
-                    index = TaskIndex(
-                        cursor="cursor-1",
-                        limit=2,
-                        user=user,
-                        entity=project,
-                    )
-                    tasks = index.tasks
+        ) as dated_query,
+        patch(
+            "lagniappe.core.entities.index.database_get.tasks_without_due_dates",
+            return_value=SimpleNamespace(
+                results=["undated-key"], next_cursor="cursor-2"
+            ),
+        ) as undated_query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            return_value=[undated_task],
+        ) as load,
+    ):
+        index = TaskIndex(
+            cursor="cursor-1",
+            limit=2,
+            user=user,
+            entity=project,
+        )
+        tasks = index.tasks
 
     dated_query.assert_called_once_with(
         start_cursor="cursor-1",

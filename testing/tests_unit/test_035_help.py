@@ -177,8 +177,8 @@ class MemoryRedis:
         definition = [b'prefixes', [HELP_PREFIX.encode()] if self.upgraded else [b'page:']]
         attributes = [[b'attribute', b'help_version', b'type', b'TAG']] if self.upgraded else []
         if self.metadata_maps:
-            definition = dict(zip(definition[::2], definition[1::2]))
-            attributes = [dict(zip(row[::2], row[1::2])) for row in attributes]
+            definition = dict(zip(definition[::2], definition[1::2], strict=True))
+            attributes = [dict(zip(row[::2], row[1::2], strict=True)) for row in attributes]
         return {'indexing': 0, 'index_definition': definition, 'attributes': attributes}
 
     def dropindex(self, *, delete_documents=False):

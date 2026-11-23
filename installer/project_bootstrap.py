@@ -1,5 +1,6 @@
 """Inspect project prerequisites, then apply explicitly confirmed bootstrap work."""
 
+from contextlib import suppress
 import json
 import webbrowser
 
@@ -114,10 +115,8 @@ def _authorize_project_billing(project_id):
             )
         )
     )
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(url)
-    except webbrowser.Error:
-        pass
 
     while True:
         response = input(

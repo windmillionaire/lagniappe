@@ -192,9 +192,11 @@ def test_scoped_browser_route_always_removes_handler():
 
     assert target.events[-1] == ("unroute", "**/ping", handler)
 
-    with pytest.raises(RuntimeError, match="route body failed"):
-        with scoped_browser_route(target, "**/sync", handler):
-            raise RuntimeError("route body failed")
+    with (
+        pytest.raises(RuntimeError, match="route body failed"),
+        scoped_browser_route(target, "**/sync", handler),
+    ):
+        raise RuntimeError("route body failed")
 
     assert target.events[-1] == ("unroute", "**/sync", handler)
 
@@ -311,20 +313,22 @@ def test_wait_reports_matching_http_failure_without_timing_out():
 def test_wait_validates_entity_revisions_and_response_payload():
     page = FakePage()
 
-    with pytest.raises(AssertionError, match="did not acknowledge entity 'task'"):
-        with expect_successful_response(
+    with (
+        pytest.raises(AssertionError, match="did not acknowledge entity 'task'"),
+        expect_successful_response(
             page,
             method="PUT",
             path="/tasks/task/update",
             entity_key="task",
-        ):
-            page.respond(
-                FakeResponse(
-                    method="PUT",
-                    url="http://test.local/tasks/task/update",
-                    headers=_revisions("page"),
-                )
+        ),
+    ):
+        page.respond(
+            FakeResponse(
+                method="PUT",
+                url="http://test.local/tasks/task/update",
+                headers=_revisions("page"),
             )
+        )
 
     with expect_successful_response(
         page,

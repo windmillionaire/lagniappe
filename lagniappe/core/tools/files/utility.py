@@ -1,5 +1,6 @@
 """File encoding and MIME detection."""
 
+from contextlib import suppress
 import filetype
 
 from .constants import ENCODINGS, TEXT_MIMETYPES
@@ -17,16 +18,12 @@ def _upload_sample(upload, size=MIME_SAMPLE_BYTES):
     if hasattr(upload, "read_sample"):
         return upload.read_sample(size)
     position = None
-    try:
+    with suppress(Exception):
         position = upload.tell()
-    except Exception:
-        pass
     upload.seek(0)
     sample = upload.read(size)
-    try:
+    with suppress(Exception):
         upload.seek(position or 0)
-    except Exception:
-        pass
     return sample or b""
 
 

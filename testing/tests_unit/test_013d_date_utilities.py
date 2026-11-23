@@ -251,52 +251,54 @@ def test_calculate_postponed_due_date():
     # Wednesday June 18, 2025
     mock_now = datetime(2025, 6, 18, 10, 0, 0, tzinfo=tz)
 
-    with patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz):
-        with patch("lagniappe.core.tools.tasks.scheduling.datetime", wraps=datetime) as mock_datetime:
-            mock_datetime.now.return_value = mock_now
-            # Tomorrow: Thursday June 19
+    with (
+        patch("lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz),
+        patch("lagniappe.core.tools.tasks.scheduling.datetime", wraps=datetime) as mock_datetime,
+    ):
+        mock_datetime.now.return_value = mock_now
+        # Tomorrow: Thursday June 19
+        assert dates.calculate_postponed_due_date(
+            "tomorrow"
+        ) == mock_now + timedelta(days=1)
+
+        # Weekend: Saturday June 21
+        # weekday() 0=Mon, 2=Wed. 5-2=3 days to Saturday.
+        assert dates.calculate_postponed_due_date(
+            "weekend"
+        ) == mock_now + timedelta(days=3)
+
+        # Remaining days this week: Thursday June 19 through Sunday June 22
+        for weekday, offset in {
+            "thursday": 1,
+            "friday": 2,
+            "saturday": 3,
+            "sunday": 4,
+        }.items():
             assert dates.calculate_postponed_due_date(
-                "tomorrow"
-            ) == mock_now + timedelta(days=1)
+                f"this-week-{weekday}"
+            ) == mock_now + timedelta(days=offset)
 
-            # Weekend: Saturday June 21
-            # weekday() 0=Mon, 2=Wed. 5-2=3 days to Saturday.
+        # Today and elapsed weekdays are not valid postponement targets.
+        assert dates.calculate_postponed_due_date("this-week-wednesday") is None
+        assert dates.calculate_postponed_due_date("this-week-tuesday") is None
+
+        # Next week: Monday June 23
+        # 7-2=5 days to Monday.
+        assert dates.calculate_postponed_due_date(
+            "next-week"
+        ) == mock_now + timedelta(days=5)
+
+        # Explicit next-week weekdays: Monday June 23 through Friday June 27
+        for weekday, offset in {
+            "monday": 0,
+            "tuesday": 1,
+            "wednesday": 2,
+            "thursday": 3,
+            "friday": 4,
+        }.items():
             assert dates.calculate_postponed_due_date(
-                "weekend"
-            ) == mock_now + timedelta(days=3)
-
-            # Remaining days this week: Thursday June 19 through Sunday June 22
-            for weekday, offset in {
-                "thursday": 1,
-                "friday": 2,
-                "saturday": 3,
-                "sunday": 4,
-            }.items():
-                assert dates.calculate_postponed_due_date(
-                    f"this-week-{weekday}"
-                ) == mock_now + timedelta(days=offset)
-
-            # Today and elapsed weekdays are not valid postponement targets.
-            assert dates.calculate_postponed_due_date("this-week-wednesday") is None
-            assert dates.calculate_postponed_due_date("this-week-tuesday") is None
-
-            # Next week: Monday June 23
-            # 7-2=5 days to Monday.
-            assert dates.calculate_postponed_due_date(
-                "next-week"
-            ) == mock_now + timedelta(days=5)
-
-            # Explicit next-week weekdays: Monday June 23 through Friday June 27
-            for weekday, offset in {
-                "monday": 0,
-                "tuesday": 1,
-                "wednesday": 2,
-                "thursday": 3,
-                "friday": 4,
-            }.items():
-                assert dates.calculate_postponed_due_date(
-                    f"next-week-{weekday}"
-                ) == mock_now + timedelta(days=5 + offset)
+                f"next-week-{weekday}"
+            ) == mock_now + timedelta(days=5 + offset)
 
 
 # @matrix template-formatting : blank-value date input-value string-passthrough

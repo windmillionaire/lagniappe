@@ -1,3 +1,4 @@
+from contextlib import suppress
 import traceback
 from pathlib import Path
 
@@ -65,10 +66,8 @@ def _caller_location():
     )
     for frame in reversed(traceback.extract_stack()[:-1]):
         path = Path(frame.filename).resolve()
-        try:
+        with suppress(ValueError):
             path = path.relative_to(PROJECT_ROOT)
-        except ValueError:
-            pass
         location = f"{path}:{frame.lineno} {frame.name}"
         if location.startswith(skip_prefixes):
             continue
@@ -92,7 +91,7 @@ def _entity_context(entity):
         "id": _safe_attr(entity, "id"),
         "hash": _safe_attr(entity, "hash"),
         "urlsafe_key": _safe_attr(entity, "urlsafe_key"),
-        "db_keys": sorted(str(key) for key in db.keys()),
+        "db_keys": sorted(str(key) for key in db),
     }
 
 

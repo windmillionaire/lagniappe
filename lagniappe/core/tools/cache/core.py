@@ -1,5 +1,6 @@
 """Redis cache clients for hash-based (search) and JSON-based (filter) entity storage."""
 
+from contextlib import suppress
 from datetime import timedelta
 
 import redis
@@ -271,10 +272,8 @@ class CacheJSON:
                 index_type=IndexType.JSON,
                 prefix=[f"{CONFIG.PREFIX}JSON:"],
             )
-            try:
+            with suppress(ResponseError):
                 self.redis.ft(self.INDEX).create_index(schema, definition=definition)
-            except ResponseError:
-                pass
 
     # @testable false
     # @reason api-wrapper; currently reserved for direct JSON key deletion
@@ -376,7 +375,7 @@ class CacheJSON:
             results = pipe.execute()
 
         parents = {}
-        for entity_hash, raw in zip(hashes, results):
+        for entity_hash, raw in zip(hashes, results, strict=True):
             result = Result.from_resp3(raw) if isinstance(raw, dict) else Result(raw, hascontent=False)
             if result.docs:
                 parents[entity_hash] = [doc.id for doc in result.docs]

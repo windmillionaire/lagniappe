@@ -83,7 +83,7 @@ def run_report(report, user, ensure_active=None):
     actions = proposal.get("actions", [])
     if any(action["type"] in {"attach_file", "summarize_file"} and not action.get("skip")
            and record.get("status") not in {"complete", "skipped"}
-           for action, record in zip(actions, result["actions"])):
+           for action, record in zip(actions, result["actions"], strict=False)):
         attached_files = [file for file in report.input_files if file.has_references]
         if attached_files:
             Entities.fetch(*attached_files, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))

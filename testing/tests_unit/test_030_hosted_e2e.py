@@ -37,9 +37,11 @@ def test_worker_inherits_run_cookie_without_replaying_bootstrap(monkeypatch, inh
 
     monkeypatch.setattr(e2e_runtime, "hosted_e2e_browser_cookie", forbidden_exchange)
     if not inherited:
-        with pytest.raises(RuntimeError, match="coordinator's run cookie"):
-            with e2e_worker.worker_runtime():
-                pytest.fail("A hosted worker started without its inherited cookie")
+        with (
+            pytest.raises(RuntimeError, match="coordinator's run cookie"),
+            e2e_worker.worker_runtime(),
+        ):
+            pytest.fail("A hosted worker started without its inherited cookie")
     else:
         with e2e_worker.worker_runtime() as runtime:
             assert runtime.run_id == "test-run"

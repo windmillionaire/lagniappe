@@ -37,8 +37,8 @@ def _supports_help():
             return False
         raise
     raw_definition = info["index_definition"]
-    definition = raw_definition if isinstance(raw_definition, dict) else dict(zip(raw_definition[::2], raw_definition[1::2]))
-    attributes = [row if isinstance(row, dict) else dict(zip(row[::2], row[1::2])) for row in info["attributes"]]
+    definition = raw_definition if isinstance(raw_definition, dict) else dict(zip(raw_definition[::2], raw_definition[1::2], strict=False))
+    attributes = [row if isinstance(row, dict) else dict(zip(row[::2], row[1::2], strict=False)) for row in info["attributes"]]
     return HELP_PREFIX in definition.get("prefixes", []) and any(
         field.get("attribute") == "help_version" for field in attributes
     )

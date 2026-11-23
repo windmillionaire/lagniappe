@@ -25,7 +25,7 @@ from ..tools.auth.references import (
 def normalize_submission_values(values, fields):
     updated = {}
 
-    for field in values.keys():
+    for field in values:
         parts = field.split(":", 1)
         schema_id = parts[0]
         part = parts[1] if len(parts) > 1 else None

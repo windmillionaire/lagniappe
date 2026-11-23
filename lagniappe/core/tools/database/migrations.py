@@ -594,7 +594,7 @@ def _load_views(datastore, catalog):
     legacy_keys = [datastore.key(KINDS.site.value, key) for key in legacy_ids]
     records = _get_multi(datastore, [*status_keys, *legacy_keys, _control_key(datastore)])
     views = []
-    for definition, key in zip(catalog, status_keys):
+    for definition, key in zip(catalog, status_keys, strict=True):
         record = records.get(key)
         view = _record_view(definition, record)
         if not record:

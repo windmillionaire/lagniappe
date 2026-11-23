@@ -354,10 +354,7 @@ def site_settings():
         )
 
     entity = site_database.image()
-    if entity:
-        site_image_response = _site_image_response(dict(entity))
-    else:
-        site_image_response = None
+    site_image_response = _site_image_response(dict(entity)) if entity else None
 
     ai_settings, ai_model_options = (
         load_ai_settings_payload(config=CONFIG) if CONFIG.AI_ENABLED else ({}, {})

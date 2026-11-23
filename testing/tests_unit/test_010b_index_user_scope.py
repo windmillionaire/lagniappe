@@ -169,7 +169,7 @@ def test_form_index_related_models_use_explicit_viewer(
     ]
     models = [
         TestEntities.get("MODEL_TASK", {"hash": f"model-{suffix}"}, project=project)
-        for suffix, project in zip(("a", "b"), projects)
+        for suffix, project in zip(("a", "b"), projects, strict=True)
     ]
     for category in categories:
         category.forms = [form]

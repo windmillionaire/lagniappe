@@ -5,7 +5,7 @@ from __future__ import annotations
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import datetime, timedelta, timezone, UTC
 import hashlib
 import json
@@ -695,10 +695,8 @@ def prepare_automatic_backup(native_backup_id, context=None):
         point_in_time_read=False,
     )
     checkpoint.update("recovery-set-complete", recovery_set=manifest.as_dict())
-    try:
+    with suppress(Exception):
         context.disable_database_delete_protection(scratch)
-    except Exception:
-        pass
     context.delete_database(scratch)
     checkpoint.finish()
     checkpoint.remove()

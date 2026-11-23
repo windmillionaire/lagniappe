@@ -83,7 +83,7 @@ class CategoryFilters(Filters):
             self._entity_fields[self.entity.form.hash].value = self.entity.form
 
         related_forms = [
-            f for f in self.entity.forms if f.hash not in self._entity_fields.keys()
+            f for f in self.entity.forms if f.hash not in self._entity_fields
         ]
         for form in related_forms:
             self._entity_fields[form.hash] = RelatedForm(entity=self.entity)

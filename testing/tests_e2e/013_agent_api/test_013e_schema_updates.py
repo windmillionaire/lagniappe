@@ -132,7 +132,7 @@ def test_reviewed_schema_migration_waits_for_publication_and_preserves_completio
     assert reviewed["actions"][0]["data"]["conversions"] == [
         {**candidate, "entity": task_keys[candidate["entity"]]} for candidate in candidates
     ]
-    for task, source in zip(tasks, notes):
+    for task, source in zip(tasks, notes, strict=True):
         assert Entities.fetch_one(task.key, request=Fetch.direct()).submission["notes"] == source
     # Hold all dispatches to observe the real parent/child scheduling boundary.
     monkeypatch.setattr(DeferredJobs, "dispatch", lambda *args, **kwargs: "held")

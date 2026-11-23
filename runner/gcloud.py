@@ -244,7 +244,7 @@ def verify_active_configuration(name, account, project, *, announce=True):
             ("Actual", (active, active_account, active_project)),
         ):
             print(ui.heading(heading))
-            for label, value in zip(("Configuration", "Account", "Project"), values):
+            for label, value in zip(("Configuration", "Account", "Project"), values, strict=True):
                 print(ui.value(label, value, column=17, verbatim=True))
         raise RuntimeError(
             "Active gcloud configuration does not match expected settings."
@@ -338,7 +338,7 @@ def config_gcloud(*, announce=True):
             return
 
     os.environ["GRPC_VERBOSITY"] = "ERROR"
-    os.environ["GLOG_minloglevel"] = "2"
+    os.environ["GLOG_minloglevel"] = "2"  # noqa: SIM112 -- glog requires this case-sensitive name.
     create_configuration(expected_name, expected_account, expected_project)
     activate_configuration(expected_name)
     verify_active_configuration(

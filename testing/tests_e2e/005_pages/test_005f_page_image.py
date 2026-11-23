@@ -472,14 +472,16 @@ def test_failed_image_replacement_preserves_existing_image(get_admin, get_user, 
             body='{"error":"Image upload rejected"}',
         )
 
-    with scoped_browser_route(user.page.context, f"**{path}", reject_replacement):
-        with browser_failures.expect_http_error(user, status=422, path=path):
-            with user.page.expect_response(f"**{path}"):
-                with user.page.expect_file_chooser() as chooser:
-                    UploadDropdown.REPLACE.select(form)
-                chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
-            expect(form.locator("[data-role='image-error']")).to_have_text("Image upload rejected")
-            image = form.locator("[data-role='existing-image'] img")
-            expect(image).to_be_visible()
-            expect(image).to_have_attribute("src", original_src)
-            expect(user.locate(page.PHOTO_PROMPT_UPLOAD)).to_be_enabled()
+    with (
+        scoped_browser_route(user.page.context, f"**{path}", reject_replacement),
+        browser_failures.expect_http_error(user, status=422, path=path),
+    ):
+        with user.page.expect_response(f"**{path}"):
+            with user.page.expect_file_chooser() as chooser:
+                UploadDropdown.REPLACE.select(form)
+            chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
+        expect(form.locator("[data-role='image-error']")).to_have_text("Image upload rejected")
+        image = form.locator("[data-role='existing-image'] img")
+        expect(image).to_be_visible()
+        expect(image).to_have_attribute("src", original_src)
+        expect(user.locate(page.PHOTO_PROMPT_UPLOAD)).to_be_enabled()

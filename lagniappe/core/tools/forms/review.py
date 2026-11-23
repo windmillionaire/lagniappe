@@ -22,7 +22,7 @@ def merge_proposal(baseline, current, proposed, *, review_only=False):
     merged, conflicts, applied = deepcopy(current), {}, []
     for field_id, value in proposed.items():
         before, latest = baseline.get(field_id), current.get(field_id)
-        if value == before or value == latest:
+        if value in (before, latest):
             continue
         if review_only or latest != before:
             conflicts[field_id] = deepcopy(value)

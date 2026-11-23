@@ -136,7 +136,7 @@ def reconcile_member_roles(
         changed = True
 
     if len(rebuilt) != len(bindings) or any(
-        left is not right for left, right in zip(rebuilt, bindings)
+        left is not right for left, right in zip(rebuilt, bindings, strict=True)
     ):
         changed = True
     if changed:

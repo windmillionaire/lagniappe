@@ -122,7 +122,7 @@ class RowSubmission(SubmissionProperty):
     @classmethod
     def validate_import(cls, table, list_of_values, import_process=None):
         row = cls(table)
-        for field_id, value in zip(row.fields.keys(), list_of_values):
+        for field_id, value in zip(row.fields.keys(), list_of_values, strict=False):
             field = row.fields[field_id]
             field.reset()
             if import_process and hasattr(field, "fuzzy_match"):

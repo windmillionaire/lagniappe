@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 import codecs
 import hashlib
 import json
@@ -139,18 +140,12 @@ def _format_command(command: list[str] | str) -> str:
 # @reason cancel only the subprocess group created for this dependency command
 def _stop_command(process):
     if os.name == "posix":
-        try:
+        with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
+        with suppress(subprocess.TimeoutExpired):
             process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            pass
-        try:
+        with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
     else:
         subprocess.run(
             ["taskkill", "/PID", str(process.pid), "/T", "/F"],
@@ -914,7 +909,7 @@ def _update_requirements_file(
         f.writelines(updated_lines)
 
     changed = False
-    for original, updated in zip(original_lines, updated_lines):
+    for original, updated in zip(original_lines, updated_lines, strict=False):
         if original == updated:
             continue
         changed = True

@@ -1,5 +1,6 @@
 """Bounded E2E batches under one owner, with private results and conflict lanes."""
 
+from contextlib import suppress
 from dataclasses import dataclass
 import json
 import math
@@ -60,15 +61,13 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
             if now >= next_check:
                 assert_active()
                 next_check = now + 1
-            for name, (batch, process, began) in list(running.items()):
+            for name, (_batch, process, began) in list(running.items()):
                 status = process.poll()
                 if status is not None:
                     # A crashed pytest can leave a browser in its process group.
                     # Even successful workers must not leave live descendants.
-                    try:
+                    with suppress(ProcessLookupError):
                         os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
                     finished[name] = status
                     events.append({"batch": name, "event": "finish", "at": now - started,
                                    "status": status})
@@ -101,10 +100,8 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
         # Reap every remaining worker before the caller can clean shared data.
         for _, process, _ in running.values():
             if process.poll() is None:
-                try:
+                with suppress(ProcessLookupError):
                     os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
         for _, process, _ in running.values():
             try:
                 process.wait(timeout=5)
@@ -112,10 +109,8 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
                 pass
             finally:
                 # A parent can exit on TERM while a descendant ignores it.
-                try:
+                with suppress(ProcessLookupError):
                     os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
                 process.wait(timeout=5)
 
 

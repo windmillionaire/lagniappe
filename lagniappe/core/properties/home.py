@@ -24,7 +24,7 @@ class HomeProperty:
             raise ValueError("Home section requires a user")
         self._user = user
         self._cursor = kwargs.get("cursor")
-        self._back = True if self._cursor else False
+        self._back = bool(self._cursor)
 
     @property
     def id(self):

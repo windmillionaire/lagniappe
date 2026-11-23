@@ -23,10 +23,7 @@ class ScheduleType(ProcessProperty):
     # @pair task-scheduling:ai-generation
     @property
     def generate(self):
-        if self.error or not self.prompt:
-            return False
-
-        return True
+        return not (self.error or not self.prompt)
 
     @property
     def prompt(self):

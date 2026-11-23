@@ -1115,11 +1115,7 @@ def should_ignore_symbol(
         ):
             return True
 
-    if symbol.language == "python" and symbol.kind == "method":
-        if is_python_property(symbol.decorators, ignored_python_decorators):
-            return True
-
-    return False
+    return bool(symbol.language == "python" and symbol.kind == "method" and is_python_property(symbol.decorators, ignored_python_decorators))
 
 
 def normalized_test_root(root: object) -> str:

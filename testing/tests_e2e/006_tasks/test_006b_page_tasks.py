@@ -610,7 +610,7 @@ def test_completed_task_can_move_to_another_page(get_admin, get_user):
     expect(moved_task).to_have_attribute("data-content-readonly", "true")
 
     user.go(source_page)
-    source_page.task_list
+    _ = source_page.task_list
     expect(user.locate(f"[data-key='{task.key}']")).not_to_be_attached()
 
 

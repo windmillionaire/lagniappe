@@ -369,7 +369,7 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
     remove = set(client).difference(roots)
     upsert = []
     order = []
-    for key, root in roots.items():
+    for key in roots:
         if key not in changed_keys and not reauthorize:
             order.append(key)
             continue

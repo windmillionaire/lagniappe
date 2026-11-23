@@ -123,14 +123,13 @@ class Checkpoint:
         ):
             raise RuntimeError("The requested recovery generation is no longer locked.")
         state = self.doc["state"] or {}
-        if state.get("status") not in {None, "torn-down"}:
-            if (
-                state.get("cloud_settings_version") != receipt["version"]
-                or state.get("source") != receipt["source"]
-            ):
-                raise RuntimeError(
-                    "Restore the active candidate's numeric settings version and checkout its source commit."
-                )
+        if state.get("status") not in {None, "torn-down"} and (
+            state.get("cloud_settings_version") != receipt["version"]
+            or state.get("source") != receipt["source"]
+        ):
+            raise RuntimeError(
+                "Restore the active candidate's numeric settings version and checkout its source commit."
+            )
         self.doc["operation"] = {
             "action": action,
             "id": uuid.uuid4().hex,

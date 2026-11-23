@@ -32,9 +32,7 @@ class SafeJSONProvider(DefaultJSONProvider):
 # @testable false
 # @reason current-user template helper is exercised through rendered E2E pages
 def starred(entity):
-    if entity.key in current_user.properties.starred.keys:
-        return True
-    return False
+    return entity.key in current_user.properties.starred.keys
 
 
 # @testable true

@@ -54,7 +54,7 @@ class Image(ColumnMixin, FilterMixin, AssetProperty):
 
     @property
     def filter_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
     @property
     def filter_label(self):

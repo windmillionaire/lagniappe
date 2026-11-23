@@ -554,9 +554,11 @@ def test_file_download_uses_original_filename_and_mimetype(get_admin, get_user):
     user.go(file)
     expect(user.locate(file.DOWNLOAD_LINK)).to_be_visible()
 
-    with user.page.expect_download() as download_info:
-        with user.page.expect_response("**/download") as response_info:
-            user.locate(file.DOWNLOAD_LINK).click()
+    with (
+        user.page.expect_download() as download_info,
+        user.page.expect_response("**/download") as response_info,
+    ):
+        user.locate(file.DOWNLOAD_LINK).click()
 
     download = download_info.value
     response = response_info.value

@@ -1,5 +1,6 @@
 """Bounded action results, diagnostics, and created-entity bookkeeping."""
 
+from contextlib import suppress
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 
@@ -221,10 +222,8 @@ def _entity_result(entity, parent=None):
                     },
                     level="warning",
                 )
-    try:
+    with suppress(Exception):
         result["url"] = entity.url
-    except Exception:
-        pass
     return result
 
 

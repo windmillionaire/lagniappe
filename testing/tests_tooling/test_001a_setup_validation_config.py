@@ -2633,26 +2633,30 @@ def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
     )
 
     adc_path.write_text(previous_credentials, encoding="utf-8")
-    with pytest.raises(RuntimeError, match="lacks project permissions"):
-        with credentials._adc_auth_transaction() as transaction:
-            credentials._run_adc_login(
-                "selected@example.com",
-                "selected-project-1",
-                transaction=transaction,
-            )
-            create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
+    with (
+        pytest.raises(RuntimeError, match="lacks project permissions"),
+        credentials._adc_auth_transaction() as transaction,
+    ):
+        credentials._run_adc_login(
+            "selected@example.com",
+            "selected-project-1",
+            transaction=transaction,
+        )
+        create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
     assert adc_path.read_text(encoding="utf-8") == previous_credentials
     assert "restored the Application Default Credentials" in capsys.readouterr().out
 
     adc_path.unlink()
-    with pytest.raises(RuntimeError, match="lacks project permissions"):
-        with credentials._adc_auth_transaction() as transaction:
-            credentials._run_adc_login(
-                "selected@example.com",
-                "selected-project-1",
-                transaction=transaction,
-            )
-            create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
+    with (
+        pytest.raises(RuntimeError, match="lacks project permissions"),
+        credentials._adc_auth_transaction() as transaction,
+    ):
+        credentials._run_adc_login(
+            "selected@example.com",
+            "selected-project-1",
+            transaction=transaction,
+        )
+        create_config._confirm_operator_permissions("selected-project-1", transaction=transaction)
     assert not adc_path.exists()
     assert "next setup run will reopen authentication" in capsys.readouterr().out
 
@@ -2683,13 +2687,15 @@ def test_adc_transaction_rolls_back_uncommitted_interruption(tmp_path, failure, 
     previous = '{"principal":"prior@example.test"}\n'
     if prior:
         path.write_text(previous)
-    with pytest.raises(failure):
-        with credentials._adc_auth_transaction(path) as transaction:
-            transaction.capture()
-            path.write_text('{"principal":"unconfirmed@example.test"}')
-            # Multiple browser attempts must retain the original snapshot.
-            transaction.capture()
-            raise failure()
+    with (
+        pytest.raises(failure),
+        credentials._adc_auth_transaction(path) as transaction,
+    ):
+        transaction.capture()
+        path.write_text('{"principal":"unconfirmed@example.test"}')
+        # Multiple browser attempts must retain the original snapshot.
+        transaction.capture()
+        raise failure()
     if prior:
         assert path.read_text() == previous
         if sys.platform != "win32":
@@ -2707,12 +2713,14 @@ def test_adc_transaction_rejects_existing_credentials_and_keeps_committed_identi
     assert not path.exists()
 
     path.write_text("previous ADC")
-    with pytest.raises(SetupCancelled):
-        with credentials._adc_auth_transaction(path) as transaction:
-            transaction.capture()
-            path.write_text("confirmed ADC")
-            transaction.commit()
-            raise SetupCancelled()
+    with (
+        pytest.raises(SetupCancelled),
+        credentials._adc_auth_transaction(path) as transaction,
+    ):
+        transaction.capture()
+        path.write_text("confirmed ADC")
+        transaction.commit()
+        raise SetupCancelled()
     assert path.read_text() == "confirmed ADC"
 
 

@@ -217,7 +217,7 @@ def status(key, task_key, **kwargs):
     model = _project_model(project, task_key)
     if not model:
         return responses.not_found("Model task not found")
-    completed = True if request.args.get("completed") == "true" else False
+    completed = request.args.get("completed") == "true"
     filter = _status_filter(project, model, completed)
 
     db = database_get.tasks(

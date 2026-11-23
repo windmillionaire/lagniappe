@@ -1,6 +1,6 @@
 """Bounded text extraction for Office Open XML files."""
 
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
@@ -373,24 +373,18 @@ def _content_source(content, budget):
         content.seek(0)
     except (AttributeError, OSError, TypeError, ValueError):
         if original_position is not None:
-            try:
+            with suppress(AttributeError, OSError, TypeError, ValueError):
                 content.seek(original_position)
-            except (AttributeError, OSError, TypeError, ValueError):
-                pass
     else:
         if size < 0 or size > policy.compressed_bytes:
-            try:
+            with suppress(AttributeError, OSError, TypeError, ValueError):
                 content.seek(original_position)
-            except (AttributeError, OSError, TypeError, ValueError):
-                pass
             raise _OOXMLPolicyError("Compressed OOXML input exceeds its byte limit.")
         try:
             yield content, size
         finally:
-            try:
+            with suppress(AttributeError, OSError, TypeError, ValueError):
                 content.seek(original_position)
-            except (AttributeError, OSError, TypeError, ValueError):
-                pass
         return
 
     with tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_BYTES, mode="w+b") as spool:
@@ -1006,10 +1000,8 @@ class _WorksheetHandler:
                 raise _OOXMLPolicyError("OOXML row exceeds the Excel column limit.")
         value = cell.inline.text if cell.cell_type == "inlineStr" else cell.value.text
         if cell.cell_type == "s" and value:
-            try:
+            with suppress(ValueError, IndexError):
                 value = self.shared_strings[int(value)]
-            except (ValueError, IndexError):
-                pass
         self.row_values[index] = value
         self.row_length = max(self.row_length, index + 1)
         self.cell = None

@@ -275,7 +275,7 @@ class HasSignature(FilterMixin, Property):
         field = self.signature_field
         if not field:
             return None
-        return True if field.value else False
+        return bool(field.value)
 
     @property
     def filter_value(self):
@@ -322,7 +322,7 @@ class HasStatus(FilterMixin, Property):
         field = self.status_field
         if not field:
             return None
-        return True if field.value else False
+        return bool(field.value)
 
     @property
     def filter_value(self):

@@ -216,7 +216,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
 
     @property
     def is_entity_valued(self):
-        return True if self["location"] == "in" else False
+        return self["location"] == "in"
 
     @property
     def index(self):

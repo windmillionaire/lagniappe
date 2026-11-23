@@ -3327,7 +3327,7 @@ def test_server_presents_matching_schemas_and_values_for_each_protocol(
     original_definitions = deepcopy(definitions)
 
     protocol = "2025-11-25" if mode == "legacy" else "2026-07-28"
-    for name, definition in definitions.items():
+    for definition in definitions.values():
         tool = definition.as_mcp_tool(protocol)
         raw_schema, raw_value = cases[tool.name]
         wrapped = mode == "legacy" and raw_schema.get("type") != "object"

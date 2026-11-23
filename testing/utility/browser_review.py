@@ -442,10 +442,7 @@ def render_command(args: argparse.Namespace) -> int:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     spec.setdefault("generated_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    if args.output:
-        output_path = Path(args.output)
-    else:
-        output_path = report_dir / "index.html"
+    output_path = Path(args.output) if args.output else report_dir / "index.html"
 
     output_path.write_text(
         render_report(spec, report_dir),

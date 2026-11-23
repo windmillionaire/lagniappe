@@ -367,11 +367,14 @@ def inspect_frontend_build(
         issues,
         "Frontend service worker",
     )
-    if service_worker is not None and isinstance(build_id, str):
-        if build_id.encode() not in service_worker:
-            issues.append(
-                "Frontend service worker does not contain the current build ID."
-            )
+    if (
+        service_worker is not None
+        and isinstance(build_id, str)
+        and build_id.encode() not in service_worker
+    ):
+        issues.append(
+            "Frontend service worker does not contain the current build ID."
+        )
 
     validation = None
     if not issues:

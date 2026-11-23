@@ -50,7 +50,7 @@ class Email(ColumnMixin, DBProperty):
 
     @property
     def sort_value(self):
-        return True if self.value else False
+        return bool(self.value)
 
 
 # @testable true
@@ -213,7 +213,7 @@ class IsOwner(DBProperty):
         )
         validated_email = getattr(self, "_validated_owner_email", "")
         return bool(
-            stored and email and (email == owner_email or email == validated_email)
+            stored and email and (email in (owner_email, validated_email))
         )
 
     @value.setter

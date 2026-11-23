@@ -35,7 +35,7 @@ def test_page_url_tab_overrides_saved_tab(get_admin, get_user):
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
-    Tabs(user).document
+    _ = Tabs(user).document
 
     user.go(page, query_params={"tab": "tasks"})
 
@@ -103,7 +103,7 @@ def test_clear_page_info_form_selector_keeps_widget_stable(get_admin, get_user):
 
 
 def _open_document_settings(user, page):
-    Tabs(user).document
+    _ = Tabs(user).document
     settings = user.locate(page.DOCUMENT_SETTINGS_FORM)
     if not settings.is_visible():
         user.locate(page.DOCUMENT_SETTINGS_TOGGLE).click()

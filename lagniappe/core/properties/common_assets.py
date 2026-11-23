@@ -173,7 +173,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @matrix page project : filter-value
     @property
     def filter_value(self):
-        return True if self.entity.get_asset(self.id) else False
+        return bool(self.entity.get_asset(self.id))
 
     @property
     def filter_kind(self):

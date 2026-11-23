@@ -1,5 +1,6 @@
 """Creator-owned report history deletion and upload cleanup."""
 
+from contextlib import suppress
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
@@ -24,10 +25,9 @@ def delete_report_record(report):
         files_to_delete = [file for file in report.input_files if not file.has_references and not _other_report_references(file, report)]
         outcome = external_operations.delete_plan_if_idle(report, snapshot, report, *files_to_delete)
         if outcome == agent_api_store.PLAN_OPERATION_COMMITTED:
-            try:
+            # Obsolete payloads cannot prevent deletion of the report.
+            with suppress(ValueError, TypeError, AttributeError, KeyError):
                 report_uploads.cleanup_report_upload_manifest(report)
-            except (ValueError, TypeError, AttributeError, KeyError):
-                pass  # Obsolete payloads cannot prevent deletion of the report.
         return outcome
     if migration_pending(report):
         return agent_api_store.PLAN_OPERATION_BUSY

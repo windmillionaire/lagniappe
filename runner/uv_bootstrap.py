@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 import argparse
 from dataclasses import dataclass
 import hashlib
@@ -711,12 +712,10 @@ def install_uv(
         try:
             directory_descriptor = os.open(destination.parent, os.O_RDONLY)
             try:
-                try:
+                # Some supported filesystems do not permit directory fsync;
+                # os.replace has already provided the atomic boundary.
+                with suppress(OSError):
                     os.fsync(directory_descriptor)
-                except OSError:
-                    # Some supported filesystems do not permit directory fsync;
-                    # os.replace has already provided the atomic boundary.
-                    pass
             finally:
                 os.close(directory_descriptor)
         except OSError:

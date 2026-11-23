@@ -1044,7 +1044,7 @@ def test_property_getattribute_wraps_descriptor_attribute_error():
     prop = BrokenProperty(entity=entity, user=object())
 
     with pytest.raises(PropertyError) as error:
-        prop.fragile
+        _ = prop.fragile
 
     assert error.value.entity is entity
     assert isinstance(error.value.__cause__, AttributeError)
@@ -1075,7 +1075,7 @@ def test_site_lazy_properties_database_key_and_error_context():
         assert site.db == site_db
 
         with pytest.raises(PropertyError) as error:
-            site.broken
+            _ = site.broken
 
     assert error.value.entity is site
     assert isinstance(error.value.__cause__, RuntimeError)
